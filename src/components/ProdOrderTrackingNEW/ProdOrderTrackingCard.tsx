@@ -1,5 +1,6 @@
 import AppAlert from '@/common/utils/appAlert';
 
+import { crlimtreq_styles } from '@/common/Style';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
@@ -36,19 +37,23 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const { width: screenWidth } = useWindowDimensions();
 
-    // 1 → phone | 2 → tablet | 3 → laptop | 4 → wide desktop
-    const numColumns =
-        screenWidth >= 1400 ? 4 :
-            screenWidth >= 1000 ? 3 :
-                screenWidth >= 700 ? 2 :
-                    1;
+    const { width } = useWindowDimensions();
 
-    const GRID_PAD = 12;
-    const GRID_GAP = 12;
+    const getColumns = () => {
+        if (width < 600) return 1;      // mobile
+        if (width < 1000) return 2;     // tablet
+        return 3;                       // web / large
+    };
+
+    const numColumns = getColumns();
+
+    // Explicit item width so the last row doesn't stretch weirdly
+    const GRID_PAD = 10;
+    const GRID_GAP = 10;
     const gridItemWidth =
         numColumns > 1
-            ? (screenWidth - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : screenWidth;
+            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
+            : width;
 
     // useEffect(() => {
     //     if (!searchQueryPOT.trim()) {
@@ -402,30 +407,32 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
 
 
     const renderCard = ({ item }: { item: any }) => (
-        <TouchableOpacity style={styles.card}>
-            <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.dsnname}</Text>
-                <TouchableOpacity onPress={() => handleCardPress(item)}>
-                    {isStageLoading && selectedCardId === item.uid ? (
-                        <ActivityIndicator size={21} color="rgb(86, 156, 214)" />
-                    ) : (
-                        <Icon name="info" size={20} color="rgb(86, 156, 214)" />
-                    )}
-                </TouchableOpacity>
-            </View>
-            <View style={styles.cardBody}>
-                {Object.entries(labelMap).map(([key, config]) => {
-                    if (config.hide) return null;
-                    return (
-                        <View key={key} style={styles.cardRow}>
-                            <Text style={styles.cardLabel}>{config.label}:</Text>
-                            <Text style={styles.cardValue}>{item[key]}</Text>
-                        </View>
-                    );
-                })}
-                {renderQuantityGraph(item)}
-            </View>
-        </TouchableOpacity>
+        <View style={crlimtreq_styles.gridCardWrapper}>
+            <TouchableOpacity style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>{item.dsnname}</Text>
+                    <TouchableOpacity onPress={() => handleCardPress(item)}>
+                        {isStageLoading && selectedCardId === item.uid ? (
+                            <ActivityIndicator size={21} color="rgb(86, 156, 214)" />
+                        ) : (
+                            <Icon name="info" size={20} color="rgb(86, 156, 214)" />
+                        )}
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.cardBody}>
+                    {Object.entries(labelMap).map(([key, config]) => {
+                        if (config.hide) return null;
+                        return (
+                            <View key={key} style={styles.cardRow}>
+                                <Text style={styles.cardLabel}>{config.label}:</Text>
+                                <Text style={styles.cardValue}>{item[key]}</Text>
+                            </View>
+                        );
+                    })}
+                    {renderQuantityGraph(item)}
+                </View>
+            </TouchableOpacity>
+        </View>
     );
 
     return (
@@ -434,28 +441,10 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
                 key={`pot-grid-${numColumns}`}
                 data={allData}
                 numColumns={numColumns}
-                {...(numColumns > 1
-                    ? {
-                        columnWrapperStyle: {
-                            gap: GRID_GAP,
-                            paddingHorizontal: GRID_PAD,
-                        },
-                    }
-                    : {})}
                 style={{ flex: 1 }}
-                renderItem={({ item }) => (
-                    <View
-                        style={{
-                            width: numColumns > 1 ? gridItemWidth : undefined,
-                            flex: numColumns === 1 ? 1 : undefined,
-                            marginBottom: 12,
-                        }}
-                    >
-                        {renderCard({ item })}
-                    </View>
-                )}
+                renderItem={({ item }) => renderCard({ item })}
                 keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
+                contentContainerStyle={crlimtreq_styles.list}
                 onEndReached={loadMoreData}
                 onEndReachedThreshold={0.3}
                 ListEmptyComponent={

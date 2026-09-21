@@ -1,5 +1,6 @@
 import AppAlert from '@/common/utils/appAlert';
 /* CollectionCard.tsx — left-swipe preview + label-value single-line + full remark display */
+import { crlimtreq_styles } from '@/common/Style';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -57,21 +58,24 @@ const CollectionCard: React.FC<{
     const PAGE_SIZE = 5;
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     // 
+    const { width } = useWindowDimensions();
     const { width: screenWidth } = useWindowDimensions();
 
-    // 1 → phone | 2 → tablet | 3 → small desktop | 4 → wide desktop
-    const numColumns =
-        screenWidth >= 1400 ? 4 :
-            screenWidth >= 1000 ? 3 :
-                screenWidth >= 700 ? 2 :
-                    1;
+    const getColumns = () => {
+        if (width < 600) return 1;      // mobile
+        if (width < 1000) return 2;     // tablet
+        return 3;                       // web / large
+    };
 
-    const GRID_PAD = 12;
-    const GRID_GAP = 12;
+    const numColumns = getColumns();
+
+    // Explicit item width so the last row doesn't stretch weirdly
+    const GRID_PAD = 10;
+    const GRID_GAP = 10;
     const gridItemWidth =
         numColumns > 1
-            ? (screenWidth - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : screenWidth;
+            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
+            : width;
 
 
     useEffect(() => {
@@ -545,162 +549,163 @@ const CollectionCard: React.FC<{
         // State for collapsible adjustment details
 
         return (
-            <Swipeable
-                renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
-                containerStyle={{ borderRadius: 12, overflow: 'hidden' }}
-            >
-                <View style={[styles.card, isAuth === '1' && styles.cardAuth, isOutdated && styles.cardOutdated]}>
-                    {/* Header: Title + Status + Actions */}
-                    <View style={styles.cardHeader}>
-                        <View style={styles.headerLeft}>
-                            <Text numberOfLines={1} style={styles.title}>{title}</Text>
-                            <Text numberOfLines={2} style={styles.subtitle}>
-                                {prp}{bank ? ` • ${bank}` : ''}{br ? ` • ${br}` : ''}
-                            </Text>
-                        </View>
-                        <View style={styles.headerRight}>
-                            {showCardActions && (
-                                <>
-                                    <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton}>
-                                        <Icon name="edit" size={18} color={theme.BRAND_ACCENT} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            AppAlert.alert('Delete', 'Are you sure?', [
-                                                { text: 'Cancel', style: 'cancel' },
-                                                { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(item) },
-                                            ]);
-                                        }}
-                                        style={styles.iconButton}
-                                    >
-                                        <Icon name="delete" size={18} color="#e53935" />
-                                    </TouchableOpacity>
-                                </>
-                            )}
-                            <View style={[styles.pill, isAuth === '1' ? styles.pillAuth : styles.pillPending]}>
-                                <Text style={styles.pillText}>{isAuth === '1' ? 'Authorized' : 'Pending'}</Text>
+            <View style={crlimtreq_styles.gridCardWrapper}>
+                <Swipeable
+                    renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
+                    containerStyle={{ borderRadius: 12, overflow: 'hidden' }}
+                >
+                    <View style={[styles.card, isAuth === '1' && styles.cardAuth, isOutdated && styles.cardOutdated]}>
+                        {/* Header: Title + Status + Actions */}
+                        <View style={styles.cardHeader}>
+                            <View style={styles.headerLeft}>
+                                <Text numberOfLines={1} style={styles.title}>{title}</Text>
+                                <Text numberOfLines={2} style={styles.subtitle}>
+                                    {prp}{bank ? ` • ${bank}` : ''}{br ? ` • ${br}` : ''}
+                                </Text>
                             </View>
-                        </View>
-                    </View>
-
-                    {/* Cheque Details (Full Width) */}
-                    <View style={styles.chequeDetails}>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Collection Date:</Text>
-                            <Text style={[styles.detailValue, isOutdated && styles.outdatedText]}>{collection}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Cheque No:</Text>
-                            <Text style={styles.detailValue}>{chqNo}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Cheque Date:</Text>
-                            <Text style={styles.detailValue}>{chqDate}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Amount:</Text>
-                            <Text style={[styles.detailValue, styles.amount]}>₹ {amountDisplay}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>TDS Amount:</Text>
-                            <Text style={[styles.detailValue, styles.amount]}>₹ {tDSAmt}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Discount Amount:</Text>
-                            <Text style={[styles.detailValue, styles.amount]}>₹ {disAmt}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Remark:</Text>
-                            <Text style={[styles.detailValue, { flex: 1 }]} numberOfLines={2}>
-                                {remark || '-'}
-                            </Text>
-                        </View>
-                        <>
-                            <View style={styles.detailRow}>
-                                <View style={styles.warningRow1}>
-                                    <Icon name="person" size={14} color="rgba(24, 161, 134, 0.87)" style={styles.warningIcon} />
-                                    <Text style={styles.warningText1}>{userName}</Text>
-                                </View>
-                                {isOutdated && (
-                                    <View style={styles.warningRow}>
-                                        <Icon name="warning" size={14} color="rgba(255, 67, 19, 0.87)" style={styles.warningIcon} />
-                                        <Text style={styles.warningText}>Past collection</Text>
-                                    </View>
+                            <View style={styles.headerRight}>
+                                {showCardActions && (
+                                    <>
+                                        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton}>
+                                            <Icon name="edit" size={18} color={theme.BRAND_ACCENT} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                AppAlert.alert('Delete', 'Are you sure?', [
+                                                    { text: 'Cancel', style: 'cancel' },
+                                                    { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(item) },
+                                                ]);
+                                            }}
+                                            style={styles.iconButton}
+                                        >
+                                            <Icon name="delete" size={18} color="#e53935" />
+                                        </TouchableOpacity>
+                                    </>
                                 )}
-
+                                <View style={[styles.pill, isAuth === '1' ? styles.pillAuth : styles.pillPending]}>
+                                    <Text style={styles.pillText}>{isAuth === '1' ? 'Authorized' : 'Pending'}</Text>
+                                </View>
                             </View>
-                        </>
+                        </View>
+
+                        {/* Cheque Details (Full Width) */}
+                        <View style={styles.chequeDetails}>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Collection Date:</Text>
+                                <Text style={[styles.detailValue, isOutdated && styles.outdatedText]}>{collection}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Cheque No:</Text>
+                                <Text style={styles.detailValue}>{chqNo}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Cheque Date:</Text>
+                                <Text style={styles.detailValue}>{chqDate}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Amount:</Text>
+                                <Text style={[styles.detailValue, styles.amount]}>₹ {amountDisplay}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>TDS Amount:</Text>
+                                <Text style={[styles.detailValue, styles.amount]}>₹ {tDSAmt}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Discount Amount:</Text>
+                                <Text style={[styles.detailValue, styles.amount]}>₹ {disAmt}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Remark:</Text>
+                                <Text style={[styles.detailValue, { flex: 1 }]} numberOfLines={2}>
+                                    {remark || '-'}
+                                </Text>
+                            </View>
+                            <>
+                                <View style={styles.detailRow}>
+                                    <View style={styles.warningRow1}>
+                                        <Icon name="person" size={14} color="rgba(24, 161, 134, 0.87)" style={styles.warningIcon} />
+                                        <Text style={styles.warningText1}>{userName}</Text>
+                                    </View>
+                                    {isOutdated && (
+                                        <View style={styles.warningRow}>
+                                            <Icon name="warning" size={14} color="rgba(255, 67, 19, 0.87)" style={styles.warningIcon} />
+                                            <Text style={styles.warningText}>Past collection</Text>
+                                        </View>
+                                    )}
+
+                                </View>
+                            </>
+                        </View>
+
+                        {/* View Cheque Button (Replaces Image Thumbnail) */}
+                        {attachUrl && (<>
+                            <TouchableOpacity
+                                onPress={() => attachUrl ? setImageModalUrl(attachUrl) : AppAlert.alert('No Image', 'No cheque image available.')}
+                                style={[styles.viewChequeButton, !attachUrl && styles.viewChequeButtonDisabled]}
+                            >
+                                <Icon name="receipt" size={18} color={attachUrl ? theme.BRAND_ACCENT : theme.TEXT_SECONDARY} />
+                                <Text style={[styles.viewChequeText, !attachUrl && styles.viewChequeTextDisabled]}>
+                                    {attachUrl ? 'View Cheque' : 'No Cheque Image'}
+                                </Text>
+                            </TouchableOpacity>
+                        </>)}
+
+                        {showCardActions && canShowAuthorize && (
+                            <TouchableOpacity
+                                onPress={() => openAuthModal(item)}
+                                style={styles.authorizeButton}
+                            >
+                                <Icon name="check-circle" size={18} color="#fff" />
+                                <Text style={styles.authorizeButtonText}>Authorize</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Adjustment Details (Full Width, Collapsible) */}
+                        {d1rows.length > 0 && (
+                            <View style={styles.adjustmentContainer}>
+                                <TouchableOpacity
+                                    style={styles.adjustmentHeader}
+                                    onPress={() => setDetailsExpanded(!detailsExpanded)}
+                                >
+                                    <Text style={styles.adjustmentTitle}>Adjustment Details ({d1rows.length})</Text>
+                                    <Icon
+                                        name={detailsExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                                        size={20}
+                                        color={theme.BRAND_DARK}
+                                    />
+                                </TouchableOpacity>
+                                {detailsExpanded && (
+                                    <>
+                                        {d1rows.map((r, i) => {
+                                            const billDate = formatDate(r.BillDate ?? r.NBillDate ?? r.nBillDate ?? r.NVOUDATE ?? r.NVOUDATE);
+                                            const billNo = safe(r.BillNo ?? r.BILLNO ?? r.BillNo ?? '');
+                                            const setAmt = safe(r.SetAmt ?? r.BALAMT1 ?? r.SetAmt ?? r.SETAMT ?? '');
+                                            return (
+                                                <View key={i} style={styles.adjustmentRow}>
+                                                    <View style={styles.adjustmentLeft}>
+                                                        <Text style={styles.adjustmentLabel}>{billNo || '-'}</Text>
+                                                        <Text style={styles.adjustmentDate}>{billDate || '-'}</Text>
+                                                    </View>
+                                                    <Text style={[styles.adjustmentAmount, styles.amount]}>
+                                                        ₹ {formatAmountDisplay(setAmt)}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                        <View style={styles.adjustmentTotalRow}>
+                                            <Text style={styles.adjustmentTotalLabel}>Total Adjustments:</Text>
+                                            <Text style={[styles.adjustmentTotalAmount, styles.amount]}>
+                                                ₹ {formatAmountDisplay(d1rows.reduce((sum, r) => sum + parseAmount(r.SetAmt ?? r.BALAMT1 ?? 0), 0))}
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        )}
                     </View>
 
-                    {/* View Cheque Button (Replaces Image Thumbnail) */}
-                    {attachUrl && (<>
-                        <TouchableOpacity
-                            onPress={() => attachUrl ? setImageModalUrl(attachUrl) : AppAlert.alert('No Image', 'No cheque image available.')}
-                            style={[styles.viewChequeButton, !attachUrl && styles.viewChequeButtonDisabled]}
-                        >
-                            <Icon name="receipt" size={18} color={attachUrl ? theme.BRAND_ACCENT : theme.TEXT_SECONDARY} />
-                            <Text style={[styles.viewChequeText, !attachUrl && styles.viewChequeTextDisabled]}>
-                                {attachUrl ? 'View Cheque' : 'No Cheque Image'}
-                            </Text>
-                        </TouchableOpacity>
-                    </>)}
-
-                    {showCardActions && canShowAuthorize && (
-                        <TouchableOpacity
-                            onPress={() => openAuthModal(item)}
-                            style={styles.authorizeButton}
-                        >
-                            <Icon name="check-circle" size={18} color="#fff" />
-                            <Text style={styles.authorizeButtonText}>Authorize</Text>
-                        </TouchableOpacity>
-                    )}
-
-                    {/* Adjustment Details (Full Width, Collapsible) */}
-                    {d1rows.length > 0 && (
-                        <View style={styles.adjustmentContainer}>
-                            <TouchableOpacity
-                                style={styles.adjustmentHeader}
-                                onPress={() => setDetailsExpanded(!detailsExpanded)}
-                            >
-                                <Text style={styles.adjustmentTitle}>Adjustment Details ({d1rows.length})</Text>
-                                <Icon
-                                    name={detailsExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                    size={20}
-                                    color={theme.BRAND_DARK}
-                                />
-                            </TouchableOpacity>
-                            {detailsExpanded && (
-                                <>
-                                    {d1rows.map((r, i) => {
-                                        const billDate = formatDate(r.BillDate ?? r.NBillDate ?? r.nBillDate ?? r.NVOUDATE ?? r.NVOUDATE);
-                                        const billNo = safe(r.BillNo ?? r.BILLNO ?? r.BillNo ?? '');
-                                        const setAmt = safe(r.SetAmt ?? r.BALAMT1 ?? r.SetAmt ?? r.SETAMT ?? '');
-                                        return (
-                                            <View key={i} style={styles.adjustmentRow}>
-                                                <View style={styles.adjustmentLeft}>
-                                                    <Text style={styles.adjustmentLabel}>{billNo || '-'}</Text>
-                                                    <Text style={styles.adjustmentDate}>{billDate || '-'}</Text>
-                                                </View>
-                                                <Text style={[styles.adjustmentAmount, styles.amount]}>
-                                                    ₹ {formatAmountDisplay(setAmt)}
-                                                </Text>
-                                            </View>
-                                        );
-                                    })}
-                                    <View style={styles.adjustmentTotalRow}>
-                                        <Text style={styles.adjustmentTotalLabel}>Total Adjustments:</Text>
-                                        <Text style={[styles.adjustmentTotalAmount, styles.amount]}>
-                                            ₹ {formatAmountDisplay(d1rows.reduce((sum, r) => sum + parseAmount(r.SetAmt ?? r.BALAMT1 ?? 0), 0))}
-                                        </Text>
-                                    </View>
-                                </>
-                            )}
-                        </View>
-                    )}
-                </View>
-
-                {/* Authorize Button (Full Width) */}
-                {/* {showCardActions && canShowAuthorize && (
+                    {/* Authorize Button (Full Width) */}
+                    {/* {showCardActions && canShowAuthorize && (
                     <TouchableOpacity
                         onPress={() => openAuthModal(item)}
                         style={styles.authorizeButton}
@@ -710,7 +715,8 @@ const CollectionCard: React.FC<{
                     </TouchableOpacity>
                 )} */}
 
-            </Swipeable >
+                </Swipeable >
+            </View>
         );
     };
 
@@ -811,29 +817,10 @@ const CollectionCard: React.FC<{
                     key={`collection-grid-${numColumns}`}   /* 👈 force remount on col change */
                     data={visibleData}
                     numColumns={numColumns}
-                    {...(numColumns > 1
-                        ? {
-                            columnWrapperStyle: {
-                                gap: GRID_GAP,
-                                paddingHorizontal: GRID_PAD,
-                            },
-                        }
-                        : {})}
                     style={{ flex: 1 }}
-                    renderItem={({ item }) => (
-                        <View
-                            style={{
-                                width: numColumns > 1 ? gridItemWidth : undefined,
-                                flex: numColumns === 1 ? 1 : undefined,
-                                marginBottom: 12,
-                                marginHorizontal: numColumns === 1 ? 12 : 0,
-                            }}
-                        >
-                            {renderItem({ item })}
-                        </View>
-                    )}
+                    renderItem={({ item }) => renderItem({ item })}
                     keyExtractor={(i, idx) => safe(i?.UId ?? i?.uid ?? idx)}
-                    contentContainerStyle={{ paddingBottom: 140, paddingTop: 4 }}
+                    contentContainerStyle={crlimtreq_styles.list}
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Text style={styles.emptyText}>No records</Text>

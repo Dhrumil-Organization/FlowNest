@@ -85,46 +85,46 @@ registerPermissionArea({
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
         },
-        // {
-        //   key: 'daily_collection_report',
-        //   name: 'Daily Collection Report',
-        //   type: 'screen',
-        //   displayOrder: 70,
-        //   actions: [{ key: 'view', name: 'View' }],
-        // },
         {
           key: 'daily_payment_report',
           name: 'Daily Payment Report',
           type: 'screen',
-          displayOrder: 70,
+          displayOrder: 80,
           actions: [{ key: 'view', name: 'View' }],
         },
         {
           key: 'daily_collection_report_new',
           name: 'Daily Payment Report',
           type: 'screen',
-          displayOrder: 70,
+          displayOrder: 90,
           actions: [{ key: 'view', name: 'View' }],
         },
         {
           key: 'snapview',
           name: 'Snap View',
           type: 'screen',
-          displayOrder: 70,
+          displayOrder: 100,
           actions: [{ key: 'view', name: 'View' }],
         },
         {
           key: 'sales_order',
           name: 'Sales Order',
           type: 'screen',
-          displayOrder: 70,
+          displayOrder: 110,
           actions: [{ key: 'view', name: 'View' }],
         },
         {
           key: 'collection',
           name: 'Collection',
           type: 'screen',
-          displayOrder: 70,
+          displayOrder: 120,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+        {
+          key: 'sales_order_tracking',
+          name: 'Sales Order Tracking',
+          type: 'screen',
+          displayOrder: 130,
           actions: [{ key: 'view', name: 'View' }],
         },
         // {
@@ -215,7 +215,7 @@ registerUiNodes([
     action: 'view',
     route: 'purchase-order',
     icon: 'attach-money',
-    order: 110,
+    order: 120,
   },
   {
     id: 'screen.purchase_order',
@@ -223,7 +223,7 @@ registerUiNodes([
     title: 'Purchase Order',
     permission: 'production.purchase_order',
     action: 'view',
-    order: 110,
+    order: 120,
   },
   // Daily Collection Report
   {
@@ -234,7 +234,7 @@ registerUiNodes([
     action: 'view',
     route: 'daily-report',
     icon: 'collections-bookmark',
-    order: 110,
+    order: 130,
   },
   {
     id: 'screen.daily_collection_report_new',
@@ -242,7 +242,7 @@ registerUiNodes([
     title: 'Daily Collection Report',
     permission: 'production.daily_collection_report_new',
     action: 'view',
-    order: 110,
+    order: 130,
   },
   // Daily Payment Report
   {
@@ -253,7 +253,7 @@ registerUiNodes([
     action: 'view',
     route: 'daily-payment-report',
     icon: 'payments',
-    order: 110,
+    order: 140,
   },
   {
     id: 'screen.daily_payment_report',
@@ -261,7 +261,7 @@ registerUiNodes([
     title: 'Daily Payment Report',
     permission: 'production.daily_payment_report',
     action: 'view',
-    order: 110,
+    order: 140,
   },
   // Snap View
   {
@@ -272,7 +272,7 @@ registerUiNodes([
     action: 'view',
     route: 'snapview',
     icon: 'table-view',
-    order: 110,
+    order: 150,
   },
   {
     id: 'screen.snapview',
@@ -280,7 +280,7 @@ registerUiNodes([
     title: 'Snap View',
     permission: 'production.snapview',
     action: 'view',
-    order: 110,
+    order: 150,
   },
   // 
   {
@@ -291,7 +291,7 @@ registerUiNodes([
     action: 'view',
     route: 'sales-order',
     icon: 'point-of-sale',
-    order: 110,
+    order: 160,
   },
   {
     id: 'screen.sales_order',
@@ -299,7 +299,7 @@ registerUiNodes([
     title: 'Sales Order',
     permission: 'production.sales_order',
     action: 'view',
-    order: 110,
+    order: 160,
   },
   // Collection
   {
@@ -310,7 +310,7 @@ registerUiNodes([
     action: 'view',
     route: 'collection',
     icon: 'currency-rupee',
-    order: 110,
+    order: 170,
   },
   {
     id: 'screen.collection',
@@ -318,8 +318,26 @@ registerUiNodes([
     title: 'Collection',
     permission: 'production.collection',
     action: 'view',
-    order: 110,
+    order: 170,
   },
+  // {
+  //   id: 'nav.sales_order_tracking',
+  //   kind: 'navigation',
+  //   title: 'Sales Order Tracking',
+  //   permission: 'production.sales_order_tracking',
+  //   action: 'view',
+  //   route: 'sales-tracking',
+  //   icon: 'track-changes',
+  //   order: 180,
+  // },
+  // {
+  //   id: 'screen.sales_order_tracking',
+  //   kind: 'screen',
+  //   title: 'Sales Order Tracking',
+  //   permission: 'production.sales_order_tracking',
+  //   action: 'view',
+  //   order: 180,
+  // },
   // {
   //   id: 'nav.payable',
   //   kind: 'navigation',

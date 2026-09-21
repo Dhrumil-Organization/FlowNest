@@ -11,7 +11,7 @@ import SearchablePickerModal, {
 import SearchableMultiSelectModal, {
   SearchableMultiSelectOption,
 } from '../../components/SearchableMultiSelectModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchPropertyData } from '../../api/legacyFunctions';
 import { useBusinessContext } from '../../core/business';
 import { usePermission } from '../../core/permissions';
@@ -174,6 +174,7 @@ export default function GreyPackingScannerScreen() {
     // strCode,
     isReady } = useBusinessContext();
   const user = useAppSessionStore((s) => s.user);
+  const token = useAppSessionStore((s) => s.token);
   const { canDo } = usePermission();
 
   const canStart = canDo('grey_packing', 'add');
@@ -318,10 +319,10 @@ export default function GreyPackingScannerScreen() {
       setPropertyLoading(true);
       try {
         const storedCode = await AsyncStorage.getItem('selected_prpcode');
-        // The app stores the login token in AsyncStorage as `access_token`.
-        // AppSessionStore.user does not reliably contain the token, so use the
-        // same token source used by the other mobile routes.
+        // Prefer the hydrated session token. compatibleStorage is the
+        // persisted fallback used by AppSessionStore across browser refreshes.
         const authToken = String(
+          token ||
           (await AsyncStorage.getItem('access_token')) ||
           (user as any)?.token ||
           (user as any)?.access_token ||
@@ -2162,6 +2163,7 @@ export default function GreyPackingScannerScreen() {
           setPropertyLoading(true);
           try {
             const authToken = String(
+              token ||
               (await AsyncStorage.getItem('access_token')) ||
               (user as any)?.token ||
               (user as any)?.access_token ||

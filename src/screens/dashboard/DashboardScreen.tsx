@@ -332,23 +332,6 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                 </View>
               </DashboardSection> */}
             {/* )} */}
-            {view === 'owner' && (
-              <ExpenseDashboardCard
-                token={getToken?.token || ''}
-                prptype={getToken?.getUserPrptype || ''}
-                yearno={getCurrentFinancialYear()}
-                monthno={new Date().getMonth() + 1}
-                isConnected={true}
-                onPress={expenseData => {
-                  // Optional future detail navigation:
-                  // navigation.navigate('Expense Dashboard', { initialData: expenseData });
-                  // Navigate to Expense scree
-                  router.push({ pathname: '/new/(tabs)/reports/expense', params: { view } } as any);
-                }}
-              />
-            )}
-
-
             <RegistryRenderer
               kind="dashboard-card"
               parentId="screen.dashboard"
@@ -378,6 +361,22 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                     onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
                   />
                 ),
+                'dashboard.costing_summary': () =>
+                  view === 'owner' ? (
+                    <ExpenseDashboardCard
+                      token={getToken?.token || ''}
+                      prptype={getToken?.getUserPrptype || ''}
+                      yearno={getCurrentFinancialYear()}
+                      monthno={new Date().getMonth() + 1}
+                      isConnected={true}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/new/(tabs)/reports/expense',
+                          params: { view },
+                        } as any)
+                      }
+                    />
+                  ) : null,
                 'dashboard.monthly_report': () => (
                   <MonthlyReportCard
                     label={periodLabel}

@@ -131,9 +131,8 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
       };
 
       const res = await axios.post(`${API}/api/getcartondetail`, payload, getRequestConfig());
-      console.log("Assign data response",res);
+
       const rows = res?.data?.response?.data || res?.data?.response?.results || [];
-      console.log("Assign data rows",rows);
       setCartons(Array.isArray(rows) ? rows : []);
     } catch (e) {
       AppAlert.alert("Error", e?.response?.data?.message || "Failed to load cartons");

@@ -78,7 +78,7 @@ import { CollectionEditScreen } from '@/src/screens/production/CollectionEditScr
 
 export default function PurchaseOrderRoute() {
   return (
-    <PermissionRouteGuard resource="production.Collection" action="view">
+    <PermissionRouteGuard resource="production.collection" action="view">
       <CollectionEditScreen />
     </PermissionRouteGuard>
   );

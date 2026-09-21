@@ -2689,6 +2689,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AmountDisplayModeControl, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
+import { usePermission } from '@/src/core/permissions';
 import {
   Platform,
   RefreshControl,
@@ -2776,6 +2777,7 @@ export default function OwnerDashboardScreen({
   showAmountControl = true,
 }) {
   const router = useRouter();
+  const { canAccess } = usePermission();
   const { user } = route.params || {};
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2965,6 +2967,27 @@ export default function OwnerDashboardScreen({
       }
 
       return { field: 'today', direction: 'desc' };
+    });
+  };
+
+  // Creditor Dashboard belongs to the payable/payment side.
+  // Keep this separate from CollectionFlow (receivable side).
+  const openCreditorDashboard = party => {
+    if (!canAccess('dashboard.creditor_dashboard')) return;
+
+    const partyCode =
+      party?.party_code != null ? String(party.party_code).trim() : '';
+
+    if (!partyCode) return;
+
+    router.push({
+      pathname: '/new/(tabs)/reports/creditor-dashboard',
+      params: {
+        prptype: getUserPrptype,
+        partycode: partyCode,
+        partyname: party?.party_name || partyCode,
+        date: dateString,
+      },
     });
   };
 
@@ -3256,6 +3279,11 @@ export default function OwnerDashboardScreen({
                     rawLeftVal={Number(party?.pending_count || 0)}
                     rawRightVal={Number(party?.to_pay || 0)}
                     trendUp={false}
+                    onPress={
+                      canAccess('dashboard.creditor_dashboard')
+                        ? () => openCreditorDashboard(party)
+                        : undefined
+                    }
                   />
                 ))}
               </TableWrapper>

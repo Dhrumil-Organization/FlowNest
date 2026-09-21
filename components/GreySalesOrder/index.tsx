@@ -693,6 +693,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
     };
 
     const handleValidation = (updatedItem: any) => {
+        const isHistoryTab =
+            String(activeTab1YPO).trim().toLowerCase() === 'history';
         if (selectedActionYPO === 'accept') {
 
             // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
@@ -727,7 +729,12 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             //     return false;
             // }
         }
-        if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        if (
+            !isHistoryTab &&
+            (selectedActionYPO === 'pending' ||
+                selectedActionYPO === 'verifyreject')
+        ) {
 
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
@@ -1198,9 +1205,13 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity> */}
-                {/* <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity> */}
+
+                {String(item.isauthedit) === '1' && (
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    </TouchableOpacity>
+                )}
+
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />

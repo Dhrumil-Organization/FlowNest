@@ -460,14 +460,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
 
     const gridConfig = useMemo(() => getGridConfig(), [effectiveWidth]);
 
-    useEffect(() => {
-        getGridConfig();
-    }, [screenWidth]);
-    // const gridConfig = getGridConfig();
-
-    const { cardWidth } = getGridConfig();
-
-
     const fixedLabels = {
         prpcode: "Property",
         pono: "PO Number",
@@ -508,7 +500,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
 
     return (
         <>
-            <View style={{ backgroundColor: '#fff' }}>
+            <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <HeaderBar userName={username} placeholder="Search purchase order..." onSearch={setSearchQueryPOT} />
                 <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
                     <Icon name="list" size={24} color="white" />
@@ -578,9 +570,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
                                 (rowIndex + 1) * gridConfig.numColumns
                             );
 
-                            return (    
+                            return (
                                 <View
-                                    key={rowIndex}  
+                                    key={rowIndex}
                                     style={{
                                         flexDirection: 'row',
                                         marginBottom: 12,

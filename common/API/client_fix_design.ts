@@ -74,6 +74,16 @@ export interface YarnLine {
     cnt: number;
     base_price?: number;
     price?: number;
+
+    // Authoritative ERP fibre metadata returned by Design/Yarn APIs.
+    fibre?: string;
+    fibre_composition?: Array<{
+        id: number;
+        name: string;
+        percent: number | null;
+    }>;
+    w_blend?: string;
+    w_blend_per?: string;
 }
 
 export interface Design {

@@ -106,10 +106,14 @@ export default function HeaderNew({
         ]);
     };
 
+    // const goBack = () => {
+    //     // router.replace('/(tabs)');
+    //     if (router.canGoBack()) router.back();
+    //     else router.replace('/new/(tabs)');
+    // };
     const goBack = () => {
         // router.replace('/(tabs)');
-        if (router.canGoBack()) router.back();
-        else router.replace('/new/(tabs)');
+        router.back()
     };
 
     useEffect(() => {
@@ -151,7 +155,7 @@ export default function HeaderNew({
             colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
             style={styles.container}>
             <SafeAreaView>
-                
+
 
                 {SearchBar && (
                     <View style={styles.searchBox}>
@@ -172,7 +176,7 @@ export default function HeaderNew({
                 {breadcrumb && (
                     <View style={styles.breadcrumbChip}>
                         <View style={styles.breadcrumbRow}>
-                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={goBack}>
+                            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.back()}>
                                 <Icon name="arrow-back" size={18} color="#fff" />
                                 <Text style={styles.breadcrumbBackText}>Back</Text>
                             </TouchableOpacity>

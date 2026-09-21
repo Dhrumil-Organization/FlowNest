@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { useDashboardResponsive } from './responsive';
 
 export const COLORS = {
   bg: '#F0F2F5',
@@ -29,9 +30,21 @@ export const COLORS = {
 };
 
 // ─── Section Card ────────────────────────────────────────────────────────────
-export const SectionCard = ({ children, style }) => (
-  <View style={[styles.sectionCard, style]}>{children}</View>
-);
+export const SectionCard = ({ children, style }) => {
+  const { isDesktop, isTablet } = useDashboardResponsive();
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        isDesktop && styles.sectionCardDesktop,
+        isTablet && styles.sectionCardTablet,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+};
 
 // ─── Section Header (colored band) ───────────────────────────────────────────
 export const SectionHeader = ({
@@ -40,23 +53,28 @@ export const SectionHeader = ({
   subtitle,
   bgColor,
   rightText,
-}) => (
-  <View
-    style={[
-      styles.sectionHeader,
-      { backgroundColor: bgColor || COLORS.primary },
-    ]}
-  >
-    <View style={styles.sectionHeaderLeft}>
-      <Text style={styles.sectionHeaderIcon}>{icon} </Text>
-      <Text style={styles.sectionHeaderTitle}>{title}</Text>
+}) => {
+  const { isDesktop, isTablet } = useDashboardResponsive();
+  return (
+    <View
+      style={[
+        styles.sectionHeader,
+        isDesktop && styles.sectionHeaderDesktop,
+        isTablet && styles.sectionHeaderTablet,
+        { backgroundColor: bgColor || COLORS.primary },
+      ]}
+    >
+      <View style={styles.sectionHeaderLeft}>
+        <Text style={[styles.sectionHeaderIcon, (isDesktop || isTablet) && styles.sectionHeaderIconWide]}>{icon} </Text>
+        <Text style={[styles.sectionHeaderTitle, isDesktop && styles.sectionHeaderTitleDesktop]}>{title}</Text>
+      </View>
+      {subtitle ? <Text style={styles.sectionHeaderSub}>{subtitle}</Text> : null}
+      {rightText ? (
+        <Text style={styles.sectionHeaderRight}>{rightText}</Text>
+      ) : null}
     </View>
-    {subtitle ? <Text style={styles.sectionHeaderSub}>{subtitle}</Text> : null}
-    {rightText ? (
-      <Text style={styles.sectionHeaderRight}>{rightText}</Text>
-    ) : null}
-  </View>
-);
+  );
+};
 
 // ─── Two-column total row ─────────────────────────────────────────────────────
 // export const TotalRow = ({
@@ -90,8 +108,10 @@ export const TotalRow = ({
   rawLeftValue,
   rawRightValue,
   tooltipPrefix,
-}) => (
-  <View style={styles.totalRow}>
+}) => {
+  const { isDesktop, isTablet } = useDashboardResponsive();
+  return (
+  <View style={[styles.totalRow, isDesktop && styles.totalRowDesktop, isTablet && styles.totalRowTablet]}>
     <View style={styles.totalSide}>
       <Text style={styles.totalLabel}>{leftLabel}</Text>
       {rawLeftValue != null ? (
@@ -102,7 +122,7 @@ export const TotalRow = ({
           prefix={tooltipPrefix}
         />
       ) : (
-        <Text style={[styles.totalValue, tealLeft && { color: COLORS.teal }]}>
+        <Text style={[styles.totalValue, tealLeft && { color: COLORS.teal }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
           {leftValue}
         </Text>
       )}
@@ -117,56 +137,14 @@ export const TotalRow = ({
           prefix={tooltipPrefix}
         />
       ) : (
-        <Text style={styles.totalValue}>{rightValue}</Text>
+        <Text style={styles.totalValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{rightValue}</Text>
       )}
     </View>
   </View>
-);
+  );
+};
 
 // ─── Rank row (with optional avatar) ─────────────────────────────────────────
-// export const RankRow = ({
-//   rank,
-//   name,
-//   avatarColor,
-//   leftVal,
-//   rightVal,
-//   onPress,
-//   trendUp,
-//   noBorder,
-// }) => (
-//   <TouchableOpacity
-//     // style={styles.rankRow}
-//     style={[styles.rankRow, noBorder && { borderBottomWidth: 0 }]}
-//     onPress={onPress}
-//     activeOpacity={onPress ? 0.7 : 1}
-//   >
-//     {rank !== undefined && <Text style={styles.rankNum}>{rank}</Text>}
-//     {avatarColor && (
-//       <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-//         <Text style={styles.avatarText}>{name.charAt(0)}</Text>
-//       </View>
-//     )}
-//     <Text style={[styles.rankName, { flex: 1 }]} numberOfLines={1}>
-//       {name}
-//     </Text>
-//     {leftVal !== undefined && (
-//       <Text style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}>
-//         {leftVal}
-//       </Text>
-//     )}
-//     {rightVal !== undefined && (
-//       <Text
-//         style={[
-//           styles.rankVal,
-//           trendUp === true && { color: COLORS.green },
-//           trendUp === false && { color: COLORS.red },
-//         ]}
-//       >
-//         {rightVal}
-//       </Text>
-//     )}
-//   </TouchableOpacity>
-// );
 export const RankRow = ({
   rank,
   name,
@@ -178,76 +156,121 @@ export const RankRow = ({
   noBorder,
   rawLeftVal,
   rawRightVal,
-}) => (
-  <TouchableOpacity
-    style={[styles.rankRow, noBorder && { borderBottomWidth: 0 }]}
-    onPress={onPress}
-    activeOpacity={onPress ? 0.7 : 1}
-  >
-    {rank !== undefined && <Text style={styles.rankNum}>{rank}</Text>}
-    {avatarColor && (
-      <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-        <Text style={styles.avatarText}>{name.charAt(0)}</Text>
-      </View>
-    )}
-    <Text style={[styles.rankName, { flex: 1 }]} numberOfLines={1}>
-      {name}
-    </Text>
+}) => {
+  const { isDesktop, isTablet, isMobile } = useDashboardResponsive();
 
-    {leftVal !== undefined &&
-      (rawLeftVal != null ? (
-        <LongPressValue
-          rawValue={rawLeftVal}
-          formattedValue={leftVal}
-          style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}
-        />
-      ) : (
-        <Text style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}>
-          {leftVal}
-        </Text>
-      ))}
+  return (
+    <TouchableOpacity
+      style={[
+        styles.rankRow,
+        isDesktop && styles.rankRowDesktop,
+        isTablet && styles.rankRowTablet,
+        noBorder && { borderBottomWidth: 0 },
+      ]}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+    >
+      {rank !== undefined && <Text style={styles.rankNum}>{rank}</Text>}
+      {avatarColor && (
+        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+          <Text style={styles.avatarText}>{name.charAt(0)}</Text>
+        </View>
+      )}
 
-    {rightVal !== undefined &&
-      (rawRightVal != null ? (
-        <LongPressValue
-          rawValue={rawRightVal}
-          formattedValue={rightVal}
-          style={[
-            styles.rankVal,
-            trendUp === true && { color: COLORS.green },
-            trendUp === false && { color: COLORS.red },
-          ]}
-        />
-      ) : (
-        <Text
-          style={[
-            styles.rankVal,
-            trendUp === true && { color: COLORS.green },
-            trendUp === false && { color: COLORS.red },
-          ]}
-        >
-          {rightVal}
-        </Text>
-      ))}
-  </TouchableOpacity>
-);
+      <Text
+        style={[styles.rankName, { flex: 1, minWidth: 0 }]}
+        numberOfLines={isMobile ? 2 : 1}
+        adjustsFontSizeToFit={!isMobile}
+        minimumFontScale={0.72}
+      >
+        {name}
+      </Text>
+
+      {leftVal !== undefined &&
+        (rawLeftVal != null ? (
+          <LongPressValue
+            rawValue={rawLeftVal}
+            formattedValue={leftVal}
+            style={[
+              styles.rankVal,
+              {
+                color: COLORS.teal,
+                marginRight: 12,
+                minWidth: isMobile ? 62 : 78,
+                textAlign: 'right',
+              },
+            ]}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.rankVal,
+              {
+                color: COLORS.teal,
+                marginRight: 12,
+                minWidth: isMobile ? 62 : 78,
+                textAlign: 'right',
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {leftVal}
+          </Text>
+        ))}
+
+      {rightVal !== undefined &&
+        (rawRightVal != null ? (
+          <LongPressValue
+            rawValue={rawRightVal}
+            formattedValue={rightVal}
+            style={[
+              styles.rankVal,
+              { minWidth: isMobile ? 62 : 78, textAlign: 'right' },
+              trendUp === true && { color: COLORS.green },
+              trendUp === false && { color: COLORS.red },
+            ]}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.rankVal,
+              { minWidth: isMobile ? 62 : 78, textAlign: 'right' },
+              trendUp === true && { color: COLORS.green },
+              trendUp === false && { color: COLORS.red },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {rightVal}
+          </Text>
+        ))}
+    </TouchableOpacity>
+  );
+};
 
 // ─── Column header row (small labels) ────────────────────────────────────────
-export const ColHeader = ({ label1, label2, label3 }) => (
-  <View style={styles.colHeader}>
+export const ColHeader = ({ label1, label2, label3 }) => {
+  const { isDesktop, isTablet, isMobile } = useDashboardResponsive();
+  const valueWidth = isMobile ? 62 : isTablet ? 74 : 88;
+  return (
+  <View style={[styles.colHeader, isDesktop && styles.colHeaderDesktop, isTablet && styles.colHeaderTablet]}>
     <Text style={[styles.colLabel, { flex: 1 }]}>{label1}</Text>
     {label2 && (
-      <Text style={[styles.colLabel, { width: 70, textAlign: 'right' }]}>
+      <Text style={[styles.colLabel, { width: valueWidth, textAlign: 'right' }]}>
         {label2}
       </Text>
     )}
     {label3 && (
-      <Text style={[styles.colLabel, { width: 70, textAlign: 'right' }]}>
+      <Text style={[styles.colLabel, { width: valueWidth, textAlign: 'right' }]}>
         {label3}
       </Text>
     )}
   </View>
-);
+  );
+};
 
 // ─── Long Press Tooltip Value ─────────────────────────────────────────────────
 // Wrap any formatted value — long press shows raw number in a tooltip above it
@@ -276,7 +299,7 @@ export const LongPressValue = ({
         delayLongPress={300}
         activeOpacity={1}
       >
-        <Text style={style}>{formattedValue}</Text>
+        <Text style={style} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{formattedValue}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -314,8 +337,10 @@ export const SummaryCard = ({
   bgColor,
   rawValue,
   prefix = '₹',
-}) => (
-  <View style={[styles.summaryCard, bgColor && { backgroundColor: bgColor }]}>
+}) => {
+  const { isDesktop, isTablet } = useDashboardResponsive();
+  return (
+  <View style={[styles.summaryCard, (isDesktop || isTablet) && styles.summaryCardWide, bgColor && { backgroundColor: bgColor }]}>
     <Text style={styles.summaryCardLabel}>{label}</Text>
     {rawValue != null ? (
       <LongPressValue
@@ -328,7 +353,8 @@ export const SummaryCard = ({
       <Text style={styles.summaryCardValue}>{value}</Text>
     )}
   </View>
-);
+  );
+};
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 export const ProgressBar = ({
   pct,
@@ -379,6 +405,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 3,
   },
+
+  sectionCardDesktop: { marginHorizontal: 0, borderRadius: 12, marginBottom: 16 },
+  sectionCardTablet: { marginHorizontal: 16 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -387,14 +416,20 @@ const styles = StyleSheet.create({
   },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   sectionHeaderIcon: { color: '#fff', fontSize: 13 },
+  sectionHeaderIconWide: { fontSize: 15 },
+  sectionHeaderDesktop: { paddingHorizontal: 14, paddingVertical: 10 },
+  sectionHeaderTablet: { paddingHorizontal: 13, paddingVertical: 9 },
   sectionHeaderTitle: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
+  sectionHeaderTitleDesktop: { fontSize: 14 },
   sectionHeaderSub: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
   sectionHeaderRight: { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
+  totalRowDesktop: { paddingHorizontal: 16, paddingVertical: 12 },
+  totalRowTablet: { paddingHorizontal: 15 },
   totalRow: {
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -411,6 +446,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   totalValue: { fontSize: 15, fontWeight: '700', color: COLORS.textDark },
+  rankRowDesktop: { paddingHorizontal: 16, paddingVertical: 10 },
+  rankRowTablet: { paddingHorizontal: 15 },
   rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,7 +472,9 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   rankName: { fontSize: 13, color: COLORS.textDark },
-  rankVal: { fontSize: 12, fontWeight: '600', color: COLORS.textDark },
+  rankVal: { fontSize: 12, fontWeight: '600', color: COLORS.textDark, flexShrink: 0 },
+  colHeaderDesktop: { paddingHorizontal: 16 },
+  colHeaderTablet: { paddingHorizontal: 15 },
   colHeader: {
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -448,6 +487,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
+  summaryCardWide: { padding: 12, marginHorizontal: 5 },
   summaryCard: {
     flex: 1,
     backgroundColor: COLORS.bg,

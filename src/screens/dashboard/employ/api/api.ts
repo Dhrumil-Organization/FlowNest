@@ -293,6 +293,19 @@ export const api = {
       date,
       prptype: getUserPrptype,
     }),
+
+     getCreditorDashboardSummary: (prptype, partycode, date = getToday()) =>
+    fetchJSON(`/creditor-dashboard/summary`, { prptype, partycode, date }),
+
+  getCreditorPosition: (prptype, partycode, date = getToday()) =>
+    fetchJSON(`/creditor-dashboard/position/analytics`, { prptype, partycode, date }),
+
+  getCreditorPayments: (prptype, partycode, date = getToday(), limit = 100) =>
+    fetchJSON(`/creditor-dashboard/payment/transactions`, { prptype, partycode, date, limit }),
+
+  getCreditorOutstandingBills: (prptype, partycode, date = getToday(), limit = 100) =>
+    fetchJSON(`/creditor-dashboard/outstanding/bills`, { prptype, partycode, date, limit }),
+    
 };
 
 /** Display amount using the dashboard-wide Compact / Actual preference. */

@@ -22,6 +22,7 @@ import { StyleSheet, View } from 'react-native';
 import { COLORS } from '../components/SharedComponents';
 import OwnerDashboardScreen from './OwnerDashboardScreen';
 import SalesExecDashboardScreen from './SalesExecDashboardScreen';
+import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 
 export type DashboardDetailVisibility = {
   sales: boolean;
@@ -40,6 +41,7 @@ type Props = {
 
 export default function EmployDashboardSection({ activeTab, username, user, visibleSections }: Props) {
   const router = useRouter();
+  const { isDesktop } = useDashboardResponsive();
   const [getUserPrptype, setUserPrptype] = useState('');
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
   console.log('activeTab 111', activeTab);
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, isDesktop && styles.wrapDesktop]}>
       {/* ─── Content ───
           Each child screen manages its own API call + pull-to-refresh, and
           scrolls internally (bounded height) since it sits inside the
@@ -108,7 +110,8 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 14, borderRadius: 15, overflow: 'hidden' },
+  wrap: { marginBottom: 14, borderRadius: 15, overflow: 'hidden', width: '100%' },
+  wrapDesktop: { maxWidth: 1260, alignSelf: 'center', borderRadius: 14 },
   // Bounded height so the internally-scrolling child dashboards (which each
   // have their own ScrollView + pull-to-refresh) behave inside the parent
   // ScrollView. Adjust to taste — a fixed viewport is the simplest reliable

@@ -145,21 +145,23 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     // const [historyDataSPO, setHistoryDataSPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingSPO] = useState(false);
 
-    const { width: screenWidth } = useWindowDimensions();
+    const { width } = useWindowDimensions();
 
-    // 1 → phone | 2 → tablet | 3 → laptop | 4 → wide desktop
-    const numColumns =
-        screenWidth >= 1400 ? 4 :
-            screenWidth >= 1000 ? 3 :
-                screenWidth >= 700 ? 2 :
-                    1;
+    const getColumns = () => {
+        if (width < 600) return 1;      // mobile
+        if (width < 1000) return 2;     // tablet
+        return 3;                       // web / large
+    };
 
-    const GRID_PAD = 12;
-    const GRID_GAP = 12;
+    const numColumns = getColumns();
+
+    // Explicit item width so the last row doesn't stretch weirdly
+    const GRID_PAD = 10;
+    const GRID_GAP = 10;
     const gridItemWidth =
         numColumns > 1
-            ? (screenWidth - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : screenWidth;
+            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
+            : width;
 
     let cancelToken: any;
 
@@ -778,93 +780,94 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
 
 
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
-        <View style={[
-            crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-            item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {item.isProcessed && (
-                <View style={[
-                    crlimtreq_styles.stampContainerPOS,
-                ]}>
+        <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[
+                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
+            ]}>
+                {item.isProcessed && (
                     <View style={[
-                        crlimtreq_styles.stamp,
-                        item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
+                        crlimtreq_styles.stampContainerPOS,
                     ]}>
-                        <Text style={crlimtreq_styles.stampText}>
-                            {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                        </Text>
+                        <View style={[
+                            crlimtreq_styles.stamp,
+                            item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
+                        ]}>
+                            <Text style={crlimtreq_styles.stampText}>
+                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+                <View style={crlimtreq_styles.dateContainer}>
+                    <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
+                </View>
+                <View style={crlimtreq_styles.cardHeaderContainer}>
+                    <View style={crlimtreq_styles.cardHeader}>
+                        <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
                     </View>
                 </View>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
-                </View>
-            </View>
-            {/* <View style={crlimtreq_styles.cardSubHeader}>
+                {/* <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
             </View> */}
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Item Name:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.itmname || ''}
-                        </Text>
+                <View style={crlimtreq_styles.cardContent}>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Item Name:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.itmname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Type:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.ratetype || ''}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Type:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.ratetype || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Design:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.dsnname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shade:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.shdname || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Design:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.dsnname || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Rate:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={
+                                    editableValuesSPO[item.uid]?.rate !== undefined
+                                        ? editableValuesSPO[item.uid].rate
+                                        : formatToIndianCurrency(item.rate || '0')
+                                }
+                                onChangeText={(text) => handleEdit(item.uid, 'rate', text)}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Production Qty:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={
+                                    editableValuesSPO[item.uid]?.qty !== undefined
+                                        ? editableValuesSPO[item.uid].qty
+                                        : formatToIndianCurrency(item.qty || '0')
+                                }
+                                onChangeText={(text) => handleEdit(item.uid, 'qty', text)}
+                                keyboardType="numeric"
+                            />
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shade:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.shdname || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Rate:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={
-                                editableValuesSPO[item.uid]?.rate !== undefined
-                                    ? editableValuesSPO[item.uid].rate
-                                    : formatToIndianCurrency(item.rate || '0')
-                            }
-                            onChangeText={(text) => handleEdit(item.uid, 'rate', text)}
-                            keyboardType="numeric"
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={
-                                editableValuesSPO[item.uid]?.qty !== undefined
-                                    ? editableValuesSPO[item.uid].qty
-                                    : formatToIndianCurrency(item.qty || '0')
-                            }
-                            onChangeText={(text) => handleEdit(item.uid, 'qty', text)}
-                            keyboardType="numeric"
-                        />
-                    </View>
-                </View>
-                {/* <View style={crlimtreq_styles.twoColumnRow}>
+                    {/* <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Production Qty:</Text>
                         <RNTextInput
@@ -886,400 +889,151 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     </View>
                 </View> */}
 
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>SExe:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>SExe:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
-                    </View>
-                </View>
 
-                {/* <View style={crlimtreq_styles.fullWidthRow}>
+                    {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
                 </View> */}
 
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={
-                                editableValuesSPO[item.uid]?.shkperc !== undefined
-                                    ? editableValuesSPO[item.uid].shkperc
-                                    : formatToIndianCurrency(item.shkperc || '0')
-                            }
-                            onChangeText={(text) => handleEdit(item.uid, 'shkperc', text)}
-                            keyboardType="numeric"
-                        />
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={
+                                    editableValuesSPO[item.uid]?.shkperc !== undefined
+                                        ? editableValuesSPO[item.uid].shkperc
+                                        : formatToIndianCurrency(item.shkperc || '0')
+                                }
+                                onChangeText={(text) => handleEdit(item.uid, 'shkperc', text)}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Remark:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.remark || ''}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.remark || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={editableValuesSPO[item.uid]?.aremark || ''}
+                                onChangeText={(text) => handleEdit(item.uid, 'aremark', text)}
+                            // keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authoriseddate || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesSPO[item.uid]?.aremark || ''}
-                            onChangeText={(text) => handleEdit(item.uid, 'aremark', text)}
-                        // keyboardType="numeric"
-                        />
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Job Qty:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.jobqty || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.selfprodqty || 'N/A'}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authoriseddate || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. by:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.authorisedby || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Status:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authstatus || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Job Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.jobqty || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.selfprodqty || 'N/A'}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. by:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.authorisedby || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authstatus || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Expected Date:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.expdate || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        {/* <Text style={crlimtreq_styles.key}>Status:</Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Expected Date:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.expdate || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            {/* <Text style={crlimtreq_styles.key}>Status:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.authstatus || ''}
                         </Text> */}
-                    </View>
-                </View>
-
-                {item.partyList?.length > 0 && (
-                    <View style={crlimtreq_styles.partyContainer}>
-
-                        <View style={crlimtreq_styles.partyHeader}>
-                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
-                                Job Work Party
-                            </Text>
-
-                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
-                                Qty
-                            </Text>
                         </View>
+                    </View>
 
-                        <ScrollView
-                            style={{ maxHeight: 150 }}
-                            nestedScrollEnabled={true}
-                            showsVerticalScrollIndicator={true}
-                        >
-                            {item.partyList.map((party, index) => (
-                                <View
-                                    key={index}
-                                    style={crlimtreq_styles.partyRow}
-                                >
-                                    <Text
-                                        style={crlimtreq_styles.partyName1}
-                                        numberOfLines={2}
+                    {item.partyList?.length > 0 && (
+                        <View style={crlimtreq_styles.partyContainer}>
+
+                            <View style={crlimtreq_styles.partyHeader}>
+                                <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                    Job Work Party
+                                </Text>
+
+                                <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                    Qty
+                                </Text>
+                            </View>
+
+                            <ScrollView
+                                style={{ maxHeight: 150 }}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {item.partyList.map((party, index) => (
+                                    <View
+                                        key={index}
+                                        style={crlimtreq_styles.partyRow}
                                     >
-                                        {party.Partyname}
-                                    </Text>
+                                        <Text
+                                            style={crlimtreq_styles.partyName1}
+                                            numberOfLines={2}
+                                        >
+                                            {party.Partyname}
+                                        </Text>
 
-                                    <Text style={crlimtreq_styles.partyQty}>
-                                        {party.qty}
-                                    </Text>
-                                </View>
-                            ))}
-                        </ScrollView>
+                                        <Text style={crlimtreq_styles.partyQty}>
+                                            {party.qty}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </ScrollView>
 
-                    </View>
-                )}
-
-            </View>
-            <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-                {/* <TouchableOpacity
-                    onPress={() => {
-                        if (isConnected && !item.isProcessed) {
-                            // const encodedData = encodeData(item.prpcode, item.yearno, item.costuid, 'production_order_sudo', token);
-                            const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`; // URL-encode
-                            console.log("🔵 Encoded URL:", url); // Example: "https://ind.tms-webapp.com/YWJjLzIwMjUvMTIzL3Byb2R1Y3Rpb25fb3JkZXJfc3Vkby90b2tlbjEyMw=="
-                            Linking.openURL(url);
-
-                        }
-                    }}
-                    disabled={!isConnected || item.isProcessed}
-                >
-                    <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                </TouchableOpacity> */}
-                <TouchableOpacity
-                    onPress={() => {
-                        console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
-                        if (isConnected && !item.isProcessed) {
-                            const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
-                            setWebViewUrl(url);
-                            setShowWebViewModal(true);
-                        }
-                    }}
-                    disabled={!isConnected || item.isProcessed}
-                >
-                    <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                </TouchableOpacity>
-
-
-
-            </View>
-        </View>
-    );
-
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
-        <View style={[
-            crlimtreq_styles.card,
-            item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {item.isauth && (
-                <View style={crlimtreq_styles.stampContainerPOS}>
-                    <View style={[
-                        crlimtreq_styles.stamp,
-                        item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                    ]}>
-                        <Text style={crlimtreq_styles.stampText}>
-                            {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' ? 'REJECTED' : 'PENDING'}
-                        </Text>
-                    </View>
-                </View>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
-                </View>
-            </View>
-            {/* <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
-            </View> */}
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Item Name:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.itmname || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Type:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.ratetype || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Design:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.dsnname || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shade:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.shdname || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Rate:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.rate || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.qty || ''}
-                        </Text>
-                    </View>
-                </View>
-                {/* <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.qty || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Order Qty.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.orderqty || ''}
-                        </Text>
-                    </View>
-                </View> */}
-
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>SExe:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
-                    </View>
-                </View>
-
-                {/* <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>SExe:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                </View> */}
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.shkperc || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.remark || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.aremark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authoriseddate || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Job Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.jobqty || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.selfprodqty || 'N/A'}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. by:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.authorisedby || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authstatus || 'N/A'}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Expected Date:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.expdate || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        {/* <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authstatus || ''}
-                        </Text> */}
-                    </View>
-                </View>
-
-
-                {item.partyList?.length > 0 && (
-                    <View style={crlimtreq_styles.partyContainer}>
-
-                        <View style={crlimtreq_styles.partyHeader}>
-                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
-                                Job Work Party
-                            </Text>
-
-                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
-                                Qty
-                            </Text>
                         </View>
+                    )}
 
-                        <ScrollView
-                            style={{ maxHeight: 150 }}
-                            nestedScrollEnabled={true}
-                            showsVerticalScrollIndicator={true}
-                        >
-                            {item.partyList.map((party, index) => (
-                                <View
-                                    key={index}
-                                    style={crlimtreq_styles.partyRow}
-                                >
-                                    <Text
-                                        style={crlimtreq_styles.partyName1}
-                                        numberOfLines={2}
-                                    >
-                                        {party.Partyname}
-                                    </Text>
-
-                                    <Text style={crlimtreq_styles.partyQty}>
-                                        {party.qty}
-                                    </Text>
-                                </View>
-                            ))}
-                        </ScrollView>
-
-                    </View>
-                )}
-
-
+                </View>
                 <View style={crlimtreq_styles.cardActions}>
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                    </TouchableOpacity>
                     {/* <TouchableOpacity
                     onPress={() => {
                         if (isConnected && !item.isProcessed) {
@@ -1296,8 +1050,8 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 </TouchableOpacity> */}
                     <TouchableOpacity
                         onPress={() => {
+                            console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                             if (isConnected && !item.isProcessed) {
-                                console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                                 const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
                                 setWebViewUrl(url);
                                 setShowWebViewModal(true);
@@ -1311,92 +1065,345 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
 
 
                 </View>
+            </View>
+        </View>
+    );
 
+    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
+        <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[
+                crlimtreq_styles.card,
+                item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
+            ]}>
+                {item.isauth && (
+                    <View style={crlimtreq_styles.stampContainerPOS}>
+                        <View style={[
+                            crlimtreq_styles.stamp,
+                            item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
+                        ]}>
+                            <Text style={crlimtreq_styles.stampText}>
+                                {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' ? 'REJECTED' : 'PENDING'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+                <View style={crlimtreq_styles.dateContainer}>
+                    <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
+                </View>
+                <View style={crlimtreq_styles.cardHeaderContainer}>
+                    <View style={crlimtreq_styles.cardHeader}>
+                        <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
+                    </View>
+                </View>
+                {/* <View style={crlimtreq_styles.cardSubHeader}>
+                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
+            </View> */}
+                <View style={crlimtreq_styles.cardContent}>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Item Name:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.itmname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Type:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.ratetype || ''}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Design:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.dsnname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shade:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.shdname || ''}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Rate:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.rate || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Production Qty:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.qty || ''}
+                            </Text>
+                        </View>
+                    </View>
+                    {/* <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>
+                            {item.qty || ''}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Order Qty.:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.orderqty || ''}
+                        </Text>
+                    </View>
+                </View> */}
+
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>SExe:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                        </View>
+                    </View>
+
+                    {/* <View style={crlimtreq_styles.fullWidthRow}>
+                    <Text style={crlimtreq_styles.key}>SExe:</Text>
+                    <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                </View> */}
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.shkperc || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Remark:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.remark || ''}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.aremark || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authoriseddate || ''}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Job Qty:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.jobqty || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.selfprodqty || 'N/A'}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. by:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.authorisedby || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Status:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authstatus || 'N/A'}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Expected Date:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.expdate || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            {/* <Text style={crlimtreq_styles.key}>Status:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.authstatus || ''}
+                        </Text> */}
+                        </View>
+                    </View>
+
+
+                    {item.partyList?.length > 0 && (
+                        <View style={crlimtreq_styles.partyContainer}>
+
+                            <View style={crlimtreq_styles.partyHeader}>
+                                <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                    Job Work Party
+                                </Text>
+
+                                <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                    Qty
+                                </Text>
+                            </View>
+
+                            <ScrollView
+                                style={{ maxHeight: 150 }}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {item.partyList.map((party, index) => (
+                                    <View
+                                        key={index}
+                                        style={crlimtreq_styles.partyRow}
+                                    >
+                                        <Text
+                                            style={crlimtreq_styles.partyName1}
+                                            numberOfLines={2}
+                                        >
+                                            {party.Partyname}
+                                        </Text>
+
+                                        <Text style={crlimtreq_styles.partyQty}>
+                                            {party.qty}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </ScrollView>
+
+                        </View>
+                    )}
+
+
+                    <View style={crlimtreq_styles.cardActions}>
+                        {/* <TouchableOpacity
+                    onPress={() => {
+                        if (isConnected && !item.isProcessed) {
+                            // const encodedData = encodeData(item.prpcode, item.yearno, item.costuid, 'production_order_sudo', token);
+                            const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`; // URL-encode
+                            console.log("🔵 Encoded URL:", url); // Example: "https://ind.tms-webapp.com/YWJjLzIwMjUvMTIzL3Byb2R1Y3Rpb25fb3JkZXJfc3Vkby90b2tlbjEyMw=="
+                            Linking.openURL(url);
+
+                        }
+                    }}
+                    disabled={!isConnected || item.isProcessed}
+                >
+                    <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
+                </TouchableOpacity> */}
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (isConnected && !item.isProcessed) {
+                                    console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
+                                    const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
+                                    setWebViewUrl(url);
+                                    setShowWebViewModal(true);
+                                }
+                            }}
+                            disabled={!isConnected || item.isProcessed}
+                        >
+                            <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
+                        </TouchableOpacity>
+
+
+
+                    </View>
+
+                </View>
             </View>
         </View>
     );
 
     const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' | 'pending' } }) => (
-        <View style={[
-            crlimtreq_styles.card,
-            item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
-            // item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {item.isProcessed ? (
-                <>
-                    <View style={crlimtreq_styles.stampContainerPOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : item.actionType === 'pending' ? crlimtreq_styles.stampPendingall : item.actionType === 'reject' ? crlimtreq_styles.stampRejected : item.actionType === 'verifyreject' ? crlimtreq_styles.stampRejected : '',
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'reject' ? 'REJECTED' : item.actionType === 'pending' ? 'PENDING' : item.actionType === 'verifyreject' ? 'REJECTED' : ''}
-                            </Text>
+        <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[
+                crlimtreq_styles.card,
+                item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
+                // item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
+            ]}>
+                {item.isProcessed ? (
+                    <>
+                        <View style={crlimtreq_styles.stampContainerPOS}>
+                            <View style={[
+                                crlimtreq_styles.stamp,
+                                item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : item.actionType === 'pending' ? crlimtreq_styles.stampPendingall : item.actionType === 'reject' ? crlimtreq_styles.stampRejected : item.actionType === 'verifyreject' ? crlimtreq_styles.stampRejected : '',
+                            ]}>
+                                <Text style={crlimtreq_styles.stampText}>
+                                    {item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'reject' ? 'REJECTED' : item.actionType === 'pending' ? 'PENDING' : item.actionType === 'verifyreject' ? 'REJECTED' : ''}
+                                </Text>
+                            </View>
                         </View>
-                    </View>
-                </>
+                    </>
 
-            ) : (
-                <>
-                    <View style={crlimtreq_styles.stampContainerPOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : item.isauth === '0' || item.isauth === 0 ? crlimtreq_styles.stampPendingall : '',
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' || item.isauth === 2 ? 'REJECTED' : item.isauth === '0' || item.isauth === 0 ? 'PENDING' : ''}
-                            </Text>
+                ) : (
+                    <>
+                        <View style={crlimtreq_styles.stampContainerPOS}>
+                            <View style={[
+                                crlimtreq_styles.stamp,
+                                item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : item.isauth === '0' || item.isauth === 0 ? crlimtreq_styles.stampPendingall : '',
+                            ]}>
+                                <Text style={crlimtreq_styles.stampText}>
+                                    {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' || item.isauth === 2 ? 'REJECTED' : item.isauth === '0' || item.isauth === 0 ? 'PENDING' : ''}
+                                </Text>
+                            </View>
                         </View>
-                    </View>
-                </>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
+                    </>
+                )}
+                <View style={crlimtreq_styles.dateContainer}>
+                    <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
                 </View>
-            </View>
-            {/* <View style={crlimtreq_styles.cardSubHeader}>
+                <View style={crlimtreq_styles.cardHeaderContainer}>
+                    <View style={crlimtreq_styles.cardHeader}>
+                        <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
+                    </View>
+                </View>
+                {/* <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
             </View> */}
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Item Name:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.itmname || ''}
-                        </Text>
+                <View style={crlimtreq_styles.cardContent}>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Item Name:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.itmname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Type:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.ratetype || ''}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Type:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.ratetype || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Design:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.dsnname || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shade:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.shdname || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Design:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.dsnname || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shade:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.shdname || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Rate:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.rate || ''}
-                        </Text>
-                        {/* <RNTextInput
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Rate:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.rate || ''}
+                            </Text>
+                            {/* <RNTextInput
                             style={crlimtreq_styles.editableValueBlack}
                             value={
                                 editableValuesSPO[item.uid]?.rate !== undefined
@@ -1406,13 +1413,13 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                             onChangeText={(text) => handleEdit(item.uid, 'rate', text)}
                             keyboardType="numeric"
                         /> */}
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.qty || ''}
-                        </Text>
-                        {/* <RNTextInput
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Production Qty:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.qty || ''}
+                            </Text>
+                            {/* <RNTextInput
                             style={crlimtreq_styles.editableValueBlack}
                             value={
                                 editableValuesSPO[item.uid]?.qty !== undefined
@@ -1422,38 +1429,38 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                             onChangeText={(text) => handleEdit(item.uid, 'qty', text)}
                             keyboardType="numeric"
                         /> */}
-                    </View>
-                    {/* <View style={crlimtreq_styles.keyValuePair}>
+                        </View>
+                        {/* <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Party:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.partyname || ''}
                         </Text>
                     </View> */}
-                </View>
-
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>SExe:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
-                    </View>
-                </View>
 
-                {/* <View style={crlimtreq_styles.fullWidthRow}>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>SExe:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                            <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                        </View>
+                    </View>
+
+                    {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
                 </View> */}
 
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.shkperc || ''}
-                        </Text>
-                        {/* <RNTextInput
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.shkperc || ''}
+                            </Text>
+                            {/* <RNTextInput
                             style={crlimtreq_styles.editableValueBlack}
                             value={
                                 editableValuesSPO[item.uid]?.shkperc !== undefined
@@ -1463,121 +1470,122 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                             onChangeText={(text) => handleEdit(item.uid, 'shkperc', text)}
                             keyboardType="numeric"
                         /> */}
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Remark:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.remark || ''}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.remark || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={editableValuesSPO[item.uid]?.aremark || ''}
+                                onChangeText={(text) => handleEdit(item.uid, 'aremark', text)}
+                            // keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authoriseddate || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesSPO[item.uid]?.aremark || ''}
-                            onChangeText={(text) => handleEdit(item.uid, 'aremark', text)}
-                        // keyboardType="numeric"
-                        />
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Job Qty:</Text>
+                            <Text style={crlimtreq_styles.Authvalue}>
+                                {item.jobqty || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.selfprodqty || 'N/A'}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authoriseddate || ''}
-                        </Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Auth. by:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.authorisedby || ''}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Status:</Text>
+                            <Text style={crlimtreq_styles.value}>
+                                {item.authstatus || ''}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Job Qty:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.jobqty || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.selfprodqty || 'N/A'}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. by:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.authorisedby || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authstatus || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Expected Date:</Text>
-                        <Text style={crlimtreq_styles.valueBold}>
-                            {item.expdate || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        {/* <Text style={crlimtreq_styles.key}>Status:</Text>
+                    <View style={crlimtreq_styles.twoColumnRow}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={crlimtreq_styles.key}>Expected Date:</Text>
+                            <Text style={crlimtreq_styles.valueBold}>
+                                {item.expdate || 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            {/* <Text style={crlimtreq_styles.key}>Status:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.authstatus || ''}
                         </Text> */}
-                    </View>
-                </View>
-
-                {item.partyList?.length > 0 && (
-                    <View style={crlimtreq_styles.partyContainer}>
-
-                        <View style={crlimtreq_styles.partyHeader}>
-                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
-                                Job Work Party
-                            </Text>
-
-                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
-                                Qty
-                            </Text>
                         </View>
-
-                        <ScrollView
-                            style={{ maxHeight: 150 }}
-                            nestedScrollEnabled={true}
-                            showsVerticalScrollIndicator={true}
-                        >
-                            {item.partyList.map((party, index) => (
-                                <View
-                                    key={index}
-                                    style={crlimtreq_styles.partyRow}
-                                >
-                                    <Text
-                                        style={crlimtreq_styles.partyName1}
-                                        numberOfLines={2}
-                                    >
-                                        {party.Partyname}
-                                    </Text>
-
-                                    <Text style={crlimtreq_styles.partyQty}>
-                                        {party.qty}
-                                    </Text>
-                                </View>
-                            ))}
-                        </ScrollView>
                     </View>
-                )}
 
-            </View>
-            <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
+                    {item.partyList?.length > 0 && (
+                        <View style={crlimtreq_styles.partyContainer}>
+
+                            <View style={crlimtreq_styles.partyHeader}>
+                                <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                    Job Work Party
+                                </Text>
+
+                                <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                    Qty
+                                </Text>
+                            </View>
+
+                            <ScrollView
+                                style={{ maxHeight: 150 }}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {item.partyList.map((party, index) => (
+                                    <View
+                                        key={index}
+                                        style={crlimtreq_styles.partyRow}
+                                    >
+                                        <Text
+                                            style={crlimtreq_styles.partyName1}
+                                            numberOfLines={2}
+                                        >
+                                            {party.Partyname}
+                                        </Text>
+
+                                        <Text style={crlimtreq_styles.partyQty}>
+                                            {party.qty}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                </View>
+                <View style={crlimtreq_styles.cardActions}>
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -1651,28 +1659,10 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         ref={flatListRefSPO}
                         data={filteredDataSPO}
                         numColumns={numColumns}
-                        {...(numColumns > 1
-                            ? {
-                                columnWrapperStyle: {
-                                    gap: GRID_GAP,
-                                    paddingHorizontal: GRID_PAD,
-                                },
-                            }
-                            : {})}
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => (
-                            <View
-                                style={{
-                                    width: numColumns > 1 ? gridItemWidth : undefined,
-                                    flex: numColumns === 1 ? 1 : undefined,
-                                    marginBottom: 12,
-                                }}
-                            >
-                                {renderCard({ item })}
-                            </View>
-                        )}
+                        renderItem={({ item }) => renderCard({ item })}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1690,28 +1680,14 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         ref={flatHistoryListRefSPO}
                         data={filteredhistoryDataSPO}
                         numColumns={numColumns}
-                        {...(numColumns > 1
-                            ? {
-                                columnWrapperStyle: {
-                                    gap: GRID_GAP,
-                                    paddingHorizontal: GRID_PAD,
-                                },
-                            }
-                            : {})}
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}
                         renderItem={({ item }) => (
-                            <View
-                                style={{
-                                    width: numColumns > 1 ? gridItemWidth : undefined,
-                                    flex: numColumns === 1 ? 1 : undefined,
-                                    marginBottom: 12,
-                                }}
-                            >
+                            <>
                                 {renderAllCardHistory({ item })}
-                            </View>
+                            </>
                         )}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1729,28 +1705,10 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         ref={flatVerifyListRefSPO}
                         data={filteredverifyDataSPO}
                         numColumns={numColumns}
-                        {...(numColumns > 1
-                            ? {
-                                columnWrapperStyle: {
-                                    gap: GRID_GAP,
-                                    paddingHorizontal: GRID_PAD,
-                                },
-                            }
-                            : {})}
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => (
-                            <View
-                                style={{
-                                    width: numColumns > 1 ? gridItemWidth : undefined,
-                                    flex: numColumns === 1 ? 1 : undefined,
-                                    marginBottom: 12,
-                                }}
-                            >
-                                {renderAllCardVerify({ item })}
-                            </View>
-                        )}
+                        renderItem={({ item }) => renderAllCardVerify({ item })}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}

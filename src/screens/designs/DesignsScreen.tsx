@@ -234,8 +234,70 @@ function calcSpec(d: any) {
     };
 
     const resolveYarnFibreShares = (yarn: any): { fibre: string; share: number }[] => {
+        /*
+         * Authoritative ERP composition from the Design detail API.
+         *
+         * Example:
+         *   WBlendPer 11,100
+         *   fibre_composition [{ id: 11, name: 'ELASTOMULTIESTER', percent: 100 }]
+         *
+         * This MUST win over sys/count heuristics. Denier/Dtx describe yarn
+         * count, not fibre identity.
+         */
+        const erpComposition = Array.isArray(yarn?.fibre_composition)
+            ? yarn.fibre_composition
+            : [];
+
+        const validErpComposition = erpComposition
+            .map((component: any) => ({
+                fibre: normalizeFibreName(String(component?.name || '')),
+                percent: Number(component?.percent),
+            }))
+            .filter((component: any) =>
+                component.fibre !== 'Other' &&
+                Number.isFinite(component.percent) &&
+                component.percent > 0
+            );
+
+        if (validErpComposition.length > 0) {
+            const totalPercent = validErpComposition.reduce(
+                (sum: number, component: any) => sum + component.percent,
+                0
+            );
+
+            if (totalPercent > 0) {
+                return validErpComposition.map((component: any) => ({
+                    fibre: component.fibre,
+                    share: component.percent / totalPercent,
+                }));
+            }
+        }
+
+        /*
+         * Pure authoritative fibre fallback from backend.
+         */
+        const authoritativeFibre = normalizeFibreName(
+            String(yarn?.fibre || '')
+        );
+
+        if (
+            authoritativeFibre !== 'Other' &&
+            !authoritativeFibre.includes(' / ')
+        ) {
+            return [{
+                fibre: authoritativeFibre,
+                share: 1,
+            }];
+        }
+
+        /*
+         * Legacy fallback only.
+         *
+         * Do NOT parse w_blend_per here. ERP WBlendPer contains fibre IDs,
+         * e.g. 11,100 means fibre 11 at 100%, not an 11:100 percentage ratio.
+         */
         const percentages = parseBlendPercentages(
-            yarn?.blend_ratio ?? yarn?.br ?? yarn?.w_blend_per
+            yarn?.blend_ratio ?? yarn?.br
         );
         const namedFibres = extractNamedFibres(yarn);
 
@@ -1856,7 +1918,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             fin_width: (design as any).fin_width ?? 58,
         });
         else setForm({ ...EMPTY_FORM });
-    }, [design?.id]);
+    }, [design]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
@@ -1878,6 +1940,15 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             cnt: y.cnt,
             base_price: y.price,
             blend_ratio: (y as any).blend_ratio || null,
+
+            // Preserve authoritative ERP fibre metadata from Yarn Help.
+            fibre: (y as any).fibre || null,
+            fibre_composition: Array.isArray((y as any).fibre_composition)
+                ? (y as any).fibre_composition
+                : [],
+            w_blend: (y as any).w_blend || '',
+            w_blend_per: (y as any).w_blend_per || '',
+
             ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
         }]);
     };

@@ -4,6 +4,7 @@ export const PermissionKeys = {
     productionSummary: 'dashboard.production_summary',
     salesSummary: 'dashboard.sales_summary',
     costingSummary: 'dashboard.costing_summary',
+    creditorDashboard: 'dashboard.creditor_dashboard',
     pendingAuthorizations: 'dashboard.pending_authorizations',
     reports: 'reports',
   },

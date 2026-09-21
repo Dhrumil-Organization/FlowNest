@@ -12,7 +12,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     Pressable,
@@ -31,8 +30,8 @@ import { T } from '../../theme';
 // import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
 import { Ionicons } from '@expo/vector-icons';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 
 const SHORT = (c: string) =>
@@ -3566,11 +3565,12 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
         setLoading(true);
         try {
             const payload = {
-                prptype: userType || prpcode,
+                prptype: userType,
                 yearno: getFinancialYear(year, month),
                 monthno: String(month + 1).padStart(2, '0'),
                 txntype: "monthly_sales_target",
             };
+            console.log("aaa payload", payload);
 
             const response = await client.get('/monthly_sales_target_browse', {
                 params: payload,

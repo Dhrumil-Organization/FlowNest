@@ -1,9 +1,11 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Animated as RNAnimated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Platform, Animated as RNAnimated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import HeaderBarwithBack from '../../../components/HeaderNew';
 
 const { width } = Dimensions.get('window');
@@ -239,10 +241,10 @@ const AccordionTable = ({ data }: { data: ChallanData }) => {
     );
 };
 
-const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ route, token, navigation, username }) => {
+const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username, party, setChallanView, setChallanPartyName }) => {
     // const { party } = route.params;
     const params = useLocalSearchParams();
-    const party = params?.party;
+    // const party = params?.party;
     const [getChallanResponse, setChallanResponse] = useState(null);
     const [renderedChallans, setRenderedChallans] = useState<ChallanData[]>([]);
     const [page, setPage] = useState(1);
@@ -405,14 +407,41 @@ const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ route, token, navi
 
     return (
         <>
-            <HeaderBarwithBack
+            {/* <HeaderBarwithBack
                 userName={username}
                 header={typeof party === 'object' ? party?.partyname : party}
                 subHeader={'Manage your Challans'}
                 // backNavigateScreen={'SOPartyDetails'}
                 breadcrumb={typeof party === 'object' ? party?.partyname : party}
                 SearchBar={false}
-            />
+            /> */}
+
+            <LinearGradient
+                // colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+                colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
+                style={styles.container1}>
+                <View style={styles.breadcrumbChip}>
+                    <View style={styles.breadcrumbRow}>
+                        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => {
+                            setChallanView(false)
+                            setChallanPartyName('')
+                        }
+                        }>
+                            <Icon name="arrow-back" size={18} color="#fff" />
+                            <Text style={styles.breadcrumbBackText}>Back</Text>
+                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {/* <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.replace('/(tabs)')}>
+                                    <Icon name="home" size={18} color="#fff" />
+                                </TouchableOpacity> */}
+                            <Text style={styles.breadcrumbSeparator}>›</Text>
+                            <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
+                                {typeof party === 'object' ? party?.partyname : party}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </LinearGradient >
 
             <View style={styles.searchContainer}>
                 <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
@@ -471,6 +500,14 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f5f5f5',
         padding: 15,
+    },
+    container1: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: Platform.OS === 'android' ? 0 : 0,
+        // borderBottomLeftRadius: 16,
+        // borderBottomRightRadius: 16,
+        elevation: 6,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -702,6 +739,38 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingBottom: 20,
+    },
+    breadcrumbChip: {
+        marginTop: 12,
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        borderBlockColor: 'rgba(255,255,255,0.15)',
+        borderTopWidth: 1,
+        paddingVertical: 6,
+        width: '100%',
+    },
+    breadcrumbRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+    },
+    breadcrumbSeparator: {
+        color: '#fff',
+        marginHorizontal: 6,
+    },
+    breadcrumbBackText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '500',
+        opacity: 0.9,
+    },
+    breadcrumbCurrent: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        flexShrink: 1,
+        textAlign: 'right',
     },
 });
 

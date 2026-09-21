@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { API } from '../../../common/API/dynamicAPI';
 import HeaderBarwithBack from '../../../components/HeaderNew';
+import SOPartyDetailsPart1 from '../SOPartyDetailsPart1/SOPartyDetailsPart1';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -98,6 +99,8 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
     const [restOrders, setRestOrders] = useState<PartyDetail[]>([]);
     const [renderedRestOrders, setRenderedRestOrders] = useState<PartyDetail[]>([]);
     const [restPage, setRestPage] = useState(1);
+    const [getChallanView, setChallanView] = useState(false);
+    const [getChallanPartyName, setChallanPartyName] = useState('');
     const [restLoading, setRestLoading] = useState(false);
 
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -258,10 +261,12 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
             if (response.data.success === true) {
                 setAPILoading(false);
                 await AsyncStorage.setItem('parties_tracking_details_challan_response', JSON.stringify(response.data));
-                router.push({
-                    pathname: '/new/SOPartyDetailsPart1',
-                    params: { party: order.partyname }
-                });
+                // router.push({
+                //     pathname: '/new/SOPartyDetailsPart1',
+                //     params: { party: order.partyname }
+                // });
+                setChallanView(true);
+                setChallanPartyName(order.partyname);
             }
         } catch (error) {
             setAPILoading(false);
@@ -667,6 +672,14 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
                     )}
                 </View>
             </ScrollView>
+
+            {getChallanView && (
+                <View style={styles.detailOverlay78910}>
+                    <View style={styles.detailContainer78910}>
+                        <SOPartyDetailsPart1 username={username} party={getChallanPartyName} setChallanView={setChallanView} setChallanPartyName={setChallanPartyName} />
+                    </View>
+                </View>
+            )}
         </>
     );
 };
@@ -972,6 +985,43 @@ const styles = StyleSheet.create({
         flexShrink: 1,
         textAlign: 'right',
     },
+    detailOverlay78910: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 500, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    
+      // Detail Container
+      detailContainer: {
+        backgroundColor: '#fff',
+        // padding: 20,
+        paddingTop: 45,
+        borderRadius: 10,
+        width: '100%',
+        height: '100%',
+        elevation: 5, // Shadow for Android
+        shadowColor: '#000', // Shadow for iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      detailContainer78910: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        width: '100%',
+        height: '100%',
+        elevation: 5, // Shadow for Android
+        shadowColor: '#000', // Shadow for iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
 });
 
 export default SOPartyDetails;

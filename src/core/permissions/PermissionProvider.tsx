@@ -112,12 +112,17 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       const path = normalize(resourcePath);
       if (!path) return false;
 
-      // SuperAdmin is unconditional full access. New registry resources are
-      // automatically available immediately after session/registry refresh.
-      if (isSuperAdmin) return true;
-
+      // Explicit resource decisions always win, including for SuperAdmin.
+      // This keeps newly registered resources available to SuperAdmin by default
+      // (no grant row yet), while allowing SuperAdmin to explicitly deny a
+      // module/screen/tab after registry sync.
       const exact = runtimeGrants.get(`resource:${path}`);
       if (exact !== undefined) return exact;
+
+      // SuperAdmin fallback applies only when there is no explicit decision for
+      // this resource. Ordinary users continue through the existing grant /
+      // legacy permission flow below.
+      if (isSuperAdmin) return true;
 
       // A container (navigation item, screen, tab or section) must remain
       // reachable when at least one explicitly allowed descendant is assigned.
@@ -154,11 +159,13 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       const action = normalize(actionKey);
       if (!canAccess(path)) return false;
 
-      // SuperAdmin is unconditional full access.
-      if (isSuperAdmin) return true;
-
+      // Explicit action decisions always win, including for SuperAdmin.
       const exact = runtimeGrants.get(`action:${path}:${action}`);
       if (exact !== undefined) return exact;
+
+      // SuperAdmin receives actions by default only when no explicit action
+      // decision exists. A configured DENY therefore remains enforceable.
+      if (isSuperAdmin) return true;
 
       // Visibility is controlled by resource access. Some backend payloads omit a
       // separate `view` action even when the resource itself is explicitly allowed.

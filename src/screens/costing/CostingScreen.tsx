@@ -416,7 +416,7 @@ function CostingTab({
     const yKey = (miId: string, br: string | null) => `${miId}|${br ?? ''}`;
 
     const designAdjustments = (full: Design) => ({
-        greige_width: Number(full.greige_width || full.reed_space || 0),
+        greige_width: Number(full.greige_width || 0),
         warp_shrink: Number(full.warp_shrink || 0),
         warp_wastage: Number(full.warp_wastage || 0),
         weft_wastage: Number(full.weft_wastage || 0),
@@ -757,6 +757,11 @@ function CostingTab({
     // live compute
     const compute = useCallback(async () => {
         if (!mdId || !design) return;
+        if (!(Number(adjust.greige_width) > 0)) {
+            setResult(null);
+            setComputing(false);
+            return;
+        }
         setComputing(true);
         try {
             const res = await CostingAPI.compute({
@@ -799,6 +804,13 @@ function CostingTab({
     // };
 
     const save = async () => {
+        if (!(Number(adjust.greige_width) > 0)) {
+            AppAlert.alert(
+                'Greige Width required',
+                'Enter the actual off-loom Greige Width before saving the costing.'
+            );
+            return;
+        }
         if (!result) {
             AppAlert.alert('Compute first');
             return;
@@ -1067,7 +1079,14 @@ function CostingTab({
 
                     <View style={c.section}>
                         <Text style={c.sHdr}>RECALC ADJUSTMENTS · DESIGN PARAMS</Text>
-                        <Text style={c.help}>Tweak shrink, width & wastage to re-cost this design without re-creating it. Shrink/width affect GSM & finished cost; wastage affects cost only. The Design Master is left unchanged.</Text>
+                        <Text style={c.help}>Tweak shrink, width & wastage to re-cost this design without re-creating it. Greige Width is the actual measured off-loom width and is required; it is never derived from Warp Shrink. The Design Master is left unchanged.</Text>
+                        <View style={{ marginBottom: 10 }}>
+                            <Text style={c.subHdr}>GREIGE WIDTH · REQUIRED</Text>
+                            <Inp value={String(adjust.greige_width || '')} onChange={v => setAdjust(a => ({ ...a, greige_width: numeric(v, 0) }))} suffix={'"'} />
+                            {!(Number(adjust.greige_width) > 0) && (
+                                <Text style={[c.help, { marginTop: 6 }]}>Enter the actual off-loom Greige Width to calculate costing.</Text>
+                            )}
+                        </View>
                         <View style={c.twoCol}>
                             <View style={{ flex: 1 }}><Text style={c.subHdr}>WARP SHRINK</Text><Inp value={String(adjust.warp_shrink)} onChange={v => setAdjust(a => ({ ...a, warp_shrink: numeric(v, 0) }))} suffix="%" /></View>
                             <View style={{ flex: 1 }}><Text style={c.subHdr}>FINISH SHRINK</Text><Inp value={String(adjust.gf_shrink)} onChange={v => setAdjust(a => ({ ...a, gf_shrink: numeric(v, 0) }))} suffix="%" /></View>
@@ -1773,9 +1792,10 @@ const blankTempDraft = (): TempDraft => ({
  * TEMP ENGINE — mirrors the frozen rules in App\Services\CostingEngine.
  *
  * Deliberate parity points:
- * - warp costing grams = EPI × reed space × GPM × (1 + warp wastage%)
+ * - Greige Width is a required independent off-loom measurement
+ * - warp costing grams = EPI × reed space × GPM × (1 + warp shrink%) × (1 + warp wastage%)
  * - PPI table = PPI loom + 2
- * - weft uses on-table PPI and RS/reed-space, not greige width
+ * - weft uses on-table PPI and RS/reed-space, not greige width (verified costing rule)
  * - warp/weft wastage is included in yarn consumption before cost
  * - selvedge uses TOTAL ENDS and is excluded from body GLM
  * - YD = base + dye; PD ignores per-yarn dye
@@ -1789,11 +1809,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     if (reedSpace <= 0 || d.warp.length === 0 || d.weft.length === 0) return null;
 
     const warpShrink = tempPct(d.warpShrink, 99.99);
-    const greigeWidthInput = tempNum(d.greigeWidth);
-    const greigeWidth = greigeWidthInput > 0
-        ? greigeWidthInput
-        : reedSpace * (1 - warpShrink / 100);
-
+    const greigeWidth = tempNum(d.greigeWidth);
+    // Required independent measurement: never derive from Reed Space/Warp Shrink.
     if (greigeWidth <= 0) return null;
 
     const validWarp = d.warp.every(r => tempRowGpm(r) > 0 && tempNum(r.basis) > 0);
@@ -1810,7 +1827,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const warpRows: TempComputedRow[] = d.warp.map(r => {
         const gpm = tempRowGpm(r);
         const epi = tempNum(r.basis);
-        const baseGrams = epi * reedSpace * gpm;
+        const warpTakeUpFactor = 1 + warpShrink / 100;
+        const baseGrams = epi * reedSpace * gpm * warpTakeUpFactor;
         const grams = baseGrams * (1 + warpWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);
@@ -1834,7 +1852,7 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const weftRows: TempComputedRow[] = d.weft.map(r => {
         const gpm = tempRowGpm(r);
         const ppi = tempNum(r.basis);
-        const baseGrams = ppi * weftFactor * reedSpace * gpm;
+        const baseGrams = ppi * weftFactor * greigeWidth * gpm;
         const grams = baseGrams * (1 + weftWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);

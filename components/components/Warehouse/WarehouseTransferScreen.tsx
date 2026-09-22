@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  TouchableWithoutFeedback,
   Modal
 } from "react-native";
 
@@ -54,6 +53,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
 
   const [toLocation, setToLocation] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cartons, setCartons] = useState([]);
@@ -84,29 +84,61 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
 
 
 
+  // Keep the TextInput immediate/responsive while the expensive list filter waits
+  // briefly. This is especially important on web/mobile with 10k+ cartons.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Build searchable text and stable row keys only when carton data changes.
+  // The old implementation rebuilt searchable strings repeatedly on every keypress.
+  const indexedCartons = useMemo(() =>
+    cartons.map((item, index) => ({
+      item,
+      key: keyOf(item) || `warehouse_row_${index}`,
+      search: searchable(item),
+    })),
+  [cartons]);
+
+  const selectedKeySet = useMemo(
+    () => new Set(Object.keys(selected)),
+    [selected]
+  );
+
+  const selectedOrderRank = useMemo(() => {
+    const rank = new Map();
+    selectedOrder.forEach((key, index) => rank.set(key, index));
+    return rank;
+  }, [selectedOrder]);
+
   const filteredCartons = useMemo(() => {
-    const s = searchText.trim().toLowerCase();
+    const query = debouncedSearchText.trim().toLowerCase();
+    const selectedRows = [];
+    const remainingRows = [];
 
-    const rows = s
-      ? cartons.filter(x => searchable(x).includes(s))
-      : cartons;
+    // Single O(n) pass. The previous selectedOrder -> rows.find() approach could
+    // become O(n*m) and was very expensive with large carton lists.
+    indexedCartons.forEach(entry => {
+      if (query && !entry.search.includes(query)) return;
 
-    const selectedMap = new Map();
-
-    selectedOrder.forEach(key => {
-      const found = rows.find(x => keyOf(x) === key);
-
-      if (found) {
-        selectedMap.set(key, found);
+      if (selectedKeySet.has(entry.key)) {
+        selectedRows.push(entry);
+      } else {
+        remainingRows.push(entry);
       }
     });
 
-    const selectedRows = Array.from(selectedMap.values());
-
-    const remainingRows = rows.filter(x => !selectedMap.has(keyOf(x)));
+    selectedRows.sort((a, b) =>
+      (selectedOrderRank.get(a.key) ?? Number.MAX_SAFE_INTEGER) -
+      (selectedOrderRank.get(b.key) ?? Number.MAX_SAFE_INTEGER)
+    );
 
     return [...selectedRows, ...remainingRows];
-  }, [cartons, searchText, selectedOrder]);
+  }, [indexedCartons, debouncedSearchText, selectedKeySet, selectedOrderRank]);
 
   const clearSelected = () => {
     setSelected({});
@@ -453,11 +485,10 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
             <WarehouseHeader title="Transfer Carton" navigation={navigation} />
 
-            <View style={[styles.container, { paddingBottom: searchFocused ? 10 : 82 }]}>
+            <View style={[styles.container, { flex: 1, minHeight: 0, paddingBottom: searchFocused ? 10 : 82 }]}>
               <View style={styles.card}>
                 <View style={styles.between}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -633,23 +664,25 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
               </View>
 
               <FlatList
+                style={[{ flex: 1, minHeight: 0 }, Platform.OS === "web" ? ({ overflowY: "auto" } as any) : null]}
                 data={filteredCartons}
-                keyboardShouldPersistTaps="handled"
-                extraData={{ selected, searchText }}
-                keyExtractor={(item, index) =>
-                  `${index}_${item?.uid || item?.UId || ""}_${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}`
-                }
-                renderItem={({ item }) => {
-                  const rowKey = keyOf(item);
-
-                  return (
-                    <CartonCard
-                      item={item}
-                      selected={!!selected[rowKey]}
-                      onPress={toggleSelect}
-                    />
-                  );
-                }}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="none"
+                extraData={selected}
+                keyExtractor={entry => entry.key}
+                initialNumToRender={16}
+                maxToRenderPerBatch={20}
+                updateCellsBatchingPeriod={50}
+                windowSize={7}
+                removeClippedSubviews={Platform.OS !== "web"}
+                renderItem={({ item: entry }) => (
+                  <CartonCard
+                    item={entry.item}
+                    selected={!!selected[entry.key]}
+                    onPress={toggleSelect}
+                  />
+                )}
                 ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>}
               />
             </View>
@@ -677,9 +710,6 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
             )}
           </View>
 
-
-
-        </TouchableWithoutFeedback>
         <Modal visible={locationPickerVisible} animationType="slide">
           <View style={{ flex: 1, backgroundColor: "#fff" }}>
 

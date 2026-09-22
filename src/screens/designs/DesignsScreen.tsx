@@ -103,62 +103,110 @@ const GPM = (sys: string, cnt: number): number => {
 export type FabricSpec = ReturnType<typeof calcSpec>;
 
 function calcSpec(d: any) {
-    const s = (Number(d.warp_shrink) || 0) / 100;   // warp take-up
-    const gf = (Number(d.gf_shrink) || 0) / 100;    // greige→finish shrink
-    const basis: 'reed' | 'greige' = d.width_basis === 'greige' ? 'greige' : 'reed';
+    // Client Claude reference: four independent engineering inputs.
+    // Reed Space       = on-loom width.
+    // Greige Width     = off-loom width entered/stored independently.
+    // Warp Shrink      = warp length take-up, not a width formula.
+    // Finish Shrink    = greige -> finished length shrink.
+    const reed = Number(d.reed_space) || 0;
+    const warpTakeUp = 1 + ((Number(d.warp_shrink) || 0) / 100);
+    const gf = (Number(d.gf_shrink) || 0) / 100;
 
-    // reed ↔ greige width are interchangeable
-    let reed = Number(d.reed_space) || 0;
-    let widthGreige = Number(d.greige_width) || 0;
-    if (basis === 'greige' && widthGreige > 0 && s < 1) {
-        reed = widthGreige / (1 - s);
-    } else {
-        widthGreige = reed * (1 - s);
-    }
+    const enteredGreigeWidth = Number(d.greige_width) || 0;
+    const greigeWidthMissing = !(enteredGreigeWidth > 0);
+    // Strong rule: Greige Width is an independent REQUIRED measurement.
+    // Never substitute Reed Space or a derived value into live calculations.
+    const widthGreige = enteredGreigeWidth > 0 ? enteredGreigeWidth : 0;
+    const widthContraction =
+        enteredGreigeWidth > 0 && reed > 0
+            ? reed / enteredGreigeWidth
+            : 0;
 
     const warpYarns: any[] = d.warp_yarns ?? [];
     const weftYarns: any[] = d.weft_yarns ?? [];
-    const epiLoom = warpYarns.reduce((t, y) => t + (Number(y.epi) || 0), 0);
-    const ppiLoom = weftYarns.reduce((t, y) => t + (Number(y.ppi) || 0), 0);
 
-    const totalEnds = epiLoom * reed;
-    const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;          // "+2 picks on table"
-    const wf = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const epiLoom = warpYarns.reduce(
+        (total, yarn) => total + (Number(yarn.epi) || 0),
+        0
+    );
+    const ppiLoom = weftYarns.reduce(
+        (total, yarn) => total + (Number(yarn.ppi) || 0),
+        0
+    );
 
-    // ends are conserved loom → greige → finished
-    const epiGreige = widthGreige > 0 ? totalEnds / widthGreige : 0;
-    const finWidthIn = (Number(d.fin_width) || 0) > 0
-        ? Number(d.fin_width)
-        : (gf < 1 ? widthGreige * (1 - gf) : widthGreige);
-    const epiFinished = finWidthIn > 0 ? totalEnds / finWidthIn : 0;
-    // picks pack closer as length shrinks in finishing
-    const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
+    // Body ends only. Selvedge remains cost-only in the current RN design model.
+    const totalEnds = Math.round(epiLoom * reed);
 
-    // ── Physical GLM (RS/reed-space basis, matching CostingEngine base consumption) ──
-    let warpGLM = 0;
-    warpYarns.forEach((y) => {
-        warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+    const epiGreige = epiLoom * widthContraction;
+    const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;
+    const ppiFactor = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+
+    // Claude physical fabric-weight formula:
+    // warp = effective greige EPI × yarn g/m × warp take-up
+    // weft = effective greige PPI × yarn g/m
+    const IN_PER_M = 39.3701;
+    const M_PER_IN = 0.0254;
+
+    let warpGSM = 0;
+    warpYarns.forEach((yarn) => {
+        const effectiveEpi =
+            (Number(yarn.epi) || 0) * widthContraction;
+        warpGSM +=
+            effectiveEpi *
+            IN_PER_M *
+            GPM(yarn.sys, Number(yarn.cnt)) *
+            warpTakeUp;
     });
-    let weftGLM = 0;
-    weftYarns.forEach((y) => {
-        weftGLM += (Number(y.ppi) || 0) * wf * reed * GPM(y.sys, Number(y.cnt));
-    });
-    const greigGLM = warpGLM + weftGLM;
-    const widthGreigeM = widthGreige * 0.0254;
-    const greigGSM = widthGreigeM > 0 ? greigGLM / widthGreigeM : 0;
-    const finGLM = gf < 1 ? greigGLM / (1 - gf) : greigGLM;   // mass conserved
-    const finWidthM = finWidthIn * 0.0254;
-    const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
 
-    // ── fibre blend, weighted by actual yarn grams contributed ──
-    //
-    // A yarn such as COTTON/LINEN 45:55 is split into its actual
-    // fibre components. Because the yarn gram contribution depends on
-    // EPI/PPI, Fibre Blend updates immediately whenever EPI/PPI changes.
+    let weftGSM = 0;
+    weftYarns.forEach((yarn) => {
+        const effectivePpi =
+            (Number(yarn.ppi) || 0) * ppiFactor;
+        weftGSM +=
+            effectivePpi *
+            IN_PER_M *
+            GPM(yarn.sys, Number(yarn.cnt));
+    });
+
+    const greigGSM = !greigeWidthMissing ? (warpGSM + weftGSM) : 0;
+    const greigGLM =
+        !greigeWidthMissing && widthGreige > 0
+            ? greigGSM * (widthGreige * M_PER_IN)
+            : 0;
+
+    const finWidthEntered = (Number(d.fin_width) || 0) > 0;
+    const finWidthIn = finWidthEntered ? Number(d.fin_width) : 0;
+    const hasFinished =
+        !greigeWidthMissing &&
+        finWidthEntered &&
+        gf >= 0 &&
+        gf < 1;
+
+    const finGLM =
+        hasFinished
+            ? greigGLM / (1 - gf)
+            : 0;
+    const finGSM =
+        hasFinished && finWidthIn > 0
+            ? finGLM / (finWidthIn * M_PER_IN)
+            : 0;
+
+    const epiFinished =
+        hasFinished && finWidthIn > 0
+            ? totalEnds / finWidthIn
+            : 0;
+    const ppiFinished =
+        hasFinished
+            ? ppiTable / (1 - gf)
+            : 0;
+
+    // ── ERP-authoritative fibre identity ──────────────────────
     const normalizeFibreName = (value: string): string => {
-        const name = String(value || '').trim().toLowerCase();
+        const raw = String(value || '').trim();
+        const name = raw.toLowerCase();
 
         if (!name) return 'Other';
+        if (name.includes('elastomultiester')) return 'Elastomultiester';
         if (name.includes('linen') || name.includes('flax')) return 'Linen';
         if (name.includes('cotton')) return 'Cotton';
         if (name.includes('polyester') || name === 'poly' || name === 'pes') return 'Polyester';
@@ -172,86 +220,19 @@ function calcSpec(d: any) {
         if (name.includes('acrylic')) return 'Acrylic';
         if (name.includes('elastane') || name.includes('spandex') || name.includes('lycra')) return 'Elastane';
 
-        return value.trim() || 'Other';
+        return raw || 'Other';
     };
 
-    const defaultFibreOf = (yarn: any): string => {
-        const sys = String(yarn?.sys || '').trim();
-
-        if (sys === 'Lea') return 'Linen';
-        if (sys === 'Ne') return 'Cotton';
-        if (sys === 'Den' || sys === 'Dtx') return 'Polyester';
-
-        return 'Other';
-    };
-
-    const extractNamedFibres = (yarn: any): string[] => {
-        const rawName = `${yarn?.name || ''} ${yarn?.itm_name || ''}`.toUpperCase();
-        const fibres: string[] = [];
-
-        const add = (fibre: string) => {
-            if (!fibres.includes(fibre)) fibres.push(fibre);
-        };
-
-        if (/\bCOTTON\b/.test(rawName)) add('Cotton');
-        if (/\bLINEN\b|\bFLAX\b/.test(rawName)) add('Linen');
-        if (/\bPOLYESTER\b|\bPES\b/.test(rawName)) add('Polyester');
-        if (/\bVISCOSE\b|\bRAYON\b/.test(rawName)) add('Viscose');
-        if (/\bMODAL\b/.test(rawName)) add('Modal');
-        if (/\bLYOCELL\b|\bTENCEL\b/.test(rawName)) add('Lyocell');
-        if (/\bBAMBOO\b/.test(rawName)) add('Bamboo');
-        if (/\bWOOL\b/.test(rawName)) add('Wool');
-        if (/\bSILK\b/.test(rawName)) add('Silk');
-        if (/\bNYLON\b|\bPOLYAMIDE\b/.test(rawName)) add('Nylon');
-        if (/\bACRYLIC\b/.test(rawName)) add('Acrylic');
-        if (/\bELASTANE\b|\bSPANDEX\b|\bLYCRA\b/.test(rawName)) add('Elastane');
-
-        // Common textile abbreviation: PC = Polyester/Cotton.
-        if (/\bPC\b/.test(rawName)) {
-            add('Polyester');
-            add('Cotton');
-        }
-
-        return fibres;
-    };
-
-    const parseBlendPercentages = (value: any): number[] => {
-        const raw = String(value ?? '').trim();
-
-        if (!raw) return [];
-
-        const values = raw
-            .replace(/%/g, '')
-            .split(/[:/,+-]/)
-            .map(part => Number(part.trim()))
-            .filter(part => Number.isFinite(part) && part >= 0);
-
-        if (values.length < 2) return [];
-
-        const total = values.reduce((sum, part) => sum + part, 0);
-        if (total <= 0) return [];
-
-        return values.map(part => part / total);
-    };
-
-    const resolveYarnFibreShares = (yarn: any): { fibre: string; share: number }[] => {
-        /*
-         * Authoritative ERP composition from the Design detail API.
-         *
-         * Example:
-         *   WBlendPer 11,100
-         *   fibre_composition [{ id: 11, name: 'ELASTOMULTIESTER', percent: 100 }]
-         *
-         * This MUST win over sys/count heuristics. Denier/Dtx describe yarn
-         * count, not fibre identity.
-         */
-        const erpComposition = Array.isArray(yarn?.fibre_composition)
+    const resolveYarnFibreShares = (
+        yarn: any
+    ): { fibre: string; share: number }[] => {
+        const rawComposition = Array.isArray(yarn?.fibre_composition)
             ? yarn.fibre_composition
             : [];
 
-        const validErpComposition = erpComposition
+        const composition = rawComposition
             .map((component: any) => ({
-                fibre: normalizeFibreName(String(component?.name || '')),
+                fibre: normalizeFibreName(component?.name),
                 percent: Number(component?.percent),
             }))
             .filter((component: any) =>
@@ -260,103 +241,97 @@ function calcSpec(d: any) {
                 component.percent > 0
             );
 
-        if (validErpComposition.length > 0) {
-            const totalPercent = validErpComposition.reduce(
+        if (composition.length > 0) {
+            const total = composition.reduce(
                 (sum: number, component: any) => sum + component.percent,
                 0
             );
 
-            if (totalPercent > 0) {
-                return validErpComposition.map((component: any) => ({
+            if (total > 0) {
+                return composition.map((component: any) => ({
                     fibre: component.fibre,
-                    share: component.percent / totalPercent,
+                    share: component.percent / total,
                 }));
             }
         }
 
-        /*
-         * Pure authoritative fibre fallback from backend.
-         */
-        const authoritativeFibre = normalizeFibreName(
-            String(yarn?.fibre || '')
-        );
-
-        if (
-            authoritativeFibre !== 'Other' &&
-            !authoritativeFibre.includes(' / ')
-        ) {
-            return [{
-                fibre: authoritativeFibre,
-                share: 1,
-            }];
+        const authoritativeFibre = String(yarn?.fibre || '').trim();
+        if (authoritativeFibre && !authoritativeFibre.includes('/')) {
+            const fibre = normalizeFibreName(authoritativeFibre);
+            if (fibre !== 'Other') {
+                return [{ fibre, share: 1 }];
+            }
         }
 
-        /*
-         * Legacy fallback only.
-         *
-         * Do NOT parse w_blend_per here. ERP WBlendPer contains fibre IDs,
-         * e.g. 11,100 means fibre 11 at 100%, not an 11:100 percentage ratio.
-         */
-        const percentages = parseBlendPercentages(
-            yarn?.blend_ratio ?? yarn?.br
-        );
-        const namedFibres = extractNamedFibres(yarn);
-
-        if (percentages.length > 0 && namedFibres.length > 0) {
-            const resolved: { fibre: string; share: number }[] = [];
-            const pairedCount = Math.min(percentages.length, namedFibres.length);
-
-            for (let index = 0; index < pairedCount; index += 1) {
-                resolved.push({
-                    fibre: normalizeFibreName(namedFibres[index]),
-                    share: percentages[index],
-                });
-            }
-
-            const assigned = resolved.reduce((sum, row) => sum + row.share, 0);
-            const balance = Math.max(0, 1 - assigned);
-
-            if (balance > 0.000001) {
-                const fallback = defaultFibreOf(yarn);
-                const existing = resolved.find(row => row.fibre === fallback);
-
-                if (existing) existing.share += balance;
-                else resolved.push({ fibre: fallback, share: balance });
-            }
-
-            return resolved;
-        }
-
-        return [{
-            fibre: defaultFibreOf(yarn),
-            share: 1,
-        }];
+        // Never infer fibre from Denier/Ne/Lea or yarn name.
+        return [{ fibre: 'Other', share: 1 }];
     };
 
-    const blendTotals: Record<string, number> = {};
+    const calculateBlend = (
+        warpMultiplier: number,
+        weftMultiplier: number
+    ) => {
+        const totals: Record<string, number> = {};
 
-    const addYarnContribution = (yarn: any, grams: number) => {
-        if (!(grams > 0)) return;
+        const add = (yarn: any, mass: number) => {
+            if (!(mass > 0)) return;
 
-        resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
-            if (!(share > 0)) return;
+            resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
+                if (!(share > 0)) return;
+                totals[fibre] = (totals[fibre] ?? 0) + (mass * share);
+            });
+        };
 
-            const key = normalizeFibreName(fibre);
-            blendTotals[key] = (blendTotals[key] ?? 0) + (grams * share);
+        warpYarns.forEach((yarn) => {
+            const mass =
+                (Number(yarn.epi) || 0) *
+                warpMultiplier *
+                IN_PER_M *
+                GPM(yarn.sys, Number(yarn.cnt));
+            add(yarn, mass);
         });
+
+        weftYarns.forEach((yarn) => {
+            const mass =
+                (Number(yarn.ppi) || 0) *
+                weftMultiplier *
+                IN_PER_M *
+                GPM(yarn.sys, Number(yarn.cnt));
+            add(yarn, mass);
+        });
+
+        const sorted = Object.fromEntries(
+            Object.entries(totals).sort(([, a], [, b]) => b - a)
+        ) as Record<string, number>;
+
+        const grand = Object.values(sorted).reduce(
+            (sum, value) => sum + value,
+            0
+        );
+
+        return { totals: sorted, grand };
     };
 
-    warpYarns.forEach((y) => {
-        const grams = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
-        addYarnContribution(y, grams);
-    });
+    // Claude GREIGE blend:
+    // warp = reed/greige width × warp take-up
+    // weft = on-table PPI / loom PPI
+    const blendGreige = !greigeWidthMissing
+        ? calculateBlend(
+            widthContraction * warpTakeUp,
+            ppiFactor
+        )
+        : { totals: {} as Record<string, number>, grand: 0 };
 
-    weftYarns.forEach((y) => {
-        const grams = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
-        addYarnContribution(y, grams);
-    });
+    // Claude FINISHED blend:
+    // warp ends are packed from reed width to finished width;
+    // picks are additionally packed by finish shrink.
+    const blendFinished = hasFinished
+        ? calculateBlend(
+            (reed / finWidthIn) * warpTakeUp,
+            ppiFactor / (1 - gf)
+        )
+        : { totals: {} as Record<string, number>, grand: 0 };
 
-    const blendGrand = Object.values(blendTotals).reduce((a, b) => a + b, 0);
     const naturalFibres = new Set([
         'Cotton',
         'Linen',
@@ -367,17 +342,43 @@ function calcSpec(d: any) {
         'Wool',
         'Silk',
     ]);
-    const hasNaturalFibre = Object.keys(blendTotals).some(
-        fibre => naturalFibres.has(fibre) && (blendTotals[fibre] ?? 0) > 0
+
+    const hasNaturalFibre = Object.keys(blendGreige.totals).some(
+        fibre =>
+            naturalFibres.has(fibre) &&
+            (blendGreige.totals[fibre] ?? 0) > 0
     );
 
     return {
-        basis, reed, widthGreige, finWidthIn,
-        epiLoom, ppiLoom, ppiTable, totalEnds,
-        epiGreige, epiFinished, ppiFinished,
-        warpGLM, weftGLM, greigGLM, greigGSM, finGLM, finGSM,
-        blendTotals, blendGrand, hasNaturalFibre,
-        finWidthEntered: (Number(d.fin_width) || 0) > 0,
+        basis: 'reed' as const,
+        reed,
+        widthGreige,
+        greigeWidthMissing,
+        widthContraction,
+        warpTakeUp,
+        finWidthIn,
+        finWidthEntered,
+        hasFinished,
+        epiLoom,
+        ppiLoom,
+        ppiTable,
+        totalEnds,
+        epiGreige,
+        epiFinished,
+        ppiFinished,
+        warpGLM: 0,
+        weftGLM: 0,
+        greigGLM,
+        greigGSM,
+        finGLM,
+        finGSM,
+        blendTotals: blendGreige.totals,
+        blendGrand: blendGreige.grand,
+        blendGreigeTotals: blendGreige.totals,
+        blendGreigeGrand: blendGreige.grand,
+        blendFinishedTotals: blendFinished.totals,
+        blendFinishedGrand: blendFinished.grand,
+        hasNaturalFibre,
     };
 }
 
@@ -385,6 +386,7 @@ const BLEND_COLORS: Record<string, string> = {
     Linen: '#C8A96E',
     Cotton: '#A8C8A0',
     Polyester: '#A0B8C8',
+    Elastomultiester: '#3F9C8F',
     Viscose: '#B8A0C8',
     Modal: '#9FC4B6',
     Lyocell: '#8FBDB0',
@@ -501,6 +503,12 @@ function LiveSpecPanel({ design }: { design: any }) {
                 ↑EPI {f1(spec.epiLoom)} × ↑PPI {f1(spec.ppiLoom)}  (on loom)
             </Text>
 
+            {spec.greigeWidthMissing && (
+                <Text style={{ fontSize: 10, color: T.red, fontWeight: '700', marginBottom: 6 }}>
+                    Greige width is required — enter the actual off-loom measurement. Greige/finished weight and fibre calculations are held until entered.
+                </Text>
+            )}
+
             {/* ── construction table LOOM / GREIGE / FINISHED ── */}
             <View style={ls.table}>
                 <View style={[ls.tr, ls.trHead]}>
@@ -554,29 +562,74 @@ function LiveSpecPanel({ design }: { design: any }) {
                 </>
             )}
 
-            {/* ── fibre blend bar ── */}
-            {spec.blendGrand > 0 && (
+            {/* ── fibre blend: greige + finished ── */}
+            {spec.blendGreigeGrand > 0 && (
                 <View style={{ marginTop: 14 }}>
-                    <Text style={ls.sec}>FINAL FABRIC COMPOSITION</Text>
-                    <Text style={ls.blendHint}>
-                        Recalculates automatically from selected yarn blend + EPI/PPI.
-                    </Text>
+                    <Text style={ls.sec}>FIBRE BLEND · GREIGE</Text>
                     <View style={ls.blendBar}>
-                        {Object.entries(spec.blendTotals).map(([k, v]) => (
-                            <View key={k} style={{ flex: v / spec.blendGrand, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                        {Object.entries(spec.blendGreigeTotals).map(([k, v]) => (
+                            <View
+                                key={k}
+                                style={{
+                                    flex: v / spec.blendGreigeGrand,
+                                    backgroundColor: BLEND_COLORS[k] ?? '#888',
+                                }}
+                            />
                         ))}
                     </View>
                     <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                        {Object.entries(spec.blendTotals).map(([k, v]) => (
+                        {Object.entries(spec.blendGreigeTotals).map(([k, v]) => (
                             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
                                 <Text style={ls.blendLegendName}>{k}</Text>
                                 <Text style={ls.blendLegendPct}>
-                                    {Math.round(v / spec.blendGrand * 100)}%
+                                    {(v / spec.blendGreigeGrand * 100).toFixed(1)}%
                                 </Text>
                             </View>
                         ))}
                     </View>
+
+                    {spec.blendFinishedGrand > 0 && (
+                        <View style={{ marginTop: 10 }}>
+                            <Text style={ls.sec}>FIBRE BLEND · FINISHED</Text>
+                            <View style={ls.blendBar}>
+                                {Object.entries(spec.blendFinishedTotals).map(([k, v]) => (
+                                    <View
+                                        key={k}
+                                        style={{
+                                            flex: v / spec.blendFinishedGrand,
+                                            backgroundColor: BLEND_COLORS[k] ?? '#888',
+                                        }}
+                                    />
+                                ))}
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                                {Object.entries(spec.blendFinishedTotals).map(([k, v]) => {
+                                    const finishedPct = v / spec.blendFinishedGrand * 100;
+                                    const greigeMass = spec.blendGreigeTotals[k] ?? 0;
+                                    const greigePct = spec.blendGreigeGrand > 0
+                                        ? greigeMass / spec.blendGreigeGrand * 100
+                                        : 0;
+                                    const delta = finishedPct - greigePct;
+
+                                    return (
+                                        <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                                            <Text style={ls.blendLegendName}>{k}</Text>
+                                            <Text style={ls.blendLegendPct}>
+                                                {finishedPct.toFixed(1)}%
+                                            </Text>
+                                            {Math.abs(delta) >= 0.1 && (
+                                                <Text style={{ fontSize: 10, fontWeight: '700', color: delta > 0 ? T.green : T.red }}>
+                                                    {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -589,12 +642,11 @@ function LiveSpecPanel({ design }: { design: any }) {
             {showFormula && (
                 <View style={ls.formulaBox}>
                     <Text style={ls.formulaTxt}>
-                        Reed and greige width are interchangeable: greige width = reed × (1 − warp shrink).
-                        Total ends = ΣEPI(loom) × reed. EPI greige = ΣEPI ÷ (1 − warp shrink),
-                        PPI greige = ΣPPI + 2. Greige GSM = greige GLM ÷ width(m).
-                        Finished GLM = greige GLM ÷ (1 − finish shrink); mass conserved.
-                        Finished EPI = total ends ÷ finished width (ends conserved).
-                        Finished PPI = PPI greige ÷ (1 − finish shrink) — picks pack closer as length shrinks.
+                        Reed Space and Greige Width are independent widths. Greige Width must be entered as the actual off-loom measurement; Reed × (1 − Warp Shrink) is suggestion only and is never substituted as the measured Greige Width. Warp Shrink is length take-up:
+                        warp mass × (1 + warp shrink), not a greige-width formula. Greige EPI = Loom EPI × Reed / Greige Width;
+                        Greige PPI = Loom PPI + 2. Greige GSM is calculated from effective warp/weft yarn mass and Greige GLM
+                        = Greige GSM × Greige Width(m). Finished GLM = Greige GLM ÷ (1 − Finish Shrink);
+                        Finished EPI = body ends ÷ Finished Width and Finished PPI = Greige PPI ÷ (1 − Finish Shrink).
                     </Text>
                 </View>
             )}
@@ -1907,6 +1959,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+    // Raw text is kept separately so values like `85.` and `85.50`
+    // remain typeable instead of being collapsed by parseFloat.
+    const [greigeWidthText, setGreigeWidthText] = useState('');
+
+    useEffect(() => {
+        const stored = Number((design as any)?.greige_width) || 0;
+        setGreigeWidthText(stored > 0 ? String((design as any)?.greige_width) : '');
+    }, [design]);
 
     useEffect(() => {
         if (design) setForm({
@@ -1922,10 +1982,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     }, [design]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-
-    // greige width ⇄ reed space, kept in sync live
-    const shrinkFrac = (Number(form.warp_shrink) || 0) / 100;
-    const autoGreige = (Number(form.reed_space) || 0) * (1 - shrinkFrac);
 
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
@@ -1962,6 +2018,15 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
     // ✅ validated + verified save (ported logic)
     const save = async () => {
+        const requiredGreigeWidth = Number(form.greige_width) || 0;
+        if (!(requiredGreigeWidth > 0)) {
+            AppAlert.alert(
+                'Greige Width required',
+                'Enter the actual off-loom Greige Width before saving the design.'
+            );
+            return;
+        }
+
         if (!String(form.code || '').trim()) {
             AppAlert.alert('Validation', 'Design code is required.');
             return;
@@ -1999,7 +2064,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
                 width_basis: 'reed',
                 reed_space: Number(form.reed_space) || 0,
-                greige_width: Number(autoGreige) || 0,
+                greige_width: Number(form.greige_width) || 0,
                 warp_shrink: Number(form.warp_shrink) || 0,
                 warp_wastage: Number(form.warp_wastage) || 0,
                 weft_wastage: Number(form.weft_wastage) || 6,
@@ -2344,7 +2409,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         <Text style={[fm.chipTxt, fm.chipTxtActive]}>Reed space</Text>
                     </View>
                     <View style={[fm.chip, fm.chipDisabled]}>
-                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · auto</Text>
+                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · entered</Text>
                     </View>
                 </View>
 
@@ -2365,14 +2430,49 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     </View>
                 </View>
 
-                <Text style={fm.label}>GREIGE WIDTH · CALCULATED</Text>
-                <Text style={fm.hint}>Greige Width = Reed Space × (1 − Warp Shrink)</Text>
+                <Text style={fm.label}>GREIGE WIDTH · REQUIRED</Text>
+                <Text style={fm.hint}>actual off-loom measurement · required</Text>
                 <View style={fm.inputRow}>
-                    <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
-                        <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
-                    </View>
+                    <TextInput
+                        value={greigeWidthText}
+                        onChangeText={v => {
+                            if (!/^\d*(?:\.\d*)?$/.test(v)) return;
+                            setGreigeWidthText(v);
+                            const parsed = Number(v);
+                            set('greige_width', v !== '' && Number.isFinite(parsed) ? parsed : 0);
+                        }}
+                        onBlur={() => {
+                            const parsed = Number(greigeWidthText);
+                            if (Number.isFinite(parsed) && parsed > 0) {
+                                setGreigeWidthText(greigeWidthText.replace(/\.$/, ''));
+                                set('greige_width', parsed);
+                            }
+                        }}
+                        keyboardType="decimal-pad"
+                        style={[fm.input, { flex: 1 }]}
+                        placeholder={(() => {
+                            const reed = Number(form.reed_space) || 0;
+                            const shrink = (Number(form.warp_shrink) || 0) / 100;
+                            return reed > 0 && shrink >= 0 && shrink < 1
+                                ? (reed * (1 - shrink)).toFixed(2)
+                                : 'Enter greige width';
+                        })()}
+                        placeholderTextColor={T.muted}
+                    />
                     <Text style={fm.unit}>"</Text>
                 </View>
+                {(() => {
+                    const reed = Number(form.reed_space) || 0;
+                    const shrink = (Number(form.warp_shrink) || 0) / 100;
+                    const suggested = reed > 0 && shrink >= 0 && shrink < 1
+                        ? reed * (1 - shrink)
+                        : 0;
+                    return suggested > 0 ? (
+                        <Text style={[fm.hint, { marginTop: 4 }]}>
+                            Suggested only: {suggested.toFixed(2)}" = Reed Space × (1 − Warp Shrink). Enter the actual measured Greige Width.
+                        </Text>
+                    ) : null;
+                })()}
 
                 <Text style={fm.label}>WARP YARNS</Text>
                 {(form.warp_yarns ?? []).map((y: any, i: number) => (
@@ -2430,7 +2530,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>FINISH SHRINK</Text>
                         <View style={fm.inputRow}>
-                            <TextInput editable={!form.finish_locked} value={String(form.gf_shrink ?? '5')} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="5" placeholderTextColor={T.muted} />
+                            <TextInput value={String(form.gf_shrink ?? 0)} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="0" placeholderTextColor={T.muted} />
                             <Text style={fm.unit}>%</Text>
                         </View>
                     </View>
@@ -2441,7 +2541,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     ...form,
                     width_basis: 'reed',
                     reed_space: form.reed_space,
-                    greige_width: autoGreige,
+                    greige_width: form.greige_width,
                 }} />
 
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
@@ -4965,6 +5065,7 @@ function YarnsTab() {
         data: any[];
         multiple?: boolean;
         value?: any;
+        disabled?: boolean;
     } | null>(null);
 
     const gridColumns = screenWidth >= 1500 ? 4 : screenWidth >= 1050 ? 3 : screenWidth >= 700 ? 2 : 1;
@@ -5062,14 +5163,42 @@ function YarnsTab() {
         setIsModifyMode(false); setModifyItemName('');
     }, []);
 
-    const roundDenier = (value: number) => Number.isFinite(value) ? String(Math.ceil(value / 5) * 5) : '';
-    const calculateDenier = (countNo: string, ply: string, formula?: string) => {
-        if (!countNo || !ply || !formula) return '';
+    // IMPORTANT: keep the legacy YMS calculation rules.
+    // Spun/Sub Item: formula result is rounded UP to the next multiple of 5.
+    // Filament: legacy YMS keeps the formula result to 2 decimals.
+    const roundDenier = (value: number) =>
+        Number.isFinite(value) ? String(Math.ceil(value / 5) * 5) : '';
+
+    const evaluateFormula = (countNo: string, ply: string, formula?: string) => {
+        if (!countNo || !ply || !formula) return null;
         try {
-            const expr = String(formula).replace(/Count/g, String(Number(countNo))).replace(/ply/g, String(Number(ply)));
-            return roundDenier(Number(Function(`"use strict"; return (${expr});`)()));
-        } catch { return ''; }
+            const expr = String(formula)
+                .replace(/Count/g, String(Number(countNo)))
+                .replace(/ply/g, String(Number(ply)));
+            const result = Function(`"use strict"; return (${expr});`)();
+            return Number(result);
+        } catch {
+            return null;
+        }
     };
+
+    const calculateDenier = (countNo: string, ply: string, formula?: string) => {
+        const result = evaluateFormula(countNo, ply, formula);
+        return result == null ? '' : roundDenier(result);
+    };
+
+    const calculateFilamentDenier = (countNo: string, ply: string, formula?: string) => {
+        const result = evaluateFormula(countNo, ply, formula);
+        return result == null ? '' : Number(result).toFixed(2);
+    };
+
+    const calculateSubitemDenier = (form: any, formulaOverride?: string) => {
+        const formula = String(formulaOverride || form?.formula || '').trim();
+        return calculateDenier(String(form?.count_no || ''), String(form?.ply || ''), formula);
+    };
+
+    const calculateMainFormDenier = (tab: 'Spun' | 'Filaments', countNo: string, ply: string, formula?: string) =>
+        tab === 'Filaments' ? calculateFilamentDenier(countNo, ply, formula) : calculateDenier(countNo, ply, formula);
 
     const buildMainItem = (countNo: string, count: string, ply: string, blends: any[], other: string) =>
         !countNo || !count || !ply || !blends?.length ? '' :
@@ -5091,12 +5220,13 @@ function YarnsTab() {
     const findByIdOrName = (list: any[], value: any, keys = ['id', 'name']) =>
         (list || []).find(obj => keys.some(k => String(obj?.[k] ?? '') === String(value ?? ''))) || null;
 
-    const openPicker = (key: string, title: string, data: any[], multiple = false, value?: any) =>
-        setPicker({ key, title, data: data || [], multiple, value });
+    const openPicker = (key: string, title: string, data: any[], multiple = false, value?: any, disabled?: false) =>
+        setPicker({ key, title, data: data || [], multiple, value, disabled });
 
     const handlePickerSelect = (item: any) => {
         if (!picker) return;
-        const { key, multiple } = picker;
+        const { key, multiple, disabled } = picker;
+        if (disabled) return;
         if (multiple) {
             const current = Array.isArray(picker.value) ? picker.value : [];
             const exists = current.some((x: any) => String(x?.id) === String(item?.id));
@@ -5125,7 +5255,7 @@ function YarnsTab() {
                                 : prev;
                     return {
                         ...next,
-                        denier: calculateDenier(next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
+                        denier: calculateMainFormDenier('Spun', next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
                         linkitmcode: buildMainItem(next.count_no, next.count, next.ply, next.blend, next.others),
                     };
                 });
@@ -5144,7 +5274,7 @@ function YarnsTab() {
                                         : prev;
                     return {
                         ...next,
-                        denier: calculateDenier(next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
+                        denier: calculateMainFormDenier('Filaments', next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
                         linkitmcode: buildFilamentItem(next.count_no, next.count, next.ply, next.lustre, next.type, next.others),
                     };
                 });
@@ -5221,34 +5351,67 @@ function YarnsTab() {
         setLoading(true);
         try {
             const ctx = context.prptype ? context : await loadContext();
-            await loadLookups(ctx);
-            const res = await apiGet('/yarnitemshow', { itmcode: item.itmcode, strcode: ctx.strcode, prptype: ctx.prptype });
-            const main = res?.data?.data?.maindata?.[0];
-            if (!res?.data?.success || !main) throw new Error(res?.data?.message || 'Item details not found.');
 
-            const mainParts = String(main?.maincode || '').trim().match(/^([^/\s]+)\/([^\s]+)\s+(.*)$/);
+            // Load the exact master lists used by the legacy YMS modify screen.
+            await loadLookups(ctx);
+            const [showRes, freshCountRes] = await Promise.all([
+                apiGet('/yarnitemshow', {
+                    itmcode: item.itmcode,
+                    strcode: ctx.strcode,
+                    prptype: ctx.prptype,
+                }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
+
+            const main = showRes?.data?.data?.maindata?.[0];
+            if (!showRes?.data?.success || !main) {
+                throw new Error(showRes?.data?.message || 'Item details not found.');
+            }
+
+            // yarnitemshow:
+            // maincode = "<count>/<ply> ..."
+            // counttype = Count Type master id
+            // count = actual numeric count value.
+            const mainParts = String(main?.maincode || '').trim().match(/^([^/\s]+)\/([^\s]+)\s*(.*)$/);
             const countNo = String(main?.count ?? mainParts?.[1] ?? '');
             const plyValue = String(mainParts?.[2] ?? main?.WPly ?? '');
 
             const countTypeId = String(main?.counttype ?? main?.CountTypeId ?? main?.WCounttype ?? '');
             const countTypeName = String(main?.CountType ?? main?.counttypeName ?? '');
-            const countObj = findByIdOrName(countData, countTypeId) || findByIdOrName(countData, countTypeName) || { id: countTypeId, name: countTypeName, formula: '' };
-            const plyObj = (plyData || []).find(p => String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue) || { id: plyValue, ply: plyValue };
+            const freshCountData = freshCountRes?.data?.data?.data || [];
+            if (freshCountData.length) setCountData(freshCountData);
 
-            let blendItems = Array.isArray(main?.BlendDisplay) ? main.BlendDisplay.map((b: any) => ({
-                id: b?.id ?? b?.blendid ?? b?.code, name: b?.name ?? b?.blend ?? b?.BlendName ?? ''
-            })).filter((b: any) => b.id !== undefined && b.id !== null) : [];
+            const countMaster = freshCountData.length ? freshCountData : countData;
+            const countObj =
+                findByIdOrName(countMaster, countTypeId) ||
+                findByIdOrName(countMaster, countTypeName) ||
+                { id: countTypeId, name: countTypeName || countTypeId, formula: '' };
+
+            const plyObj =
+                (plyData || []).find(p =>
+                    String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue
+                ) ||
+                { id: plyValue, ply: plyValue };
+
+            let blendItems = Array.isArray(main?.BlendDisplay)
+                ? main.BlendDisplay.map((b: any) => ({
+                    id: b?.id ?? b?.blendid ?? b?.code,
+                    name: b?.name ?? b?.blend ?? b?.BlendName ?? '',
+                })).filter((b: any) => b.id !== undefined && b.id !== null)
+                : [];
+
             if (!blendItems.length && main?.blend) {
-                blendItems = String(main.blend).split(/[\/,\s]+/).filter(Boolean).map(id => findByIdOrName(blendData, id) || { id, name: id });
+                blendItems = String(main.blend)
+                    .split(/[\/,\s]+/)
+                    .filter(Boolean)
+                    .map(id => findByIdOrName(blendData, id) || { id, name: id });
             } else {
                 blendItems = blendItems.map((b: any) => findByIdOrName(blendData, b.id) || b);
             }
-
-            setModifyItemName(String(main?.itmname || item?.WNameCode || item.itmcode));
-            setIsModifyMode(true);
-            setSelectedBlend(blendItems);
-            setSelectedCount(countObj);
-            setSelectedPly(plyObj);
 
             const base = {
                 ItmCode: String(main?.itmcode || item.itmcode),
@@ -5256,30 +5419,47 @@ function YarnsTab() {
                 denier: String(main?.denier ?? ''),
                 count_no: countNo,
                 count: String(countObj?.name || countTypeName),
-                count_id: countObj?.id || countTypeId,
+                count_id: String(countObj?.id || countTypeId),
                 ply: String(plyObj?.ply || plyValue),
-                ply_id: plyObj?.id || plyValue,
+                ply_id: String(plyObj?.id || plyValue),
                 blend: blendItems.map((b: any) => b.name).filter(Boolean),
                 blend_id: blendItems.map((b: any) => b.id).filter(Boolean),
-                others: String(main?.other || ''),
+                others: String(main?.other ?? ''),
+                formula: String(countObj?.formula || ''),
             };
+
+            setModifyItemName(String(main?.itmname || item?.WNameCode || item.itmcode));
+            setIsModifyMode(true);
+            setSelectedBlend(blendItems);
+            setSelectedCount(countObj);
+            setSelectedPly(plyObj);
 
             if (activeTab === 'Spun') {
                 setSpunForm(base);
             } else {
-                const typeObj = findByIdOrName(typeData, main?.Type, ['id', 'type']) || (main?.Type ? { id: main.Type, type: main.Type } : null);
-                const lustreObj = findByIdOrName(lustreData, main?.Lustre, ['id', 'lustre']) || (main?.Lustre ? { id: main.Lustre, lustre: main.Lustre } : null);
-                setSelectedType(typeObj); setSelectedLustre(lustreObj);
+                const typeObj =
+                    findByIdOrName(typeData, main?.Type, ['id', 'type']) ||
+                    (main?.Type ? { id: main.Type, type: main.Type } : null);
+                const lustreObj =
+                    findByIdOrName(lustreData, main?.Lustre, ['id', 'lustre']) ||
+                    (main?.Lustre ? { id: main.Lustre, lustre: main.Lustre } : null);
+
+                setSelectedType(typeObj);
+                setSelectedLustre(lustreObj);
                 setFilamentForm({
                     ...base,
-                    type_id: typeObj?.id || '', type: typeObj?.type || main?.Type || '',
-                    lustre_id: lustreObj?.id || '', lustre: lustreObj?.lustre || main?.Lustre || '',
+                    type_id: typeObj?.id || '',
+                    type: typeObj?.type || main?.Type || '',
+                    lustre_id: lustreObj?.id || '',
+                    lustre: lustreObj?.lustre || main?.Lustre || '',
                 });
             }
             setScreen('MAIN_FORM');
         } catch (e: any) {
             AppAlert.alert('Error', e?.message || 'Unable to load item details.');
-        } finally { setLoading(false); }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const saveMain = async () => {
@@ -5324,34 +5504,143 @@ function YarnsTab() {
     };
 
     const openSubCreate = async (parent: YarnItem) => {
+        if (!parent?.itmcode) {
+            return AppAlert.alert('Error', 'Main item code not found.');
+        }
+
         setLoading(true);
         try {
             const ctx = context.prptype ? context : await loadContext();
-            await loadLookups(ctx);
-            const master = await apiGet('/getyarnmasteritem', {
-                prptype: ctx.prptype, strcode: ctx.strcode,
-                txntype: 'yarn_creation_item_master',
-                yarntype: activeTab === 'Spun' ? '1' : '2',
-            });
-            const mapped = master?.data?.data?.mapped_data || [];
-            const blendObj = mapped.find((b: any) => String(b.blendid) === String(parent?.WBlend) && String(b.itmcode) === String(parent?.itmcode));
-            const list = (blendObj?.blend_names || []).map((b: any) => ({ id: b.id, name: b.name, per: blendObj?.blend_names?.length === 1 ? '100' : '' }));
-            setSubBlendList(list);
-            setSubForm(prev => ({
-                ...prev,
-                WNameCode: parent?.WNameCode || '',
-                WBlend: String(parent?.WBlend || ''),
-                WYarnType: String(parent?.WYarnType || (activeTab === 'Spun' ? '1' : '2')),
-                mitmcode: String(parent?.itmcode || ''),
-                WCounttype: String(parent?.WCounttype || ''),
-                blend_id: list.map((b: any) => b.id),
-                blend: list.map((b: any) => b.name),
+
+            // Match legacy YMS exactly: first restore the selected main item
+            // through yarnitemshow, then load fresh count/ply/type masters.
+            const [showRes, countRes, masterRes, typeRes, plyRes, subTypeRes] = await Promise.all([
+                apiGet('/yarnitemshow', {
+                    itmcode: parent.itmcode,
+                    strcode: ctx.strcode,
+                    prptype: ctx.prptype,
+                }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/getyarnmasteritem', {
+                    prptype: ctx.prptype,
+                    strcode: ctx.strcode,
+                    txntype: 'yarn_creation_item_master',
+                    yarntype: activeTab === 'Spun' ? '1' : '2',
+                }),
+                apiGet('/yarntype', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarnply', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarntypesubitem', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
+
+            const show = showRes?.data?.data?.maindata?.[0];
+            if (!showRes?.data?.success || !show) {
+                throw new Error(showRes?.data?.message || 'Main item details not found.');
+            }
+
+            const freshCounts = countRes?.data?.data?.data || [];
+            const freshPlys = plyRes?.data?.data?.data || [];
+            const freshSubTypes = subTypeRes?.data?.data?.data || [];
+            const mapped = masterRes?.data?.data?.mapped_data || [];
+
+            setCountData(freshCounts);
+            setPlyData(freshPlys);
+            setSubTypeData(freshSubTypes);
+
+            const selectedBlendId = String(show?.blend ?? parent?.WBlend ?? '');
+            const apiBlendList = Array.isArray(show?.BlendDisplay)
+                ? show.BlendDisplay
+                    .map((b: any) => ({
+                        id: String(b?.id ?? b?.blendid ?? ''),
+                        name: b?.name || '',
+                        per: String(b?.per ?? ''),
+                    }))
+                    .filter((b: any) => b.name)
+                : [];
+
+            const blendObj = (mapped || []).find((b: any) =>
+                String(b?.blendid) === selectedBlendId &&
+                String(b?.itmcode) === String(parent.itmcode)
+            );
+
+            let fallbackBlendList = (blendObj?.blend_names || []).map((b: any) => ({
+                id: String(b?.id ?? ''),
+                name: b?.name || '',
+                per: '',
             }));
+            if (fallbackBlendList.length === 1) fallbackBlendList[0].per = '100';
+
+            const finalBlendList = apiBlendList.length ? apiBlendList : fallbackBlendList;
+
+            const countTypeId = String(show?.CountTypeId ?? show?.WCounttype ?? show?.counttype ?? parent?.WCounttype ?? '');
+            const countObj =
+                freshCounts.find((c: any) => String(c?.id ?? '') === countTypeId) ||
+                freshCounts.find((c: any) => String(c?.name ?? '') === String(show?.CountType ?? '')) ||
+                null;
+
+            const plyValue = String(show?.WPly ?? '');
+            const plyObj =
+                freshPlys.find((p: any) => String(p?.ply ?? '') === plyValue) ||
+                freshPlys.find((p: any) => String(p?.id ?? '') === plyValue) ||
+                (plyValue ? { id: plyValue, ply: plyValue } : null);
+
+            const subtypeId = String(show?.subyarntype ?? '');
+            const subtypeName = String(show?.subyarntypename ?? '');
+            const subtypeObj =
+                freshSubTypes.find((x: any) => String(x?.id ?? '') === subtypeId) ||
+                freshSubTypes.find((x: any) => String(x?.name ?? '') === subtypeName) ||
+                (subtypeId || subtypeName ? { id: subtypeId, name: subtypeName } : null);
+
+            setSubBlendList(finalBlendList);
+            setSelectedCount(countObj);
+            setSelectedPly(plyObj);
+            setSelectedSubType(subtypeObj);
+
+            setSubForm({
+                WNameCode: String(show?.itmname || parent?.WNameCode || ''),
+                WBlend: selectedBlendId,
+                WYarnType: String(parent?.WYarnType || (activeTab === 'Spun' ? '1' : '2')),
+                mitmcode: String(parent.itmcode),
+                WCounttype: countTypeId,
+                count: String(countObj?.name || show?.CountType || ''),
+                count_id: countTypeId,
+                count_no: String(show?.count ?? ''),
+                ply: String(plyObj?.ply || plyValue),
+                ply_id: String(plyObj?.id || plyValue),
+                linkitmcode: String(show?.maincode || ''),
+                denier: String(show?.denier ?? ''),
+                others: String(show?.other ?? ''),
+                subtype_id: subtypeId,
+                subtype_name: subtypeName,
+                ItmCode: String(parent.itmcode),
+                formula: String(countObj?.formula || ''),
+                blend: finalBlendList.map((b: any) => b.name),
+                blend_id: finalBlendList.map((b: any) => b.id),
+            });
+
             setIsModifyMode(false);
+            setModifyItemName('');
             setScreen('SUB_FORM');
         } catch (e: any) {
-            AppAlert.alert('Error', e?.response?.data?.message || 'Unable to open sub item form.');
-        } finally { setLoading(false); }
+            AppAlert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to open sub item form.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const openSubModify = async (item: any) => {
@@ -5359,36 +5648,80 @@ function YarnsTab() {
         setLoading(true);
         try {
             const ctx = context.prptype ? context : await loadContext();
-            await loadLookups(ctx);
-            const res = await apiGet('/yarnitemshow', { itmcode: item.itmcode, strcode: ctx.strcode, prptype: ctx.prptype });
-            const show = res?.data?.data?.maindata?.[0];
-            if (!res?.data?.success || !show) throw new Error(res?.data?.message || 'Sub item details not found.');
+            const [res, countRes, plyRes, subtypeRes] = await Promise.all([
+                apiGet('/yarnitemshow', { itmcode: item.itmcode, strcode: ctx.strcode, prptype: ctx.prptype }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarnply', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarntypesubitem', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
 
-            const blends = Array.isArray(show?.BlendDisplay) ? show.BlendDisplay.map((b: any) => ({
-                id: String(b?.id ?? ''), name: b?.name || '', per: String(b?.per ?? '')
-            })).filter((b: any) => b.name) : [];
-            setSubBlendList(blends);
+            const show = res?.data?.data?.maindata?.[0];
+            if (!res?.data?.success || !show) {
+                throw new Error(res?.data?.message || 'Sub item details not found.');
+            }
+
+            const freshCounts = countRes?.data?.data?.data || countData;
+            const freshPlys = plyRes?.data?.data?.data || plyData;
+            const freshSubTypes = subtypeRes?.data?.data?.data || subTypeData;
+            setCountData(freshCounts);
+            setPlyData(freshPlys);
+            setSubTypeData(freshSubTypes);
+
+            const blends = Array.isArray(show?.BlendDisplay)
+                ? show.BlendDisplay.map((b: any) => ({
+                    id: String(b?.id ?? b?.blendid ?? ''),
+                    name: b?.name || '',
+                    per: String(b?.per ?? ''),
+                })).filter((b: any) => b.name)
+                : [];
 
             const apiPly = String(show?.WPly ?? '');
-            const plyObj = (plyData || []).find(p => String(p?.ply ?? '') === apiPly || String(p?.id ?? '') === apiPly) || { id: apiPly, ply: apiPly };
+            const plyObj =
+                freshPlys.find((p: any) => String(p?.ply ?? '') === apiPly) ||
+                freshPlys.find((p: any) => String(p?.id ?? '') === apiPly) ||
+                { id: apiPly, ply: apiPly };
+
             const countId = String(show?.CountTypeId ?? show?.WCounttype ?? show?.counttype ?? '');
             const countName = String(show?.CountType ?? show?.counttypeName ?? '');
-            const countObj = findByIdOrName(countData, countId) || findByIdOrName(countData, countName) || { id: countId, name: countName, formula: '' };
+            const countObj =
+                freshCounts.find((c: any) => String(c?.id ?? '') === countId) ||
+                freshCounts.find((c: any) => String(c?.name ?? '') === countName) ||
+                { id: countId, name: countName, formula: '' };
+
             const subtypeId = String(show?.subyarntype ?? '');
             const subtypeName = String(show?.subyarntypename ?? '');
-            const subtypeObj = findByIdOrName(subTypeData, subtypeId) || findByIdOrName(subTypeData, subtypeName) || { id: subtypeId, name: subtypeName };
+            const subtypeObj =
+                freshSubTypes.find((x: any) => String(x?.id ?? '') === subtypeId) ||
+                freshSubTypes.find((x: any) => String(x?.name ?? '') === subtypeName) ||
+                { id: subtypeId, name: subtypeName };
 
-            setSelectedPly(plyObj); setSelectedCount(countObj); setSelectedSubType(subtypeObj);
+            setSubBlendList(blends);
+            setSelectedPly(plyObj);
+            setSelectedCount(countObj);
+            setSelectedSubType(subtypeObj);
+
             setSubForm({
-                WNameCode: browseParent?.WNameCode || show?.itmname || '',
+                WNameCode: String(browseParent?.WNameCode || show?.itmname || item?.WNameCode || ''),
                 WBlend: String(show?.blend ?? ''),
                 WYarnType: String(browseParent?.WYarnType || item?.WYarnType || ''),
                 mitmcode: String(browseParent?.itmcode || item?.mitmcode || ''),
-                WCounttype: String(countObj?.id || countId),
+                WCounttype: countId,
                 count: String(countObj?.name || countName),
-                count_id: String(countObj?.id || countId),
+                count_id: countId,
                 count_no: String(show?.count ?? ''),
-                ply: apiPly,
+                ply: String(plyObj?.ply || apiPly),
                 ply_id: String(plyObj?.id || apiPly),
                 linkitmcode: String(show?.maincode || ''),
                 denier: String(show?.denier ?? ''),
@@ -5397,77 +5730,18 @@ function YarnsTab() {
                 subtype_name: subtypeName,
                 ItmCode: String(show?.itmcode || item.itmcode),
                 formula: String(countObj?.formula || show?.formula || ''),
-                blend_id: blends.map((b: any) => b.id),
                 blend: blends.map((b: any) => b.name),
+                blend_id: blends.map((b: any) => b.id),
             });
-            setModifyItemName(String(show?.itmname || item?.WNameCode || 'Selected Sub Item'));
+
+            setModifyItemName(String(show?.itmname || item?.WNameCode || item.itmcode));
             setIsModifyMode(true);
             setScreen('SUB_FORM');
         } catch (e: any) {
             AppAlert.alert('Error', e?.message || 'Unable to load sub item details.');
-        } finally { setLoading(false); }
-    };
-
-    const saveSub = async () => {
-        if (!subForm.WNameCode) return AppAlert.alert('Validation', 'Yarn Main Code required');
-        if (!subBlendList.length) return AppAlert.alert('Validation', 'Please select blend');
-        const total = subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0);
-        if (subBlendList.some(b => !Number(b.per) || Number(b.per) <= 0)) return AppAlert.alert('Validation', 'Enter valid % for each blend');
-        if (total !== 100) return AppAlert.alert('Validation', `Total percentage must be 100. Current: ${total}`);
-        if (!subForm.count_no) return AppAlert.alert('Validation', 'Please enter count value');
-        if (!subForm.ply_id) return AppAlert.alert('Validation', 'Please select Ply');
-        if (!subForm.subtype_id) return AppAlert.alert('Validation', 'Please enter yarn type');
-        if (!subForm.linkitmcode) return AppAlert.alert('Validation', 'Please enter Sub Item Name');
-
-        setLoading(true);
-        try {
-            const ctx = context.prptype ? context : await loadContext();
-            const payload: any = isModifyMode
-                ? {
-                    maincode: subForm.linkitmcode,
-                    denier: subForm.denier,
-                    blend: subBlendList.map(b => b.id).join('/'),
-                    count: subForm.count_no,
-                    ply: subForm.ply_id,
-                    mitmcode: subForm.mitmcode || '',
-                    blend_names: subBlendList.map(b => ({ id: b.id, name: b.name, per: Number(b.per || 0) })),
-                    prptype: ctx.prptype,
-                    txntype: 'SUBITEM',
-                    yarntype: subForm.WYarnType,
-                    strcode: ctx.strcode,
-                    linkitmcode: subForm.ItmCode || '',
-                    other: subForm.others || '',
-                    subyarntype: subForm.subtype_id || '',
-                    itmcode: subForm.ItmCode || '',
-                }
-                : {
-                    maincode: subForm.linkitmcode,
-                    denier: subForm.denier,
-                    blendid: subForm.WBlend,
-                    count: subForm.count_no,
-                    ply: subForm.ply_id,
-                    mitmcode: subForm.mitmcode || '',
-                    blend_names: subBlendList.map(b => ({ id: b.id, name: b.name, per: Number(b.per || 0) })),
-                    prptype: ctx.prptype,
-                    txntype: 'yarn_creation_item_master',
-                    yarntype: subForm.WYarnType,
-                    strcode: ctx.strcode,
-                    linkitmcode: subForm.ItmCode || '',
-                    other: subForm.others || '',
-                    subyarntype: subForm.subtype_id || '',
-                };
-
-            const res = await apiPost(isModifyMode ? '/yarncreationmodify' : '/addyarnsubitem', payload);
-            if (!res?.data?.success) return AppAlert.alert('Warning', res?.data?.message || 'Unable to save sub item.');
-
-            const code = res?.data?.data?.data?.itmcode || subForm.ItmCode || '';
-            AppAlert.alert('Success', isModifyMode ? `Sub Item ${code} updated successfully.` : `Item ${code} saved successfully.`);
-            setIsModifyMode(false);
-            setScreen('SUB_LIST');
-            if (browseParent) await loadSubList(browseParent);
-        } catch (e: any) {
-            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong.');
-        } finally { setLoading(false); }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const openParty = async (item: any) => {
@@ -5608,13 +5882,20 @@ function YarnsTab() {
         return partyItems.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
     }, [partyItems, search]);
 
-    const field = (label: string, value: any, onChange: (v: string) => void, numeric = false, editable = true) => (
+    const field = (
+        label: string,
+        value: any,
+        onChange: (v: string) => void,
+        numeric = false,
+        editable = true,
+        errorText?: string,
+    ) => (
         <View style={ym2.field}>
             <Text style={ym2.label}>{label}</Text>
-            <View style={ym2.inputWrap}>
+            <View style={[ym2.inputWrap, !editable && ym2.disabledInputWrap, errorText && ym2.errorInputWrap]}>
                 <TextInput
                     value={String(value ?? '')}
-                    editable={editable}
+                    editable={editable && !loading}
                     keyboardType={numeric ? 'numeric' : 'default'}
                     onChangeText={v => {
                         if (numeric && !/^[0-9.]*$/.test(v)) return;
@@ -5622,21 +5903,36 @@ function YarnsTab() {
                     }}
                     placeholder={label.replace(' *', '') + '...'}
                     placeholderTextColor={T.muted}
-                    style={ym2.input}
+                    style={[ym2.input, !editable && ym2.disabledInput]}
                 />
+                {!editable ? <Ionicons name="lock-closed-outline" size={15} color={T.muted} /> : null}
             </View>
+            {errorText ? <Text style={ym2.validationText}>{errorText}</Text> : null}
         </View>
     );
 
-    const selectField = (label: string, valueText: string, onPress: () => void, required = false) => (
+    const selectField = (
+        label: string,
+        valueText: string,
+        onPress: () => void,
+        required = false,
+        disabled = false,
+        errorText?: string,
+    ) => (
         <View style={ym2.field}>
             <Text style={ym2.label}>{label}{required ? <Text style={ym2.required}> *</Text> : null}</Text>
-            <TouchableOpacity style={ym2.selectWrap} onPress={onPress} activeOpacity={0.8}>
+            <TouchableOpacity
+                disabled={disabled || loading}
+                style={[ym2.selectWrap, disabled && ym2.disabledInputWrap, errorText && ym2.errorInputWrap]}
+                onPress={onPress}
+                activeOpacity={0.8}
+            >
                 <Text numberOfLines={2} style={[ym2.selectText, !valueText && ym2.selectPlaceholder]}>
                     {valueText || 'Choose...'}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={T.muted} />
+                <Ionicons name={disabled ? 'lock-closed-outline' : 'chevron-down'} size={16} color={T.muted} />
             </TouchableOpacity>
+            {errorText ? <Text style={ym2.validationText}>{errorText}</Text> : null}
         </View>
     );
 
@@ -5716,7 +6012,7 @@ function YarnsTab() {
                         {selectField('Blend', blendText, () => openPicker('blend', 'Select Blend', blendData, true, selectedBlend), true)}
                         {selectField('Count Type', form.count || '', () => openPicker('count', 'Select Count Type', countData, false, selectedCount), true)}
                         {field('Count *', form.count_no, v => {
-                            if (filament) setFilamentForm((p: any) => ({ ...p, count_no: v, denier: calculateDenier(v, p.ply, selectedCount?.formula), linkitmcode: buildFilamentItem(v, p.count, p.ply, p.lustre, p.type, p.others) }));
+                            if (filament) setFilamentForm((p: any) => ({ ...p, count_no: v, denier: calculateFilamentDenier(v, p.ply, selectedCount?.formula), linkitmcode: buildFilamentItem(v, p.count, p.ply, p.lustre, p.type, p.others) }));
                             else setSpunForm((p: any) => ({ ...p, count_no: v, denier: calculateDenier(v, p.ply, selectedCount?.formula), linkitmcode: buildMainItem(v, p.count, p.ply, p.blend, p.others) }));
                         }, true)}
                         {selectField('Ply', form.ply || '', () => openPicker('ply', 'Select Ply', plyData, false, selectedPly), true)}
@@ -5726,7 +6022,7 @@ function YarnsTab() {
                                 {selectField('Lustre', form.lustre || '', () => openPicker('lustre', 'Select Lustre', lustreData, false, selectedLustre), true)}
                             </>
                         )}
-                        {field('Other', form.others, (v) => {
+                        {field('Other', form.others, v => {
                             if (filament) {
                                 setFilamentForm((p: any) => ({
                                     ...p,
@@ -5758,52 +6054,266 @@ function YarnsTab() {
         );
     };
 
-    const renderSubForm = () => (
-        <View style={ym2.page}>
-            <View style={ym2.subHeader}>
-                <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                    <Text style={ym2.subHeaderTitle}>{isModifyMode ? 'Modify Sub Item' : 'Create Sub Item'}</Text>
-                    <Text style={ym2.subHeaderSub}>{modifyItemName || subForm.WNameCode}</Text>
-                </View>
-            </View>
-            <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
-                <View style={ym2.formCard}>
-                    <View style={ym2.readonlyBox}><Text style={ym2.readonlyLabel}>Main Item</Text><Text style={ym2.readonlyValue}>{subForm.WNameCode || '-'}</Text></View>
-                    <Text style={ym2.label}>Blend <Text style={ym2.required}>*</Text></Text>
-                    {subBlendList.map((b, i) => (
-                        <View key={`${b.id}-${i}`} style={ym2.blendRow}>
-                            <Text numberOfLines={1} style={[ym2.blendName, { flex: 1 }]}>{b.name}</Text>
-                            <TextInput
-                                value={String(b.per ?? '')}
-                                onChangeText={v => setSubBlendList(prev => prev.map((x, idx) => idx === i ? { ...x, per: v } : x))}
-                                keyboardType="numeric" placeholder="%" placeholderTextColor={T.muted} style={ym2.percentInput}
-                            />
-                        </View>
-                    ))}
-                    <Text style={ym2.totalText}>Total: {subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0)}%</Text>
+    const getSubValidationErrors = () => {
+        const errors: Record<string, string> = {};
+        if (!subForm.WNameCode) errors.main = 'Main Item is required';
+        if (!subBlendList.length) {
+            errors.blend = 'Please select Blend';
+        } else {
+            const total = subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0);
+            if (subBlendList.some(b => !Number.isFinite(Number(b.per)) || Number(b.per) <= 0)) {
+                errors.blend = 'Enter a valid percentage for every blend';
+            } else if (Math.abs(total - 100) > 0.0001) {
+                errors.blend = `Total percentage must be 100%. Current: ${total}%`;
+            }
+        }
+        if (!subForm.count) errors.count = 'Please select Count Type';
+        if (!subForm.count_no) errors.countNo = 'Please enter Count value';
+        if (!subForm.ply_id) errors.ply = 'Please select Ply';
+        if (!subForm.subtype_id) errors.subtype = 'Please select Yarn Type';
+        if (!subForm.linkitmcode) errors.name = 'Sub Item Name is required';
+        if (!subForm.denier) errors.denier = 'Denier is calculated automatically after Count/Ply/Formula are available';
+        return errors;
+    };
 
-                    {selectField('Count Type', subForm.count || '', () => openPicker('count', 'Select Count Type', countData, false, selectedCount), true)}
-                    {field('Count *', subForm.count_no, v => setSubForm((p: any) => ({
-                        ...p, count_no: v, denier: calculateDenier(v, p.ply, p.formula),
-                        linkitmcode: buildSubItem(v, p.ply, subBlendList, p.others),
-                    })), true)}
-                    {selectField('Ply', subForm.ply || '', () => openPicker('ply', 'Select Ply', plyData, false, selectedPly), true)}
-                    {selectField('Yarn Type', subForm.subtype_name || '', () => openPicker('subtype', 'Select Yarn Type', subTypeData, false, selectedSubType), true)}
-                    {field('Other', subForm.others, v => setSubForm((p: any) => ({ ...p, others: v, linkitmcode: buildSubItem(p.count_no, p.ply, subBlendList, v) })))}
-                    {field('Sub Item Name *', subForm.linkitmcode, v => setSubForm((p: any) => ({ ...p, linkitmcode: v })))}
-                    {field('Denier *', subForm.denier, () => { }, false, false)}
-                    <View style={ym2.actions}>
-                        <TouchableOpacity style={ym2.secondaryBtn} onPress={closeCurrent}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
-                        <TouchableOpacity style={ym2.primaryBtn} onPress={saveSub}>
-                            <Ionicons name={isModifyMode ? 'checkmark-circle-outline' : 'add-circle-outline'} size={17} color="#fff" />
-                            <Text style={ym2.primaryText}>{isModifyMode ? 'Modify Sub Item' : 'Add Sub Item'}</Text>
-                        </TouchableOpacity>
+    const saveSub = async () => {
+        const errors = getSubValidationErrors();
+        const firstError = Object.values(errors)[0];
+        if (firstError) {
+            AppAlert.alert('Validation', firstError);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+
+            const payload: any = isModifyMode
+                ? {
+                    maincode: subForm.linkitmcode,
+                    denier: subForm.denier,
+                    blend: subBlendList.map(b => b.id).join('/'),
+                    count: subForm.count_no,
+                    ply: subForm.ply_id,
+                    mitmcode: subForm.mitmcode || '',
+                    blend_names: subBlendList.map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        per: Number(b.per || 0),
+                    })),
+                    prptype: ctx.prptype,
+                    txntype: 'SUBITEM',
+                    yarntype: subForm.WYarnType,
+                    strcode: ctx.strcode,
+                    linkitmcode: subForm.ItmCode || '',
+                    other: subForm.others || '',
+                    subyarntype: subForm.subtype_id || '',
+                    itmcode: subForm.ItmCode || '',
+                }
+                : {
+                    maincode: subForm.linkitmcode,
+                    denier: subForm.denier,
+                    blendid: subForm.WBlend,
+                    count: subForm.count_no,
+                    ply: subForm.ply_id,
+                    mitmcode: subForm.mitmcode || '',
+                    blend_names: subBlendList.map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        per: Number(b.per || 0),
+                    })),
+                    prptype: ctx.prptype,
+                    txntype: 'yarn_creation_item_master',
+                    yarntype: subForm.WYarnType,
+                    strcode: ctx.strcode,
+                    linkitmcode: subForm.ItmCode || '',
+                    other: subForm.others || '',
+                    subyarntype: subForm.subtype_id || '',
+                };
+
+            const res = await apiPost(
+                isModifyMode ? '/yarncreationmodify' : '/addyarnsubitem',
+                payload,
+            );
+
+            if (!res?.data?.success) {
+                return AppAlert.alert(
+                    'Warning',
+                    res?.data?.message || 'Unable to save sub item.',
+                );
+            }
+
+            const code = res?.data?.data?.data?.itmcode || subForm.ItmCode || '';
+            AppAlert.alert(
+                'Success',
+                isModifyMode
+                    ? `Sub Item ${code} updated successfully.`
+                    : `Item ${code} saved successfully.`,
+            );
+
+            setIsModifyMode(false);
+            setScreen('SUB_LIST');
+            if (browseParent) await loadSubList(browseParent);
+        } catch (e: any) {
+            AppAlert.alert(
+                'Error',
+                e?.response?.data?.message || 'Something went wrong.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderSubForm = () => {
+        const subErrors = getSubValidationErrors();
+        const isSaving = loading;
+
+        return (
+            <View style={ym2.page}>
+                <View style={ym2.subHeader}>
+                    <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn} disabled={isSaving}>
+                        <Ionicons name="arrow-back" size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                        <Text style={ym2.subHeaderTitle}>{isModifyMode ? 'Modify Sub Item' : 'Create Sub Item'}</Text>
+                        <Text style={ym2.subHeaderSub}>{modifyItemName || subForm.WNameCode}</Text>
                     </View>
                 </View>
-            </ScrollView>
-        </View>
-    );
+
+                <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                    <View style={ym2.formCard}>
+                        {field(
+                            'Main Item *',
+                            subForm.WNameCode,
+                            () => { },
+                            false,
+                            false,
+                            subErrors.main,
+                        )}
+
+                        <Text style={ym2.label}>Blend <Text style={ym2.required}>*</Text></Text>
+                        {subBlendList.map((b, i) => (
+                            <View key={`${b.id}-${i}`} style={ym2.blendRow}>
+                                <Text numberOfLines={1} style={[ym2.blendName, { flex: 1 }]}>{b.name}</Text>
+                                <TextInput
+                                    value={String(b.per ?? '')}
+                                    editable={!isSaving}
+                                    onChangeText={v => {
+                                        if (!/^[0-9.]*$/.test(v)) return;
+                                        setSubBlendList(prev => {
+                                            const nextList = prev.map((x, idx) => idx === i ? { ...x, per: v } : x);
+                                            setSubForm(current => ({
+                                                ...current,
+                                                linkitmcode: buildSubItem(current.count_no, current.ply, nextList, current.others),
+                                            }));
+                                            return nextList;
+                                        });
+                                    }}
+                                    keyboardType="numeric"
+                                    placeholder="%"
+                                    placeholderTextColor={T.muted}
+                                    style={[ym2.percentInput, isSaving && ym2.disabledInput]}
+                                />
+                            </View>
+                        ))}
+                        <Text style={[ym2.totalText, subErrors.blend && ym2.validationText]}>
+                            Total: {subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0)}%
+                        </Text>
+                        {subErrors.blend ? <Text style={ym2.validationText}>{subErrors.blend}</Text> : null}
+
+                        {selectField(
+                            'Count Type',
+                            subForm.count || '',
+                            () => openPicker('count', 'Select Count Type', countData, false, selectedCount),
+                            false,
+                            false,
+                            subErrors.count,
+                        )}
+
+                        {field(
+                            'Count *',
+                            subForm.count_no,
+                            v => setSubForm((p: any) => ({
+                                ...p,
+                                count_no: v,
+                                denier: calculateDenier(v, p.ply, p.formula),
+                                linkitmcode: buildSubItem(v, p.ply, subBlendList, p.others),
+                            })),
+                            false,
+                            false,
+                            subErrors.countNo,
+                        )}
+
+                        {selectField(
+                            'Ply',
+                            subForm.ply || '',
+                            () => openPicker('ply', 'Select Ply', plyData, false, selectedPly, true),
+                            false,
+                            false,
+                            subErrors.ply,
+                        )}
+
+                        {selectField(
+                            'Yarn Type',
+                            subForm.subtype_name || '',
+                            () => openPicker('subtype', 'Select Yarn Type', subTypeData, false, selectedSubType),
+                            true,
+                            false,
+                            subErrors.subtype,
+                        )}
+
+                        {field(
+                            'Other',
+                            subForm.others,
+                            v => setSubForm((p: any) => ({
+                                ...p,
+                                others: v,
+                                linkitmcode: buildSubItem(p.count_no, p.ply, subBlendList, v),
+                            })),
+                            false,
+                            false,
+                        )}
+
+                        {field(
+                            'Sub Item Name *',
+                            subForm.linkitmcode,
+                            v => setSubForm((p: any) => ({ ...p, linkitmcode: v })),
+                            false,
+                            false,
+                            subErrors.name,
+                        )}
+
+                        {field(
+                            'Denier *',
+                            subForm.denier,
+                            () => { },
+                            false,
+                            false,
+                            subErrors.denier,
+                        )}
+
+                        <View style={ym2.actions}>
+                            <TouchableOpacity style={ym2.secondaryBtn} onPress={closeCurrent} disabled={isSaving}>
+                                <Text style={ym2.secondaryText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[ym2.primaryBtn, isSaving && ym2.disabledButton]}
+                                onPress={saveSub}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Ionicons name={isModifyMode ? 'checkmark-circle-outline' : 'add-circle-outline'} size={17} color="#fff" />
+                                )}
+                                <Text style={ym2.primaryText}>{isModifyMode ? 'Modify Sub Item' : 'Add Sub Item'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    };
 
     const renderParty = () => (
         <View style={ym2.page}>
@@ -5824,6 +6334,7 @@ function YarnsTab() {
                 </View>
                 <Text style={ym2.sectionTitle}>Existing Party Items ({filteredParty.length})</Text>
                 <FlatList
+                    key={`party-grid-${gridColumns}`}
                     data={filteredParty}
                     keyExtractor={(item, i) => `${item?.id || item?.itmcode || i}`}
                     numColumns={gridColumns}
@@ -5862,6 +6373,7 @@ function YarnsTab() {
             </View>
             <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
                 <FlatList
+                    key={`sub-grid-${gridColumns}`}
                     data={filteredSub}
                     keyExtractor={(item, i) => `${item?.itmcode || i}`}
                     numColumns={gridColumns}
@@ -5901,6 +6413,7 @@ function YarnsTab() {
                                 {loading && <View style={ym2.loadingBar}><ActivityIndicator size="small" color={T.copper} /><Text style={ym2.loadingText}>Loading yarn management data...</Text></View>}
                                 <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
                                     <FlatList
+                                        key={`main-grid-${activeTab}-${gridColumns}`}
                                         data={filtered}
                                         keyExtractor={(item, i) => `${item?.itmcode || item?.id || i}`}
                                         numColumns={gridColumns}
@@ -6028,12 +6541,12 @@ const ym2 = StyleSheet.create({
     badge: { backgroundColor: T.sub, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 6 },
     badgeText: { fontSize: 9, fontWeight: '800', color: T.muted },
     divider: { height: 1, backgroundColor: T.border, marginVertical: 10 },
-    infoGrid: { flexDirection: 'row', gap: 8 },
-    infoCell: { flex: 1, minWidth: 0 },
+    infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    infoCell: { flex: 1, minWidth: 90 },
     infoLabel: { fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
     infoValue: { fontSize: 11, fontWeight: '700', color: T.ink },
-    cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
-    outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: T.surface },
+    cardActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 8, marginTop: 12 },
+    outlineBtn: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 5, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: T.surface },
     outlineText: { fontSize: 10, fontWeight: '700', color: T.ink },
     emptyCard: { alignItems: 'center', justifyContent: 'center', paddingVertical: 70 },
     emptyTitle: { marginTop: 9, fontSize: 13, fontWeight: '800', color: T.ink },
@@ -6050,6 +6563,11 @@ const ym2 = StyleSheet.create({
     required: { color: '#C0392B' },
     inputWrap: { minHeight: 42, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub, borderRadius: 9, justifyContent: 'center' },
     input: { color: T.ink, fontSize: 13, paddingHorizontal: 10, paddingVertical: 9 },
+    disabledInputWrap: { backgroundColor: T.border + '55', borderColor: T.border, flexDirection: 'row', alignItems: 'center', paddingRight: 9 },
+    disabledInput: { color: T.muted },
+    errorInputWrap: { borderColor: T.red, borderWidth: 1.2 },
+    validationText: { color: T.red, fontSize: 10, fontWeight: '700', marginTop: 4, lineHeight: 14 },
+    disabledButton: { opacity: 0.55 },
     readonlyBox: { backgroundColor: T.sub, borderRadius: 9, padding: 10, marginBottom: 4 },
     readonlyLabel: { fontSize: 9, color: T.muted, textTransform: 'uppercase' },
     readonlyValue: { fontSize: 12, fontWeight: '800', color: T.ink, marginTop: 2 },
@@ -6072,7 +6590,7 @@ const ym2 = StyleSheet.create({
     selectText: { flex: 1, color: T.ink, fontSize: 13, fontWeight: '600', marginRight: 8 },
     selectPlaceholder: { color: T.muted, fontWeight: '400' },
     gridRow: { gap: 10, alignItems: 'stretch' },
-    outlineBtnDanger: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#F3C4C0', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: '#FFF8F7' },
+    outlineBtnDanger: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 5, borderWidth: 1, borderColor: '#F3C4C0', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: '#FFF8F7' },
     outlineTextDanger: { fontSize: 10, fontWeight: '700', color: '#B42318' },
     headerAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: T.copper, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
     headerAddText: { color: '#fff', fontSize: 10, fontWeight: '800' },

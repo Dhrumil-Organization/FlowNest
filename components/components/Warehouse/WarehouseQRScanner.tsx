@@ -379,11 +379,9 @@ export default function WarehouseQRScanner({ navigation, route }) {
 
   const processScan = value => {
     const rawInput = cleanScannerValue(value);
-    console.log("rawInput",rawInput);
     if (!rawInput) return;
 
     const result = findIndexedQrMatch(qrIdentityIndex, rawInput);
-    console.log("result",result);
     if (result.ambiguous) {
       setScanStatus("error", "Multiple Stock Matches", "More than one stock row matches this QR");
       return;

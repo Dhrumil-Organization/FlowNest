@@ -2999,7 +2999,7 @@ const SubItemCreateTab: React.FC = () => {
                                         style={{ color: 'black' }}
                                         placeholder="Count..."
                                         value={subitemform.count_no || ''}
-                                        editable={true}
+                                        editable={false}
                                         // onChangeText={(text) => {
                                         //     setSpunForm(prev => ({
                                         //         ...prev,
@@ -3042,7 +3042,8 @@ const SubItemCreateTab: React.FC = () => {
                                 <Text style={yarnmanagementsystemstyle.label}>
                                     Ply <Text style={{ color: 'red' }}>*</Text>
                                 </Text>
-                                <PartyDropdown
+                                <View pointerEvents="none" style={{ opacity: 0.6 }}>
+                                    <PartyDropdown
                                     data={plydata}
                                     placeholder="Choose Ply..."
                                     labelKey={["ply", "id"]}
@@ -3066,7 +3067,8 @@ const SubItemCreateTab: React.FC = () => {
                                             };
                                         });
                                     }}
-                                />
+                                    />
+                                </View>
                             </View>
 
                             <View style={yarnmanagementsystemstyle.inputGroup}>
@@ -3134,7 +3136,7 @@ const SubItemCreateTab: React.FC = () => {
                                         style={{ color: 'black' }}
                                         placeholder="Others..."
                                         value={subitemform.others || ''}
-                                        editable={true}
+                                        editable={false}
                                         // onChangeText={(text) => {
                                         //     setsubitemform(prev => ({
                                         //         ...prev,
@@ -3167,7 +3169,7 @@ const SubItemCreateTab: React.FC = () => {
                                     <TextInput
                                         placeholder="Main Item..."
                                         value={subitemform.linkitmcode || ''}
-                                        editable={true}
+                                        editable={false}
                                         onChangeText={(text) => {
                                             setsubitemform(prev => ({
                                                 ...prev,
@@ -6846,17 +6848,17 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                             setIsModifyMode(false);
                             setIsModifyMode(false);
-                             setSubItemFormLoading(false);
-                             setSubItemTab('LIST');
-                             setShowSubItemCard(true);
-                             setShowSpunCard(false);
-                             setShowFilamentCard(false);
-                             setshowbrwosecard(false);
-                             setpartycard(false);
-                             setCurrentScreen('SUB_ITEM');
-                             if (subItemParent?.itmcode) {
-                                 fetchSubItemList(subItemParent);
-                             }
+                            setSubItemFormLoading(false);
+                            setSubItemTab('LIST');
+                            setShowSubItemCard(true);
+                            setShowSpunCard(false);
+                            setShowFilamentCard(false);
+                            setshowbrwosecard(false);
+                            setpartycard(false);
+                            setCurrentScreen('SUB_ITEM');
+                            if (subItemParent?.itmcode) {
+                                fetchSubItemList(subItemParent);
+                            }
                         }
                     }]
                 );
@@ -6974,17 +6976,17 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                 setselectedsubcount([]);
                                 setselectedsubitem([]);
                                 setIsModifyMode(false);
-                                 setSubItemFormLoading(false);
-                                 setSubItemTab('LIST');
-                                 setShowSubItemCard(true);
-                                 setShowSpunCard(false);
-                                 setShowFilamentCard(false);
-                                 setshowbrwosecard(false);
-                                 setpartycard(false);
-                                 setCurrentScreen('SUB_ITEM');
-                                 if (subItemParent?.itmcode) {
-                                     fetchSubItemList(subItemParent);
-                                 }
+                                setSubItemFormLoading(false);
+                                setSubItemTab('LIST');
+                                setShowSubItemCard(true);
+                                setShowSpunCard(false);
+                                setShowFilamentCard(false);
+                                setshowbrwosecard(false);
+                                setpartycard(false);
+                                setCurrentScreen('SUB_ITEM');
+                                if (subItemParent?.itmcode) {
+                                    fetchSubItemList(subItemParent);
+                                }
                             }
                         }
                     ]
@@ -7235,18 +7237,69 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const total = getTotalPercentage(blendList);
 
+    // Smart search: 28/2 and 2/28 both should match
+    const getSearchVariants = (value: any): string[] => {
+        const text = String(value ?? '')
+            .toLowerCase()
+            .trim();
+
+        if (!text) return [];
+
+        const variants = [text];
+
+        // Match count/ply formats:
+        // 28/2 -> 2/28
+        // 2/28 -> 28/2
+        const slashPattern = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/g;
+
+        let match;
+
+        while ((match = slashPattern.exec(text)) !== null) {
+            const first = match[1];
+            const second = match[2];
+
+            const original = `${first}/${second}`;
+            const reversed = `${second}/${first}`;
+
+            variants.push(
+                text.replace(original, reversed)
+            );
+        }
+
+        return [...new Set(variants)];
+    };
+
+    // const filteredData = useMemo(() => {
+    //     const search = cardSearch.trim().toLowerCase();
+
+    //     if (!search) return data;
+
+    //     return data.filter(item =>
+    //         Object.values(item || {}).some(value =>
+    //             String(value ?? '').toLowerCase().includes(search)
+    //         )
+    //     );
+    // }, [data, cardSearch]);
+
+
     const filteredData = useMemo(() => {
         const search = cardSearch.trim().toLowerCase();
 
         if (!search) return data;
 
-        return data.filter(item =>
-            Object.values(item || {}).some(value =>
-                String(value ?? '').toLowerCase().includes(search)
-            )
-        );
-    }, [data, cardSearch]);
+        return data.filter(item => {
+            const allValues = Object.values(item || {});
 
+            return allValues.some(value => {
+                const variants = getSearchVariants(value);
+
+                return variants.some(text =>
+                    text.includes(search)
+                );
+            });
+        });
+    }, [data, cardSearch]);
+    
     /*-------------------------------------------------browse carddddddddddd--------------------------------------------------*/
     /*-------------------------------------------browse over--------------------------------------------------------------------*/
 

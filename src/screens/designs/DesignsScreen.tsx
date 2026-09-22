@@ -102,62 +102,110 @@ const GPM = (sys: string, cnt: number): number => {
 export type FabricSpec = ReturnType<typeof calcSpec>;
 
 function calcSpec(d: any) {
-    const s = (Number(d.warp_shrink) || 0) / 100;   // warp take-up
-    const gf = (Number(d.gf_shrink) || 0) / 100;    // greige→finish shrink
-    const basis: 'reed' | 'greige' = d.width_basis === 'greige' ? 'greige' : 'reed';
+    // Client Claude reference: four independent engineering inputs.
+    // Reed Space       = on-loom width.
+    // Greige Width     = off-loom width entered/stored independently.
+    // Warp Shrink      = warp length take-up, not a width formula.
+    // Finish Shrink    = greige -> finished length shrink.
+    const reed = Number(d.reed_space) || 0;
+    const warpTakeUp = 1 + ((Number(d.warp_shrink) || 0) / 100);
+    const gf = (Number(d.gf_shrink) || 0) / 100;
 
-    // reed ↔ greige width are interchangeable
-    let reed = Number(d.reed_space) || 0;
-    let widthGreige = Number(d.greige_width) || 0;
-    if (basis === 'greige' && widthGreige > 0 && s < 1) {
-        reed = widthGreige / (1 - s);
-    } else {
-        widthGreige = reed * (1 - s);
-    }
+    const enteredGreigeWidth = Number(d.greige_width) || 0;
+    const greigeWidthMissing = !(enteredGreigeWidth > 0);
+    // Strong rule: Greige Width is an independent REQUIRED measurement.
+    // Never substitute Reed Space or a derived value into live calculations.
+    const widthGreige = enteredGreigeWidth > 0 ? enteredGreigeWidth : 0;
+    const widthContraction =
+        enteredGreigeWidth > 0 && reed > 0
+            ? reed / enteredGreigeWidth
+            : 0;
 
     const warpYarns: any[] = d.warp_yarns ?? [];
     const weftYarns: any[] = d.weft_yarns ?? [];
-    const epiLoom = warpYarns.reduce((t, y) => t + (Number(y.epi) || 0), 0);
-    const ppiLoom = weftYarns.reduce((t, y) => t + (Number(y.ppi) || 0), 0);
 
-    const totalEnds = epiLoom * reed;
-    const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;          // "+2 picks on table"
-    const wf = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const epiLoom = warpYarns.reduce(
+        (total, yarn) => total + (Number(yarn.epi) || 0),
+        0
+    );
+    const ppiLoom = weftYarns.reduce(
+        (total, yarn) => total + (Number(yarn.ppi) || 0),
+        0
+    );
 
-    // ends are conserved loom → greige → finished
-    const epiGreige = widthGreige > 0 ? totalEnds / widthGreige : 0;
-    const finWidthIn = (Number(d.fin_width) || 0) > 0
-        ? Number(d.fin_width)
-        : (gf < 1 ? widthGreige * (1 - gf) : widthGreige);
-    const epiFinished = finWidthIn > 0 ? totalEnds / finWidthIn : 0;
-    // picks pack closer as length shrinks in finishing
-    const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
+    // Body ends only. Selvedge remains cost-only in the current RN design model.
+    const totalEnds = Math.round(epiLoom * reed);
 
-    // ── Physical GLM (RS/reed-space basis, matching CostingEngine base consumption) ──
-    let warpGLM = 0;
-    warpYarns.forEach((y) => {
-        warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+    const epiGreige = epiLoom * widthContraction;
+    const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;
+    const ppiFactor = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+
+    // Claude physical fabric-weight formula:
+    // warp = effective greige EPI × yarn g/m × warp take-up
+    // weft = effective greige PPI × yarn g/m
+    const IN_PER_M = 39.3701;
+    const M_PER_IN = 0.0254;
+
+    let warpGSM = 0;
+    warpYarns.forEach((yarn) => {
+        const effectiveEpi =
+            (Number(yarn.epi) || 0) * widthContraction;
+        warpGSM +=
+            effectiveEpi *
+            IN_PER_M *
+            GPM(yarn.sys, Number(yarn.cnt)) *
+            warpTakeUp;
     });
-    let weftGLM = 0;
-    weftYarns.forEach((y) => {
-        weftGLM += (Number(y.ppi) || 0) * wf * reed * GPM(y.sys, Number(y.cnt));
-    });
-    const greigGLM = warpGLM + weftGLM;
-    const widthGreigeM = widthGreige * 0.0254;
-    const greigGSM = widthGreigeM > 0 ? greigGLM / widthGreigeM : 0;
-    const finGLM = gf < 1 ? greigGLM / (1 - gf) : greigGLM;   // mass conserved
-    const finWidthM = finWidthIn * 0.0254;
-    const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
 
-    // ── fibre blend, weighted by actual yarn grams contributed ──
-    //
-    // A yarn such as COTTON/LINEN 45:55 is split into its actual
-    // fibre components. Because the yarn gram contribution depends on
-    // EPI/PPI, Fibre Blend updates immediately whenever EPI/PPI changes.
+    let weftGSM = 0;
+    weftYarns.forEach((yarn) => {
+        const effectivePpi =
+            (Number(yarn.ppi) || 0) * ppiFactor;
+        weftGSM +=
+            effectivePpi *
+            IN_PER_M *
+            GPM(yarn.sys, Number(yarn.cnt));
+    });
+
+    const greigGSM = !greigeWidthMissing ? (warpGSM + weftGSM) : 0;
+    const greigGLM =
+        !greigeWidthMissing && widthGreige > 0
+            ? greigGSM * (widthGreige * M_PER_IN)
+            : 0;
+
+    const finWidthEntered = (Number(d.fin_width) || 0) > 0;
+    const finWidthIn = finWidthEntered ? Number(d.fin_width) : 0;
+    const hasFinished =
+        !greigeWidthMissing &&
+        finWidthEntered &&
+        gf >= 0 &&
+        gf < 1;
+
+    const finGLM =
+        hasFinished
+            ? greigGLM / (1 - gf)
+            : 0;
+    const finGSM =
+        hasFinished && finWidthIn > 0
+            ? finGLM / (finWidthIn * M_PER_IN)
+            : 0;
+
+    const epiFinished =
+        hasFinished && finWidthIn > 0
+            ? totalEnds / finWidthIn
+            : 0;
+    const ppiFinished =
+        hasFinished
+            ? ppiTable / (1 - gf)
+            : 0;
+
+    // ── ERP-authoritative fibre identity ──────────────────────
     const normalizeFibreName = (value: string): string => {
-        const name = String(value || '').trim().toLowerCase();
+        const raw = String(value || '').trim();
+        const name = raw.toLowerCase();
 
         if (!name) return 'Other';
+        if (name.includes('elastomultiester')) return 'Elastomultiester';
         if (name.includes('linen') || name.includes('flax')) return 'Linen';
         if (name.includes('cotton')) return 'Cotton';
         if (name.includes('polyester') || name === 'poly' || name === 'pes') return 'Polyester';
@@ -171,86 +219,19 @@ function calcSpec(d: any) {
         if (name.includes('acrylic')) return 'Acrylic';
         if (name.includes('elastane') || name.includes('spandex') || name.includes('lycra')) return 'Elastane';
 
-        return value.trim() || 'Other';
+        return raw || 'Other';
     };
 
-    const defaultFibreOf = (yarn: any): string => {
-        const sys = String(yarn?.sys || '').trim();
-
-        if (sys === 'Lea') return 'Linen';
-        if (sys === 'Ne') return 'Cotton';
-        if (sys === 'Den' || sys === 'Dtx') return 'Polyester';
-
-        return 'Other';
-    };
-
-    const extractNamedFibres = (yarn: any): string[] => {
-        const rawName = `${yarn?.name || ''} ${yarn?.itm_name || ''}`.toUpperCase();
-        const fibres: string[] = [];
-
-        const add = (fibre: string) => {
-            if (!fibres.includes(fibre)) fibres.push(fibre);
-        };
-
-        if (/\bCOTTON\b/.test(rawName)) add('Cotton');
-        if (/\bLINEN\b|\bFLAX\b/.test(rawName)) add('Linen');
-        if (/\bPOLYESTER\b|\bPES\b/.test(rawName)) add('Polyester');
-        if (/\bVISCOSE\b|\bRAYON\b/.test(rawName)) add('Viscose');
-        if (/\bMODAL\b/.test(rawName)) add('Modal');
-        if (/\bLYOCELL\b|\bTENCEL\b/.test(rawName)) add('Lyocell');
-        if (/\bBAMBOO\b/.test(rawName)) add('Bamboo');
-        if (/\bWOOL\b/.test(rawName)) add('Wool');
-        if (/\bSILK\b/.test(rawName)) add('Silk');
-        if (/\bNYLON\b|\bPOLYAMIDE\b/.test(rawName)) add('Nylon');
-        if (/\bACRYLIC\b/.test(rawName)) add('Acrylic');
-        if (/\bELASTANE\b|\bSPANDEX\b|\bLYCRA\b/.test(rawName)) add('Elastane');
-
-        // Common textile abbreviation: PC = Polyester/Cotton.
-        if (/\bPC\b/.test(rawName)) {
-            add('Polyester');
-            add('Cotton');
-        }
-
-        return fibres;
-    };
-
-    const parseBlendPercentages = (value: any): number[] => {
-        const raw = String(value ?? '').trim();
-
-        if (!raw) return [];
-
-        const values = raw
-            .replace(/%/g, '')
-            .split(/[:/,+-]/)
-            .map(part => Number(part.trim()))
-            .filter(part => Number.isFinite(part) && part >= 0);
-
-        if (values.length < 2) return [];
-
-        const total = values.reduce((sum, part) => sum + part, 0);
-        if (total <= 0) return [];
-
-        return values.map(part => part / total);
-    };
-
-    const resolveYarnFibreShares = (yarn: any): { fibre: string; share: number }[] => {
-        /*
-         * Authoritative ERP composition from the Design detail API.
-         *
-         * Example:
-         *   WBlendPer 11,100
-         *   fibre_composition [{ id: 11, name: 'ELASTOMULTIESTER', percent: 100 }]
-         *
-         * This MUST win over sys/count heuristics. Denier/Dtx describe yarn
-         * count, not fibre identity.
-         */
-        const erpComposition = Array.isArray(yarn?.fibre_composition)
+    const resolveYarnFibreShares = (
+        yarn: any
+    ): { fibre: string; share: number }[] => {
+        const rawComposition = Array.isArray(yarn?.fibre_composition)
             ? yarn.fibre_composition
             : [];
 
-        const validErpComposition = erpComposition
+        const composition = rawComposition
             .map((component: any) => ({
-                fibre: normalizeFibreName(String(component?.name || '')),
+                fibre: normalizeFibreName(component?.name),
                 percent: Number(component?.percent),
             }))
             .filter((component: any) =>
@@ -259,103 +240,97 @@ function calcSpec(d: any) {
                 component.percent > 0
             );
 
-        if (validErpComposition.length > 0) {
-            const totalPercent = validErpComposition.reduce(
+        if (composition.length > 0) {
+            const total = composition.reduce(
                 (sum: number, component: any) => sum + component.percent,
                 0
             );
 
-            if (totalPercent > 0) {
-                return validErpComposition.map((component: any) => ({
+            if (total > 0) {
+                return composition.map((component: any) => ({
                     fibre: component.fibre,
-                    share: component.percent / totalPercent,
+                    share: component.percent / total,
                 }));
             }
         }
 
-        /*
-         * Pure authoritative fibre fallback from backend.
-         */
-        const authoritativeFibre = normalizeFibreName(
-            String(yarn?.fibre || '')
-        );
-
-        if (
-            authoritativeFibre !== 'Other' &&
-            !authoritativeFibre.includes(' / ')
-        ) {
-            return [{
-                fibre: authoritativeFibre,
-                share: 1,
-            }];
+        const authoritativeFibre = String(yarn?.fibre || '').trim();
+        if (authoritativeFibre && !authoritativeFibre.includes('/')) {
+            const fibre = normalizeFibreName(authoritativeFibre);
+            if (fibre !== 'Other') {
+                return [{ fibre, share: 1 }];
+            }
         }
 
-        /*
-         * Legacy fallback only.
-         *
-         * Do NOT parse w_blend_per here. ERP WBlendPer contains fibre IDs,
-         * e.g. 11,100 means fibre 11 at 100%, not an 11:100 percentage ratio.
-         */
-        const percentages = parseBlendPercentages(
-            yarn?.blend_ratio ?? yarn?.br
-        );
-        const namedFibres = extractNamedFibres(yarn);
-
-        if (percentages.length > 0 && namedFibres.length > 0) {
-            const resolved: { fibre: string; share: number }[] = [];
-            const pairedCount = Math.min(percentages.length, namedFibres.length);
-
-            for (let index = 0; index < pairedCount; index += 1) {
-                resolved.push({
-                    fibre: normalizeFibreName(namedFibres[index]),
-                    share: percentages[index],
-                });
-            }
-
-            const assigned = resolved.reduce((sum, row) => sum + row.share, 0);
-            const balance = Math.max(0, 1 - assigned);
-
-            if (balance > 0.000001) {
-                const fallback = defaultFibreOf(yarn);
-                const existing = resolved.find(row => row.fibre === fallback);
-
-                if (existing) existing.share += balance;
-                else resolved.push({ fibre: fallback, share: balance });
-            }
-
-            return resolved;
-        }
-
-        return [{
-            fibre: defaultFibreOf(yarn),
-            share: 1,
-        }];
+        // Never infer fibre from Denier/Ne/Lea or yarn name.
+        return [{ fibre: 'Other', share: 1 }];
     };
 
-    const blendTotals: Record<string, number> = {};
+    const calculateBlend = (
+        warpMultiplier: number,
+        weftMultiplier: number
+    ) => {
+        const totals: Record<string, number> = {};
 
-    const addYarnContribution = (yarn: any, grams: number) => {
-        if (!(grams > 0)) return;
+        const add = (yarn: any, mass: number) => {
+            if (!(mass > 0)) return;
 
-        resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
-            if (!(share > 0)) return;
+            resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
+                if (!(share > 0)) return;
+                totals[fibre] = (totals[fibre] ?? 0) + (mass * share);
+            });
+        };
 
-            const key = normalizeFibreName(fibre);
-            blendTotals[key] = (blendTotals[key] ?? 0) + (grams * share);
+        warpYarns.forEach((yarn) => {
+            const mass =
+                (Number(yarn.epi) || 0) *
+                warpMultiplier *
+                IN_PER_M *
+                GPM(yarn.sys, Number(yarn.cnt));
+            add(yarn, mass);
         });
+
+        weftYarns.forEach((yarn) => {
+            const mass =
+                (Number(yarn.ppi) || 0) *
+                weftMultiplier *
+                IN_PER_M *
+                GPM(yarn.sys, Number(yarn.cnt));
+            add(yarn, mass);
+        });
+
+        const sorted = Object.fromEntries(
+            Object.entries(totals).sort(([, a], [, b]) => b - a)
+        ) as Record<string, number>;
+
+        const grand = Object.values(sorted).reduce(
+            (sum, value) => sum + value,
+            0
+        );
+
+        return { totals: sorted, grand };
     };
 
-    warpYarns.forEach((y) => {
-        const grams = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
-        addYarnContribution(y, grams);
-    });
+    // Claude GREIGE blend:
+    // warp = reed/greige width × warp take-up
+    // weft = on-table PPI / loom PPI
+    const blendGreige = !greigeWidthMissing
+        ? calculateBlend(
+            widthContraction * warpTakeUp,
+            ppiFactor
+        )
+        : { totals: {} as Record<string, number>, grand: 0 };
 
-    weftYarns.forEach((y) => {
-        const grams = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
-        addYarnContribution(y, grams);
-    });
+    // Claude FINISHED blend:
+    // warp ends are packed from reed width to finished width;
+    // picks are additionally packed by finish shrink.
+    const blendFinished = hasFinished
+        ? calculateBlend(
+            (reed / finWidthIn) * warpTakeUp,
+            ppiFactor / (1 - gf)
+        )
+        : { totals: {} as Record<string, number>, grand: 0 };
 
-    const blendGrand = Object.values(blendTotals).reduce((a, b) => a + b, 0);
     const naturalFibres = new Set([
         'Cotton',
         'Linen',
@@ -366,17 +341,43 @@ function calcSpec(d: any) {
         'Wool',
         'Silk',
     ]);
-    const hasNaturalFibre = Object.keys(blendTotals).some(
-        fibre => naturalFibres.has(fibre) && (blendTotals[fibre] ?? 0) > 0
+
+    const hasNaturalFibre = Object.keys(blendGreige.totals).some(
+        fibre =>
+            naturalFibres.has(fibre) &&
+            (blendGreige.totals[fibre] ?? 0) > 0
     );
 
     return {
-        basis, reed, widthGreige, finWidthIn,
-        epiLoom, ppiLoom, ppiTable, totalEnds,
-        epiGreige, epiFinished, ppiFinished,
-        warpGLM, weftGLM, greigGLM, greigGSM, finGLM, finGSM,
-        blendTotals, blendGrand, hasNaturalFibre,
-        finWidthEntered: (Number(d.fin_width) || 0) > 0,
+        basis: 'reed' as const,
+        reed,
+        widthGreige,
+        greigeWidthMissing,
+        widthContraction,
+        warpTakeUp,
+        finWidthIn,
+        finWidthEntered,
+        hasFinished,
+        epiLoom,
+        ppiLoom,
+        ppiTable,
+        totalEnds,
+        epiGreige,
+        epiFinished,
+        ppiFinished,
+        warpGLM: 0,
+        weftGLM: 0,
+        greigGLM,
+        greigGSM,
+        finGLM,
+        finGSM,
+        blendTotals: blendGreige.totals,
+        blendGrand: blendGreige.grand,
+        blendGreigeTotals: blendGreige.totals,
+        blendGreigeGrand: blendGreige.grand,
+        blendFinishedTotals: blendFinished.totals,
+        blendFinishedGrand: blendFinished.grand,
+        hasNaturalFibre,
     };
 }
 
@@ -384,6 +385,7 @@ const BLEND_COLORS: Record<string, string> = {
     Linen: '#C8A96E',
     Cotton: '#A8C8A0',
     Polyester: '#A0B8C8',
+    Elastomultiester: '#3F9C8F',
     Viscose: '#B8A0C8',
     Modal: '#9FC4B6',
     Lyocell: '#8FBDB0',
@@ -500,6 +502,12 @@ function LiveSpecPanel({ design }: { design: any }) {
                 ↑EPI {f1(spec.epiLoom)} × ↑PPI {f1(spec.ppiLoom)}  (on loom)
             </Text>
 
+            {spec.greigeWidthMissing && (
+                <Text style={{ fontSize: 10, color: T.red, fontWeight: '700', marginBottom: 6 }}>
+                    Greige width is required — enter the actual off-loom measurement. Greige/finished weight and fibre calculations are held until entered.
+                </Text>
+            )}
+
             {/* ── construction table LOOM / GREIGE / FINISHED ── */}
             <View style={ls.table}>
                 <View style={[ls.tr, ls.trHead]}>
@@ -553,29 +561,74 @@ function LiveSpecPanel({ design }: { design: any }) {
                 </>
             )}
 
-            {/* ── fibre blend bar ── */}
-            {spec.blendGrand > 0 && (
+            {/* ── fibre blend: greige + finished ── */}
+            {spec.blendGreigeGrand > 0 && (
                 <View style={{ marginTop: 14 }}>
-                    <Text style={ls.sec}>FINAL FABRIC COMPOSITION</Text>
-                    <Text style={ls.blendHint}>
-                        Recalculates automatically from selected yarn blend + EPI/PPI.
-                    </Text>
+                    <Text style={ls.sec}>FIBRE BLEND · GREIGE</Text>
                     <View style={ls.blendBar}>
-                        {Object.entries(spec.blendTotals).map(([k, v]) => (
-                            <View key={k} style={{ flex: v / spec.blendGrand, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                        {Object.entries(spec.blendGreigeTotals).map(([k, v]) => (
+                            <View
+                                key={k}
+                                style={{
+                                    flex: v / spec.blendGreigeGrand,
+                                    backgroundColor: BLEND_COLORS[k] ?? '#888',
+                                }}
+                            />
                         ))}
                     </View>
                     <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                        {Object.entries(spec.blendTotals).map(([k, v]) => (
+                        {Object.entries(spec.blendGreigeTotals).map(([k, v]) => (
                             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
                                 <Text style={ls.blendLegendName}>{k}</Text>
                                 <Text style={ls.blendLegendPct}>
-                                    {Math.round(v / spec.blendGrand * 100)}%
+                                    {(v / spec.blendGreigeGrand * 100).toFixed(1)}%
                                 </Text>
                             </View>
                         ))}
                     </View>
+
+                    {spec.blendFinishedGrand > 0 && (
+                        <View style={{ marginTop: 10 }}>
+                            <Text style={ls.sec}>FIBRE BLEND · FINISHED</Text>
+                            <View style={ls.blendBar}>
+                                {Object.entries(spec.blendFinishedTotals).map(([k, v]) => (
+                                    <View
+                                        key={k}
+                                        style={{
+                                            flex: v / spec.blendFinishedGrand,
+                                            backgroundColor: BLEND_COLORS[k] ?? '#888',
+                                        }}
+                                    />
+                                ))}
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                                {Object.entries(spec.blendFinishedTotals).map(([k, v]) => {
+                                    const finishedPct = v / spec.blendFinishedGrand * 100;
+                                    const greigeMass = spec.blendGreigeTotals[k] ?? 0;
+                                    const greigePct = spec.blendGreigeGrand > 0
+                                        ? greigeMass / spec.blendGreigeGrand * 100
+                                        : 0;
+                                    const delta = finishedPct - greigePct;
+
+                                    return (
+                                        <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                                            <Text style={ls.blendLegendName}>{k}</Text>
+                                            <Text style={ls.blendLegendPct}>
+                                                {finishedPct.toFixed(1)}%
+                                            </Text>
+                                            {Math.abs(delta) >= 0.1 && (
+                                                <Text style={{ fontSize: 10, fontWeight: '700', color: delta > 0 ? T.green : T.red }}>
+                                                    {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -588,12 +641,11 @@ function LiveSpecPanel({ design }: { design: any }) {
             {showFormula && (
                 <View style={ls.formulaBox}>
                     <Text style={ls.formulaTxt}>
-                        Reed and greige width are interchangeable: greige width = reed × (1 − warp shrink).
-                        Total ends = ΣEPI(loom) × reed. EPI greige = ΣEPI ÷ (1 − warp shrink),
-                        PPI greige = ΣPPI + 2. Greige GSM = greige GLM ÷ width(m).
-                        Finished GLM = greige GLM ÷ (1 − finish shrink); mass conserved.
-                        Finished EPI = total ends ÷ finished width (ends conserved).
-                        Finished PPI = PPI greige ÷ (1 − finish shrink) — picks pack closer as length shrinks.
+                        Reed Space and Greige Width are independent widths. Greige Width must be entered as the actual off-loom measurement; Reed × (1 − Warp Shrink) is suggestion only and is never substituted as the measured Greige Width. Warp Shrink is length take-up:
+                        warp mass × (1 + warp shrink), not a greige-width formula. Greige EPI = Loom EPI × Reed / Greige Width;
+                        Greige PPI = Loom PPI + 2. Greige GSM is calculated from effective warp/weft yarn mass and Greige GLM
+                        = Greige GSM × Greige Width(m). Finished GLM = Greige GLM ÷ (1 − Finish Shrink);
+                        Finished EPI = body ends ÷ Finished Width and Finished PPI = Greige PPI ÷ (1 − Finish Shrink).
                     </Text>
                 </View>
             )}
@@ -1906,6 +1958,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+    // Raw text is kept separately so values like `85.` and `85.50`
+    // remain typeable instead of being collapsed by parseFloat.
+    const [greigeWidthText, setGreigeWidthText] = useState('');
+
+    useEffect(() => {
+        const stored = Number((design as any)?.greige_width) || 0;
+        setGreigeWidthText(stored > 0 ? String((design as any)?.greige_width) : '');
+    }, [design]);
 
     useEffect(() => {
         if (design) setForm({
@@ -1921,10 +1981,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     }, [design]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-
-    // greige width ⇄ reed space, kept in sync live
-    const shrinkFrac = (Number(form.warp_shrink) || 0) / 100;
-    const autoGreige = (Number(form.reed_space) || 0) * (1 - shrinkFrac);
 
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
@@ -1961,6 +2017,15 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
     // ✅ validated + verified save (ported logic)
     const save = async () => {
+        const requiredGreigeWidth = Number(form.greige_width) || 0;
+        if (!(requiredGreigeWidth > 0)) {
+            AppAlert.alert(
+                'Greige Width required',
+                'Enter the actual off-loom Greige Width before saving the design.'
+            );
+            return;
+        }
+
         if (!String(form.code || '').trim()) {
             AppAlert.alert('Validation', 'Design code is required.');
             return;
@@ -1998,7 +2063,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
                 width_basis: 'reed',
                 reed_space: Number(form.reed_space) || 0,
-                greige_width: Number(autoGreige) || 0,
+                greige_width: Number(form.greige_width) || 0,
                 warp_shrink: Number(form.warp_shrink) || 0,
                 warp_wastage: Number(form.warp_wastage) || 0,
                 weft_wastage: Number(form.weft_wastage) || 6,
@@ -2343,7 +2408,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         <Text style={[fm.chipTxt, fm.chipTxtActive]}>Reed space</Text>
                     </View>
                     <View style={[fm.chip, fm.chipDisabled]}>
-                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · auto</Text>
+                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · entered</Text>
                     </View>
                 </View>
 
@@ -2364,14 +2429,49 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     </View>
                 </View>
 
-                <Text style={fm.label}>GREIGE WIDTH · CALCULATED</Text>
-                <Text style={fm.hint}>Greige Width = Reed Space × (1 − Warp Shrink)</Text>
+                <Text style={fm.label}>GREIGE WIDTH · REQUIRED</Text>
+                <Text style={fm.hint}>actual off-loom measurement · required</Text>
                 <View style={fm.inputRow}>
-                    <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
-                        <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
-                    </View>
+                    <TextInput
+                        value={greigeWidthText}
+                        onChangeText={v => {
+                            if (!/^\d*(?:\.\d*)?$/.test(v)) return;
+                            setGreigeWidthText(v);
+                            const parsed = Number(v);
+                            set('greige_width', v !== '' && Number.isFinite(parsed) ? parsed : 0);
+                        }}
+                        onBlur={() => {
+                            const parsed = Number(greigeWidthText);
+                            if (Number.isFinite(parsed) && parsed > 0) {
+                                setGreigeWidthText(greigeWidthText.replace(/\.$/, ''));
+                                set('greige_width', parsed);
+                            }
+                        }}
+                        keyboardType="decimal-pad"
+                        style={[fm.input, { flex: 1 }]}
+                        placeholder={(() => {
+                            const reed = Number(form.reed_space) || 0;
+                            const shrink = (Number(form.warp_shrink) || 0) / 100;
+                            return reed > 0 && shrink >= 0 && shrink < 1
+                                ? (reed * (1 - shrink)).toFixed(2)
+                                : 'Enter greige width';
+                        })()}
+                        placeholderTextColor={T.muted}
+                    />
                     <Text style={fm.unit}>"</Text>
                 </View>
+                {(() => {
+                    const reed = Number(form.reed_space) || 0;
+                    const shrink = (Number(form.warp_shrink) || 0) / 100;
+                    const suggested = reed > 0 && shrink >= 0 && shrink < 1
+                        ? reed * (1 - shrink)
+                        : 0;
+                    return suggested > 0 ? (
+                        <Text style={[fm.hint, { marginTop: 4 }]}>
+                            Suggested only: {suggested.toFixed(2)}" = Reed Space × (1 − Warp Shrink). Enter the actual measured Greige Width.
+                        </Text>
+                    ) : null;
+                })()}
 
                 <Text style={fm.label}>WARP YARNS</Text>
                 {(form.warp_yarns ?? []).map((y: any, i: number) => (
@@ -2429,7 +2529,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>FINISH SHRINK</Text>
                         <View style={fm.inputRow}>
-                            <TextInput editable={!form.finish_locked} value={String(form.gf_shrink ?? '5')} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="5" placeholderTextColor={T.muted} />
+                            <TextInput value={String(form.gf_shrink ?? 0)} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="0" placeholderTextColor={T.muted} />
                             <Text style={fm.unit}>%</Text>
                         </View>
                     </View>
@@ -2440,7 +2540,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     ...form,
                     width_basis: 'reed',
                     reed_space: form.reed_space,
-                    greige_width: autoGreige,
+                    greige_width: form.greige_width,
                 }} />
 
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>

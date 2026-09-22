@@ -437,6 +437,12 @@ client.interceptors.response.use(
 );
 
 // ── Types ────────────────────────────────────────────────────
+export interface FibreComponent {
+    name: string;
+    percent: number | string | null;
+    id?: string | number;
+}
+
 export interface YarnLine {
     mi_id: string;
     blend_ratio: string | null;
@@ -449,6 +455,14 @@ export interface YarnLine {
     cnt: number;
     base_price?: number;
     price?: number;
+
+    // Authoritative ERP fibre metadata.
+    // Identity comes from FAMItem.WBlend / WBlendPer via DesignController;
+    // never infer fibre from count system (Den/Ne/Lea) or yarn name.
+    fibre?: string;
+    fibre_composition?: FibreComponent[];
+    w_blend?: string | number;
+    w_blend_per?: string;
 }
 
 export interface Design {

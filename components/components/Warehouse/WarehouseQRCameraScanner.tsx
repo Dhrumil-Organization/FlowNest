@@ -15,8 +15,6 @@ import {
 import Icon from "@expo/vector-icons/MaterialIcons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-// import { parseWarehouseQrIdentity, isSameWarehouseCart } from "./utils/warehouseQrMatcher";
-import { parseWarehouseQrIdentity, isSameWarehouseCart } from '@/common/utils/warehouseQrMatcher';
 
 const EXPECTED_LENGTH = 14;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -45,7 +43,6 @@ const splitScanParts = value => {
   let cleanValue = cleanScannerValue(value);
 
   if (!cleanValue) return [];
-  console.log("cleanScannerValue", cleanScannerValue);
   cleanValue = cleanValue
     .replace(/\\"/g, '"')
     .replace(/\\+/g, "")
@@ -71,12 +68,10 @@ const normalizeScan = value => {
   const parts = splitScanParts(value);
   if (!parts.length) return "";
 
-  console.log("parts", parts);
 
 
   const raw = cleanScannerValue(value);
 
-  console.log("raw", raw);
 
   if (raw.includes("~")) {
     let finalParts = parts;
@@ -90,8 +85,6 @@ const normalizeScan = value => {
       }
     }
 
-    console.log("finalParts.length", finalParts.length);
-    console.log("finalParts", finalParts);
 
     if (finalParts.length > EXPECTED_LENGTH) {
       finalParts = finalParts.slice(0, EXPECTED_LENGTH);
@@ -133,17 +126,74 @@ const getCartonKey = item =>
     ""
   );
 
-const getStockRowKey = item => {
-  const uid = item?.ZUId ?? item?.zuid ?? item?.ZUID ?? item?.UId ?? item?.uid;
-  const srNo = item?.ZSrNo ?? item?.zsrno ?? item?.ZSRNO ?? item?.SrNo ?? item?.srno;
-  const subSr = item?.ZSubSr ?? item?.zsubsr ?? item?.ZSUBSR ?? item?.SubSr ?? item?.subsr;
-  if (uid !== undefined && uid !== null && uid !== "" && srNo !== undefined && srNo !== null && srNo !== "" && subSr !== undefined && subSr !== null && subSr !== "") {
-    return `${String(uid).trim()}|${String(srNo).trim()}|${String(subSr).trim()}`;
+
+
+// Stable business identity used by both OLD and NEW warehouse QR labels.
+const parseQrIdentity = value => {
+  const parts = splitScanParts(value);
+  if (!parts.length) return null;
+  const old = cleanScannerValue(value).includes("~");
+  if (old) {
+    if (parts.length < 7) return null;
+    return { itm: parts[0], mer: parts[1], grd: parts[2], shd: parts[3], cart: normalizeCart(parts[6]) };
   }
-  return getCartonKey(item);
+  if (parts.length < 16) return null;
+  return { itm: parts[0], mer: parts[6], grd: parts[4], shd: parts[2], cart: normalizeCart(parts[15]) };
 };
 
-console.log("normalizeCart",normalizeCart);
+const qrIdentityKey = q => q ? `${q.itm}|${q.mer}|${q.grd}|${q.shd}` : "";
+
+const getStockCartNo = row => normalizeCart(
+  row?.cartonNo || row?.cartno || row?.CartNo || row?.cartno1 || row?.CartNo1 || ""
+);
+
+const getStockRowKey = row => {
+  const uid = row?.ZUId ?? row?.zuid ?? row?.ZUID;
+  const sr = row?.ZSrNo ?? row?.zsrno ?? row?.ZSRNO;
+  const sub = row?.ZSubSr ?? row?.zsubsr ?? row?.ZSUBSR;
+  if (uid !== undefined && uid !== null && sr !== undefined && sr !== null && sub !== undefined && sub !== null) {
+    return `STOCK:${uid}|${sr}|${sub}`;
+  }
+  return getCartonKey(row);
+};
+
+const addQrIndexRow = (index, row, qrValue) => {
+  const q = parseQrIdentity(qrValue);
+  const key = qrIdentityKey(q);
+  if (!key) return;
+  const list = index.get(key) || [];
+  const stockKey = getStockRowKey(row);
+  if (!list.some(x => x.stockKey === stockKey)) {
+    list.push({ row, qr: q, stockKey });
+    index.set(key, list);
+  }
+};
+
+const findIndexedQrMatch = (index, scannedValue) => {
+  const scannedQr = parseQrIdentity(scannedValue);
+  const key = qrIdentityKey(scannedQr);
+  if (!key || !scannedQr?.cart) return { row: null, ambiguous: false };
+  const candidates = index.get(key) || [];
+  if (!candidates.length) return { row: null, ambiguous: false };
+
+  const exact = [];
+  const fallback = [];
+  for (const c of candidates) {
+    const stockCart = getStockCartNo(c.row) || c.qr?.cart || "";
+    if (!stockCart) continue;
+    if (stockCart === scannedQr.cart) exact.push(c);
+    else if (sameCart(stockCart, scannedQr.cart)) fallback.push(c);
+  }
+  const chosen = exact.length ? exact : fallback;
+  const unique = [];
+  const seen = new Set();
+  for (const c of chosen) {
+    if (!seen.has(c.stockKey)) { seen.add(c.stockKey); unique.push(c); }
+  }
+  return unique.length === 1
+    ? { row: unique[0].row, ambiguous: false }
+    : { row: null, ambiguous: unique.length > 1 };
+};
 
 const getCartonName = item =>
   item?.cartonNo ||
@@ -224,6 +274,8 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
   });
 
   const processingRef = useRef(false);
+  const lastCameraQrRef = useRef({ value: "", seenAt: 0 });
+  const SAME_QR_SUPPRESS_MS = 700;
   const scaleAnim = useRef(new Animated.Value(0.4)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -241,24 +293,59 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
     }
   }, [permission]);
 
-  // Precompute stable QR identities once when the loaded stock changes.
-  // Physical scans use this index and never walk the complete carton list.
-  const qrIdentityIndex = useMemo(() => {
+  // Build the OLD exact-match map after the camera screen has painted.
+  // Building it synchronously during first render can block navigation on large
+  // carton lists. The matching rules themselves remain unchanged.
+  const qrIndexRef = useRef(new Map());
+  const [scanIndexReady, setScanIndexReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
     const map = new Map();
-    const add = (row, qrValue) => {
-      const identity = parseWarehouseQrIdentity(qrValue);
-      if (!identity) return;
-      const key = `${identity.itmcode}|${identity.mercode}|${identity.grdcode}|${identity.shdcode}`;
-      const list = map.get(key) || [];
-      list.push({ row, qrCartNo: identity.cartno });
-      map.set(key, list);
+    let index = 0;
+    const batchSize = 250;
+
+    qrIndexRef.current = map;
+    setScanIndexReady(false);
+
+    if (!hasPermission) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const buildBatch = () => {
+      if (cancelled) return;
+
+      const end = Math.min(index + batchSize, cartons.length);
+
+      for (; index < end; index += 1) {
+        const row = cartons[index];
+
+        if (row?.scancode) addQrIndexRow(map, row, row.scancode);
+        if (row?.scancode1) {
+          addQrIndexRow(map, row, row.scancode1);
+          addQrIndexRow(map, row, String(row.scancode1).replace(/\\"/g, '"'));
+        }
+      }
+
+      if (index < cartons.length) {
+        timer = setTimeout(buildBatch, 0);
+      } else {
+        qrIndexRef.current = map;
+        if (!cancelled) setScanIndexReady(true);
+      }
     };
-    cartons.forEach(row => {
-      if (row.scancode) add(row, row.scancode);
-      if (row.scancode1) add(row, row.scancode1);
-    });
-    return map;
-  }, [cartons]);
+
+    // Let navigation and CameraView render first.
+    timer = setTimeout(buildBatch, 50);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [cartons, hasPermission]);
 
   const selectedCartSet = useMemo(() => {
     const set = new Set();
@@ -309,59 +396,46 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
     const cartKey = getCartonKey(row);
     const stockRowKey = getStockRowKey(row);
     const displayCarton = getCartonName(row) || cartKey;
+
     if (!cartKey || !stockRowKey) {
-      setScanStatus("error", "Invalid Carton", "Carton/stock identity missing");
+      setScanStatus("error", "Invalid Carton", "Carton number missing");
       return false;
     }
+
     if (selectedCartSet.has(stockRowKey)) {
       setScanStatus("duplicate", "Already Scanned", `Carton ${displayCarton} already selected`);
       return false;
     }
+
     setScanned(prev => ({
       ...prev,
-      [stockRowKey]: { ...row, _scanCartonKey: cartKey, _scanStockRowKey: stockRowKey },
+      [stockRowKey]: {
+        ...row,
+        _scanCartonKey: cartKey,
+        _scanStockRowKey: stockRowKey,
+      },
     }));
+
     setScanStatus("success", "Scan Successful!", `Carton ${displayCarton} added`);
     return true;
   };
 
   const processScan = value => {
     const rawInput = cleanScannerValue(value);
+     console.log("rawInput",rawInput);
     if (!rawInput) return;
 
-    // Parse the scanned QR once. Only stable business identity participates.
-    const scannedIdentity = parseWarehouseQrIdentity(rawInput);
-    if (!scannedIdentity) {
-      setScanStatus("error", "Invalid QR", "Unable to read QR data");
+    const result = findIndexedQrMatch(qrIndexRef.current, rawInput);
+     console.log("result",result);
+    if (result.ambiguous) {
+      setScanStatus("error", "Multiple Stock Matches", "More than one stock row matches this QR");
       return;
     }
-
-    const identityKey = `${scannedIdentity.itmcode}|${scannedIdentity.mercode}|${scannedIdentity.grdcode}|${scannedIdentity.shdcode}`;
-    const candidates = qrIdentityIndex.get(identityKey) || [];
-    const exactRows = new Map();
-    const fallbackRows = new Map();
-    const scannedCartNo = normalizeCart(scannedIdentity.cartno);
-
-    candidates.forEach(({ row, qrCartNo }) => {
-      const stockCartNo = normalizeCart(row?.cartonNo ?? row?.cartno ?? row?.CartNo ?? row?.cartno1 ?? row?.CartNo1 ?? qrCartNo);
-      const stockRowKey = getStockRowKey(row);
-      if (!stockRowKey || !stockCartNo || !scannedCartNo) return;
-      if (stockCartNo === scannedCartNo) exactRows.set(stockRowKey, row);
-      else if (isSameWarehouseCart(stockCartNo, scannedCartNo)) fallbackRows.set(stockRowKey, row);
-    });
-
-    // Exact carton wins; O-prefix equivalence is fallback only.
-    const matches = exactRows.size > 0 ? exactRows : fallbackRows;
-    if (matches.size > 1) {
-      setScanStatus("error", "Multiple Stock Matches", "QR matches more than one stock row. Please verify the carton.");
-      return;
-    }
-    const matchingRow = matches.size === 1 ? Array.from(matches.values())[0] : null;
-    if (!matchingRow) {
+    if (!result.row) {
       setScanStatus("error", "No Match", "Carton not found in loaded list");
       return;
     }
-    markSelected(matchingRow);
+    markSelected(result.row);
   };
   const handleDone = () => {
     const finalRows = Object.values(scanned || {});
@@ -372,12 +446,31 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
     if (processingRef.current) return;
     if (!data) return;
 
+    const cleanData = cleanScannerValue(data);
+    if (!cleanData) return;
+
+    const now = Date.now();
+    const last = lastCameraQrRef.current;
+
+    // CameraView can report the same visible QR repeatedly. Keep the fast
+    // 350 ms processing re-arm, but suppress the same continuously-visible
+    // QR until it has been absent for at least 700 ms. A different QR is not
+    // delayed by this guard and can be processed as soon as the scanner is free.
+    if (last.value === cleanData && now - last.seenAt < SAME_QR_SUPPRESS_MS) {
+      // Sliding window: repeated camera callbacks keep extending suppression.
+      // Once the QR leaves the frame for >= 700 ms, scanning it again is
+      // intentional and the normal Already Scanned result can be shown.
+      lastCameraQrRef.current = { value: cleanData, seenAt: now };
+      return;
+    }
+
+    lastCameraQrRef.current = { value: cleanData, seenAt: now };
     processingRef.current = true;
-    processScan(data);
+    processScan(cleanData);
 
     setTimeout(() => {
       processingRef.current = false;
-    }, 1800);
+    }, 350);
   };
 
   const statusIcon =
@@ -414,11 +507,17 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
         style={screenStyles.fullCamera}
         facing="back"
         enableTorch={torch === "on"}
-        onBarcodeScanned={handleBarcodeScanned}
+        onBarcodeScanned={scanIndexReady ? handleBarcodeScanned : undefined}
         barcodeScannerSettings={{ barcodeTypes: ["qr", "ean13", "code128"] }}
       />
 
       <View style={screenStyles.darkOverlay} />
+
+      {!scanIndexReady && (
+        <View style={screenStyles.indexPreparing}>
+          <Text style={screenStyles.indexPreparingText}>Preparing scanner...</Text>
+        </View>
+      )}
 
       <SafeAreaView style={screenStyles.safeTop} edges={["top", "left", "right"]}>
         <View style={screenStyles.header}>
@@ -531,6 +630,17 @@ const screenStyles = StyleSheet.create({
   fullCamera: { ...StyleSheet.absoluteFillObject },
   darkOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.30)" },
   centerBlack: { flex: 1, backgroundColor: "#020617", justifyContent: "center", alignItems: "center" },
+  indexPreparing: {
+    position: "absolute",
+    top: 110,
+    alignSelf: "center",
+    zIndex: 30,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  indexPreparingText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   whiteBold: { color: "#fff", fontWeight: "900" },
   safeTop: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 30 },
   header: {

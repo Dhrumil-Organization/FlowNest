@@ -1,20 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
+  ActivityIndicator,
   Animated,
   Dimensions,
-  Platform,
+  Modal,
   ScrollView,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PlatformDatePicker } from '../../common/PlatformDatePicker';
 import {
   CustomDrawerProps,
   DesignData,
@@ -22,7 +22,6 @@ import {
   ItemStatus,
   WiseStatus,
 } from './Modal';
-import theme from '@/components/theme';
 
 const { height } = Dimensions.get('window');
 
@@ -512,23 +511,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Delivery Date</Text>
-                <TouchableOpacity
+                <PlatformDatePicker
+                  value={delDate}
+                  onChange={onToDateChange}
                   style={styles.dateInput}
-                  onPress={() => setShowToDatePicker(true)}
-                >
-                  <Text style={styles.dateText}>{formatDate(delDate)}</Text>
-                </TouchableOpacity>
-                {showToDatePicker && (
-                  <DateTimePicker
-                    value={delDate}
-                    mode="date"
-                    display="default"
-                    onChange={(event, date) => {
-                      setShowToDatePicker(Platform.OS === 'ios');
-                      if (date) onToDateChange(date);
-                    }}
-                  />
-                )}
+                  textStyle={styles.dateText}
+                />
               </View>
 
               {/* Financial Year Dropdown */}

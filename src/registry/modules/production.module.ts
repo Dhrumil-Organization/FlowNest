@@ -141,6 +141,20 @@ registerPermissionArea({
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
         },
+        {
+          key: 'grey_purchase_order',
+          name: 'Grey Purchase Order',
+          type: 'screen',
+          displayOrder: 70,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+        {
+          key: 'event',
+          name: 'Event',
+          type: 'screen',
+          displayOrder: 70,
+          actions: [{ key: 'view', name: 'View' }],
+        },
         // {
         //   key: 'payable',
         //   name: 'Payable',
@@ -370,6 +384,45 @@ registerUiNodes([
     action: 'view',
     order: 110,
   },
+  // Grey Purchase Order
+  {
+    id: 'nav.grey_purchase_order',
+    kind: 'navigation',
+    title: 'Grey Purchase Order',
+    permission: 'production.grey_purchase_order',
+    action: 'view',
+    route: 'grey-order',
+    icon: 'shopping-cart',
+    order: 110,
+  },
+  {
+    id: 'screen.grey_purchase_order',
+    kind: 'screen',
+    title: 'Grey Purchase Order',
+    permission: 'production.grey_purchase_order',
+    action: 'view',
+    order: 110,
+  },
+  // 
+  {
+    id: 'nav.event',
+    kind: 'navigation',
+    title: 'Event',
+    permission: 'production.event',
+    action: 'view',
+    route: 'event',
+    icon: 'event',
+    order: 110,
+  },
+  {
+    id: 'screen.event',
+    kind: 'screen',
+    title: 'Event',
+    permission: 'production.event',
+    action: 'view',
+    order: 110,
+  }, 
+  
   // {
   //   id: 'nav.payable',
   //   kind: 'navigation',

@@ -1,6 +1,5 @@
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -8,14 +7,14 @@ import {
     Animated,
     Dimensions,
     Modal,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { PlatformDatePicker } from '../../common/PlatformDatePicker';
 import { CustomDrawerProps, DesignData, ItemData, ItemStatus } from './Modal';
 
 const { height } = Dimensions.get('window');
@@ -244,39 +243,23 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                             {/* From Date */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>From Date</Text>
-                                <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromDatePicker(true)}>
-                                    <Text style={styles.dateText}>{formatDate(fromDate)}</Text>
-                                </TouchableOpacity>
-                                {showFromDatePicker && (
-                                    <DateTimePicker
-                                        value={fromDate}
-                                        mode="date"
-                                        display="default"
-                                        onChange={(event, date) => {
-                                            setShowFromDatePicker(Platform.OS === 'ios');
-                                            if (date) onFromDateChange(date);
-                                        }}
-                                    />
-                                )}
+                                <PlatformDatePicker
+                                    value={fromDate}
+                                    onChange={onFromDateChange}
+                                    style={styles.dateInput}
+                                    textStyle={styles.dateText}
+                                />
                             </View>
 
                             {/* To Date */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>To Date</Text>
-                                <TouchableOpacity style={styles.dateInput} onPress={() => setShowToDatePicker(true)}>
-                                    <Text style={styles.dateText}>{formatDate(toDate)}</Text>
-                                </TouchableOpacity>
-                                {showToDatePicker && (
-                                    <DateTimePicker
-                                        value={toDate}
-                                        mode="date"
-                                        display="default"
-                                        onChange={(event, date) => {
-                                            setShowToDatePicker(Platform.OS === 'ios');
-                                            if (date) onToDateChange(date);
-                                        }}
-                                    />
-                                )}
+                                <PlatformDatePicker
+                                    value={toDate}
+                                    onChange={onToDateChange}
+                                    style={styles.dateInput}
+                                    textStyle={styles.dateText}
+                                />
                             </View>
 
                             {/* Financial Year Dropdown */}

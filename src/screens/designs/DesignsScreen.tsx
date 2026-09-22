@@ -21,6 +21,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from 'react-native';
 import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
@@ -1620,8 +1621,8 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                 page === 1
                     ? rows.length + (hasMore ? 1 : 0)
                     : Math.max(0, previousTotal - 1)
-                        + rows.length
-                        + (hasMore ? 1 : 0)
+                    + rows.length
+                    + (hasMore ? 1 : 0)
             );
             setCurrentPage(page);
         } catch (e: any) {
@@ -4991,80 +4992,1629 @@ const styles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // TAB 4 — YARNS
 // ═══════════════════════════════════════════════════════════════
-function YarnsTab() {
-    const { prpcode, strcode, yearno } = useERP();
-    const [yarns, setYarns] = useState<YarnMaster[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'Lea' | 'Ne' | 'Den'>('all');
-    const [search, setSearch] = useState('');
 
-    const loadYarns = useCallback(async (q = '') => {
+function YarnsTab() {
+    const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = useERP();
+    const { width: screenWidth } = useWindowDimensions();
+
+    type YarnItem = any;
+    type Option = { id: string | number; name?: string;[key: string]: any };
+    type PartyOption = { acccode: string; accountname: string;[key: string]: any };
+
+    const [activeTab, setActiveTab] = useState<'Spun' | 'Filaments'>('Spun');
+    const [screen, setScreen] = useState<'LIST' | 'SUB_LIST' | 'PARTY' | 'MAIN_FORM' | 'SUB_FORM'>('LIST');
+    const [items, setItems] = useState<YarnItem[]>([]);
+    const [browseItems, setBrowseItems] = useState<YarnItem[]>([]);
+    const [partyItems, setPartyItems] = useState<any[]>([]);
+    const [partyData, setPartyData] = useState<PartyOption[]>([]);
+    const [browseParent, setBrowseParent] = useState<YarnItem | null>(null);
+    const [selectedBrowseItem, setSelectedBrowseItem] = useState<any>(null);
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const [context, setContext] = useState({
+        prpcode: defaultPrpcode || 'SIP',
+        strcode: defaultStrcode || '002',
+        yearno: defaultYearno || '27',
+        prptype: '',
+    });
+
+    const [blendData, setBlendData] = useState<Option[]>([]);
+    const [countData, setCountData] = useState<any[]>([]);
+    const [plyData, setPlyData] = useState<any[]>([]);
+    const [typeData, setTypeData] = useState<any[]>([]);
+    const [lustreData, setLustreData] = useState<any[]>([]);
+    const [subTypeData, setSubTypeData] = useState<any[]>([]);
+
+    const [selectedBlend, setSelectedBlend] = useState<Option[]>([]);
+    const [selectedCount, setSelectedCount] = useState<any>(null);
+    const [selectedPly, setSelectedPly] = useState<any>(null);
+    const [selectedType, setSelectedType] = useState<any>(null);
+    const [selectedLustre, setSelectedLustre] = useState<any>(null);
+    const [selectedSubType, setSelectedSubType] = useState<any>(null);
+    const [subBlendList, setSubBlendList] = useState<Option[]>([]);
+
+    const [spunForm, setSpunForm] = useState<any>({
+        blend: [], blend_id: [], count: '', count_id: '', count_no: '',
+        ply: '', ply_id: '', linkitmcode: '', denier: '', ItmCode: '', others: '',
+    });
+    const [filamentForm, setFilamentForm] = useState<any>({
+        blend: [], blend_id: [], count: '', count_id: '', count_no: '',
+        ply: '', ply_id: '', linkitmcode: '', denier: '', ItmCode: '',
+        type_id: '', type: '', lustre_id: '', lustre: '', others: '',
+    });
+    const [subForm, setSubForm] = useState<any>({
+        WNameCode: '', WBlend: '', WYarnType: '', mitmcode: '', WCounttype: '',
+        count: '', count_id: '', count_no: '', ply: '', ply_id: '',
+        linkitmcode: '', denier: '', others: '', subtype_id: '', subtype_name: '',
+        ItmCode: '', formula: '',
+    });
+    const [partyForm, setPartyForm] = useState({ accountname: '', acccode: '', ItemName: '' });
+
+    const [isModifyMode, setIsModifyMode] = useState(false);
+    const [modifyItemName, setModifyItemName] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
+    const [deleteTargetType, setDeleteTargetType] = useState<'MAIN' | 'SUB'>('MAIN');
+    const [deleteVisible, setDeleteVisible] = useState(false);
+    const [deleteResultVisible, setDeleteResultVisible] = useState(false);
+    const [deleteResultType, setDeleteResultType] = useState<'SUCCESS' | 'PERMISSION' | 'ERROR'>('ERROR');
+    const [deleteResultMessage, setDeleteResultMessage] = useState('');
+    const [picker, setPicker] = useState<{
+        key: string;
+        title: string;
+        data: any[];
+        multiple?: boolean;
+        value?: any;
+        disabled?: boolean;
+    } | null>(null);
+
+    const gridColumns = screenWidth >= 1500 ? 4 : screenWidth >= 1050 ? 3 : screenWidth >= 700 ? 2 : 1;
+
+    const apiGet = useCallback(async (path: string, params: Record<string, any> = {}) => {
+        return client.get(path, { params });
+    }, []);
+    const apiPost = useCallback(async (path: string, body: Record<string, any>) => {
+        return client.post(path, body);
+    }, []);
+
+    const getPrpType = useCallback(async () => {
+        return (await AsyncStorage.getItem('user_prptype')) || '';
+    }, []);
+
+    const loadContext = useCallback(async () => {
+        const prptype = await getPrpType();
+        try {
+            const res = await apiPost('/getyarndefault', { prptype, return_json_data: '1' });
+            const main = res?.data?.data?.main || {};
+            const next = {
+                prpcode: main.prpcode || defaultPrpcode || 'SIP',
+                strcode: main.yarnstrcode || defaultStrcode || '002',
+                yearno: main.yearno || defaultYearno || '27',
+                prptype,
+            };
+            setContext(next);
+            return next;
+        } catch {
+            const next = { ...context, prptype };
+            setContext(next);
+            return next;
+        }
+    }, [apiPost, context, defaultPrpcode, defaultStrcode, defaultYearno, getPrpType]);
+
+    const category = activeTab === 'Spun' ? '1' : '2';
+
+    const loadLookups = useCallback(async (ctx = context) => {
+        const base = { prptype: ctx.prptype, category: activeTab === 'Spun' ? '1' : '2', txntype: 'yarn_creation_item_master' };
+        try {
+            const [blend, count, ply, type, lustre, subType] = await Promise.all([
+                apiGet('/yarnblend', base),
+                apiGet('/yarncount', base),
+                apiGet('/yarnply', base),
+                apiGet('/yarntype', base),
+                apiGet('/yarnlustre', base),
+                apiGet('/yarntypesubitem', base),
+            ]);
+            setBlendData(blend?.data?.data?.data || []);
+            setCountData(count?.data?.data?.data || []);
+            setPlyData(ply?.data?.data?.data || []);
+            setTypeData(type?.data?.data?.data || []);
+            setLustreData(lustre?.data?.data?.data || []);
+            setSubTypeData(subType?.data?.data?.data || []);
+        } catch {
+            setBlendData([]); setCountData([]); setPlyData([]); setTypeData([]); setLustreData([]); setSubTypeData([]);
+        }
+    }, [activeTab, apiGet, context]);
+
+    const loadItems = useCallback(async (tab = activeTab, ctx = context) => {
         setLoading(true);
         try {
-            const res = await (DesignAPI.yarns as any)({ limit: 100, yearno: yearno, prpcode: prpcode, strcode: strcode, search: q.trim() || undefined });
-            setYarns(res?.data?.data || []);
-        } catch (e: any) {
-            console.log('YARNS TAB ERROR', { message: e?.message, status: e?.response?.status, data: e?.response?.data, baseURL: e?.config?.baseURL, url: e?.config?.url, params: e?.config?.params });
-            setYarns([]);
+            const res = await apiGet('/getyarnmasteritem', {
+                prptype: ctx.prptype,
+                strcode: ctx.strcode,
+                txntype: 'yarn_creation_item_master',
+                yarntype: tab === 'Spun' ? '1' : '2',
+            });
+            setItems(res?.data?.data?.data || []);
+        } catch {
+            setItems([]);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [activeTab, apiGet, context]);
 
     useEffect(() => {
-        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
-        return () => clearTimeout(t);
-    }, [search, loadYarns]);
+        let alive = true;
+        (async () => {
+            const ctx = await loadContext();
+            if (!alive) return;
+            await Promise.all([loadLookups(ctx), loadItems(activeTab, ctx)]);
+        })();
+        return () => { alive = false; };
+    }, [activeTab]); // legacy behaviour: switching Spun/Filament reloads all masters and list
 
-    const filtered = useMemo(() => filter === 'all' ? yarns : yarns.filter(y => y.sys === filter), [yarns, filter]);
-    return (
-        <View style={{ flex: 1 }}>
-            <View style={{ backgroundColor: T.surface, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border }}>
-                <TextInput value={search} onChangeText={setSearch} placeholder="Search yarn name / code / count..." placeholderTextColor={T.muted} style={[ct.search, { marginBottom: 8 }]} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {(['all', 'Lea', 'Ne', 'Den'] as const).map(f => (
-                        <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[ct.chip, filter === f && ct.chipActive]}>
-                            <Text style={[ct.chipTxt, filter === f && ct.chipTxtActive]}>
-                                {f === 'all' ? 'All' : f === 'Lea' ? 'Linen (Lea)' : f === 'Ne' ? 'Cotton (Ne)' : 'Polyester (Den)'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-            {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 12 }} />}
-            <View style={yp.listFrame}>
-                <FlatList data={filtered} keyExtractor={(y, idx) => `${y.mi_id}-${idx}`} contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
-                    renderItem={({ item: y }) => (
-                        <View style={yn.row}>
-                            <View style={[yn.badge, { backgroundColor: y.sys === 'Lea' ? '#E8F4E8' : y.sys === 'Ne' ? '#E8EEF4' : '#F4EEE8' }]}>
-                                <Text style={[yn.badgeTxt, { color: y.sys === 'Lea' ? T.green : y.sys === 'Ne' ? T.blue : T.pd }]}>{y.sys}</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={yn.name}>{y.name}</Text>
-                                <Text style={yn.sub}>{y.mi_id} · {y.cnt} {y.sys === 'Den' ? 'Denier' : 'count'}</Text>
-                            </View>
-                            <Text style={yn.price}>₹{y.price}/kg</Text>
-                        </View>
-                    )}
-                    ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border }} />}
-                    ListEmptyComponent={!loading ? <Text style={s.empty}>No yarns found</Text> : null}
+    const resetForms = useCallback(() => {
+        setSelectedBlend([]); setSelectedCount(null); setSelectedPly(null);
+        setSelectedType(null); setSelectedLustre(null); setSelectedSubType(null);
+        setSubBlendList([]);
+        setSpunForm({ blend: [], blend_id: [], count: '', count_id: '', count_no: '', ply: '', ply_id: '', linkitmcode: '', denier: '', ItmCode: '', others: '' });
+        setFilamentForm({ blend: [], blend_id: [], count: '', count_id: '', count_no: '', ply: '', ply_id: '', linkitmcode: '', denier: '', ItmCode: '', type_id: '', type: '', lustre_id: '', lustre: '', others: '' });
+        setSubForm({ WNameCode: '', WBlend: '', WYarnType: '', mitmcode: '', WCounttype: '', count: '', count_id: '', count_no: '', ply: '', ply_id: '', linkitmcode: '', denier: '', others: '', subtype_id: '', subtype_name: '', ItmCode: '', formula: '' });
+        setPartyForm({ accountname: '', acccode: '', ItemName: '' });
+        setIsModifyMode(false); setModifyItemName('');
+    }, []);
+
+    // IMPORTANT: keep the legacy YMS calculation rules.
+    // Spun/Sub Item: formula result is rounded UP to the next multiple of 5.
+    // Filament: legacy YMS keeps the formula result to 2 decimals.
+    const roundDenier = (value: number) =>
+        Number.isFinite(value) ? String(Math.ceil(value / 5) * 5) : '';
+
+    const evaluateFormula = (countNo: string, ply: string, formula?: string) => {
+        if (!countNo || !ply || !formula) return null;
+        try {
+            const expr = String(formula)
+                .replace(/Count/g, String(Number(countNo)))
+                .replace(/ply/g, String(Number(ply)));
+            const result = Function(`"use strict"; return (${expr});`)();
+            return Number(result);
+        } catch {
+            return null;
+        }
+    };
+
+    const calculateDenier = (countNo: string, ply: string, formula?: string) => {
+        const result = evaluateFormula(countNo, ply, formula);
+        return result == null ? '' : roundDenier(result);
+    };
+
+    const calculateFilamentDenier = (countNo: string, ply: string, formula?: string) => {
+        const result = evaluateFormula(countNo, ply, formula);
+        return result == null ? '' : Number(result).toFixed(2);
+    };
+
+    const calculateSubitemDenier = (form: any, formulaOverride?: string) => {
+        const formula = String(formulaOverride || form?.formula || '').trim();
+        return calculateDenier(String(form?.count_no || ''), String(form?.ply || ''), formula);
+    };
+
+    const calculateMainFormDenier = (tab: 'Spun' | 'Filaments', countNo: string, ply: string, formula?: string) =>
+        tab === 'Filaments' ? calculateFilamentDenier(countNo, ply, formula) : calculateDenier(countNo, ply, formula);
+
+    const buildMainItem = (countNo: string, count: string, ply: string, blends: any[], other: string) =>
+        !countNo || !count || !ply || !blends?.length ? '' :
+            [`${countNo}/${ply}`, count, blends.map((b: any) => typeof b === 'object' ? b.name : b).join(' '), other]
+                .filter(v => String(v || '').trim()).join(' ');
+
+    const buildFilamentItem = (countNo: string, count: string, ply: string, lustre: string, type: string, other: string) =>
+        !countNo || !count || !ply || !lustre || !type ? '' : [`${countNo}/${ply}`, count, lustre, type, other]
+            .filter(v => String(v || '').trim()).join(' ');
+
+    const buildSubItem = (countNo: string, ply: string, blends: any[], other: string) => {
+        if (!countNo || !ply) return '';
+        const total = (blends || []).reduce((sum, b) => sum + Number(b.per || 0), 0);
+        if (blends?.length && total !== 100) return '';
+        return [`${countNo}/${ply}`, (blends || []).map(b => `${b.name}${b.per ? ` ${b.per}%` : ''}`).join(' '), other]
+            .filter(v => String(v || '').trim()).join(' ');
+    };
+
+    const findByIdOrName = (list: any[], value: any, keys = ['id', 'name']) =>
+        (list || []).find(obj => keys.some(k => String(obj?.[k] ?? '') === String(value ?? ''))) || null;
+
+    const openPicker = (key: string, title: string, data: any[], multiple = false, value?: any, disabled?: false) =>
+        setPicker({ key, title, data: data || [], multiple, value, disabled });
+
+    const handlePickerSelect = (item: any) => {
+        if (!picker) return;
+        const { key, multiple, disabled } = picker;
+        if (disabled) return;
+        if (multiple) {
+            const current = Array.isArray(picker.value) ? picker.value : [];
+            const exists = current.some((x: any) => String(x?.id) === String(item?.id));
+            const next = exists ? current.filter((x: any) => String(x?.id) !== String(item?.id)) : [...current, item];
+            setPicker({ ...picker, value: next });
+            return;
+        }
+
+        if (key === 'blend') setSelectedBlend(item ? [item] : []);
+        if (key === 'count') setSelectedCount(item);
+        if (key === 'ply') setSelectedPly(item);
+        if (key === 'type') setSelectedType(item);
+        if (key === 'lustre') setSelectedLustre(item);
+        if (key === 'subtype') setSelectedSubType(item);
+        if (key === 'party') setPartyForm(prev => ({ ...prev, acccode: item?.acccode || '', accountname: item?.accountname || item?.name || '' }));
+
+        if (screen === 'MAIN_FORM') {
+            if (activeTab === 'Spun') {
+                setSpunForm(prev => {
+                    const next = key === 'blend'
+                        ? { ...prev, blend_id: [item?.id], blend: [item?.name] }
+                        : key === 'count'
+                            ? { ...prev, count_id: item?.id || '', count: item?.name || '' }
+                            : key === 'ply'
+                                ? { ...prev, ply_id: item?.id || '', ply: item?.ply || item?.name || '' }
+                                : prev;
+                    return {
+                        ...next,
+                        denier: calculateMainFormDenier('Spun', next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
+                        linkitmcode: buildMainItem(next.count_no, next.count, next.ply, next.blend, next.others),
+                    };
+                });
+            } else {
+                setFilamentForm(prev => {
+                    const next = key === 'blend'
+                        ? { ...prev, blend_id: [item?.id], blend: [item?.name] }
+                        : key === 'count'
+                            ? { ...prev, count_id: item?.id || '', count: item?.name || '' }
+                            : key === 'ply'
+                                ? { ...prev, ply_id: item?.id || '', ply: item?.ply || item?.name || '' }
+                                : key === 'type'
+                                    ? { ...prev, type_id: item?.id || '', type: item?.type || item?.name || '' }
+                                    : key === 'lustre'
+                                        ? { ...prev, lustre_id: item?.id || '', lustre: item?.lustre || item?.name || '' }
+                                        : prev;
+                    return {
+                        ...next,
+                        denier: calculateMainFormDenier('Filaments', next.count_no, next.ply, key === 'count' ? item?.formula : selectedCount?.formula),
+                        linkitmcode: buildFilamentItem(next.count_no, next.count, next.ply, next.lustre, next.type, next.others),
+                    };
+                });
+            }
+        } else if (screen === 'SUB_FORM') {
+            setSubForm(prev => {
+                if (key === 'ply') {
+                    const next = { ...prev, ply_id: item?.id || '', ply: item?.ply || item?.name || '' };
+                    return { ...next, denier: calculateDenier(next.count_no, next.ply, prev.formula), linkitmcode: buildSubItem(next.count_no, next.ply, subBlendList, next.others) };
+                }
+                if (key === 'count') {
+                    const next = { ...prev, count_id: item?.id || '', WCounttype: item?.id || '', count: item?.name || '', formula: item?.formula || '' };
+                    return { ...next, denier: calculateDenier(next.count_no, next.ply, item?.formula) };
+                }
+                if (key === 'subtype') return { ...prev, subtype_id: item?.id || '', subtype_name: item?.name || '' };
+                return prev;
+            });
+        }
+        setPicker(null);
+    };
+
+    const applyMultiPicker = () => {
+        if (!picker) return;
+        const value = Array.isArray(picker.value) ? picker.value : [];
+        if (picker.key === 'blend') {
+            setSelectedBlend(value);
+            if (screen === 'MAIN_FORM') {
+                if (activeTab === 'Spun') {
+                    setSpunForm(prev => {
+                        const next = { ...prev, blend_id: value.map(x => x.id), blend: value.map(x => x.name) };
+                        return { ...next, linkitmcode: buildMainItem(next.count_no, next.count, next.ply, next.blend, next.others) };
+                    });
+                } else {
+                    setFilamentForm(prev => {
+                        const next = { ...prev, blend_id: value.map(x => x.id), blend: value.map(x => x.name) };
+                        return { ...next, linkitmcode: buildFilamentItem(next.count_no, next.count, next.ply, next.lustre, next.type, next.others) };
+                    });
+                }
+            }
+        }
+        setPicker(null);
+    };
+
+    const loadSubList = useCallback(async (parent: YarnItem) => {
+        if (!parent?.itmcode) {
+            AppAlert.alert('Error', 'Main item code not found.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const res = await apiGet('/yarnwbrowse', {
+                prptype: parent?.prptype ?? parent?.PrpType ?? parent?.PRPTYPE ?? ctx.prptype,
+                mitmcode: parent.itmcode,
+                txntype: 'yarn_creation_item_master',
+            });
+            setBrowseParent(parent);
+            setBrowseItems(Array.isArray(res?.data?.data?.maindata) ? res.data.data.maindata : []);
+            setScreen('SUB_LIST');
+        } catch {
+            setBrowseParent(parent); setBrowseItems([]); setScreen('SUB_LIST');
+        } finally { setLoading(false); }
+    }, [apiGet, context, loadContext]);
+
+    const openAddMain = async () => {
+        const ctx = context.prptype ? context : await loadContext();
+        resetForms();
+        await loadLookups(ctx);
+        setScreen('MAIN_FORM');
+    };
+
+    const openModifyMain = async (item: YarnItem) => {
+        if (!item?.itmcode) return AppAlert.alert('Error', 'Item code not found.');
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+
+            // Load the exact master lists used by the legacy YMS modify screen.
+            await loadLookups(ctx);
+            const [showRes, freshCountRes] = await Promise.all([
+                apiGet('/yarnitemshow', {
+                    itmcode: item.itmcode,
+                    strcode: ctx.strcode,
+                    prptype: ctx.prptype,
+                }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
+
+            const main = showRes?.data?.data?.maindata?.[0];
+            if (!showRes?.data?.success || !main) {
+                throw new Error(showRes?.data?.message || 'Item details not found.');
+            }
+
+            // yarnitemshow:
+            // maincode = "<count>/<ply> ..."
+            // counttype = Count Type master id
+            // count = actual numeric count value.
+            const mainParts = String(main?.maincode || '').trim().match(/^([^/\s]+)\/([^\s]+)\s*(.*)$/);
+            const countNo = String(main?.count ?? mainParts?.[1] ?? '');
+            const plyValue = String(mainParts?.[2] ?? main?.WPly ?? '');
+
+            const countTypeId = String(main?.counttype ?? main?.CountTypeId ?? main?.WCounttype ?? '');
+            const countTypeName = String(main?.CountType ?? main?.counttypeName ?? '');
+            const freshCountData = freshCountRes?.data?.data?.data || [];
+            if (freshCountData.length) setCountData(freshCountData);
+
+            const countMaster = freshCountData.length ? freshCountData : countData;
+            const countObj =
+                findByIdOrName(countMaster, countTypeId) ||
+                findByIdOrName(countMaster, countTypeName) ||
+                { id: countTypeId, name: countTypeName || countTypeId, formula: '' };
+
+            const plyObj =
+                (plyData || []).find(p =>
+                    String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue
+                ) ||
+                { id: plyValue, ply: plyValue };
+
+            let blendItems = Array.isArray(main?.BlendDisplay)
+                ? main.BlendDisplay.map((b: any) => ({
+                    id: b?.id ?? b?.blendid ?? b?.code,
+                    name: b?.name ?? b?.blend ?? b?.BlendName ?? '',
+                })).filter((b: any) => b.id !== undefined && b.id !== null)
+                : [];
+
+            if (!blendItems.length && main?.blend) {
+                blendItems = String(main.blend)
+                    .split(/[\/,\s]+/)
+                    .filter(Boolean)
+                    .map(id => findByIdOrName(blendData, id) || { id, name: id });
+            } else {
+                blendItems = blendItems.map((b: any) => findByIdOrName(blendData, b.id) || b);
+            }
+
+            const base = {
+                ItmCode: String(main?.itmcode || item.itmcode),
+                linkitmcode: String(main?.maincode || ''),
+                denier: String(main?.denier ?? ''),
+                count_no: countNo,
+                count: String(countObj?.name || countTypeName),
+                count_id: String(countObj?.id || countTypeId),
+                ply: String(plyObj?.ply || plyValue),
+                ply_id: String(plyObj?.id || plyValue),
+                blend: blendItems.map((b: any) => b.name).filter(Boolean),
+                blend_id: blendItems.map((b: any) => b.id).filter(Boolean),
+                others: String(main?.other ?? ''),
+                formula: String(countObj?.formula || ''),
+            };
+
+            setModifyItemName(String(main?.itmname || item?.WNameCode || item.itmcode));
+            setIsModifyMode(true);
+            setSelectedBlend(blendItems);
+            setSelectedCount(countObj);
+            setSelectedPly(plyObj);
+
+            if (activeTab === 'Spun') {
+                setSpunForm(base);
+            } else {
+                const typeObj =
+                    findByIdOrName(typeData, main?.Type, ['id', 'type']) ||
+                    (main?.Type ? { id: main.Type, type: main.Type } : null);
+                const lustreObj =
+                    findByIdOrName(lustreData, main?.Lustre, ['id', 'lustre']) ||
+                    (main?.Lustre ? { id: main.Lustre, lustre: main.Lustre } : null);
+
+                setSelectedType(typeObj);
+                setSelectedLustre(lustreObj);
+                setFilamentForm({
+                    ...base,
+                    type_id: typeObj?.id || '',
+                    type: typeObj?.type || main?.Type || '',
+                    lustre_id: lustreObj?.id || '',
+                    lustre: lustreObj?.lustre || main?.Lustre || '',
+                });
+            }
+            setScreen('MAIN_FORM');
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.message || 'Unable to load item details.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const saveMain = async () => {
+        const form = activeTab === 'Spun' ? spunForm : filamentForm;
+        const error = activeTab === 'Spun'
+            ? (!form.blend_id?.length ? 'Please select Blend' : !form.count_no ? 'Please Enter Count Value' : !form.count_id ? 'Please select Count' : !form.ply_id ? 'Please select Ply' : null)
+            : (!form.blend_id?.length ? 'Please select Blend' : !form.count_id ? 'Please select Count Type' : !form.count_no ? 'Please enter Count value' : !form.ply_id ? 'Please select Ply' : !form.type_id ? 'Please Filament select Type' : !form.lustre_id ? 'Please select Lustre' : null);
+        if (error) return AppAlert.alert('Validation', error);
+
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const payload: any = {
+                maincode: form.linkitmcode,
+                denier: form.denier,
+                blend: Array.isArray(form.blend_id) ? form.blend_id.join('/') : form.blend_id || '',
+                counttype: form.count_id,
+                ply: form.ply_id,
+                linkitmcode: form.ItmCode || '',
+                prptype: ctx.prptype,
+                txntype: 'yarn_creation_item_master',
+                yarntype: activeTab === 'Spun' ? '1' : '2',
+                strcode: ctx.strcode,
+                count: form.count_no,
+                other: form.others,
+            };
+            if (activeTab === 'Filaments') {
+                payload.lustre = form.lustre_id;
+                payload.type = form.type_id;
+            }
+            if (isModifyMode) payload.itmcode = form.ItmCode || '';
+
+            const res = await apiPost(isModifyMode ? '/yarncreationmodify' : '/yarnadd', payload);
+            if (!res?.data?.success) return AppAlert.alert('Warning', res?.data?.message || 'Unable to save item.');
+
+            const code = res?.data?.data?.data?.itmcode || form.ItmCode || '';
+            AppAlert.alert('Success', isModifyMode ? `Item ${code} modified successfully.` : `Item ${code} saved successfully.`);
+            setScreen('LIST'); resetForms(); await loadItems(activeTab, ctx);
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong.');
+        } finally { setLoading(false); }
+    };
+
+    const openSubCreate = async (parent: YarnItem) => {
+        if (!parent?.itmcode) {
+            return AppAlert.alert('Error', 'Main item code not found.');
+        }
+
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+
+            // Match legacy YMS exactly: first restore the selected main item
+            // through yarnitemshow, then load fresh count/ply/type masters.
+            const [showRes, countRes, masterRes, typeRes, plyRes, subTypeRes] = await Promise.all([
+                apiGet('/yarnitemshow', {
+                    itmcode: parent.itmcode,
+                    strcode: ctx.strcode,
+                    prptype: ctx.prptype,
+                }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/getyarnmasteritem', {
+                    prptype: ctx.prptype,
+                    strcode: ctx.strcode,
+                    txntype: 'yarn_creation_item_master',
+                    yarntype: activeTab === 'Spun' ? '1' : '2',
+                }),
+                apiGet('/yarntype', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarnply', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarntypesubitem', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
+
+            const show = showRes?.data?.data?.maindata?.[0];
+            if (!showRes?.data?.success || !show) {
+                throw new Error(showRes?.data?.message || 'Main item details not found.');
+            }
+
+            const freshCounts = countRes?.data?.data?.data || [];
+            const freshPlys = plyRes?.data?.data?.data || [];
+            const freshSubTypes = subTypeRes?.data?.data?.data || [];
+            const mapped = masterRes?.data?.data?.mapped_data || [];
+
+            setCountData(freshCounts);
+            setPlyData(freshPlys);
+            setSubTypeData(freshSubTypes);
+
+            const selectedBlendId = String(show?.blend ?? parent?.WBlend ?? '');
+            const apiBlendList = Array.isArray(show?.BlendDisplay)
+                ? show.BlendDisplay
+                    .map((b: any) => ({
+                        id: String(b?.id ?? b?.blendid ?? ''),
+                        name: b?.name || '',
+                        per: String(b?.per ?? ''),
+                    }))
+                    .filter((b: any) => b.name)
+                : [];
+
+            const blendObj = (mapped || []).find((b: any) =>
+                String(b?.blendid) === selectedBlendId &&
+                String(b?.itmcode) === String(parent.itmcode)
+            );
+
+            let fallbackBlendList = (blendObj?.blend_names || []).map((b: any) => ({
+                id: String(b?.id ?? ''),
+                name: b?.name || '',
+                per: '',
+            }));
+            if (fallbackBlendList.length === 1) fallbackBlendList[0].per = '100';
+
+            const finalBlendList = apiBlendList.length ? apiBlendList : fallbackBlendList;
+
+            const countTypeId = String(show?.CountTypeId ?? show?.WCounttype ?? show?.counttype ?? parent?.WCounttype ?? '');
+            const countObj =
+                freshCounts.find((c: any) => String(c?.id ?? '') === countTypeId) ||
+                freshCounts.find((c: any) => String(c?.name ?? '') === String(show?.CountType ?? '')) ||
+                null;
+
+            const plyValue = String(show?.WPly ?? '');
+            const plyObj =
+                freshPlys.find((p: any) => String(p?.ply ?? '') === plyValue) ||
+                freshPlys.find((p: any) => String(p?.id ?? '') === plyValue) ||
+                (plyValue ? { id: plyValue, ply: plyValue } : null);
+
+            const subtypeId = String(show?.subyarntype ?? '');
+            const subtypeName = String(show?.subyarntypename ?? '');
+            const subtypeObj =
+                freshSubTypes.find((x: any) => String(x?.id ?? '') === subtypeId) ||
+                freshSubTypes.find((x: any) => String(x?.name ?? '') === subtypeName) ||
+                (subtypeId || subtypeName ? { id: subtypeId, name: subtypeName } : null);
+
+            setSubBlendList(finalBlendList);
+            setSelectedCount(countObj);
+            setSelectedPly(plyObj);
+            setSelectedSubType(subtypeObj);
+
+            setSubForm({
+                WNameCode: String(show?.itmname || parent?.WNameCode || ''),
+                WBlend: selectedBlendId,
+                WYarnType: String(parent?.WYarnType || (activeTab === 'Spun' ? '1' : '2')),
+                mitmcode: String(parent.itmcode),
+                WCounttype: countTypeId,
+                count: String(countObj?.name || show?.CountType || ''),
+                count_id: countTypeId,
+                count_no: String(show?.count ?? ''),
+                ply: String(plyObj?.ply || plyValue),
+                ply_id: String(plyObj?.id || plyValue),
+                linkitmcode: String(show?.maincode || ''),
+                denier: String(show?.denier ?? ''),
+                others: String(show?.other ?? ''),
+                subtype_id: subtypeId,
+                subtype_name: subtypeName,
+                ItmCode: String(parent.itmcode),
+                formula: String(countObj?.formula || ''),
+                blend: finalBlendList.map((b: any) => b.name),
+                blend_id: finalBlendList.map((b: any) => b.id),
+            });
+
+            setIsModifyMode(false);
+            setModifyItemName('');
+            setScreen('SUB_FORM');
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to open sub item form.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openSubModify = async (item: any) => {
+        if (!item?.itmcode) return AppAlert.alert('Error', 'Sub item code not found.');
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const [res, countRes, plyRes, subtypeRes] = await Promise.all([
+                apiGet('/yarnitemshow', { itmcode: item.itmcode, strcode: ctx.strcode, prptype: ctx.prptype }),
+                apiGet('/yarncount', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarnply', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+                apiGet('/yarntypesubitem', {
+                    prptype: ctx.prptype,
+                    category: activeTab === 'Spun' ? '1' : '2',
+                    txntype: 'yarn_creation_item_master',
+                }),
+            ]);
+
+            const show = res?.data?.data?.maindata?.[0];
+            if (!res?.data?.success || !show) {
+                throw new Error(res?.data?.message || 'Sub item details not found.');
+            }
+
+            const freshCounts = countRes?.data?.data?.data || countData;
+            const freshPlys = plyRes?.data?.data?.data || plyData;
+            const freshSubTypes = subtypeRes?.data?.data?.data || subTypeData;
+            setCountData(freshCounts);
+            setPlyData(freshPlys);
+            setSubTypeData(freshSubTypes);
+
+            const blends = Array.isArray(show?.BlendDisplay)
+                ? show.BlendDisplay.map((b: any) => ({
+                    id: String(b?.id ?? b?.blendid ?? ''),
+                    name: b?.name || '',
+                    per: String(b?.per ?? ''),
+                })).filter((b: any) => b.name)
+                : [];
+
+            const apiPly = String(show?.WPly ?? '');
+            const plyObj =
+                freshPlys.find((p: any) => String(p?.ply ?? '') === apiPly) ||
+                freshPlys.find((p: any) => String(p?.id ?? '') === apiPly) ||
+                { id: apiPly, ply: apiPly };
+
+            const countId = String(show?.CountTypeId ?? show?.WCounttype ?? show?.counttype ?? '');
+            const countName = String(show?.CountType ?? show?.counttypeName ?? '');
+            const countObj =
+                freshCounts.find((c: any) => String(c?.id ?? '') === countId) ||
+                freshCounts.find((c: any) => String(c?.name ?? '') === countName) ||
+                { id: countId, name: countName, formula: '' };
+
+            const subtypeId = String(show?.subyarntype ?? '');
+            const subtypeName = String(show?.subyarntypename ?? '');
+            const subtypeObj =
+                freshSubTypes.find((x: any) => String(x?.id ?? '') === subtypeId) ||
+                freshSubTypes.find((x: any) => String(x?.name ?? '') === subtypeName) ||
+                { id: subtypeId, name: subtypeName };
+
+            setSubBlendList(blends);
+            setSelectedPly(plyObj);
+            setSelectedCount(countObj);
+            setSelectedSubType(subtypeObj);
+
+            setSubForm({
+                WNameCode: String(browseParent?.WNameCode || show?.itmname || item?.WNameCode || ''),
+                WBlend: String(show?.blend ?? ''),
+                WYarnType: String(browseParent?.WYarnType || item?.WYarnType || ''),
+                mitmcode: String(browseParent?.itmcode || item?.mitmcode || ''),
+                WCounttype: countId,
+                count: String(countObj?.name || countName),
+                count_id: countId,
+                count_no: String(show?.count ?? ''),
+                ply: String(plyObj?.ply || apiPly),
+                ply_id: String(plyObj?.id || apiPly),
+                linkitmcode: String(show?.maincode || ''),
+                denier: String(show?.denier ?? ''),
+                others: String(show?.other ?? ''),
+                subtype_id: subtypeId,
+                subtype_name: subtypeName,
+                ItmCode: String(show?.itmcode || item.itmcode),
+                formula: String(countObj?.formula || show?.formula || ''),
+                blend: blends.map((b: any) => b.name),
+                blend_id: blends.map((b: any) => b.id),
+            });
+
+            setModifyItemName(String(show?.itmname || item?.WNameCode || item.itmcode));
+            setIsModifyMode(true);
+            setScreen('SUB_FORM');
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.message || 'Unable to load sub item details.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openParty = async (item: any) => {
+        if (!item?.itmcode) return AppAlert.alert('Error', 'Item code not found.');
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const [partyRes, browseRes] = await Promise.all([
+                apiGet('/accountbasic', {
+                    prpcode: ctx.prpcode, prptype: ctx.prptype, yearno: ctx.yearno, strcode: ctx.strcode,
+                    txntype: 'yarn_creation_item_master', partytype: 'p', type: 'P', page: '', limit: '',
+                    search: '', isceo: '', partype: '', grntype: '', parcode: '', fetch: '', acccode: '',
+                    billdate: '', strtype: '', isfaint: '',
+                }),
+                apiGet('/yarnitemd1browse', {
+                    itmcode: item.itmcode, prptype: ctx.prptype, strcode: ctx.strcode,
+                    txntype: 'yarn_creation_item_master', yarntype: activeTab === 'Spun' ? '1' : '2',
+                    prpcode: ctx.prpcode,
+                }),
+            ]);
+            setSelectedBrowseItem(item);
+            setPartyData(partyRes?.data?.response?.data || []);
+            setPartyItems(browseRes?.data?.data?.maindata || []);
+            setPartyForm({ accountname: '', acccode: '', ItemName: '' });
+            setScreen('PARTY');
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.response?.data?.message || 'Unable to load party/item details.');
+        } finally { setLoading(false); }
+    };
+
+    const addPartyItem = async () => {
+        if (!partyForm.acccode) return AppAlert.alert('Validation', 'Party Can not be blank');
+        if (!partyForm.ItemName) return AppAlert.alert('Validation', 'Please enter Item value');
+        if (!selectedBrowseItem?.itmcode) return AppAlert.alert('Error', 'Please select item from list');
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const res = await apiPost('/yarnitemd1add', {
+                prptype: ctx.prptype, parcode: partyForm.acccode, parname: partyForm.accountname,
+                itmcode: selectedBrowseItem.itmcode, itmname: partyForm.ItemName,
+                txntype: 'yarn_creation_item_master', yarntype: activeTab === 'Spun' ? '1' : '2', strcode: ctx.strcode,
+            });
+            if (!res?.data?.success) return AppAlert.alert('Warning', res?.data?.message || 'Unable to save item.');
+            setPartyForm({ accountname: '', acccode: '', ItemName: '' });
+            AppAlert.alert('Success', 'Item Saved successfully.');
+            const refreshed = await apiGet('/yarnitemd1browse', {
+                itmcode: browseParent?.itmcode || selectedBrowseItem?.itmcode,
+                prptype: ctx.prptype, strcode: ctx.strcode, txntype: 'yarn_creation_item_master',
+                yarntype: activeTab === 'Spun' ? '1' : '2', prpcode: ctx.prpcode,
+            });
+            setPartyItems(refreshed?.data?.data?.maindata || []);
+        } catch (e: any) {
+            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong.');
+        } finally { setLoading(false); }
+    };
+
+    const requestDelete = (item: any, type: 'MAIN' | 'SUB') => {
+        setDeleteTarget(item); setDeleteTargetType(type); setDeleteVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget || loading) return;
+        const itemCode = deleteTargetType === 'SUB'
+            ? deleteTarget?.itmcode || ''
+            : deleteTarget?.itmcode || deleteTarget?.mitmcode || deleteTarget?.ItmCode || '';
+        if (!itemCode) {
+            setDeleteVisible(false);
+            setDeleteResultType('ERROR');
+            setDeleteResultMessage('Item code not found. Unable to delete this item.');
+            setDeleteResultVisible(true);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+            const res = await apiPost('/yarnitemdelete', {
+                prptype: deleteTarget?.prptype ?? deleteTarget?.PrpType ?? deleteTarget?.PRPTYPE ?? ctx.prptype,
+                itmcode: itemCode,
+                strcode: ctx.strcode,
+                txntype: 'yarn_creation_item_master',
+            });
+            const responseData = res?.data || {};
+            const responseObject = responseData?.response || responseData?.data?.response || {};
+            const message = responseObject?.message || responseData?.message || responseData?.data?.message || 'Delete response received.';
+            const normalized = String(message).trim().toLowerCase();
+            const status = String(responseObject?.status ?? '').trim().toUpperCase();
+            const explicitSuccess = normalized.includes('delete successful') || normalized.includes('deleted successfully') || normalized.includes('delete successfully') || normalized.includes('successfully deleted');
+            const success = responseData?.success === true && (status === 'P' || explicitSuccess);
+
+            setDeleteVisible(false);
+            setDeleteResultType(success ? 'SUCCESS' : 'PERMISSION');
+            setDeleteResultMessage(String(message));
+            setDeleteResultVisible(true);
+        } catch (e: any) {
+            setDeleteVisible(false);
+            setDeleteResultType('ERROR');
+            setDeleteResultMessage(e?.response?.data?.response?.message || e?.response?.data?.message || 'Unable to delete item. Please try again.');
+            setDeleteResultVisible(true);
+        } finally { setLoading(false); }
+    };
+
+    const closeCurrent = () => {
+        setSearch('');
+        if (screen === 'MAIN_FORM') { setScreen('LIST'); resetForms(); return; }
+        if (screen === 'SUB_FORM') { setScreen('SUB_LIST'); setIsModifyMode(false); return; }
+        if (screen === 'PARTY') { setScreen('SUB_LIST'); return; }
+        if (screen === 'SUB_LIST') { setScreen('LIST'); return; }
+    };
+
+    const handleDeleteResultOk = async () => {
+        const type = deleteResultType;
+        setDeleteResultVisible(false);
+        if (type !== 'SUCCESS') return;
+        if (deleteTargetType === 'MAIN') {
+            await loadItems(activeTab, context);
+        } else if (browseParent) {
+            await loadSubList(browseParent);
+        }
+        setDeleteTarget(null);
+    };
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return items;
+        return items.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
+    }, [items, search]);
+
+    const filteredSub = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return browseItems;
+        return browseItems.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
+    }, [browseItems, search]);
+
+    const filteredParty = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return partyItems;
+        return partyItems.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
+    }, [partyItems, search]);
+
+    const field = (
+        label: string,
+        value: any,
+        onChange: (v: string) => void,
+        numeric = false,
+        editable = true,
+        errorText?: string,
+    ) => (
+        <View style={ym2.field}>
+            <Text style={ym2.label}>{label}</Text>
+            <View style={[ym2.inputWrap, !editable && ym2.disabledInputWrap, errorText && ym2.errorInputWrap]}>
+                <TextInput
+                    value={String(value ?? '')}
+                    editable={editable && !loading}
+                    keyboardType={numeric ? 'numeric' : 'default'}
+                    onChangeText={v => {
+                        if (numeric && !/^[0-9.]*$/.test(v)) return;
+                        onChange(v);
+                    }}
+                    placeholder={label.replace(' *', '') + '...'}
+                    placeholderTextColor={T.muted}
+                    style={[ym2.input, !editable && ym2.disabledInput]}
                 />
+                {!editable ? <Ionicons name="lock-closed-outline" size={15} color={T.muted} /> : null}
+            </View>
+            {errorText ? <Text style={ym2.validationText}>{errorText}</Text> : null}
+        </View>
+    );
+
+    const selectField = (
+        label: string,
+        valueText: string,
+        onPress: () => void,
+        required = false,
+        disabled = false,
+        errorText?: string,
+    ) => (
+        <View style={ym2.field}>
+            <Text style={ym2.label}>{label}{required ? <Text style={ym2.required}> *</Text> : null}</Text>
+            <TouchableOpacity
+                disabled={disabled || loading}
+                style={[ym2.selectWrap, disabled && ym2.disabledInputWrap, errorText && ym2.errorInputWrap]}
+                onPress={onPress}
+                activeOpacity={0.8}
+            >
+                <Text numberOfLines={2} style={[ym2.selectText, !valueText && ym2.selectPlaceholder]}>
+                    {valueText || 'Choose...'}
+                </Text>
+                <Ionicons name={disabled ? 'lock-closed-outline' : 'chevron-down'} size={16} color={T.muted} />
+            </TouchableOpacity>
+            {errorText ? <Text style={ym2.validationText}>{errorText}</Text> : null}
+        </View>
+    );
+
+    const renderCard = ({ item, index }: { item: any; index: number }) => (
+        <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
+            <View style={ym2.cardHeader}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
+                    <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+                </View>
+                <View style={ym2.badge}><Text style={ym2.badgeText}>{activeTab === 'Spun' ? 'SPUN' : 'FILAMENT'}</Text></View>
+            </View>
+            <View style={ym2.divider} />
+            <View style={ym2.infoGrid}>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Blend</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.BlendNames || item.WBlend || '-'}</Text></View>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || '-'}</Text></View>
+            </View>
+            <View style={ym2.cardActions}>
+                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
+                    <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'MAIN')}>
+                    <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={ym2.outlineBtn} onPress={() => loadSubList(item)}>
+                    <Ionicons name="git-branch-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Sub Items</Text>
+                </TouchableOpacity>
             </View>
         </View>
     );
+
+    const renderSubCard = ({ item }: { item: any }) => (
+        <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
+            <View style={ym2.cardHeader}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
+                    <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+                </View>
+                <View style={ym2.badge}><Text style={ym2.badgeText}>SUB ITEM</Text></View>
+            </View>
+            <View style={ym2.divider} />
+            <View style={ym2.infoGrid}>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Count</Text><Text style={ym2.infoValue}>{item.WCount || item.count || '-'}</Text></View>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
+                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || item.other || '-'}</Text></View>
+            </View>
+            <View style={ym2.cardActions}>
+                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openSubModify(item)}>
+                    <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'SUB')}>
+                    <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openParty(item)}>
+                    <Ionicons name="people-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Party Items</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
+    const renderMainForm = () => {
+        const filament = activeTab === 'Filaments';
+        const form = filament ? filamentForm : spunForm;
+        const blendText = (form.blend || []).join(', ');
+        return (
+            <View style={ym2.page}>
+                <View style={ym2.subHeader}>
+                    <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                        <Text style={ym2.subHeaderTitle}>{isModifyMode ? `Modify ${filament ? 'Filament' : 'Spun'} Main Item` : `Add ${filament ? 'Filament' : 'Spun'} Main Item`}</Text>
+                        {isModifyMode ? <Text style={ym2.subHeaderSub}>{modifyItemName}</Text> : null}
+                    </View>
+                </View>
+                <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                    <View style={ym2.formCard}>
+                        {selectField('Blend', blendText, () => openPicker('blend', 'Select Blend', blendData, true, selectedBlend), true)}
+                        {selectField('Count Type', form.count || '', () => openPicker('count', 'Select Count Type', countData, false, selectedCount), true)}
+                        {field('Count *', form.count_no, v => {
+                            if (filament) setFilamentForm((p: any) => ({ ...p, count_no: v, denier: calculateFilamentDenier(v, p.ply, selectedCount?.formula), linkitmcode: buildFilamentItem(v, p.count, p.ply, p.lustre, p.type, p.others) }));
+                            else setSpunForm((p: any) => ({ ...p, count_no: v, denier: calculateDenier(v, p.ply, selectedCount?.formula), linkitmcode: buildMainItem(v, p.count, p.ply, p.blend, p.others) }));
+                        }, true)}
+                        {selectField('Ply', form.ply || '', () => openPicker('ply', 'Select Ply', plyData, false, selectedPly), true)}
+                        {filament && (
+                            <>
+                                {selectField('Filament Type', form.type || '', () => openPicker('type', 'Select Filament Type', typeData, false, selectedType), true)}
+                                {selectField('Lustre', form.lustre || '', () => openPicker('lustre', 'Select Lustre', lustreData, false, selectedLustre), true)}
+                            </>
+                        )}
+                        {field('Other', form.others, v => {
+                            if (filament) {
+                                setFilamentForm((p: any) => ({
+                                    ...p,
+                                    others: v,
+                                    linkitmcode: buildFilamentItem(p.count_no, p.count, p.ply, p.lustre, p.type, v),
+                                }));
+                            } else {
+                                setSpunForm((p: any) => ({
+                                    ...p,
+                                    others: v,
+                                    linkitmcode: buildMainItem(p.count_no, p.count, p.ply, p.blend, v),
+                                }));
+                            }
+                        })}
+                        {field('Main Item *', form.linkitmcode, v => filament
+                            ? setFilamentForm((p: any) => ({ ...p, linkitmcode: v }))
+                            : setSpunForm((p: any) => ({ ...p, linkitmcode: v })))}
+                        {field('Denier *', form.denier, () => { }, false, false)}
+                        <View style={ym2.actions}>
+                            <TouchableOpacity style={ym2.secondaryBtn} onPress={closeCurrent}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity style={ym2.primaryBtn} onPress={saveMain}>
+                                <Ionicons name={isModifyMode ? 'checkmark-circle-outline' : 'save-outline'} size={17} color="#fff" />
+                                <Text style={ym2.primaryText}>{isModifyMode ? 'Modify Item' : `Add ${filament ? 'Filament' : 'Spun'} Item`}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    };
+
+    const getSubValidationErrors = () => {
+        const errors: Record<string, string> = {};
+        if (!subForm.WNameCode) errors.main = 'Main Item is required';
+        if (!subBlendList.length) {
+            errors.blend = 'Please select Blend';
+        } else {
+            const total = subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0);
+            if (subBlendList.some(b => !Number.isFinite(Number(b.per)) || Number(b.per) <= 0)) {
+                errors.blend = 'Enter a valid percentage for every blend';
+            } else if (Math.abs(total - 100) > 0.0001) {
+                errors.blend = `Total percentage must be 100%. Current: ${total}%`;
+            }
+        }
+        if (!subForm.count) errors.count = 'Please select Count Type';
+        if (!subForm.count_no) errors.countNo = 'Please enter Count value';
+        if (!subForm.ply_id) errors.ply = 'Please select Ply';
+        if (!subForm.subtype_id) errors.subtype = 'Please select Yarn Type';
+        if (!subForm.linkitmcode) errors.name = 'Sub Item Name is required';
+        if (!subForm.denier) errors.denier = 'Denier is calculated automatically after Count/Ply/Formula are available';
+        return errors;
+    };
+
+    const saveSub = async () => {
+        const errors = getSubValidationErrors();
+        const firstError = Object.values(errors)[0];
+        if (firstError) {
+            AppAlert.alert('Validation', firstError);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const ctx = context.prptype ? context : await loadContext();
+
+            const payload: any = isModifyMode
+                ? {
+                    maincode: subForm.linkitmcode,
+                    denier: subForm.denier,
+                    blend: subBlendList.map(b => b.id).join('/'),
+                    count: subForm.count_no,
+                    ply: subForm.ply_id,
+                    mitmcode: subForm.mitmcode || '',
+                    blend_names: subBlendList.map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        per: Number(b.per || 0),
+                    })),
+                    prptype: ctx.prptype,
+                    txntype: 'SUBITEM',
+                    yarntype: subForm.WYarnType,
+                    strcode: ctx.strcode,
+                    linkitmcode: subForm.ItmCode || '',
+                    other: subForm.others || '',
+                    subyarntype: subForm.subtype_id || '',
+                    itmcode: subForm.ItmCode || '',
+                }
+                : {
+                    maincode: subForm.linkitmcode,
+                    denier: subForm.denier,
+                    blendid: subForm.WBlend,
+                    count: subForm.count_no,
+                    ply: subForm.ply_id,
+                    mitmcode: subForm.mitmcode || '',
+                    blend_names: subBlendList.map(b => ({
+                        id: b.id,
+                        name: b.name,
+                        per: Number(b.per || 0),
+                    })),
+                    prptype: ctx.prptype,
+                    txntype: 'yarn_creation_item_master',
+                    yarntype: subForm.WYarnType,
+                    strcode: ctx.strcode,
+                    linkitmcode: subForm.ItmCode || '',
+                    other: subForm.others || '',
+                    subyarntype: subForm.subtype_id || '',
+                };
+
+            const res = await apiPost(
+                isModifyMode ? '/yarncreationmodify' : '/addyarnsubitem',
+                payload,
+            );
+
+            if (!res?.data?.success) {
+                return AppAlert.alert(
+                    'Warning',
+                    res?.data?.message || 'Unable to save sub item.',
+                );
+            }
+
+            const code = res?.data?.data?.data?.itmcode || subForm.ItmCode || '';
+            AppAlert.alert(
+                'Success',
+                isModifyMode
+                    ? `Sub Item ${code} updated successfully.`
+                    : `Item ${code} saved successfully.`,
+            );
+
+            setIsModifyMode(false);
+            setScreen('SUB_LIST');
+            if (browseParent) await loadSubList(browseParent);
+        } catch (e: any) {
+            AppAlert.alert(
+                'Error',
+                e?.response?.data?.message || 'Something went wrong.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderSubForm = () => {
+        const subErrors = getSubValidationErrors();
+        const isSaving = loading;
+
+        return (
+            <View style={ym2.page}>
+                <View style={ym2.subHeader}>
+                    <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn} disabled={isSaving}>
+                        <Ionicons name="arrow-back" size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                        <Text style={ym2.subHeaderTitle}>{isModifyMode ? 'Modify Sub Item' : 'Create Sub Item'}</Text>
+                        <Text style={ym2.subHeaderSub}>{modifyItemName || subForm.WNameCode}</Text>
+                    </View>
+                </View>
+
+                <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                    <View style={ym2.formCard}>
+                        {field(
+                            'Main Item *',
+                            subForm.WNameCode,
+                            () => { },
+                            false,
+                            false,
+                            subErrors.main,
+                        )}
+
+                        <Text style={ym2.label}>Blend <Text style={ym2.required}>*</Text></Text>
+                        {subBlendList.map((b, i) => (
+                            <View key={`${b.id}-${i}`} style={ym2.blendRow}>
+                                <Text numberOfLines={1} style={[ym2.blendName, { flex: 1 }]}>{b.name}</Text>
+                                <TextInput
+                                    value={String(b.per ?? '')}
+                                    editable={!isSaving}
+                                    onChangeText={v => {
+                                        if (!/^[0-9.]*$/.test(v)) return;
+                                        setSubBlendList(prev => {
+                                            const nextList = prev.map((x, idx) => idx === i ? { ...x, per: v } : x);
+                                            setSubForm(current => ({
+                                                ...current,
+                                                linkitmcode: buildSubItem(current.count_no, current.ply, nextList, current.others),
+                                            }));
+                                            return nextList;
+                                        });
+                                    }}
+                                    keyboardType="numeric"
+                                    placeholder="%"
+                                    placeholderTextColor={T.muted}
+                                    style={[ym2.percentInput, isSaving && ym2.disabledInput]}
+                                />
+                            </View>
+                        ))}
+                        <Text style={[ym2.totalText, subErrors.blend && ym2.validationText]}>
+                            Total: {subBlendList.reduce((sum, b) => sum + Number(b.per || 0), 0)}%
+                        </Text>
+                        {subErrors.blend ? <Text style={ym2.validationText}>{subErrors.blend}</Text> : null}
+
+                        {selectField(
+                            'Count Type',
+                            subForm.count || '',
+                            () => openPicker('count', 'Select Count Type', countData, false, selectedCount),
+                            false,
+                            false,
+                            subErrors.count,
+                        )}
+
+                        {field(
+                            'Count *',
+                            subForm.count_no,
+                            v => setSubForm((p: any) => ({
+                                ...p,
+                                count_no: v,
+                                denier: calculateDenier(v, p.ply, p.formula),
+                                linkitmcode: buildSubItem(v, p.ply, subBlendList, p.others),
+                            })),
+                            false,
+                            false,
+                            subErrors.countNo,
+                        )}
+
+                        {selectField(
+                            'Ply',
+                            subForm.ply || '',
+                            () => openPicker('ply', 'Select Ply', plyData, false, selectedPly, true),
+                            false,
+                            false,
+                            subErrors.ply,
+                        )}
+
+                        {selectField(
+                            'Yarn Type',
+                            subForm.subtype_name || '',
+                            () => openPicker('subtype', 'Select Yarn Type', subTypeData, false, selectedSubType),
+                            true,
+                            false,
+                            subErrors.subtype,
+                        )}
+
+                        {field(
+                            'Other',
+                            subForm.others,
+                            v => setSubForm((p: any) => ({
+                                ...p,
+                                others: v,
+                                linkitmcode: buildSubItem(p.count_no, p.ply, subBlendList, v),
+                            })),
+                            false,
+                            false,
+                        )}
+
+                        {field(
+                            'Sub Item Name *',
+                            subForm.linkitmcode,
+                            v => setSubForm((p: any) => ({ ...p, linkitmcode: v })),
+                            false,
+                            false,
+                            subErrors.name,
+                        )}
+
+                        {field(
+                            'Denier *',
+                            subForm.denier,
+                            () => { },
+                            false,
+                            false,
+                            subErrors.denier,
+                        )}
+
+                        <View style={ym2.actions}>
+                            <TouchableOpacity style={ym2.secondaryBtn} onPress={closeCurrent} disabled={isSaving}>
+                                <Text style={ym2.secondaryText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[ym2.primaryBtn, isSaving && ym2.disabledButton]}
+                                onPress={saveSub}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Ionicons name={isModifyMode ? 'checkmark-circle-outline' : 'add-circle-outline'} size={17} color="#fff" />
+                                )}
+                                <Text style={ym2.primaryText}>{isModifyMode ? 'Modify Sub Item' : 'Add Sub Item'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    };
+
+    const renderParty = () => (
+        <View style={ym2.page}>
+            <View style={ym2.subHeader}>
+                <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                    <Text style={ym2.subHeaderTitle}>Party Items</Text>
+                    <Text style={ym2.subHeaderSub}>{selectedBrowseItem?.WNameCode || selectedBrowseItem?.itmname || selectedBrowseItem?.itmcode || '-'}</Text>
+                </View>
+            </View>
+            <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                <View style={ym2.formCard}>
+                    {selectField('Party', partyForm.accountname || partyForm.acccode, () => openPicker('party', 'Select Party', partyData, false, partyData.find(p => String(p.acccode) === String(partyForm.acccode))), true)}
+                    {field('Item Name *', partyForm.ItemName, v => setPartyForm(p => ({ ...p, ItemName: v })))}
+                    <TouchableOpacity style={ym2.primaryBtn} onPress={addPartyItem}>
+                        <Ionicons name="add-circle-outline" size={17} color="#fff" /><Text style={ym2.primaryText}>Add Item</Text>
+                    </TouchableOpacity>
+                </View>
+                <Text style={ym2.sectionTitle}>Existing Party Items ({filteredParty.length})</Text>
+                <FlatList
+                    key={`party-grid-${gridColumns}`}
+                    data={filteredParty}
+                    keyExtractor={(item, i) => `${item?.id || item?.itmcode || i}`}
+                    numColumns={gridColumns}
+                    scrollEnabled={false}
+                    columnWrapperStyle={gridColumns > 1 ? ym2.gridRow : undefined}
+                    renderItem={({ item }) => (
+                        <View style={[ym2.listCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
+                            <Text style={ym2.listTitle}>{item?.itmname || item?.ItemName || item?.name || '-'}</Text>
+                            <Text style={ym2.listMeta}>{item?.accountname || item?.parname || item?.acccode || '-'}</Text>
+                        </View>
+                    )}
+                    ListEmptyComponent={<Text style={ym2.emptySub}>No party items found.</Text>}
+                />
+            </ScrollView>
+        </View>
+    );
+
+    const renderSubList = () => (
+        <View style={ym2.page}>
+            <View style={ym2.subHeader}>
+                <TouchableOpacity onPress={closeCurrent} style={ym2.backBtn}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                    <Text style={ym2.subHeaderTitle}>Sub Items</Text>
+                    <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
+                </View>
+                <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
+                    <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
+                </TouchableOpacity>
+            </View>
+            <View style={ym2.toolbar}>
+                <View style={ym2.searchWrap}>
+                    <Ionicons name="search-outline" size={19} color={T.muted} />
+                    <TextInput value={search} onChangeText={setSearch} placeholder="Search sub item..." placeholderTextColor={T.muted} style={ym2.searchInput} />
+                    {search ? <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={T.muted} /></TouchableOpacity> : null}
+                </View>
+            </View>
+            <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                <FlatList
+                    key={`sub-grid-${gridColumns}`}
+                    data={filteredSub}
+                    keyExtractor={(item, i) => `${item?.itmcode || i}`}
+                    numColumns={gridColumns}
+                    scrollEnabled={false}
+                    columnWrapperStyle={gridColumns > 1 ? ym2.gridRow : undefined}
+                    renderItem={renderSubCard}
+                    ListEmptyComponent={<View style={ym2.emptyCard}><Ionicons name="git-branch-outline" size={32} color={T.muted} /><Text style={ym2.emptyTitle}>No sub items</Text></View>}
+                />
+            </ScrollView>
+        </View>
+    );
+
+    const body =
+        screen === 'MAIN_FORM' ? renderMainForm() :
+            screen === 'SUB_FORM' ? renderSubForm() :
+                screen === 'PARTY' ? renderParty() :
+                    screen === 'SUB_LIST' ? renderSubList() :
+                        (
+                            <View style={ym2.page}>
+                                <View style={ym2.topTabs}>
+                                    {(['Spun', 'Filaments'] as const).map(tab => (
+                                        <TouchableOpacity key={tab} onPress={() => { setActiveTab(tab); setSearch(''); resetForms(); }} style={[ym2.topTab, activeTab === tab && ym2.topTabActive]}>
+                                            <Text style={[ym2.topTabText, activeTab === tab && ym2.topTabTextActive]}>{tab === 'Filaments' ? 'Filament' : 'Spun'}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                <View style={ym2.toolbar}>
+                                    <View style={ym2.searchWrap}>
+                                        <Ionicons name="search-outline" size={19} color={T.muted} />
+                                        <TextInput value={search} onChangeText={setSearch} placeholder="Search yarn name / code / count..." placeholderTextColor={T.muted} style={ym2.searchInput} />
+                                        {search ? <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={T.muted} /></TouchableOpacity> : null}
+                                    </View>
+                                    <TouchableOpacity style={ym2.addButton} onPress={openAddMain}>
+                                        <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.addButtonText}>Add {activeTab === 'Spun' ? 'Spun' : 'Filament'} Main Item</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                {loading && <View style={ym2.loadingBar}><ActivityIndicator size="small" color={T.copper} /><Text style={ym2.loadingText}>Loading yarn management data...</Text></View>}
+                                <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
+                                    <FlatList
+                                        key={`main-grid-${activeTab}-${gridColumns}`}
+                                        data={filtered}
+                                        keyExtractor={(item, i) => `${item?.itmcode || item?.id || i}`}
+                                        numColumns={gridColumns}
+                                        scrollEnabled={false}
+                                        columnWrapperStyle={gridColumns > 1 ? ym2.gridRow : undefined}
+                                        renderItem={renderCard}
+                                        ListEmptyComponent={<View style={ym2.emptyCard}><Ionicons name="layers-outline" size={32} color={T.muted} /><Text style={ym2.emptyTitle}>{loading ? 'Loading...' : 'No items yet'}</Text><Text style={ym2.emptySub}>Add one to get started.</Text></View>}
+                                    />
+                                </ScrollView>
+                            </View>
+                        );
+
+    const pickerData = picker?.data || [];
+    const pickerValue = picker?.value;
+    const pickerLabel = (item: any) => {
+        if (picker?.key === 'ply') return String(item?.ply ?? item?.name ?? item?.id ?? '');
+        if (picker?.key === 'type') return String(item?.type ?? item?.name ?? item?.id ?? '');
+        if (picker?.key === 'lustre') return String(item?.lustre ?? item?.name ?? item?.id ?? '');
+        if (picker?.key === 'party') return String(item?.accountname ?? item?.name ?? item?.acccode ?? '');
+        return String(item?.name ?? item?.id ?? '');
+    };
+
+    const pickerModal = picker ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPicker(null)}>
+            <View style={ym2.modalBackdrop}>
+                <View style={[ym2.pickerModal, { maxHeight: Math.min(screenWidth >= 700 ? 620 : 560, 620) }]}>
+                    <View style={ym2.pickerHeader}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={ym2.pickerTitle}>{picker.title}</Text>
+                            {picker.multiple ? <Text style={ym2.pickerHint}>Select one or more, then press Done.</Text> : null}
+                        </View>
+                        <TouchableOpacity onPress={() => setPicker(null)} style={ym2.iconBtn}><Ionicons name="close" size={20} color={T.ink} /></TouchableOpacity>
+                    </View>
+                    <FlatList
+                        data={pickerData}
+                        keyExtractor={(item, i) => `${item?.id ?? item?.acccode ?? i}`}
+                        contentContainerStyle={{ padding: 10 }}
+                        renderItem={({ item }) => {
+                            const selected = picker.multiple
+                                ? (Array.isArray(pickerValue) && pickerValue.some((x: any) => String(x?.id) === String(item?.id)))
+                                : String(pickerValue?.id ?? pickerValue?.acccode ?? '') === String(item?.id ?? item?.acccode ?? '');
+                            return (
+                                <TouchableOpacity
+                                    style={[ym2.pickerRow, selected && ym2.pickerRowSelected]}
+                                    onPress={() => handlePickerSelect(item)}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={ym2.pickerRowTitle}>{pickerLabel(item)}</Text>
+                                        {item?.id !== undefined || item?.acccode ? <Text style={ym2.pickerRowMeta}>{String(item?.id ?? item?.acccode ?? '')}</Text> : null}
+                                    </View>
+                                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={selected ? T.copper : T.muted} />
+                                </TouchableOpacity>
+                            );
+                        }}
+                        ListEmptyComponent={<Text style={ym2.emptySub}>No options found.</Text>}
+                    />
+                    {picker.multiple ? (
+                        <View style={ym2.pickerFooter}>
+                            <TouchableOpacity style={ym2.secondaryBtn} onPress={() => setPicker(null)}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity style={ym2.primaryBtn} onPress={applyMultiPicker}><Text style={ym2.primaryText}>Done</Text></TouchableOpacity>
+                        </View>
+                    ) : null}
+                </View>
+            </View>
+        </Modal>
+    ) : null;
+
+    const deleteModal = (
+        <Modal visible={deleteVisible} transparent animationType="fade" onRequestClose={() => setDeleteVisible(false)}>
+            <View style={ym2.modalBackdrop}>
+                <View style={ym2.deleteModal}>
+                    <View style={ym2.deleteIcon}><Ionicons name="trash-outline" size={24} color="#B42318" /></View>
+                    <Text style={ym2.deleteTitle}>{deleteTargetType === 'SUB' ? 'Delete Sub Item' : 'Delete Item'}</Text>
+                    <Text style={ym2.deleteMessage}>Are you sure you want to delete this item?</Text>
+                    <View style={ym2.deleteInfo}>
+                        <Text numberOfLines={2} style={ym2.itemTitle}>{deleteTarget?.WNameCode || deleteTarget?.itmname || deleteTarget?.ItmName || 'Selected Item'}</Text>
+                        <Text style={ym2.itemCode}>Item Code: {deleteTarget?.itmcode || '-'}</Text>
+                    </View>
+                    <Text style={ym2.deleteWarning}>This action cannot be undone.</Text>
+                    <View style={ym2.actions}>
+                        <TouchableOpacity style={ym2.secondaryBtn} onPress={() => setDeleteVisible(false)}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
+                        <TouchableOpacity style={ym2.dangerBtn} onPress={confirmDelete}><Ionicons name="trash-outline" size={17} color="#fff" /><Text style={ym2.primaryText}>Delete</Text></TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    const deleteResultModal = (
+        <Modal visible={deleteResultVisible} transparent animationType="fade" onRequestClose={() => setDeleteResultVisible(false)}>
+            <View style={ym2.modalBackdrop}>
+                <View style={ym2.deleteModal}>
+                    <View style={[ym2.deleteIcon, deleteResultType === 'SUCCESS' ? { backgroundColor: '#DCFCE7' } : { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name={deleteResultType === 'SUCCESS' ? 'checkmark-circle-outline' : 'information-circle-outline'} size={25} color={deleteResultType === 'SUCCESS' ? '#15803D' : '#B45309'} />
+                    </View>
+                    <Text style={ym2.deleteTitle}>{deleteResultType === 'SUCCESS' ? 'Delete Successful' : deleteResultType === 'PERMISSION' ? 'Delete Not Allowed' : 'Delete Error'}</Text>
+                    <Text style={ym2.deleteMessage}>{deleteResultMessage}</Text>
+                    <TouchableOpacity style={ym2.primaryBtn} onPress={handleDeleteResultOk}><Text style={ym2.primaryText}>OK</Text></TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    return <>{body}{pickerModal}{deleteModal}{deleteResultModal}</>;
 }
-const yn = StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-    badge: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-    badgeTxt: { fontSize: 10, fontWeight: '800' },
-    name: { fontSize: 13, fontWeight: '700', color: T.ink },
-    sub: { fontSize: 11, color: T.muted, marginTop: 2 },
-    price: { fontSize: 13, fontWeight: '700', color: T.copper },
+const ym2 = StyleSheet.create({
+    page: { flex: 1, backgroundColor: T.bg },
+    topTabs: { flexDirection: 'row', backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border, paddingHorizontal: 14 },
+    topTab: { paddingHorizontal: 18, paddingVertical: 12, marginRight: 6 },
+    topTabActive: { borderBottomWidth: 2, borderBottomColor: T.copper },
+    topTabText: { fontSize: 12, fontWeight: '700', color: T.muted },
+    topTabTextActive: { color: T.ink },
+    toolbar: { padding: 12, backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border },
+    searchWrap: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11 },
+    searchInput: { flex: 1, color: T.ink, fontSize: 13, marginLeft: 8, paddingVertical: 8 },
+    addButton: { marginTop: 9, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.ink, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 9 },
+    addButtonText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    loadingBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: T.sub },
+    loadingText: { fontSize: 11, color: T.muted },
+    content: { padding: 12, paddingBottom: 32 },
+    itemCard: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 13, marginBottom: 10 },
+    cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    itemTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+    itemCode: { fontSize: 10, color: T.muted, marginTop: 3 },
+    badge: { backgroundColor: T.sub, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 6 },
+    badgeText: { fontSize: 9, fontWeight: '800', color: T.muted },
+    divider: { height: 1, backgroundColor: T.border, marginVertical: 10 },
+    infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    infoCell: { flex: 1, minWidth: 90 },
+    infoLabel: { fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+    infoValue: { fontSize: 11, fontWeight: '700', color: T.ink },
+    cardActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 8, marginTop: 12 },
+    outlineBtn: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 5, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: T.surface },
+    outlineText: { fontSize: 10, fontWeight: '700', color: T.ink },
+    emptyCard: { alignItems: 'center', justifyContent: 'center', paddingVertical: 70 },
+    emptyTitle: { marginTop: 9, fontSize: 13, fontWeight: '800', color: T.ink },
+    emptySub: { marginTop: 3, fontSize: 11, color: T.muted },
+    subHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.nav, paddingHorizontal: 10, paddingVertical: 11 },
+    backBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+    subHeaderTitle: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '800', marginLeft: 6 },
+    parentBanner: { backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border, paddingHorizontal: 14, paddingVertical: 10 },
+    parentCode: { fontSize: 10, fontWeight: '800', color: T.copper },
+    parentName: { fontSize: 13, fontWeight: '800', color: T.ink, marginTop: 2 },
+    formCard: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14 },
+    formTitle: { fontSize: 16, fontWeight: '800', color: T.ink, marginBottom: 14 },
+    label: { fontSize: 11, fontWeight: '700', color: T.ink, marginBottom: 6, marginTop: 10 },
+    required: { color: '#C0392B' },
+    inputWrap: { minHeight: 42, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub, borderRadius: 9, justifyContent: 'center' },
+    input: { color: T.ink, fontSize: 13, paddingHorizontal: 10, paddingVertical: 9 },
+    disabledInputWrap: { backgroundColor: T.border + '55', borderColor: T.border, flexDirection: 'row', alignItems: 'center', paddingRight: 9 },
+    disabledInput: { color: T.muted },
+    errorInputWrap: { borderColor: T.red, borderWidth: 1.2 },
+    validationText: { color: T.red, fontSize: 10, fontWeight: '700', marginTop: 4, lineHeight: 14 },
+    disabledButton: { opacity: 0.55 },
+    readonlyBox: { backgroundColor: T.sub, borderRadius: 9, padding: 10, marginBottom: 4 },
+    readonlyLabel: { fontSize: 9, color: T.muted, textTransform: 'uppercase' },
+    readonlyValue: { fontSize: 12, fontWeight: '800', color: T.ink, marginTop: 2 },
+    actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 18 },
+    primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.ink, borderRadius: 8, paddingHorizontal: 13, paddingVertical: 10 },
+    primaryText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    secondaryBtn: { borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, borderRadius: 8, paddingHorizontal: 13, paddingVertical: 10 },
+    secondaryText: { color: T.ink, fontSize: 11, fontWeight: '700' },
+    blendRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.sub, borderRadius: 8, padding: 8, marginBottom: 6 },
+    blendName: { fontSize: 11, fontWeight: '700', color: T.ink },
+    percentInput: { width: 64, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, borderRadius: 7, color: T.ink, paddingHorizontal: 8, paddingVertical: 7, textAlign: 'right' },
+    totalText: { fontSize: 10, color: T.muted, textAlign: 'right', marginTop: 2 },
+    sectionTitle: { fontSize: 13, fontWeight: '800', color: T.ink, marginBottom: 8, marginTop: 2 },
+    listCard: { backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginBottom: 8 },
+    listTitle: { fontSize: 12, fontWeight: '800', color: T.ink },
+    listMeta: { fontSize: 10, color: T.muted, marginTop: 3 },
+    iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    field: { marginBottom: 8 },
+    selectWrap: { minHeight: 42, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    selectText: { flex: 1, color: T.ink, fontSize: 13, fontWeight: '600', marginRight: 8 },
+    selectPlaceholder: { color: T.muted, fontWeight: '400' },
+    gridRow: { gap: 10, alignItems: 'stretch' },
+    outlineBtnDanger: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 5, borderWidth: 1, borderColor: '#F3C4C0', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: '#FFF8F7' },
+    outlineTextDanger: { fontSize: 10, fontWeight: '700', color: '#B42318' },
+    headerAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: T.copper, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+    headerAddText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+    subHeaderSub: { color: 'rgba(255,255,255,0.72)', fontSize: 10.5, marginTop: 2, marginLeft: 6 },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 18 },
+    pickerModal: { width: '100%', maxWidth: 560, backgroundColor: T.surface, borderRadius: 16, overflow: 'hidden' },
+    pickerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: T.border },
+    pickerTitle: { fontSize: 16, fontWeight: '800', color: T.ink },
+    pickerHint: { fontSize: 11, color: T.muted, marginTop: 2 },
+    pickerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: T.border, borderRadius: 9, marginBottom: 7, backgroundColor: T.surface },
+    pickerRowSelected: { borderColor: T.copper, backgroundColor: T.sub },
+    pickerRowTitle: { fontSize: 13, fontWeight: '700', color: T.ink },
+    pickerRowMeta: { fontSize: 10, color: T.muted, marginTop: 2 },
+    pickerFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: T.border },
+    deleteModal: { width: '100%', maxWidth: 420, backgroundColor: T.surface, borderRadius: 16, padding: 20 },
+    deleteIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12 },
+    deleteTitle: { fontSize: 19, fontWeight: '800', color: T.ink, textAlign: 'center' },
+    deleteMessage: { marginTop: 8, fontSize: 13, lineHeight: 19, color: T.muted, textAlign: 'center' },
+    deleteInfo: { marginTop: 16, padding: 12, backgroundColor: T.sub, borderRadius: 10, borderWidth: 1, borderColor: T.border },
+    deleteWarning: { marginTop: 12, fontSize: 11, color: '#B42318', textAlign: 'center' },
+    dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#C0392B', borderRadius: 8, paddingHorizontal: 13, paddingVertical: 10 },
+
 });
 
-// ═══════════════════════════════════════════════════════════════
-// TAB 5 — DYEING
-// ═══════════════════════════════════════════════════════════════
 function DyeingTab({ design }: { design: Design | null }) {
     const [dyeData, setDyeData] = useState<Record<string, { average: number; recent: any[] }>>({});
     const [loading, setLoading] = useState(false);

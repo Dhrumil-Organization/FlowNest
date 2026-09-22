@@ -395,6 +395,56 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
   });
 };
 
+  // Mobile camera scanner entry point. Kept separate from the existing
+  // hardware-scanner path so scanner timing/matching behavior remains untouched.
+  const openCameraScanner = () => {
+    Keyboard.dismiss();
+
+    if (!toLocation.trim()) {
+      return AppAlert.alert("Validation", "Please enter/select To Location");
+    }
+
+    if (!cartons.length) {
+      return AppAlert.alert("Validation", "Please load carton data first");
+    }
+
+    navigation.navigate("WarehouseQRCameraScanner", {
+      mode: "TRANSFER",
+      cartons,
+      selected,
+      onScanResult: result => {
+        const rows = Array.isArray(result) ? result : [result];
+        const validRows = rows.filter(Boolean);
+
+        if (!validRows.length) return;
+
+        setSelected(prev => {
+          const next = { ...prev };
+
+          validRows.forEach(row => {
+            const key = keyOf(row);
+            if (key) {
+              next[key] = row;
+            }
+          });
+
+          return next;
+        });
+
+        setSelectedOrder(prev => {
+          const newKeys = validRows
+            .map(row => keyOf(row))
+            .filter(Boolean);
+
+          return [
+            ...newKeys.reverse(),
+            ...prev.filter(x => !newKeys.includes(x)),
+          ];
+        });
+      },
+    });
+  };
+
 
 
   return (
@@ -522,6 +572,24 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
                     }}
                   >
                     <Icon name="qr-code-scanner" size={28} color="#0f8f9a" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={openCameraScanner}
+                    style={{
+                      width: 54,
+                      height: 54,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: "#0f8f9a",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#fff",
+                      marginLeft: 8,
+                    }}
+                    accessibilityLabel="Open mobile camera scanner"
+                  >
+                    <Icon name="photo-camera" size={27} color="#0f8f9a" />
                   </TouchableOpacity>
                 </View>
               </View>

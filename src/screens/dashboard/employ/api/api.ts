@@ -294,18 +294,57 @@ export const api = {
       prptype: getUserPrptype,
     }),
 
-     getCreditorDashboardSummary: (prptype, partycode, date = getToday()) =>
-    fetchJSON(`/creditor-dashboard/summary`, { prptype, partycode, date }),
+  getCreditorDashboardSummary: (prptype, partycode, date = getToday(), options: any = {}) =>
+    fetchJSON(`/creditor-dashboard/summary`, {
+      prptype, partycode, date,
+      date_basis: options?.dateBasis,
+      number_basis: options?.numberBasis,
+    }),
 
   getCreditorPosition: (prptype, partycode, date = getToday()) =>
     fetchJSON(`/creditor-dashboard/position/analytics`, { prptype, partycode, date }),
 
-  getCreditorPayments: (prptype, partycode, date = getToday(), limit = 100) =>
-    fetchJSON(`/creditor-dashboard/payment/transactions`, { prptype, partycode, date, limit }),
+  getCreditorPayments: (prptype, partycode, date = getToday(), limit = 200, fromdate: any = null) =>
+    fetchJSON(`/creditor-dashboard/payments/transactions`, { prptype, partycode, date, fromdate, limit }),
 
-  getCreditorOutstandingBills: (prptype, partycode, date = getToday(), limit = 100) =>
+  getCreditorPaymentSettlements: (prptype, partycode, date = getToday(), limit = 500, fromdate: any = null) =>
+    fetchJSON(`/creditor-dashboard/payments/settlements`, { prptype, partycode, date, fromdate, limit }),
+
+  getCreditorOutstandingBills: (prptype, partycode, date = getToday(), limit = 500) =>
     fetchJSON(`/creditor-dashboard/outstanding/bills`, { prptype, partycode, date, limit }),
-    
+
+  getCreditorPurchaseTransactions: (
+    prptype, partycode, date = getToday(), dateBasis = 'inward_date',
+    numberBasis = 'inward_no', limit = 500
+  ) => fetchJSON(`/creditor-dashboard/purchase/transactions`, {
+    prptype, partycode, date, date_basis: dateBasis, number_basis: numberBasis, limit,
+  }),
+
+  getCreditorPurchaseAnalytics: (
+    prptype, partycode, date = getToday(), dateBasis = 'inward_date',
+    fromdate: any = null, todate: any = null
+  ) => fetchJSON(`/creditor-dashboard/purchase/analytics`, {
+    prptype, partycode, date, date_basis: dateBasis, fromdate, todate,
+  }),
+
+  getCreditorPurchaseRateComparison: (
+    prptype, partycode, itemcode, date = getToday(), dateBasis = 'inward_date'
+  ) => fetchJSON(`/creditor-dashboard/purchase/rate-comparison`, {
+    prptype, partycode, itemcode, date, date_basis: dateBasis,
+  }),
+
+  getCreditorPurchaseOrderAnalytics: (
+    prptype, partycode, date = getToday(), fromdate: any = null, todate: any = null
+  ) => fetchJSON(`/creditor-dashboard/purchase-orders/analytics`, {
+    prptype, partycode, date, fromdate, todate,
+  }),
+
+  getCreditorPendingPurchaseOrders: (
+    prptype, partycode, date = getToday(), limit = 500
+  ) => fetchJSON(`/creditor-dashboard/purchase-orders/pending`, {
+    prptype, partycode, date, limit,
+  }),
+
 };
 
 /** Display amount using the dashboard-wide Compact / Actual preference. */

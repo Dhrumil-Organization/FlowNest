@@ -5220,13 +5220,13 @@ function YarnsTab() {
     const findByIdOrName = (list: any[], value: any, keys = ['id', 'name']) =>
         (list || []).find(obj => keys.some(k => String(obj?.[k] ?? '') === String(value ?? ''))) || null;
 
-    const openPicker = (key: string, title: string, data: any[], multiple = false, value?: any, disabled?: false) =>
+    const openPicker = (key: string, title: string, data: any[], multiple = false, value?: any, disabled?: boolean) =>
         setPicker({ key, title, data: data || [], multiple, value, disabled });
 
     const handlePickerSelect = (item: any) => {
+
         if (!picker) return;
         const { key, multiple, disabled } = picker;
-        if (disabled) return;
         if (multiple) {
             const current = Array.isArray(picker.value) ? picker.value : [];
             const exists = current.some((x: any) => String(x?.id) === String(item?.id));
@@ -5294,6 +5294,7 @@ function YarnsTab() {
             });
         }
         setPicker(null);
+
     };
 
     const applyMultiPicker = () => {
@@ -5864,10 +5865,54 @@ function YarnsTab() {
         setDeleteTarget(null);
     };
 
+    // Main Spun/Filament search: keep the existing broad search behaviour,
+    // but also make slash-pair values reversible. For example, a yarn named
+    // `190/1 Den BRIGHT DTY CARORPATI 2` is found by `190`, `190/1`, or `1/190`.
+    const normalizeYarnSearchText = (value: any) =>
+        String(value ?? '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+
+    const getYarnSearchVariants = (value: any) => {
+        const q = normalizeYarnSearchText(value);
+        if (!q) return [];
+
+        const variants = new Set<string>([q]);
+        const slashPair = q.match(/\b(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\b/);
+
+        if (slashPair) {
+            const [, first, second] = slashPair;
+            variants.add(`${first}/${second}`);
+            variants.add(`${second}/${first}`);
+            variants.add(`${first} / ${second}`);
+            variants.add(`${second} / ${first}`);
+            variants.add(`${first} ${second}`);
+            variants.add(`${second} ${first}`);
+
+            // Preserve the rest of a longer query too.
+            // Example: `1/190 bright` -> `190/1 bright`.
+            variants.add(q.replace(slashPair[0], `${second}/${first}`));
+        }
+
+        return Array.from(variants);
+    };
+
     const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
+        const q = normalizeYarnSearchText(search);
         if (!q) return items;
-        return items.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
+
+        const queryVariants = getYarnSearchVariants(q);
+
+        return items.filter(item => {
+            // Keep the old behaviour: every property of the item remains searchable.
+            const searchableText = Object.values(item || {})
+                .map(v => normalizeYarnSearchText(v))
+                .filter(Boolean)
+                .join(' ');
+
+            return queryVariants.some(variant => searchableText.includes(variant));
+        });
     }, [items, search]);
 
     const filteredSub = useMemo(() => {
@@ -5903,7 +5948,7 @@ function YarnsTab() {
                     }}
                     placeholder={label.replace(' *', '') + '...'}
                     placeholderTextColor={T.muted}
-                    style={[ym2.input, !editable && ym2.disabledInput]}
+                    style={[ym2.input, !editable && ym2.disabledInput, { width: '-webkit-fill-available' }]}
                 />
                 {!editable ? <Ionicons name="lock-closed-outline" size={15} color={T.muted} /> : null}
             </View>
@@ -6221,14 +6266,14 @@ function YarnsTab() {
                         </Text>
                         {subErrors.blend ? <Text style={ym2.validationText}>{subErrors.blend}</Text> : null}
 
-                        {selectField(
+                        {/* {selectField(
                             'Count Type',
                             subForm.count || '',
-                            () => openPicker('count', 'Select Count Type', countData, false, selectedCount),
+                            () => openPicker('count', 'Select Count Type', countData, false, selectedCount, true),
                             false,
-                            false,
+                            true,
                             subErrors.count,
-                        )}
+                        )} */}
 
                         {field(
                             'Count *',
@@ -6249,7 +6294,7 @@ function YarnsTab() {
                             subForm.ply || '',
                             () => openPicker('ply', 'Select Ply', plyData, false, selectedPly, true),
                             false,
-                            false,
+                            true,
                             subErrors.ply,
                         )}
 
@@ -6280,7 +6325,7 @@ function YarnsTab() {
                             v => setSubForm((p: any) => ({ ...p, linkitmcode: v })),
                             false,
                             false,
-                            subErrors.name,
+                            // subErrors.name,
                         )}
 
                         {field(
@@ -6342,8 +6387,9 @@ function YarnsTab() {
                     columnWrapperStyle={gridColumns > 1 ? ym2.gridRow : undefined}
                     renderItem={({ item }) => (
                         <View style={[ym2.listCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
-                            <Text style={ym2.listTitle}>{item?.itmname || item?.ItemName || item?.name || '-'}</Text>
-                            <Text style={ym2.listMeta}>{item?.accountname || item?.parname || item?.acccode || '-'}</Text>
+                            <Text style={ym2.listTitle}>Item: {item?.ItmName || item?.itmname || item?.ItemName || item?.name || '-'}</Text>
+                            <Text style={ym2.listTitle}>Code: {item?.ItmCode || item?.itmcode || item?.ItemCode || item?.code || '-'}</Text>
+                            <Text style={ym2.listTitle}>Party: {item?.ParName || item?.accountname || item?.parname || item?.acccode || '-'}</Text>
                         </View>
                     )}
                     ListEmptyComponent={<Text style={ym2.emptySub}>No party items found.</Text>}
@@ -6437,48 +6483,54 @@ function YarnsTab() {
     };
 
     const pickerModal = picker ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setPicker(null)}>
-            <View style={ym2.modalBackdrop}>
-                <View style={[ym2.pickerModal, { maxHeight: Math.min(screenWidth >= 700 ? 620 : 560, 620) }]}>
-                    <View style={ym2.pickerHeader}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={ym2.pickerTitle}>{picker.title}</Text>
-                            {picker.multiple ? <Text style={ym2.pickerHint}>Select one or more, then press Done.</Text> : null}
+        <>
+            {!picker.disabled && (
+                <Modal visible transparent animationType="fade" onRequestClose={() => setPicker(null)}>
+                    <View style={ym2.modalBackdrop}>
+                        <View style={[ym2.pickerModal, { maxHeight: Math.min(screenWidth >= 700 ? 620 : 560, 620) }]}>
+                            <View style={ym2.pickerHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={ym2.pickerTitle}>{picker.title}</Text>
+                                    {picker.multiple ? <Text style={ym2.pickerHint}>Select one or more, then press Done.</Text> : null}
+                                </View>
+                                <TouchableOpacity onPress={() => setPicker(null)} style={ym2.iconBtn}><Ionicons name="close" size={20} color={T.ink} /></TouchableOpacity>
+                            </View>
+                            <FlatList
+                                data={pickerData}
+                                keyExtractor={(item, i) => `${item?.id ?? item?.acccode ?? i}`}
+                                contentContainerStyle={{ padding: 10 }}
+                                renderItem={({ item }) => {
+                                    const selected = picker.multiple
+                                        ? (Array.isArray(pickerValue) && pickerValue.some((x: any) => String(x?.id) === String(item?.id)))
+                                        : String(pickerValue?.id ?? pickerValue?.acccode ?? '') === String(item?.id ?? item?.acccode ?? '');
+                                    return (
+                                        <TouchableOpacity
+                                            style={[ym2.pickerRow, selected && ym2.pickerRowSelected]}
+                                            onPress={() => {
+                                                handlePickerSelect(item)
+                                            }}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={ym2.pickerRowTitle}>{pickerLabel(item)}</Text>
+                                                {item?.id !== undefined || item?.acccode ? <Text style={ym2.pickerRowMeta}>{String(item?.id ?? item?.acccode ?? '')}</Text> : null}
+                                            </View>
+                                            <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={selected ? T.copper : T.muted} />
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                                ListEmptyComponent={<Text style={ym2.emptySub}>No options found.</Text>}
+                            />
+                            {picker.multiple ? (
+                                <View style={ym2.pickerFooter}>
+                                    <TouchableOpacity style={ym2.secondaryBtn} onPress={() => setPicker(null)}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
+                                    <TouchableOpacity style={ym2.primaryBtn} onPress={applyMultiPicker}><Text style={ym2.primaryText}>Done</Text></TouchableOpacity>
+                                </View>
+                            ) : null}
                         </View>
-                        <TouchableOpacity onPress={() => setPicker(null)} style={ym2.iconBtn}><Ionicons name="close" size={20} color={T.ink} /></TouchableOpacity>
                     </View>
-                    <FlatList
-                        data={pickerData}
-                        keyExtractor={(item, i) => `${item?.id ?? item?.acccode ?? i}`}
-                        contentContainerStyle={{ padding: 10 }}
-                        renderItem={({ item }) => {
-                            const selected = picker.multiple
-                                ? (Array.isArray(pickerValue) && pickerValue.some((x: any) => String(x?.id) === String(item?.id)))
-                                : String(pickerValue?.id ?? pickerValue?.acccode ?? '') === String(item?.id ?? item?.acccode ?? '');
-                            return (
-                                <TouchableOpacity
-                                    style={[ym2.pickerRow, selected && ym2.pickerRowSelected]}
-                                    onPress={() => handlePickerSelect(item)}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={ym2.pickerRowTitle}>{pickerLabel(item)}</Text>
-                                        {item?.id !== undefined || item?.acccode ? <Text style={ym2.pickerRowMeta}>{String(item?.id ?? item?.acccode ?? '')}</Text> : null}
-                                    </View>
-                                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={selected ? T.copper : T.muted} />
-                                </TouchableOpacity>
-                            );
-                        }}
-                        ListEmptyComponent={<Text style={ym2.emptySub}>No options found.</Text>}
-                    />
-                    {picker.multiple ? (
-                        <View style={ym2.pickerFooter}>
-                            <TouchableOpacity style={ym2.secondaryBtn} onPress={() => setPicker(null)}><Text style={ym2.secondaryText}>Cancel</Text></TouchableOpacity>
-                            <TouchableOpacity style={ym2.primaryBtn} onPress={applyMultiPicker}><Text style={ym2.primaryText}>Done</Text></TouchableOpacity>
-                        </View>
-                    ) : null}
-                </View>
-            </View>
-        </Modal>
+                </Modal>
+            )}
+        </>
     ) : null;
 
     const deleteModal = (

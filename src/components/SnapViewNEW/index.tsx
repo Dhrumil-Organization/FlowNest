@@ -94,7 +94,7 @@
 //       try {
 //         // Clear all localStorage
 //         localStorage.clear();
-  
+
 //         // Set values from state
 //         localStorage.setItem('deviceID', ${JSON.stringify(deviceId)});
 //         localStorage.setItem('login_user_name', ${JSON.stringify(getLoginName)});
@@ -334,6 +334,7 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
   const [getLoginName, setLoginName] = useState<string | null>(null);
   const [getLoginPasswd, setLoginPasswd] = useState<string | null>(null);
 
+
   // ---------- Load credentials once ----------
   useEffect(() => {
     const loadCredentials = async () => {
@@ -354,8 +355,8 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
     API === 'https://apig.tms-webapp.com'
       ? 'https://dash.tms-webapp.com/mob-snap-view'
       : API === 'https://apiy.tms-webapp.com'
-      ? 'https://viz.tms-webapp.com/mob-snap-view'
-      : '';
+        ? 'https://viz.tms-webapp.com/mob-snap-view'
+        : '';
 
   console.log('Snap View API:', API, REMOTE_URL);
 
@@ -365,6 +366,7 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
     try {
       const u = new URL(REMOTE_URL);
       if (deviceId) u.searchParams.set('deviceID', deviceId);
+      console.log('getLoginName', JSON.stringify(deviceId), JSON.stringify(getLoginName), JSON.stringify(getLoginPasswd));
       if (getLoginName) u.searchParams.set('login_user_name', getLoginName);
       if (getLoginPasswd) u.searchParams.set('login_user_passwd', getLoginPasswd);
       return u.toString();
@@ -372,6 +374,16 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
       return REMOTE_URL;
     }
   }, [REMOTE_URL, deviceId, getLoginName, getLoginPasswd]);
+
+
+  useEffect(() => {
+    if (isWeb && webUrl) {
+      console.log('========================================');
+      console.log('🌐 SNAP VIEW IFRAME TEST URL:', webUrl);
+      console.log(webUrl);
+      console.log('========================================');
+    }
+  }, [webUrl]);
 
   // ---------- NATIVE injected JS (unchanged) ----------
   const injectedBefore = useMemo(
@@ -445,7 +457,7 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
       };
       // '*' is required because the target is a different origin
       win.postMessage(payload, '*');
-      console.log('[WebView bridge] posted credentials to iframe');
+      console.log('[WebView bridge] posted credentials to iframe', webUrl);
     } catch (e) {
       console.warn('postMessage failed:', e);
     }
@@ -535,10 +547,48 @@ const SnapView: React.FC<Props> = ({ token, deviceId = HARDCODED_DEVICE_ID, user
   );
 };
 
-export default SnapView;
+// export default SnapView;
+
+
+
+const SnapViewContainer: React.FC<Props> = (props) => {
+  const [reloadKey, setReloadKey] = useState(0);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.reloadButton}
+          onPress={() => setReloadKey(prev => prev + 1)}
+        >
+          <Text style={styles.reloadText}>↻ Reload</Text>
+        </TouchableOpacity>
+      </View>
+
+      <SnapView
+        key={reloadKey}
+        {...props}
+      />
+    </View>
+  );
+};
+
+
+export default SnapViewContainer;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  topBar: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  }
+  ,
+  reloadButton: { paddingHorizontal: 8, paddingVertical: 6 },
+  reloadText: { fontSize: 16, fontWeight: '600' },
   header: {
     height: 48,
     flexDirection: 'row',

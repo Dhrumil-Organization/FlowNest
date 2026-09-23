@@ -21,6 +21,7 @@ import {
 import { WebView } from 'react-native-webview';
 import HeaderBar from '../../components/HeaderNew';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
+import ProductionCostingPreviewModal from './ProductionCostingPreviewModal';
 
 interface CardData {
     [key: string]: string;
@@ -142,10 +143,27 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     const [activeTab1SPO, setActiveTab1SPO] = useState<'requests' | 'history' | 'verify'>('requests');
     const [showWebViewModal, setShowWebViewModal] = useState(false);
     const [webViewUrl, setWebViewUrl] = useState('');
+    const [costingPreviewMdId, setCostingPreviewMdId] = useState('');
+    const [showCostingPreview, setShowCostingPreview] = useState(false);
     // const [historyDataSPO, setHistoryDataSPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingSPO] = useState(false);
 
     const { width } = useWindowDimensions();
+
+    const openProductionCosting = (item: any) => {
+        if (!isConnected || item?.isProcessed) return;
+        const source = String(item?.design_costing_source || '').trim().toUpperCase();
+        const mdId = String(item?.md_id || '').trim();
+        if (source === 'NEW') {
+            if (!mdId) { AppAlert.alert('Costing unavailable', 'New design costing reference is missing.'); return; }
+            setCostingPreviewMdId(mdId);
+            setShowCostingPreview(true);
+            return;
+        }
+        const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
+        setWebViewUrl(url);
+        setShowWebViewModal(true);
+    };
 
     const getColumns = () => {
         if (width < 600) return 1;      // mobile
@@ -1049,14 +1067,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
                 </TouchableOpacity> */}
                     <TouchableOpacity
-                        onPress={() => {
-                            console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
-                            if (isConnected && !item.isProcessed) {
-                                const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
-                                setWebViewUrl(url);
-                                setShowWebViewModal(true);
-                            }
-                        }}
+                        onPress={() => openProductionCosting(item)}
                         disabled={!isConnected || item.isProcessed}
                     >
                         <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
@@ -1300,14 +1311,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
                 </TouchableOpacity> */}
                         <TouchableOpacity
-                            onPress={() => {
-                                if (isConnected && !item.isProcessed) {
-                                    console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
-                                    const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
-                                    setWebViewUrl(url);
-                                    setShowWebViewModal(true);
-                                }
-                            }}
+                            onPress={() => openProductionCosting(item)}
                             disabled={!isConnected || item.isProcessed}
                         >
                             <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
@@ -1880,7 +1884,12 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             </Modal>
 
 
-        </>
+                    <ProductionCostingPreviewModal
+                visible={showCostingPreview}
+                mdId={costingPreviewMdId}
+                onClose={() => { setShowCostingPreview(false); setCostingPreviewMdId(''); }}
+            />
+</>
     );
 };
 export default SudamoProdOrder;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import AppAlert from '@/common/utils/appAlert';
@@ -388,10 +389,12 @@ function CostingTab({
     onSaved,
     reopenRequest,
     freshMode = false,
+    initialMdId = '',
 }: {
     onSaved: () => void;
     reopenRequest: ReopenCostingRequest | null;
     freshMode?: boolean;
+    initialMdId?: string;
 }) {
     const [mdId, setMdId] = useState('');
     const [design, setDesign] = useState<Design | null>(null);
@@ -411,6 +414,7 @@ function CostingTab({
     const [prefilledInfo, setPrefilledInfo] = useState<ReopenedCostingInfo | null>(null);
     const [designLoading, setDesignLoading] = useState(false);
     const [adjust, setAdjust] = useState({ greige_width: 0, warp_shrink: 0, warp_wastage: 0, weft_wastage: 0, weft_shrink: 0, fin_width: 0, gf_shrink: 0 });
+    const initialMdIdHandledRef = useRef('');
 
     // build yarn key
     const yKey = (miId: string, br: string | null) => `${miId}|${br ?? ''}`;
@@ -527,13 +531,17 @@ function CostingTab({
         }
     };
 
-    // Load design details quickly, then prefill either latest costing or masters.
-    const handleSelectDesign = async (d: Design) => {
+    // Load one MainDesign by id. This is shared by the normal DesignPicker and
+    // Production Order deep-link entry, so both paths have identical costing behaviour.
+    const loadDesignById = useCallback(async (designId: string) => {
+        const id = String(designId || '').trim();
+        if (!id) return;
+
         setDesignLoading(true);
         setResult(null);
         setPrefilledInfo(null);
         try {
-            const res = await DesignAPI.get(d.id);
+            const res = await DesignAPI.get(id);
             const full = res.data.data;
             setDesign(full);
             setMdId(full.id);
@@ -559,7 +567,23 @@ function CostingTab({
         } finally {
             setDesignLoading(false);
         }
+    }, [freshMode]);
+
+    const handleSelectDesign = async (d: Design) => {
+        await loadDesignById(d.id);
     };
+
+    // Production Order Request/History can open Costing with mdId. Load it once
+    // on entry; ordinary Costing navigation (without mdId) remains unchanged.
+    useEffect(() => {
+        const incoming = String(initialMdId || '').trim();
+        if (!incoming || initialMdIdHandledRef.current === incoming) return;
+
+        // Mark before the request so an API failure cannot create a retry loop.
+        // A later navigation with a different mdId is still handled normally.
+        initialMdIdHandledRef.current = incoming;
+        loadDesignById(incoming);
+    }, [initialMdId, loadDesignById]);
 
     const startFreshFromMasters = () => {
         if (!design) return;
@@ -4183,6 +4207,10 @@ const v = StyleSheet.create({
 });
 
 export function CostingScreen() {
+    const routeParams = useLocalSearchParams<{ mdId?: string | string[] }>();
+    const incomingMdId = Array.isArray(routeParams.mdId)
+        ? String(routeParams.mdId[0] || '').trim()
+        : String(routeParams.mdId || '').trim();
     const [tab, setTab] = useState<Tab>('Costing');
     const [histRefreshKey, setHistRefreshKey] = useState(0);
     const [reopenRequest, setReopenRequest] =
@@ -4201,6 +4229,7 @@ export function CostingScreen() {
                     <CostingTab
                         reopenRequest={reopenRequest}
                         freshMode={false}
+                        initialMdId={incomingMdId}
                         onSaved={() => setHistRefreshKey(k => k + 1)}
                     />
                 )}

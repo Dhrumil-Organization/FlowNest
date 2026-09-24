@@ -358,7 +358,8 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
                 // txntype: 'creel_yarn_issue',
                 fromdate: FormState.values.fromdate,
                 todate: FormState.values.todate,
-                status: ''
+                status: '',
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("browse historyPayload:", payload);

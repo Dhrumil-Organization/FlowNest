@@ -60,41 +60,45 @@ const rateMonthLabel=(value:any)=>{
 };
 
 function LatestRateChart({detail,money}:any) {
-  const rows=(Array.isArray(detail?.transactions)?detail.transactions:[]).slice(0,5).reverse();
-  if(!rows.length) return <Empty text="No rate history for this item."/>;
+  const rows=Array.isArray(detail?.months)?detail.months.slice(0,6):[];
+  if(!rows.length) return <Empty text="No monthly rate history for this item."/>;
 
-  const rates=rows.map((r:any)=>n(r?.unit_rate));
-  const min=Math.min(...rates), max=Math.max(...rates), span=max-min;
-  const points=rows.map((r:any)=>({
-    ...r,_rate:n(r?.unit_rate),
-    _height:span===0?55:22+((n(r?.unit_rate)-min)/span)*68,
-    _month:rateMonthLabel(r?.date),
-  }));
+  const valid=rows.filter((r:any)=>r?.latest_rate!==null&&r?.latest_rate!==undefined).map((r:any)=>n(r.latest_rate));
+  const min=valid.length?Math.min(...valid):0, max=valid.length?Math.max(...valid):0, span=max-min;
 
   return <View style={styles.rateChartCard}>
     <View style={styles.rateChartHeader}>
       <View style={{flex:1}}>
-        <Text style={styles.rateChartTitle}>Latest Rate Comparison · Item {detail?.item_code}</Text>
-        <Text style={styles.rateChartSubtitle}>Last {points.length} actual rates · oldest → newest</Text>
+        <Text style={styles.rateChartTitle}>Monthly Rate Comparison · Item {detail?.item_code}</Text>
+        <Text style={styles.rateChartSubtitle}>Same item · latest actual rate each month · no averaging</Text>
       </View>
-      <View style={styles.rateLatest}>
-        <Text style={styles.rateLatestLabel}>LATEST</Text>
-        <Text style={styles.rateLatestValue}>{money(detail?.latest_rate)}</Text>
-      </View>
+      <View style={styles.rateLatest}><Text style={styles.rateLatestLabel}>LATEST</Text>
+        <Text style={styles.rateLatestValue}>{detail?.latest_rate===null?'—':money(detail?.latest_rate)}</Text></View>
     </View>
     <View style={styles.ratePlot}>
-      {points.map((pt:any,i:number)=><View key={`${pt.uid}-${pt.sr_no}-${i}`} style={styles.ratePoint}>
-        <Text style={styles.rateValue}>{money(pt._rate)}</Text>
-        <View style={styles.rateTrack}><View style={[styles.rateBar,{height:`${pt._height}%`}]} /></View>
-        <Text style={styles.rateMonth}>{pt._month}</Text>
-        <Text style={styles.rateRef} numberOfLines={1}>{pt.bill_no||pt.inward_no||'—'}</Text>
+      {rows.map((r:any,i:number)=>{
+        const has=r?.latest_rate!==null&&r?.latest_rate!==undefined;
+        const h=!has?0:(span===0?55:22+((n(r.latest_rate)-min)/span)*68);
+        return <View key={`${r.ym}-${i}`} style={styles.ratePoint}>
+          <Text style={styles.rateValue}>{has?money(r.latest_rate):'—'}</Text>
+          <View style={styles.rateTrack}>{has?<View style={[styles.rateBar,{height:`${h}%`}]} />:<View style={styles.noRateMark}/>}</View>
+          <Text style={styles.rateMonth}>{r.label}</Text>
+          <Text style={styles.rateRef} numberOfLines={1}>{has?(r.bill_no||r.inward_no||'—'):'No purchase'}</Text>
+        </View>;
+      })}
+    </View>
+    <View style={styles.monthRateRows}>
+      {rows.map((r:any)=><View key={`m-${r.ym}`} style={styles.monthRateRow}>
+        <View style={styles.monthRateLeft}><Text style={styles.monthRateName}>{r.label}</Text>
+          <Text style={styles.monthRateMeta}>{n(r.bill_count)} bills · Qty {qty(r.qty)}</Text></View>
+        <View style={styles.monthRateRight}><Text style={styles.monthRateAmount}>{money(r.amount)}</Text>
+          <Text style={styles.monthRateValue}>{r.latest_rate===null?'Rate —':`Latest ${money(r.latest_rate)}`}</Text></View>
       </View>)}
     </View>
     <View style={styles.rateFooter}>
-      <Text style={styles.rateFooterText}>Previous {money(detail?.previous_rate)}</Text>
-      <Text style={styles.rateFooterText}>Change {n(detail?.change)>=0?'+':''}{money(detail?.change)}
-        {detail?.change_percent!==null&&detail?.change_percent!==undefined
-          ? ` · ${n(detail.change_percent)>=0?'+':''}${n(detail.change_percent).toFixed(2)}%`:''}</Text>
+      <Text style={styles.rateFooterText}>Previous month with rate {detail?.previous_rate===null?'—':money(detail?.previous_rate)}</Text>
+      <Text style={styles.rateFooterText}>Change {detail?.change===null?'—':`${n(detail.change)>=0?'+':''}${money(detail.change)}`}
+        {detail?.change_percent!==null&&detail?.change_percent!==undefined?` · ${n(detail.change_percent)>=0?'+':''}${n(detail.change_percent).toFixed(2)}%`:''}</Text>
     </View>
   </View>;
 }
@@ -226,14 +230,42 @@ export default function CreditorDashboardScreen() {
     const range=purchaseMonthRange(ym);
     try{
       setDetailLoading('purchase');
-      const [a,t]=await Promise.all([
+
+      // Do not let a drill-down transport/API failure escape into the Expo
+      // uncaught-error overlay. Load the two independent purchase resources
+      // independently so one failure does not destroy the other result.
+      const [analyticsResult,transactionsResult]=await Promise.allSettled([
         api.getCreditorPurchaseAnalytics(prptype,partycode,date,basis,range.fromdate,range.todate),
         api.getCreditorPurchaseTransactions(
           prptype,partycode,date,basis,basis==='bill_date'?'bill_no':'inward_no',500
         ),
       ]);
-      setPurchaseAnalytics(a?.success?a.data||{}:{});
-      setPurchaseRows(t?.success?t.data||[]:[]);
+
+      if(analyticsResult.status==='fulfilled'){
+        const a=analyticsResult.value;
+        setPurchaseAnalytics(a?.success?a.data||{}:{});
+      }else{
+        console.error('Creditor purchase analytics failed:',analyticsResult.reason);
+        setPurchaseAnalytics({});
+      }
+
+      if(transactionsResult.status==='fulfilled'){
+        const t=transactionsResult.value;
+        setPurchaseRows(t?.success?t.data||[]:[]);
+      }else{
+        console.error('Creditor purchase transactions failed:',transactionsResult.reason);
+        setPurchaseRows([]);
+      }
+
+      if(analyticsResult.status==='rejected' && transactionsResult.status==='rejected'){
+        setError('Purchase drill-down could not be loaded. Please retry.');
+      }
+    }catch(e:any){
+      // Last-resort guard: drill-down errors must never crash the dashboard.
+      console.error('Creditor purchase drill-down failed:',e);
+      setError(e?.message||'Purchase drill-down could not be loaded.');
+      setPurchaseAnalytics({});
+      setPurchaseRows([]);
     }finally{ setDetailLoading(''); }
   };
 
@@ -530,7 +562,14 @@ const styles=StyleSheet.create({
   ratePlot:{height:175,flexDirection:'row',alignItems:'stretch',gap:8,paddingTop:6},
   ratePoint:{flex:1,minWidth:0,alignItems:'center'},rateValue:{color:T.ink,fontSize:8,fontWeight:'900',height:18},
   rateTrack:{height:105,width:'72%',maxWidth:48,borderRadius:7,backgroundColor:T.bg,justifyContent:'flex-end',overflow:'hidden'},
-  rateBar:{width:'100%',backgroundColor:T.nav,borderRadius:7},rateMonth:{color:T.ink,fontSize:8,fontWeight:'900',marginTop:5},
+  rateBar:{width:'100%',backgroundColor:T.nav,borderRadius:7},
+  noRateMark:{width:'70%',height:2,backgroundColor:T.border,marginBottom:8},
+  monthRateRows:{marginTop:8,borderTopWidth:1,borderTopColor:T.border},
+  monthRateRow:{flexDirection:'row',justifyContent:'space-between',gap:10,paddingVertical:7,borderBottomWidth:1,borderBottomColor:T.border},
+  monthRateLeft:{flex:1},monthRateRight:{alignItems:'flex-end'},
+  monthRateName:{color:T.ink,fontSize:9,fontWeight:'900'},monthRateMeta:{color:T.muted,fontSize:7,fontWeight:'700',marginTop:2},
+  monthRateAmount:{color:T.ink,fontSize:9,fontWeight:'900'},monthRateValue:{color:T.nav,fontSize:7,fontWeight:'800',marginTop:2},
+  rateMonth:{color:T.ink,fontSize:8,fontWeight:'900',marginTop:5},
   rateRef:{color:T.muted,fontSize:7,fontWeight:'700',marginTop:2,maxWidth:90},
   rateFooter:{flexDirection:'row',justifyContent:'space-between',gap:10,borderTopWidth:1,borderTopColor:T.border,paddingTop:8,marginTop:4},
   rateFooterText:{color:T.muted,fontSize:8,fontWeight:'800'},

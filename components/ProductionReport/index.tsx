@@ -1,28 +1,28 @@
+import { PlatformDatePicker } from '@/common/PlatformDatePicker';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Modal,
-  Animated,
-  Alert,
-  ScrollView,
   ActivityIndicator,
+  Animated,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import {
-  fetchPropertyData,
-  fetchAllYeardata,
   fetchAllStoredata,
+  fetchAllYeardata,
+  fetchPropertyData,
 } from '../../common/API/Functions';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
 
 const SkeletonCard = () => (
   <View style={styles.card}>
@@ -495,17 +495,13 @@ const ProductionReport = ({ token }) => {
     if (getFromDate) {
       const fd = getFromDate.toISOString().split('T')[0];
       const resfd = fd.split('-');
-
-      finalfromdate =
-        resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+      finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
     }
 
     if (getToDate) {
       const td = getToDate.toISOString().split('T')[0];
       const restd = td.split('-');
-
-      finaltodate =
-        restd[2] + '-' + restd[1] + '-' + restd[0];
+      finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
     }
 
     if (
@@ -610,11 +606,11 @@ const ProductionReport = ({ token }) => {
 
     let fd = '';
     let resfd = '';
-    let finalfromdate = '';
+    // let finalfromdate = '';
 
     let td = '';
     let restd = '';
-    let finaltodate = '';
+    // let finaltodate = '';
 
     let convertedStatus = '';
     if (productionType == 'all') {
@@ -626,17 +622,20 @@ const ProductionReport = ({ token }) => {
     }
     let status = convertedStatus;
 
-    if (fd != '') {
-      fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
-      resfd = fd.split('-');
-      finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
-    }
+    // if (fd != '') {
+    //   fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
+    //   resfd = fd.split('-');
+    //   finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    // }
 
-    if (td != '') {
-      td = getToDate ? getToDate.toISOString().split('T')[0] : '';
-      restd = td.split('-');
-      finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
-    }
+    // if (td != '') {
+    //   td = getToDate ? getToDate.toISOString().split('T')[0] : '';
+    //   restd = td.split('-');
+    //   finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
+    // }
+
+    const finalfromdate = formatDateForAPI(getFromDate);
+    const finaltodate = formatDateForAPI(getToDate);
 
     // if (getFromDate) {
     //   const fd = getFromDate.toISOString().split('T')[0];
@@ -717,7 +716,6 @@ const ProductionReport = ({ token }) => {
       setAllInfoData([]);
       return [];
 
-      showWarning('Server Error');
     } finally {
       setLoading(false);
     }
@@ -784,6 +782,19 @@ const ProductionReport = ({ token }) => {
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
+  };
+
+  // ✅ Timezone-safe date formatter (dd-mm-yyyy)
+  const formatDateForAPI = (date: Date | null): string => {
+    if (!date || isNaN(date.getTime())) {
+      return '';
+    }
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year}`;
   };
 
   return (
@@ -1085,28 +1096,26 @@ const ProductionReport = ({ token }) => {
                   >
                     <View style={{ flex: 1, marginRight: 8 }}>
                       <Text style={styles.label}>From date</Text>
-                      <TouchableOpacity
+                      <PlatformDatePicker
+                        value={getFromDate}
+                        onChange={setFromDate}
+                        placeholder="From date"
                         style={styles.bigInput}
-                        onPress={() => setCheckingDatePickerVisible(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {getFromDate ? formatFull(getFromDate) : 'From date'}
-                        </Text>
-                        <Icon name="keyboard-arrow-down" size={20} />
-                      </TouchableOpacity>
+                        textStyle={styles.inputText}
+                        formatFull={formatFull}
+                      />
                     </View>
 
                     <View style={{ flex: 1, marginLeft: 8 }}>
                       <Text style={styles.label}>To date</Text>
-                      <TouchableOpacity
+                      <PlatformDatePicker
+                        value={getToDate}
+                        onChange={setToDate}
+                        placeholder="To date"
                         style={styles.bigInput}
-                        onPress={() => setCheckingDatePickerVisible1(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {getToDate ? formatFull(getToDate) : 'To date'}
-                        </Text>
-                        <Icon name="keyboard-arrow-down" size={20} />
-                      </TouchableOpacity>
+                        textStyle={styles.inputText}
+                        formatFull={formatFull}
+                      />
                     </View>
                   </View>
 
@@ -2230,7 +2239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-    // Detail Container
+  // Detail Container
   detailContainer: {
     backgroundColor: '#fff',
     // padding: 20,

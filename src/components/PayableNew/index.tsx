@@ -9,7 +9,6 @@ import qs from 'qs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import CustomDrawer from './CustomDrawer';
-import { CustomerSummaryBody, DashboardGrid, SummaryList, VoucherList } from './PayableViews';
 import { TableData } from './data';
 import { CardPayload, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ExeData, InternalDropdown, ItemData, ItemStatus, POTData, ReceivablesDetails, ReceivablesPrpgroup, ReceivablesSummary } from './Modal';
 
@@ -18,8 +17,6 @@ interface Props {
     username?: string;
     duration?: number;
 }
-
-const DrawerLazy = React.memo(CustomDrawer as any, (a: any, b: any) => !a.isVisible && !b.isVisible) as any;
 
 const PayableNew: React.FC<Props> = ({ token, username }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -182,12 +179,17 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     // }, [searchQueryPOTDetails, selectedAccCode, visibleDetailItems, getOutDetails]);
 
     useEffect(() => {
-        const q = searchQueryPOTDetails.toLowerCase();
-        const id = setTimeout(() => {
-            const details = getOutDetails?.filter((d) => d.ACCCODE === selectedAccCode) || [];
-            setFilteredDetails(q ? details.filter((item) => Object.values(item).some((v) => String(v).toLowerCase().includes(q))) : details);
-        }, q ? 200 : 0);
-        return () => clearTimeout(id);
+        // console.log('ddd:', selectedAccCode, getOutDetails);
+        const details = getOutDetails?.filter(
+            (detail) => detail.ACCCODE === selectedAccCode
+        );
+        const filtered = details?.filter((item) =>
+            Object.values(item).some((val) =>
+                String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
+            )
+        );
+        // console.log('filtered:', filtered);
+        setFilteredDetails(filtered || []);
     }, [searchQueryPOTDetails, selectedAccCode, getOutDetails]);
 
 
@@ -212,10 +214,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             selectedDashSubHead,
             selectedDashAccount,
             card?.caption,
-            0,
+            1, // <-- Pass caption as CardName
             card
         );
-        setSummaryDrawerVisible(true);
     };
 
 
@@ -554,6 +555,26 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     // console.log('🔵 receivables_sync_date', receivables_sync_date);
     // console.log('🔵 receivables_prpgroup', receivables_prpgroup);
 
+    useEffect(() => {
+        if (contentWidth > 0 && containerWidth > 0) {
+            Animated.loop(
+                Animated.sequence([
+                    // Scroll left to right (negative to positive)
+                    Animated.timing(scrollPosition, {
+                        toValue: containerWidth, // Scroll full container width
+                        duration: 15000, // 15 seconds for full scroll
+                        useNativeDriver: true,
+                    }),
+                    // Instant reset to start position
+                    Animated.timing(scrollPosition, {
+                        toValue: 0,
+                        duration: 0,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        }
+    }, [contentWidth, containerWidth]);
 
 
 
@@ -1057,15 +1078,228 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
 
 
+    const DashboardGrid = ({ cards, onCardPress, activeSlab }) => {
+        const numColumns = Platform.isPad ? 3 : 2;
+
+        const renderItem = ({ item, index }) => {
+            const isActive = activeSlab === item.slab;
+            const isDisabled = parseFloat(item.summary.replace(/,/g, '')) === 0; // Remove commas before checking
+            const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
+            const visual = getCardVisual(item.caption);
+
+            return (
+                <TouchableOpacity
+                    activeOpacity={isDisabled ? 1 : 0.9}
+                    onPress={isDisabled ? undefined : () => onCardPress(item)}
+                    style={[styles.dashboardCard, isActive && styles.activeDashboardCard]}
+                    disabled={isDisabled}
+                >
+                    <LinearGradient
+                        colors={isActive ? ['#DCEBFF', '#C7DDFF'] : isDisabled ? ['#EEF1F5', '#E2E8F0'] : colors}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.dashboardCardInner}
+                    >
+                        <View style={styles.dashboardCardTopRow}>
+                            <View style={[styles.dashboardIconCircle, { backgroundColor: visual.iconBg }]}>
+                                <Icon name={visual.icon as any} size={27} color={visual.iconColor} />
+                            </View>
+                            <Icon name="chevron-right" size={27} color={visual.text} />
+                        </View>
+                        <View style={styles.dashboardTextBlock}>
+                            <Text style={[styles.dashboardCaption, { color: visual.text }]} numberOfLines={1}>
+                                {isActive && isLoading ? 'Loading...' : item.caption?.toUpperCase()}
+                            </Text>
+                            <Text style={[styles.dashboardValue, { color: visual.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                                ₹ {formatIndianNumber(item.summary)}
+                            </Text>
+                        </View>
+                    </LinearGradient>
+                </TouchableOpacity>
+            );
+        };
+
+        return (
+            <FlatList
+                data={cards}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.slab}
+                numColumns={numColumns}
+                columnWrapperStyle={{ gap: 14 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 16,
+                    rowGap: 14,
+                }}
+                showsVerticalScrollIndicator={false}
+                style={styles.dashboardList}
+                ListEmptyComponent={
+                    !isLoading ? (
+                        <View style={crlimtreq_styles.emptyContainer}>
+                            <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                        </View>
+                    ) : null
+                }
+            />
+        );
+    };
 
 
 
 
     // Responsive card-based summary used by the reference UI.
     // Keeps the existing API response fields and action handlers unchanged.
+    const SummaryCardList = ({ mode = 'summary' }: { mode?: 'summary' | 'advance' | 'onaccount' }) => {
+        const formatAmount = (value: any) => (Number(value) || 0).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+
+        const metric = (label: string, value: any, tone: 'blue' | 'orange' | 'green' | 'purple' | 'red' = 'blue') => (
+            <View style={[styles.summaryMetric, styles[`summaryMetric_${tone}` as keyof typeof styles] as any]}>
+                <Text style={styles.summaryMetricLabel}>{label}</Text>
+                <Text style={styles.summaryMetricValue}>₹ {formatAmount(value)}</Text>
+            </View>
+        );
+
+        if (!filteredData?.length) {
+            return <View style={styles.cardEmpty}><Text style={styles.cardEmptyText}>No summary data found</Text></View>;
+        }
+
+        return (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.summaryCardList}>
+                {filteredData.map((item: any, index: number) => (
+                    <TouchableOpacity key={`${item.AccCode || item.AccName || 'account'}-${index}`} style={styles.customerSummaryCard} activeOpacity={0.85} onPress={() => { setSelectedAccCode(item.AccCode); setCustomerSummaryVisible(true); }}>
+                        <View style={styles.customerCardTop}>
+                            <View style={styles.customerAvatar}>
+                                <Text style={styles.customerAvatarText}>{String(item.AccName || 'A').trim().charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <View style={styles.customerCardIdentity}>
+                                <Text style={styles.customerCardName} numberOfLines={2}>{item.AccName || 'Unnamed account'}</Text>
+                                <Text style={styles.customerCardMeta}>Code: {item.AccCode || '-'}</Text>
+                            </View>
+                            <TouchableOpacity style={styles.customerInfoButton} onPress={() => {
+                                setSelectedAccCode(item.AccCode);
+                                setCustomerSummaryVisible(true);
+                            }}>
+                                <Icon name="info-outline" size={20} color={theme.BRAND_GRADIENT_END} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.summaryMetricsGrid}>
+                            {mode === 'advance' ? metric('Advance', item.advance, 'blue') : mode === 'onaccount' ? metric('Amount', item.amount, 'purple') : metric('Outstanding', item.Total, 'blue')}
+                            {metric('cr Days', item.crday ?? 0, 'orange')}
+                        </View>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        );
+    };
 
     // Customer summary screen: opened after selecting a customer from the summary list.
     // This is presentation-only; all values come from the existing API response.
+    const CustomerSummaryView = () => {
+        const customer: any = getOutSummary.find((item: any) => String(item.AccCode) === String(selectedAccCode));
+        const amount = (value: any) => (Number(value) || 0).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        const ageing = [
+            { label: '0-30', value: customer?.slab1 },
+            { label: '31-60', value: customer?.slab2 },
+            { label: '61-90', value: customer?.slab3 },
+            { label: '91-120', value: customer?.slab4 },
+            { label: '121+', value: customer?.slab5 },
+        ];
+        const maxAgeing = Math.max(...ageing.map((item) => Number(item.value) || 0), 1);
+
+        return (
+            <View style={styles.detailOverlay}>
+                <View style={styles.detailContainer}>
+                    <View style={styles.drawerHeader}>
+                        <TouchableOpacity onPress={() => { setCustomerSummaryVisible(false); setSummaryDrawerVisible(true); }}>
+                            <Icon name="arrow-back" size={25} color="#F97316" />
+                        </TouchableOpacity>
+                        <Text style={[styles.drawerTitle, { flex: 1, marginLeft: 10 }]}>Customer Summary</Text>
+                        <View style={styles.headerSpacer} />
+                    </View>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.summaryCardList}>
+                        <View style={styles.customerDetailsIdentity}>
+                            <View style={styles.customerDetailsAvatar}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 18 }}>{String(customer?.AccName || 'A').trim().charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.customerDetailsName} numberOfLines={2}>{customer?.AccName || 'Customer Details'}</Text>
+                                <Text style={styles.customerDetailsMeta}>Code: {selectedAccCode || '-'}  |  Group: SUNDRY CREDITORS</Text>
+                            </View>
+                        </View>
+                        <View style={styles.customerDetailsMetricRow}>
+                            <View style={styles.customerDetailsMetric}><Text style={styles.customerDetailsMetricLabel}>Outstanding</Text><Text style={styles.customerDetailsMetricValue}>₹ {amount(customer?.Total)}</Text></View>
+                            <View style={styles.customerDetailsMetric}><Text style={styles.customerDetailsMetricLabel}>cr Days</Text><Text style={[styles.customerDetailsMetricValue, { color: '#EA641F' }]}>{customer?.crday ?? 0}</Text></View>
+                            <View style={styles.customerDetailsMetric}><Text style={styles.customerDetailsMetricLabel}>Cumulative</Text><Text style={styles.customerDetailsMetricValue}>₹ {amount(customer?.Total)}</Text></View>
+                        </View>
+                        <View style={styles.ageingAnalysisCard}>
+                            <View style={styles.ageingTitleRow}>
+                                <View style={styles.ageingTitleIcon}>
+                                    <Icon name="insights" size={16} color="#F97316" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.ageingAnalysisTitle}>Ageing Analysis</Text>
+                                    <Text style={styles.ageingAnalysisSubtitle}>Outstanding amount by ageing range</Text>
+                                </View>
+                                <View style={styles.chartHintBadge}>
+                                    <Icon name="touch-app" size={13} color="#C2410C" />
+                                    <Text style={styles.chartHintText}>Tap bar</Text>
+                                </View>
+                            </View>
+                            {selectedAgeingLabel && (
+                                <View style={styles.ageingTooltipCard}>
+                                    <Text style={styles.ageingTooltipLabel}>{selectedAgeingLabel} days</Text>
+                                    <Text style={styles.ageingTooltipValue}>₹ {amount(ageing.find((entry) => entry.label === selectedAgeingLabel)?.value)}</Text>
+                                </View>
+                            )}
+                            <View style={styles.ageingChartArea}>
+                                {[0, 1, 2, 3].map((line) => (
+                                    <View key={line} style={[styles.ageingGridLine, { top: `${line * 25}%` }]} />
+                                ))}
+                                <View style={styles.ageingChartRow}>
+                                    {ageing.map((item) => {
+                                        const numeric = Number(item.value) || 0;
+                                        const isSelected = selectedAgeingLabel === item.label;
+                                        return (
+                                            <TouchableOpacity
+                                                key={item.label}
+                                                activeOpacity={0.8}
+                                                style={[styles.ageingChartItem, isSelected && styles.ageingChartItemSelected]}
+                                                onPress={() => setSelectedAgeingLabel(isSelected ? null : item.label)}
+                                            >
+                                                <Text style={[styles.ageingChartValue, isSelected && styles.ageingChartValueSelected]}>
+                                                    {numeric ? amount(numeric / 100000) + ' L' : '₹ 0'}
+                                                </Text>
+                                                <View style={styles.ageingBarTrack}>
+                                                    <View style={[styles.ageingBar, { height: Math.max(5, (numeric / maxAgeing) * 118) }, isSelected && styles.ageingBarSelected]} />
+                                                </View>
+                                                <Text style={[styles.ageingChartLabel, isSelected && styles.ageingChartLabelSelected]}>{item.label}</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        </View>
+                        <View style={styles.summaryMetricsGrid}>
+                            <View style={[styles.summaryMetric, styles.summaryMetric_green]}><Text style={styles.summaryMetricLabel}>Advance</Text><Text style={styles.summaryMetricValue}>₹ {amount(customer?.advance)}</Text></View>
+                            <View style={[styles.summaryMetric, styles.summaryMetric_purple]}><Text style={styles.summaryMetricLabel}>On Account</Text><Text style={styles.summaryMetricValue}>₹ {amount(customer?.onaccount)}</Text></View>
+                            <View style={[styles.summaryMetric, styles.summaryMetric_blue]}><Text style={styles.summaryMetricLabel}>PDC Amount</Text><Text style={styles.summaryMetricValue}>₹ {amount(customer?.pdcamt)}</Text></View>
+                            <View style={[styles.summaryMetric, styles.summaryMetric_red]}><Text style={styles.summaryMetricLabel}>NCL Amount</Text><Text style={styles.summaryMetricValue}>₹ {amount(customer?.nclramt)}</Text></View>
+                        </View>
+                        <TouchableOpacity style={styles.primaryActionButton} onPress={() => { setCustomerSummaryVisible(false); setModalVisible(true); }}>
+                            <Icon name="description" size={20} color="#FFFFFF" />
+                            <Text style={styles.primaryActionText}>View Details</Text>
+                        </TouchableOpacity>                        
+                    </ScrollView>
+                </View>
+            </View>
+        );
+    };
 
     const SummaryTable = () => {
         const summaryColumns = [
@@ -1829,6 +2063,94 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
 
     // Responsive card-based voucher details. This replaces the old grid/table view.
+    const DetailVoucherCards = () => {
+        const formatAmount = (value: any) => (Number(value) || 0).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        const rows = [...(filteredDetails || [])].sort((a: any, b: any) =>
+            String(b.NTRANDATE || b.TRANDATE || '').localeCompare(String(a.NTRANDATE || a.TRANDATE || ''))
+        );
+        const customer: any = getOutSummary.find((item: any) => String(item.AccCode) === String(selectedAccCode));
+        // Balance total is the sum of voucher balances.
+        const totalBalance = rows.reduce((sum: number, item: any) =>
+            sum + (Number(item.CUMBAL ?? item.AMOUNT ?? item.BALANCE) || 0), 0
+        );
+
+        // Some API responses do not contain a Cumulative field. In that case,
+        // calculate it from CUMBAL in chronological order instead of showing 0.
+        const cumulativeSource = [...rows].sort((a: any, b: any) => {
+            const dateA = String(a.NTRANDATE || a.TRANDATE || '');
+            const dateB = String(b.NTRANDATE || b.TRANDATE || '');
+            const dateCompare = dateA.localeCompare(dateB);
+            if (dateCompare !== 0) return dateCompare;
+            return String(a.TRANID || a.VOUNO || '').localeCompare(String(b.TRANID || b.VOUNO || ''));
+        });
+        let runningCumulative = 0;
+        cumulativeSource.forEach((item: any) => {
+            runningCumulative += Number(item.CUMBAL ?? item.AMOUNT ?? item.BALANCE) || 0;
+        });
+        const totalCumulative = runningCumulative;
+        const isOnAccount = getActiveCardDetails?.caption === 'On Account';
+
+        return (
+            <ScrollView style={styles.detailCardsScroll} contentContainerStyle={styles.detailCardsContent} showsVerticalScrollIndicator={false}>
+                {rows.length === 0 ? (
+                    <View style={styles.emptyDetailsCard}>
+                        <Icon name="inbox" size={28} color="#94A3B8" />
+                        <Text style={styles.emptyDetailsText}>No details available</Text>
+                    </View>
+                ) : rows.map((item: any, index: number) => {
+                    const date = String(item.TRANDATE || item.NTRANDATE || '-');
+                    const voucherNo = item.VOUNO || item.TRANID || item.vouno || '-';
+                    const amount = item.CUMBAL ?? item.AMOUNT ?? 0;
+                    return (
+                        <View key={`${voucherNo}-${index}`} style={styles.detailVoucherCard}>
+                            <View style={styles.detailVoucherTopRow}>
+                                <View style={styles.detailVoucherDateBadge}>
+                                    <Text style={styles.detailVoucherDateDay}>{date.slice(0, 2) || '--'}</Text>
+                                    <Text style={styles.detailVoucherDateMonth}>{date.length >= 6 ? date.slice(3, 6) : 'DATE'}</Text>
+                                </View>
+                                <View style={styles.detailVoucherMain}>
+                                    <View style={styles.detailVoucherTitleRow}>
+                                        <Text style={styles.detailVoucherType}>{item.TYPE || (isOnAccount ? 'ON ACCOUNT' : 'PURC')}</Text>
+                                        <Text style={styles.detailVoucherNo}>{voucherNo}</Text>
+                                    </View>
+                                    <Text style={styles.detailVoucherDate}>{date}</Text>
+                                </View>
+                                <Icon name="chevron-right" size={21} color="#F97316" />
+                            </View>
+                            <View style={styles.detailVoucherInfoRow}>
+                                <View style={styles.detailVoucherInfoBox}>
+                                    <Text style={styles.detailVoucherInfoLabel}>{isOnAccount ? 'Cheque No.' : 'Balance'}</Text>
+                                    <Text style={styles.detailVoucherInfoValue}>{isOnAccount ? (item.chqno || '-') : `₹ ${formatAmount(amount)}`}</Text>
+                                </View>
+                                <View style={styles.detailVoucherInfoBox}>
+                                    <Text style={styles.detailVoucherInfoLabel}>{isOnAccount ? 'Cheque Date' : 'Due Days'}</Text>
+                                    <Text style={styles.detailVoucherInfoValue}>{isOnAccount ? (item.chqdate || '-') : (item.DUEDAY ?? item.dueday ?? 0)}</Text>
+                                </View>
+                                <View style={styles.detailVoucherInfoBox}>
+                                    <Text style={styles.detailVoucherInfoLabel}>{isOnAccount ? 'Clearing Date' : 'Cumulative'}</Text>
+                                    <Text style={styles.detailVoucherInfoValue}>{isOnAccount ? (item.clrdate || '-') : `₹ ${formatAmount(item.Cumulative ?? amount)}`}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    );
+                })}
+                <View style={styles.simpleDetailTotals}>
+                    <View style={styles.simpleDetailTotalItem}>
+                        <Text style={styles.simpleDetailTotalLabel}>Balance</Text>
+                        <Text style={styles.simpleDetailTotalValue}>₹ {formatAmount(totalBalance)}</Text>
+                    </View>
+                    <View style={styles.simpleDetailTotalDivider} />
+                    <View style={styles.simpleDetailTotalItem}>
+                        <Text style={styles.simpleDetailTotalLabel}>Cumulative</Text>
+                        <Text style={styles.simpleDetailTotalValue}>₹ {formatAmount(totalCumulative)}</Text>
+                    </View>
+                </View>
+            </ScrollView>
+        );
+    };
 
     const DetailTable = () => {
         // console.log("Filtered Details:", filteredDetails);
@@ -2148,14 +2470,6 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
 
 
-    const selectedCustomer: any = React.useMemo(
-        () => getOutSummary.find((i: any) => String(i.AccCode) === String(selectedAccCode)),
-        [getOutSummary, selectedAccCode]);
-    const cardPressRef = useRef<any>(null);
-    cardPressRef.current = onDashboardCardPress;
-    const stableCardPress = useCallback((c: any) => cardPressRef.current?.(c), []);
-    const openParty = useCallback((code: any) => { setSelectedAccCode(code); setCustomerSummaryVisible(true); }, []);
-    const summaryMode = getActiveCardDetails?.caption == 'On Account' ? 'onaccount' : getActiveCardDetails?.caption == 'Advance' ? 'advance' : 'summary';
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
     const closeDrawer123 = () => setSummaryDrawerVisible(false);
@@ -2207,9 +2521,8 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             )} */}
             <DashboardGrid
                 cards={filteredCards.length > 0 ? filteredCards : getOutCardData}
-                onCardPress={stableCardPress}
+                onCardPress={onDashboardCardPress}
                 activeSlab={activeCard}
-                loading={isLoading}
             />
             {/* <SummaryDrawer
                 visible={summaryDrawerVisible}
@@ -2252,34 +2565,13 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
                         {/* CONTENT */}
                         <View style={{ flex: 1, paddingHorizontal: 10, }}>
-                            <SummaryList data={filteredData} mode={summaryMode} onOpen={openParty} loading={isLoading} />
+                            {getActiveCardDetails?.caption == 'On Account' ? <SummaryCardList mode="onaccount" /> : getActiveCardDetails?.caption == 'Advance' ? <SummaryCardList mode="advance" /> : <SummaryCardList mode="summary" />}
                         </View>
 
                     </View>
                 </View>
             )}
-            {customerSummaryVisible && (
-                <View style={styles.detailOverlay}>
-                    <View style={styles.detailContainer}>
-                        <View style={styles.drawerHeader}>
-                            <TouchableOpacity style={styles.headerBackButton} onPress={() => { setCustomerSummaryVisible(false); setSummaryDrawerVisible(true); }}>
-                                <Icon name="arrow-back" size={26} color="#F97316" />
-                            </TouchableOpacity>
-                            <Text style={[styles.drawerTitle, { flex: 1, marginLeft: 10 }]}>Customer Summary</Text>
-                            <View style={styles.headerSpacer} />
-                        </View>
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            <CustomerSummaryBody
-                                customer={selectedCustomer}
-                                code={selectedAccCode}
-                                selected={selectedAgeingLabel}
-                                onSelect={setSelectedAgeingLabel}
-                                onViewDetails={() => { setCustomerSummaryVisible(false); setModalVisible(true); }}
-                            />
-                        </ScrollView>
-                    </View>
-                </View>
-            )}
+            {customerSummaryVisible && <CustomerSummaryView />}
             {/* <DetailModal /> */}
             {modalVisible && (
                 <View style={styles.detailOverlay123}>
@@ -2318,20 +2610,20 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.detailCustomerName} numberOfLines={1}>
-                                    {selectedCustomer?.AccName || 'Customer Details'}
+                                    {getOutSummary.find((item: any) => String(item.AccCode) === String(selectedAccCode))?.AccName || 'Customer Details'}
                                 </Text>
                                 <Text style={styles.detailCustomerMeta}>
                                     Code: {selectedAccCode || '-'}  |  Group: SUNDRY CREDITORS
                                 </Text>
                             </View>
                         </View>                        
-                        <View style={{ flex: 1 }}><VoucherList rows={filteredDetails} isOnAccount={getActiveCardDetails?.caption === 'On Account'} /></View>
+                        <DetailVoucherCards />
 
                     </View>
                 </View>
 
             )}
-            <DrawerLazy
+            <CustomDrawer
                 isVisible={isDrawerVisible}
                 onClose={closeDrawer}
                 fromDate={fromDate}

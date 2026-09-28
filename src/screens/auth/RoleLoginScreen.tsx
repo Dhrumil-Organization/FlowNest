@@ -19,36 +19,25 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
-  TouchableOpacity,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  AuthButton,
+  AuthField,
+  AuthShell,
+  CheckItem,
+  ChecklistBox,
+  PasswordToggle,
+} from '../../components/auth/AuthUI';
 import { performLogin } from '../../core/authFlow';
 import {
   getBiometricLabel,
   isBiometricSupported,
 } from '../../lib/biometricAuth';
 import { T } from '../../theme';
-
-const COLORS = {
-  background: '#F6F4F1',
-  dark: '#111111',
-  white: '#FFFFFF',
-  primary: '#C87516',
-  primaryDark: '#A35F0F',
-  border: '#ECECEC',
-  text: '#202020',
-  subText: '#707070',
-  success: '#2BA84A',
-};
 
 // ---------- Password Validation Types ----------
 type PasswordValidation = {
@@ -60,16 +49,7 @@ type PasswordValidation = {
 
 // ---------- Validation Item Component ----------
 const ValidationItem = ({ label, valid }: { label: string; valid: boolean }) => (
-  <View style={styles.validationRow}>
-    <Icon
-      name={valid ? "check-circle" : "cancel"}
-      size={18}
-      color={valid ? COLORS.success : "red"}
-    />
-    <Text style={[styles.validationText, { color: valid ? COLORS.success : "red" }]}>
-      {label}
-    </Text>
-  </View>
+  <CheckItem label={label} valid={valid} pendingIcon="cancel" />
 );
 
 export function RoleLoginScreen() {
@@ -255,335 +235,162 @@ export function RoleLoginScreen() {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        // paddingBottom: 40
-      }}
+    <AuthShell
+      eyebrow="NEW ERP SYSTEM"
+      title="Sign in"
+      subtitle="Username and password only. Year, property, group and store are derived automatically from your ERP user defaults."
+      onBack={goBack}
+      brandTitle="Welcome to the New ERP"
+      brandSubtitle="Login creates your business context and permission context for every screen you open."
+      highlights={[
+        { icon: 'verified-user', title: 'Secure ERP session', desc: 'Role-based permissions applied to every module.' },
+        { icon: 'apartment', title: 'Property aware', desc: 'Connects to the property you selected in the previous step.' },
+        { icon: 'fingerprint', title: 'Remember me', desc: 'Sign in faster next time with your device screen lock.' },
+      ]}
     >
-      <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView
-          style={styles.wrap}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.hero}>
-            <View style={styles.topRow}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={goBack}
-                style={styles.backButton}
-              >
-                <Icon
-                  name="arrow-back-ios-new"
-                  size={18}
-                  color={COLORS.white}
-                />
+      <View style={styles.contextCard}>
+        <View style={styles.contextIcon}>
+          <Icon name="shield" size={18} color={T.copper} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.contextLabel}>MOBILE PLATFORM CORE</Text>
+          <Text style={styles.contextTitle}>Secure ERP session</Text>
+          <Text style={styles.contextSub}>
+            Login creates business context + permission context for every screen.
+          </Text>
+        </View>
+      </View>
 
-                <Text style={styles.backText}>Back</Text>
-              </TouchableOpacity>
+      <AuthField
+        label="USERNAME"
+        icon="person-outline"
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
+        importantForAutofill="no"
+        placeholder="Enter username"
+      />
 
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                style={styles.brand}
-              >
-                MADHUSUDHAN FABRICS
-              </Text>
+      <AuthField
+        label="PASSWORD"
+        icon="lock-outline"
+        value={password}
+        onChangeText={handlePasswordChange}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="oneTimeCode"
+        importantForAutofill="noExcludeDescendants"
+        secureTextEntry={!showPassword}
+        placeholder="Enter password"
+        onSubmitEditing={handleLogin}
+        right={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />}
+      />
 
-              <View style={{ width: 70 }} />
-            </View>
+      {/* ---------- Live Password Validation ---------- */}
+      <ChecklistBox>
+        <ValidationItem label="Minimum 8 characters" valid={validation.minLength} />
+        <ValidationItem label="1 uppercase letter" valid={validation.hasUppercase} />
+        <ValidationItem label="1 special character" valid={validation.hasSpecialChar} />
+        <ValidationItem label="1 number" valid={validation.hasNumber} />
+      </ChecklistBox>
 
-            <Text style={styles.title}>Sign in</Text>
+      <AuthButton
+        label="Login"
+        icon="arrow-forward"
+        onPress={handleLogin}
+        disabled={!canSubmit}
+        loading={loading}
+        style={{ marginTop: 18 }}
+      />
 
-            <Text style={styles.sub}>
-              Username and password only. Year, property, group and store
-              are derived automatically from your ERP user defaults.
+      {bioSupported && (
+        <View style={styles.bioBox}>
+          <View style={styles.bioIconWrap}>
+            <Icon name="fingerprint" size={20} color={T.copper} />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bioTitle}>Remember me</Text>
+
+            <Text style={styles.bioSub}>
+              We&apos;ll confirm with your {bioLabel} and save this
+              login for next time.
             </Text>
           </View>
 
-          <View style={styles.panel}>
-            <View style={styles.contextCard}>
-              <Text style={styles.contextLabel}>
-                MOBILE PLATFORM CORE
-              </Text>
-
-              <Text style={styles.contextTitle}>
-                Secure ERP session
-              </Text>
-
-              <Text style={styles.contextSub}>
-                Login creates business context + permission context for
-                every screen.
-              </Text>
-            </View>
-
-            <Text style={styles.label}>USERNAME</Text>
-
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              placeholder="Enter username"
-              placeholderTextColor={T.muted}
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>PASSWORD</Text>
-
-            <View style={styles.passwordRow}>
-              <TextInput
-                value={password}
-                onChangeText={handlePasswordChange}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                textContentType="oneTimeCode"
-                importantForAutofill="noExcludeDescendants"
-                secureTextEntry={!showPassword}
-                placeholder="Enter password"
-                placeholderTextColor={T.muted}
-                style={[styles.input, styles.passwordInput]}
-              />
-
-              <TouchableOpacity
-                onPress={() => setShowPassword((value) => !value)}
-                style={styles.eyeBtn}
-              >
-                <Text style={styles.eyeText}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* ---------- Live Password Validation ---------- */}
-            <View style={styles.validationContainer}>
-              <ValidationItem label="Minimum 8 characters" valid={validation.minLength} />
-              <ValidationItem label="At least 1 uppercase letter" valid={validation.hasUppercase} />
-              <ValidationItem label="At least 1 special character" valid={validation.hasSpecialChar} />
-              <ValidationItem label="At least 1 number" valid={validation.hasNumber} />
-            </View>
-
-            <TouchableOpacity
-              onPress={handleLogin}
-              disabled={!canSubmit}
-              activeOpacity={0.85}
-              style={[
-                styles.loginBtn,
-                !canSubmit && styles.loginBtnDisabled,
-              ]}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.loginText}>Login</Text>
-              )}
-            </TouchableOpacity>
-
-            {bioSupported && (
-              <View style={styles.bioBox}>
-                <Text style={styles.bioIcon}>◉</Text>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bioTitle}>Remember me</Text>
-
-                  <Text style={styles.bioSub}>
-                    We&apos;ll confirm with your {bioLabel} and save this
-                    login for next time.
-                  </Text>
-                </View>
-
-                <Switch
-                  value={rememberMe}
-                  onValueChange={setRememberMe}
-                  trackColor={{ true: T.copper }}
-                />
-              </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ScrollView>
+          <Switch
+            value={rememberMe}
+            onValueChange={setRememberMe}
+            trackColor={{ true: T.copper }}
+          />
+        </View>
+      )}
+    </AuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: T.nav,
-  },
-  wrap: {
-    flex: 1,
-  },
-  hero: {
-    paddingHorizontal: 24,
-    paddingTop: 34,
-    paddingBottom: 26,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  backButton: {
-    width: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  brand: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#B6B6B6',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 2,
-    paddingHorizontal: 10,
-  },
-  title: {
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  sub: {
-    fontSize: 13,
-    color: '#A9C0D4',
-    lineHeight: 19,
-    maxWidth: 340,
-  },
-  panel: {
-    flex: 1,
-    backgroundColor: T.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 18,
-    paddingTop: 20,
-  },
   contextCard: {
-    backgroundColor: T.surface,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: T.sub,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: T.border,
-    padding: 16,
+    padding: 14,
     marginBottom: 18,
+  },
+  contextIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   contextLabel: {
     fontSize: 10,
     color: T.copper,
     fontWeight: '900',
     letterSpacing: 0.8,
-    marginBottom: 5,
+    marginBottom: 3,
   },
   contextTitle: {
-    fontSize: 18,
+    fontSize: 15,
     color: T.ink,
     fontWeight: '900',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   contextSub: {
     fontSize: 12,
     color: T.muted,
     lineHeight: 17,
   },
-  label: {
-    fontSize: 10,
-    color: T.muted,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    marginTop: 12,
-    marginBottom: 7,
-  },
-  input: {
-    backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: T.ink,
-  },
-  passwordRow: {
-    position: 'relative',
-  },
-  passwordInput: {
-    paddingRight: 70,
-  },
-  eyeBtn: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  eyeText: {
-    color: T.copper,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  // ----- Password validation styles -----
-  validationContainer: {
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  validationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 2,
-  },
-  validationText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  loginBtn: {
-    marginTop: 22,
-    height: 52,
-    borderRadius: 15,
-    backgroundColor: T.copper,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: T.copper,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-  },
-  loginBtnDisabled: {
-    opacity: 0.45,
-  },
-  loginText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
   bioBox: {
     flexDirection: 'row',
     gap: 12,
     alignItems: 'center',
-    backgroundColor: T.sub,
+    backgroundColor: T.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: T.border,
     padding: 13,
     marginTop: 16,
   },
-  bioIcon: {
-    color: T.copper,
-    fontSize: 22,
-    fontWeight: '900',
+  bioIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: T.sub,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bioTitle: {
     color: T.ink,

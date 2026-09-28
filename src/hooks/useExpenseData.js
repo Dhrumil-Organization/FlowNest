@@ -43,6 +43,7 @@ import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { fetchExpenseDashboardCard } from '@/src/services/Dashboard/expenseDashboardApi';
 // ── Financial Year Helper ────────────────────────────────────────
 // calMonth: 0-indexed JS Date month (0=Jan ... 11=Dec)
 // April (3) onwards belongs to the NEW financial year
@@ -427,63 +428,117 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
   // ── Fire single month request ──
   const fetchMonth = useCallback(
     async ({ yearno, monthno, key }) => {
-
-      const userPtype = await AsyncStorage.getItem('user_prptype');
-
-      console.log("yearno", yearno, monthno)
-      const payload = {
-        prptype: 'S',
-        // prptype: userPtype,
-        yearno,
-        monthno,
-        action: 'excel',
-        txntype,
-      };
-
-      console.log('API Payload =>', payload);
-
-      axios.post(
-        `${apiBase}/api/exp_costing_crud`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          timeout: 60000,
-        }
-      )
-        .then((res) => {
-          const filedata = res.data?.data?.filedata;
-          const data = filedata ? parseXlsxBase64(filedata) : null;
-
-          console.log("filedata", filedata);
-          console.log("data", data);
-
-          // Only update THIS month — others are unaffected
-          setStates((prev) => ({
-            ...prev,
-            [key]: {
-              status: data ? 'done' : 'error',
-              data,
-              error: data ? null : 'Could not parse response',
-            },
-          }));
-        })
-        .catch((err) => {
-          const msg =
-            err?.response?.data?.message ||
-            err?.message ||
-            'Network error';
-
-          setStates((prev) => ({
-            ...prev,
-            [key]: { status: 'error', data: null, error: msg },
-          }));
+      try {
+        const userPtype = (await AsyncStorage.getItem('user_prptype')) || 'S';
+        const payload = await fetchExpenseDashboardCard({
+          token,
+          prptype: userPtype,
+          yearno,
+          monthno,
         });
+
+        const r = payload.division?.rapier || {};
+        const w = payload.division?.waterjet || {};
+        const utilityRows = payload.utilities?.rate_rows || [];
+        const util = Object.fromEntries(utilityRows.map(x => [x.key, x]));
+        const expenseDaily = payload.trends?.expense_daily || [];
+        const utilityDaily = payload.trends?.utility_daily || [];
+        const electricityDaily = payload.trends?.electricity_daily || [];
+        const prodDaily = payload.production?.daily_trend || [];
+        const byDate = Object.fromEntries(expenseDaily.map(x => [Number(x.date_ymd), x]));
+
+        const daily = prodDaily.map(row => {
+          const t = byDate[Number(row.date_ymd)] || {};
+          const ymd = String(row.date_ymd || '');
+          const date = ymd.length === 8
+            ? `${ymd.slice(6,8)}-${new Date(Number(ymd.slice(0,4)), Number(ymd.slice(4,6))-1, 1).toLocaleString('en-US',{month:'short'})}`
+            : String(row.day || '');
+          return {
+            date,
+            date_ymd: Number(row.date_ymd || 0),
+            mw_looms: 0, mw_luwa: 0, sd_looms: 0, sd_luwa: 0, wj_looms: 0, warping: 0, misc: 0,
+            total_kwh: 0,
+            sal_r: 0, sal_w: 0, sal_t: Number(t.salary || 0),
+            prod_mw: Number(row.mw_rapier_mtr || 0),
+            prod_sud: Number(row.sip_rapier_mtr || 0),
+            prod_wj: Number(row.waterjet_mtr || 0),
+            prod_tot: Number(row.combined_mtr || 0),
+          };
+        });
+
+        const data = {
+          unit_rate: Number(payload.summary?.unit_rate || 0),
+          days: Number(payload.period?.working_days || 0),
+          total: Number(payload.summary?.total_cost || 0),
+          cpp_total: Number(payload.summary?.cost_per_pick || 0),
+          avg_pick_mw: Number(r.avg_picks || 0),
+          avg_pick_wjet: Number(w.avg_picks || 0),
+          avg_pick_tot: Number(payload.summary?.avg_picks || 0),
+          cpmc: Number(payload.summary?.cost_per_machine_day || 0),
+          cpmc_rapier: 0,
+          cpmc_wjet: 0,
+          rapier_pct: payload.summary?.total_cost > 0 ? Number(r.total_cost || 0) / Number(payload.summary.total_cost) * 100 : 0,
+          wjet_pct: payload.summary?.total_cost > 0 ? Number(w.total_cost || 0) / Number(payload.summary.total_cost) * 100 : 0,
+          cpp_rapier: Number(r.cost_per_pick || 0),
+          cpp_wjet: Number(w.cost_per_pick || 0),
+          total_rapier: Number(r.total_cost || 0),
+          total_wjet: Number(w.total_cost || 0),
+          per_mtr: payload.summary?.production_mtr > 0 ? Number(payload.summary.total_cost || 0) / Number(payload.summary.production_mtr) : 0,
+
+          kwh_total: Number(payload.utilities?.total_kwh || payload.summary?.units || 0),
+          kwh_mw_looms: Number(util.mw_rapier_looms?.kwh || 0),
+          kwh_mw_luwa: Number(util.mw_rapier_luwa?.kwh || 0),
+          kwh_sd_looms: Number(util.sip_rapier_looms?.kwh || 0),
+          kwh_sd_luwa: Number(util.sip_rapier_luwa?.kwh || 0),
+          kwh_wj_looms: Number(util.sip_waterjet_looms?.kwh || 0),
+          kwh_warping: Number(util.warping_shared?.kwh || 0),
+          kwh_misc: Number(util.misc_shared?.kwh || 0),
+
+          elec_total: Number(payload.composition?.electricity || 0),
+          elec_mw_looms: Number(util.mw_rapier_looms?.amount || 0),
+          elec_mw_luwa: Number(util.mw_rapier_luwa?.amount || 0),
+          elec_sd_looms: Number(util.sip_rapier_looms?.amount || 0),
+          elec_sd_luwa: Number(util.sip_rapier_luwa?.amount || 0),
+          elec_wj_looms: Number(util.sip_waterjet_looms?.amount || 0),
+          elec_warping: Number(util.warping_shared?.amount || 0),
+          elec_misc: Number(util.misc_shared?.amount || 0),
+          elec_rapier: Number(r.electricity || 0),
+          elec_wjet: Number(w.electricity || 0),
+
+          sal_rapier: Number(r.salary || 0),
+          sal_wjet: Number(w.salary || 0),
+          sal_total: Number(payload.composition?.salary || 0),
+          store_total: Number(payload.composition?.stores || 0),
+          store_rapier: Number(r.stores || 0),
+          store_wjet: Number(w.stores || 0),
+
+          prod_mw: Number(payload.production?.mw_rapier_mtr || 0),
+          prod_sud: Number(payload.production?.sip_rapier_mtr || 0),
+          prod_rapier: Number(payload.production?.rapier_total_mtr || 0),
+          prod_wjet: Number(payload.production?.sip_waterjet_mtr || 0),
+          prod_total: Number(payload.production?.total_mtr || 0),
+          prod_total_L: Number(payload.production?.total_mtr || 0) / 1e5,
+          utility_rates: utilityRows,
+          units_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.summary?.units || 0) / Number(payload.production.total_mtr) : 0,
+          sal_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.composition?.salary || 0) / Number(payload.production.total_mtr) : 0,
+          store_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.composition?.stores || 0) / Number(payload.production.total_mtr) : 0,
+          daily,
+          coverage_daily: daily,
+          expense_daily_trend: expenseDaily,
+          utility_daily_trend: utilityDaily,
+          electricity_daily: electricityDaily,
+          trend_meta: payload.trends || {},
+          conversion_rates: payload.conversion_rates || null,
+          coverage: payload.period,
+        };
+
+        setStates(prev => ({ ...prev, [key]: { status: 'done', data, error: null } }));
+      } catch (err) {
+        const msg = err?.message || 'Network error';
+        setStates(prev => ({ ...prev, [key]: { status: 'error', data: null, error: msg } }));
+      }
     },
-    [apiBase, token, txntype]
+    [token]
   );
 
   // ── Fire all 6 in parallel ──

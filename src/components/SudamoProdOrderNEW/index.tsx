@@ -144,6 +144,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     const [showWebViewModal, setShowWebViewModal] = useState(false);
     const [webViewUrl, setWebViewUrl] = useState('');
     const [costingPreviewMdId, setCostingPreviewMdId] = useState('');
+    const [costingPreviewId, setCostingPreviewId] = useState('');
     const [showCostingPreview, setShowCostingPreview] = useState(false);
     // const [historyDataSPO, setHistoryDataSPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingSPO] = useState(false);
@@ -155,8 +156,17 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
         const source = String(item?.design_costing_source || '').trim().toUpperCase();
         const mdId = String(item?.md_id || '').trim();
         if (source === 'NEW') {
-            if (!mdId) { AppAlert.alert('Costing unavailable', 'New design costing reference is missing.'); return; }
+            const costingId = String(item?.design_costing_id || '').trim();
+            if (!mdId) {
+                AppAlert.alert('Costing unavailable', 'New design costing reference is missing.');
+                return;
+            }
+            if (!costingId) {
+                AppAlert.alert('Costing unavailable', 'No saved costing is available for this design.');
+                return;
+            }
             setCostingPreviewMdId(mdId);
+            setCostingPreviewId(costingId);
             setShowCostingPreview(true);
             return;
         }
@@ -1887,7 +1897,12 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     <ProductionCostingPreviewModal
                 visible={showCostingPreview}
                 mdId={costingPreviewMdId}
-                onClose={() => { setShowCostingPreview(false); setCostingPreviewMdId(''); }}
+                costingId={costingPreviewId}
+                onClose={() => {
+                    setShowCostingPreview(false);
+                    setCostingPreviewMdId('');
+                    setCostingPreviewId('');
+                }}
             />
 </>
     );

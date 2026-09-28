@@ -24,7 +24,7 @@ interface Props {
     duration?: number;
 }
 
-const Receivables: React.FC<Props> = ({ token, username }) => {
+const ReceivablesNew: React.FC<Props> = ({ token, username }) => {
     console.log("Token received in Receivables:", token);
     const [isLoading, setIsLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
@@ -2909,4 +2909,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default Receivables;
+export default ReceivablesNew;

@@ -1,3 +1,4 @@
+
 export const PermissionKeys = {
   management: {
     dashboard: 'dashboard',
@@ -27,6 +28,7 @@ export const PermissionKeys = {
     production: 'production',
     productionOrderTracking: 'production.production_order_tracking',
     payable: 'production.payable',
+    // receivables: 'production.receivables',
     sudamoProductionOrder: 'production.sudamo_production_order',
     creditLimitRequest: 'production.credit_limit_request',
   },

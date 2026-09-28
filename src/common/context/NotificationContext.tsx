@@ -139,7 +139,7 @@ export function NotificationProvider({
     const LEGACY_HOME_APPS: readonly { name: string; route: string }[] = [
         { name: 'Credit Limit Request', route: 'credit-limit' },
         { name: 'Outstanding Days Request', route: 'outstanding-days-request' },
-        { name: 'Receivables', route: 'receivables' },
+        { name: 'Receivables', route: 'Receivables-Screen' },
         { name: 'Collection', route: 'Collection' },
         { name: 'Yarn Purchase Order', route: 'yarn-purchase-order' },
         { name: 'Production Order Tracking', route: 'production-order-tracking' },

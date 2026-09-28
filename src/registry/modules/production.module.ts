@@ -440,6 +440,6 @@ registerUiNodes([
     permission: 'production.payable',
     action: 'view',
     order: 110,
-  }
+  },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

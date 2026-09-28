@@ -34,7 +34,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
-import DyeingMasterTab, { type DyeingMasterApi } from './DyeingMasterTab';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -998,7 +997,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                     <View style={yp.header}>
                         {stage === 'items' ? (
                             <TouchableOpacity
-                            onPress={goBackToMain}
+                                onPress={goBackToMain}
                                 style={yp.backBtn}
                             >
                                 <Text style={yp.backTxt}>‹ Main Yarn</Text>
@@ -1997,7 +1996,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             sys: y.sys,
             cnt: y.cnt,
             base_price: y.price,
-            blend_ratio: (y as any).blend_ratio || null,// Preserve authoritative ERP fibre metadata from Yarn Help.
+            blend_ratio: (y as any).blend_ratio || null,
+
+            // Preserve authoritative ERP fibre metadata from Yarn Help.
             fibre: (y as any).fibre || null,
             fibre_composition: Array.isArray((y as any).fibre_composition)
                 ? (y as any).fibre_composition
@@ -2665,23 +2666,7 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
     );
 }
 
-type Shade = {
-    key: string;
-    source: 'dyeing' | 'legacy';
-    mapping_id?: string | null;
-    shd_code: number;
-    shd_name: string;
-    color_name: string;
-    hex: string;
-    shade_no: string;
-    colour_id?: string | null;
-    colour_code?: string | null;
-    colour_name?: string | null;
-    party_acc_code?: string | null;
-    party_name?: string | null;
-    party_shade_no?: string | null;
-    legacy: boolean;
-};
+type Shade = { color_name: string; hex: string; shade_no?: string };
 type ShadeBand = Shade & { mi_id: string; blend_ratio?: string | null; thread_count: number };
 
 function ShadePickerModal({ visible, onSelect, onClose }: {
@@ -2692,109 +2677,43 @@ function ShadePickerModal({ visible, onSelect, onClose }: {
     const { prpcode, strcode, yearno } = useERP();
     const [search, setSearch] = useState('');
     const [rows, setRows] = useState<Shade[]>([]);
-    const [loading, setLoading] = useState(false);
-    const requestSeq = useRef(0);
+    const [name, setName] = useState('');
+    const [shadeNo, setShadeNo] = useState('');
+    const [hex, setHex] = useState('#808080');
 
     useEffect(() => {
-        if (!visible) {
-            setSearch('');
-            setRows([]);
-            setLoading(false);
-            return;
-        }
+        if (!visible) return;
+        client.get('/design-options', { params: { prpcode, strcode, yearno } })
+            .then(r => setRows(r.data?.data?.shades || []))
+            .catch(() => setRows([]));
+    }, [visible, prpcode, strcode, yearno]);
 
-        const seq = ++requestSeq.current;
-        const timer = setTimeout(() => {
-            setLoading(true);
-            client.get('/design-dyeing/shade-options', {
-                params: { prpcode, strcode, yearno, search: search.trim() },
-            })
-                .then(r => {
-                    if (seq !== requestSeq.current) return;
-                    const data = Array.isArray(r.data?.data) ? r.data.data : [];
-                    setRows(data.map((x: any): Shade => {
-                        const shdCode = Number(x.shd_code || 0);
-                        const isLegacy = Boolean(x.legacy) || x.source === 'legacy';
-                        const logicalName = String(x.colour_name || x.shd_name || `ERP ${shdCode}`).trim();
-                        return {
-                            key: String(x.key || `${isLegacy ? 'L' : 'D'}:${x.mapping_id || shdCode}`),
-                            source: isLegacy ? 'legacy' : 'dyeing',
-                            mapping_id: x.mapping_id ? String(x.mapping_id) : null,
-                            shd_code: shdCode,
-                            shd_name: String(x.shd_name || logicalName).trim(),
-                            color_name: logicalName,
-                            hex: /^#[0-9A-Fa-f]{6}$/.test(String(x.hex || '')) ? String(x.hex) : '#808080',
-                            shade_no: String(shdCode),
-                            colour_id: x.colour_id ? String(x.colour_id) : null,
-                            colour_code: x.colour_code ? String(x.colour_code) : null,
-                            colour_name: x.colour_name ? String(x.colour_name) : null,
-                            party_acc_code: x.party_acc_code ? String(x.party_acc_code) : null,
-                            party_name: x.party_name ? String(x.party_name) : null,
-                            party_shade_no: x.party_shade_no ? String(x.party_shade_no) : null,
-                            legacy: isLegacy,
-                        };
-                    }).filter((x: Shade) => x.shd_code > 0));
-                })
-                .catch(() => {
-                    if (seq === requestSeq.current) setRows([]);
-                })
-                .finally(() => {
-                    if (seq === requestSeq.current) setLoading(false);
-                });
-        }, 250);
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return !q ? rows : rows.filter(x => `${x.color_name} ${x.shade_no || ''}`.toLowerCase().includes(q));
+    }, [rows, search]);
 
-        return () => clearTimeout(timer);
-    }, [visible, search, prpcode, strcode, yearno]);
+    const addManual = () => {
+        if (!name.trim()) { AppAlert.alert('Shade name required'); return; }
+        onSelect({ color_name: name.trim(), shade_no: shadeNo.trim() || name.trim(), hex: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : '#808080' });
+        onClose();
+    };
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
             <View style={yp.overlay}><View style={yp.sheet}>
                 <View style={yp.handle} />
-                <View style={yp.header}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={yp.title}>Select dyed shade</Text>
-                        <Text style={yp.yarnSub}>Dyeing master + existing ERP shades</Text>
-                    </View>
-                    <TouchableOpacity onPress={onClose}><Text style={yp.closeTxt}>✕</Text></TouchableOpacity>
-                </View>
-                <View style={yp.searchWrap}>
-                    <TextInput
-                        value={search}
-                        onChangeText={setSearch}
-                        placeholder="Search colour, ERP shade, party or party shade no..."
-                        placeholderTextColor={T.muted}
-                        style={yp.search}
-                        autoFocus
-                    />
+                <View style={yp.header}><Text style={yp.title}>Select or Add Shade</Text><TouchableOpacity onPress={onClose}><Text style={yp.closeTxt}>✕</Text></TouchableOpacity></View>
+                <View style={yp.searchWrap}><TextInput value={search} onChangeText={setSearch} placeholder="Search saved shades..." placeholderTextColor={T.muted} style={yp.search} /></View>
+                <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: T.border }}>
+                    <TextInput value={name} onChangeText={setName} placeholder="Shade name" placeholderTextColor={T.muted} style={yp.search} />
+                    <TextInput value={shadeNo} onChangeText={setShadeNo} placeholder="Shade number/code (optional)" placeholderTextColor={T.muted} style={[yp.search, { marginTop: 8 }]} />
+                    <TextInput value={hex} onChangeText={setHex} placeholder="#RRGGBB" autoCapitalize="none" style={[yp.search, { marginTop: 8 }]} />
+                    <TouchableOpacity onPress={addManual} style={{ backgroundColor: T.copper, borderRadius: 8, padding: 10, alignItems: 'center', marginTop: 8 }}><Text style={{ color: '#fff', fontWeight: '800' }}>Use This Shade</Text></TouchableOpacity>
                 </View>
                 <View style={yp.listFrame}>
-                    {loading ? (
-                        <ActivityIndicator color={T.copper} style={{ padding: 24 }} />
-                    ) : (
-                        <FlatList
-                            data={rows}
-                            keyExtractor={x => x.key}
-                            keyboardShouldPersistTaps="handled"
-                            ListEmptyComponent={<Text style={[yp.yarnSub, { padding: 18, textAlign: 'center' }]}>No matching ERP shade found.</Text>}
-                            renderItem={({ item }) => {
-                                const detail = item.legacy
-                                    ? `ERP ${item.shd_code} · Legacy / no party mapping`
-                                    : `${item.party_name || item.party_acc_code || 'Job Work Party'}${item.party_shade_no ? ` · ${item.party_shade_no}` : ''} · ERP ${item.shd_code}`;
-                                return (
-                                    <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: item.hex, borderWidth: 1, borderColor: T.border }} />
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={yp.yarnName}>{item.colour_name || item.shd_name}</Text>
-                                                {!item.legacy && item.shd_name !== item.colour_name ? <Text style={yp.yarnSub}>{item.shd_name}</Text> : null}
-                                                <Text style={yp.yarnSub}>{detail}</Text>
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            }}
-                        />
-                    )}
+                    <FlatList data={filtered} keyExtractor={(x, i) => `${x.color_name}-${x.shade_no || ''}-${i}`}
+                        renderItem={({ item }) => <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: item.hex || '#808080', borderWidth: 1, borderColor: T.border }} /><View><Text style={yp.yarnName}>{item.color_name}</Text><Text style={yp.yarnSub}>{item.shade_no || ''}</Text></View></View></TouchableOpacity>} />
                 </View>
             </View></View>
         </Modal>
@@ -2903,19 +2822,8 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     const save = async () => {
         if (!baseDesign) { AppAlert.alert('Main Design required'); return; }
         if (!subCode.trim()) { AppAlert.alert('Sub Design code required'); return; }
-        if (baseDesign.type === 'YD') {
-            const missingWarp = warpYarns.some((y: any, i: number) => {
-                const key = `${y.mi_id}|${y.blend_ratio ?? ''}|${i}`;
-                return (warpBands[key] || []).length === 0;
-            });
-            const missingWeft = weftYarns.some((y: any, i: number) => {
-                const key = `${y.mi_id}|${y.blend_ratio ?? ''}|${i}`;
-                return (weftBands[key] || []).length === 0;
-            });
-            if (missingWarp || missingWeft) {
-                AppAlert.alert('Shade required', 'Assign at least one dyed shade to every Warp and Weft yarn before saving.');
-                return;
-            }
+        if (baseDesign.type === 'YD' && allWarp.length === 0 && allWeft.length === 0) {
+            AppAlert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
         }
         if (baseDesign.type === 'PD' && !commercialName.trim()) {
             AppAlert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
@@ -2925,11 +2833,11 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
         try {
             const toColors = (rows: ShadeBand[]) => rows.map(r => ({
                 mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
-                shade: String(r.shd_code), color_name: r.shd_name || r.color_name, hex: r.hex,
+                shade: r.shade_no ?? r.color_name, color_name: r.color_name, hex: r.hex,
             }));
             const toPatterns = (rows: ShadeBand[]) => rows.map(r => ({
                 mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
-                shade: String(r.shd_code), color_name: r.shd_name || r.color_name, hex: r.hex,
+                shade: r.shade_no ?? r.color_name, color_name: r.color_name, hex: r.hex,
                 thread_count: r.thread_count,
             }));
 
@@ -3087,7 +2995,9 @@ const cw3 = StyleSheet.create({
     pdPreviewText: { color: T.muted, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
     save: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
     saveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-});// Design Picker Modal (Isolated for AliasesTab)
+});
+
+// Design Picker Modal (Isolated for AliasesTab)
 // function AliasesDesignPickerModal({
 //     visible,
 //     onSelect,
@@ -4086,7 +3996,8 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
                 <ActivityIndicator size="large" color="#6200ee" style={mst.loader} />
             ) : filteredRows.length === 0 ? (
                 <Text style={mst.emptyText}>No executives found for this period.</Text>
-            ) : (<FlatList
+            ) : (
+                <FlatList
                     data={filteredRows}
                     keyExtractor={(item) => item.id}
                     renderItem={renderRow}
@@ -5084,7 +4995,9 @@ const styles = StyleSheet.create({
 
 function YarnsTab() {
     const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = useERP();
-    const { width: screenWidth } = useWindowDimensions();type YarnItem = any;
+    const { width: screenWidth } = useWindowDimensions();
+
+    type YarnItem = any;
     type Option = { id: string | number; name?: string;[key: string]: any };
     type PartyOption = { acccode: string; accountname: string;[key: string]: any };
 
@@ -6083,7 +5996,8 @@ function YarnsTab() {
                 <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
                 <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || '-'}</Text></View>
             </View>
-            <View style={ym2.cardActions}><TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
+            <View style={ym2.cardActions}>
+                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
                     <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'MAIN')}>
@@ -6897,50 +6811,7 @@ export function DesignsScreen() {
         setCatalogRefreshKey(v => v + 1);
         openTab('Catalog');
     };
-    // Dyeing Master uses the shared authenticated client directly.
-    // This deliberately does NOT add unverified methods to DesignAPI, which
-    // keeps the existing client_fix_design.ts contract untouched.
-    // useMemo is important here: a new adapter object on every render would
-    // retrigger DyeingMasterTab's load effect continuously.
-    const dyeingMasterApi = useMemo<DyeingMasterApi>(() => ({
-        listColours: async () => {
-            const response = await client.get('/design-dyeing/colours', {
-                params: {
-                    prpcode: context.prpcode,
-                    strcode: context.strcode,
-                    yearno: context.yearno,
-                },
-            });
-            return response.data?.data ?? [];
-        },
 
-        searchJobWorkParties: async (search: string) => {
-            const response = await client.get('/design-dyeing/job-work-parties', {
-                params: {
-                    prpcode: context.prpcode,
-                    strcode: context.strcode,
-                    yearno: context.yearno,
-                    search: search.trim(),
-                },
-            });
-
-            const rows = response.data?.data ?? [];
-            return rows.map((x: any) => ({
-                acc_code: String(x.acc_code ?? x.AccCode ?? '').trim(),
-                name: String(x.name ?? x.AccName ?? x.accountname ?? '').trim(),
-                short_name: x.short_name ?? x.ShtName ?? null,
-            })).filter((x: any) => x.acc_code !== '' && x.name !== '');
-        },
-
-        saveColour: async (payload) => {
-            return client.post('/design-dyeing/colours', {
-                ...payload,
-                prpcode: context.prpcode,
-                strcode: context.strcode,
-                yearno: context.yearno,
-            });
-        },
-    }), [context.prpcode, context.strcode, context.yearno]);
     return (
         <ERPContext.Provider value={context}>
             <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -6971,9 +6842,7 @@ export function DesignsScreen() {
                                 />
                             )}
                             {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
-                            {tab === 'Dyeing' && canAccess('designs.dyeing') && (
-                                <DyeingMasterTab api={dyeingMasterApi} />
-                            )}
+                            {tab === 'Dyeing' && canAccess('designs.dyeing') && <DyeingTab design={detailDesign} />}
                         </View>
                     </>
                 ) : (

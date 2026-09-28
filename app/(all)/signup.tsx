@@ -1,22 +1,26 @@
-import AppAlert from '@/common/utils/appAlert';
 import { initAPI } from '@/common/API/dynamicAPI';
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import { theme } from '../../components/theme';
+import {
+  AuthButton,
+  AuthField,
+  AuthShell,
+  CheckItem,
+  ChecklistBox,
+  FieldTone,
+  PasswordToggle,
+} from '../../src/components/auth/AuthUI';
+import { T } from '../../src/theme';
 
 type FieldStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
@@ -366,443 +370,217 @@ export default function Signup() {
   const getStatusIcon = (status: FieldStatus) => {
     switch (status) {
       case 'checking':
-        return <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />;
+        return <ActivityIndicator size="small" color={T.copper} />;
       case 'available':
-        return <Icon name="check-circle" size={20} color="#2E7D32" />;
+        return <Icon name="check-circle" size={20} color={T.green} />;
       case 'taken':
-        return <Icon name="cancel" size={20} color="#D32F2F" />;
+        return <Icon name="cancel" size={20} color={T.red} />;
       case 'invalid':
-        return <Icon name="error-outline" size={20} color="#FFA726" />;
+        return <Icon name="error-outline" size={20} color={T.amber} />;
       default:
         return null;
     }
   };
+
+  const statusTone = (status: FieldStatus): FieldTone =>
+    status === 'available' ? 'success' : status === 'taken' ? 'error' : status === 'invalid' ? 'warning' : 'default';
 
    const goBack = () => {
         if (router.canGoBack()) router.back();
         else router.replace('/');
     };
 
+  const confirmTone: FieldTone =
+    confirmPassword.length === 0 ? 'default' : password === confirmPassword ? 'success' : 'error';
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.NEUTRAL_BG }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <AuthShell
+      eyebrow="SIGN UP"
+      title="Create your account"
+      subtitle="Start managing your textile business smarter. Fill in your details to get started."
+      onBack={goBack}
+      brandTitle="Join FlowNest Textile ERP"
+      brandSubtitle="Create your account to access production, collections, receivables and sales analysis from any device."
+      highlights={[
+        { icon: 'alternate-email', title: 'Pick a unique username', desc: 'Availability is checked live as you type.' },
+        { icon: 'lock-outline', title: 'Strong password', desc: '8+ characters with upper, lower, number and symbol.' },
+        { icon: 'login', title: 'Sign in right after', desc: 'You will be taken to the login screen once created.' },
+      ]}
+      maxWidth={560}
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* 🔥 HERO SECTION */}
-        <LinearGradient
-          colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-          style={styles.hero}
-        >
-          <TouchableOpacity
-            // onPress={() => router.replace('/(auth)/login')}
-            onPress={goBack}
-            style={styles.backBtn}
-          >
-            <Icon name="arrow-back" size={22} color="#fff" />
-            {/* <Text style={styles.backText}>Back to Login</Text> */}
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-
-          {/* <View style={styles.logoRow}>
-            <Image source={logo} style={styles.logo} />
-            <Text style={styles.brandName}>FlowNest</Text>
-          </View> */}
-
-          <Text style={styles.heroTitle}>Create Your Account</Text>
-          <Text style={styles.heroSubtitle}>
-            Start managing your textile business smarter
-          </Text>
-        </LinearGradient>
-
-        {/* 🔥 SIGNUP CARD */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sign Up</Text>
-          <Text style={styles.cardSubtitle}>
-            Fill in your details to get started
-          </Text>
-
-          {/* ERROR MESSAGE */}
-          {submitError ? (
-            <View style={styles.errorBox}>
-              <Icon name="error-outline" size={18} color="#D32F2F" />
-              <Text style={styles.errorText}>{submitError}</Text>
-            </View>
-          ) : null}
-
-          {/* 🔥 FIRST NAME & LAST NAME (Row) */}
-          <View style={styles.row}>
-            <View style={styles.halfInput}>
-              <Text style={styles.label}>First Name</Text>
-              <View style={styles.inputBox}>
-                <Icon name="person-outline" size={20} color={theme.BRAND_GRADIENT_END} />
-                <TextInput
-                  placeholder="John"
-                  style={styles.input}
-                  value={firstName}
-                  onChangeText={setFirstName}
-                  autoCapitalize="words"
-                />
-                {firstName.length > 0 && (
-                  <Icon name="check-circle" size={18} color="#2E7D32" />
-                )}
-              </View>
-            </View>
-
-            <View style={styles.halfInput}>
-              <Text style={styles.label}>Last Name</Text>
-              <View style={styles.inputBox}>
-                <Icon name="person-outline" size={20} color={theme.BRAND_GRADIENT_END} />
-                <TextInput
-                  placeholder="Doe"
-                  style={styles.input}
-                  value={lastName}
-                  onChangeText={setLastName}
-                  autoCapitalize="words"
-                />
-                {lastName.length > 0 && (
-                  <Icon name="check-circle" size={18} color="#2E7D32" />
-                )}
-              </View>
-            </View>
-          </View>
-
-          {/* 🔥 USERNAME WITH REAL-TIME CHECK */}
-          <Text style={styles.label}>Username</Text>
-          <View
-            style={[
-              styles.inputBox,
-              usernameStatus === 'available' && styles.inputSuccess,
-              (usernameStatus === 'taken' || usernameStatus === 'invalid') && styles.inputError,
-            ]}
-          >
-            <Icon name="alternate-email" size={20} color={theme.BRAND_GRADIENT_END} />
-            <TextInput
-              placeholder="johndoe123"
-              style={styles.input}
-              value={username}
-              onChangeText={handleUsernameChange}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {getStatusIcon(usernameStatus)}
-          </View>
-          {usernameMessage ? (
-            <Text
-              style={[
-                styles.helperText,
-                usernameStatus === 'available' && styles.helperSuccess,
-                (usernameStatus === 'taken' || usernameStatus === 'invalid') && styles.helperError,
-              ]}
-            >
-              {usernameMessage}
-            </Text>
-          ) : (
-            <Text style={styles.helperText}>
-              3-20 characters, letters, numbers, underscore only
-            </Text>
-          )}
-
-          {/* 🔥 EMAIL WITH REAL-TIME CHECK */}
-          <Text style={styles.label}>Email Address</Text>
-          <View
-            style={[
-              styles.inputBox,
-              emailStatus === 'available' && styles.inputSuccess,
-              (emailStatus === 'taken' || emailStatus === 'invalid') && styles.inputError,
-            ]}
-          >
-            <Icon name="email" size={20} color={theme.BRAND_GRADIENT_END} />
-            <TextInput
-              placeholder="john@example.com"
-              style={styles.input}
-              value={email}
-              onChangeText={handleEmailChange}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {getStatusIcon(emailStatus)}
-          </View>
-          {emailMessage ? (
-            <Text
-              style={[
-                styles.helperText,
-                emailStatus === 'available' && styles.helperSuccess,
-                (emailStatus === 'taken' || emailStatus === 'invalid') && styles.helperError,
-              ]}
-            >
-              {emailMessage}
-            </Text>
-          ) : null}
-
-          {/* 🔥 PASSWORD WITH STRENGTH METER */}
-          <Text style={styles.label}>Password</Text>
-          <View style={styles.inputBox}>
-            <Icon name="lock-outline" size={20} color={theme.BRAND_GRADIENT_END} />
-            <TextInput
-              placeholder="Enter password"
-              secureTextEntry={!showPassword}
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Icon
-                name={showPassword ? 'visibility-off' : 'visibility'}
-                size={22}
-                color={theme.BRAND_GRADIENT_END}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* PASSWORD STRENGTH BAR */}
-          {password.length > 0 && (
-            <>
-              <View style={styles.strengthBarContainer}>
-                <View
-                  style={[
-                    styles.strengthBar,
-                    {
-                      width: `${strengthInfo.percent}%`,
-                      backgroundColor: strengthInfo.color,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.strengthLabel, { color: strengthInfo.color }]}>
-                {strengthInfo.label}
-              </Text>
-            </>
-          )}
-
-          {/* PASSWORD REQUIREMENTS */}
-          <View style={styles.requirementsBox}>
-            <RequirementRow met={passwordChecks.length} text="At least 8 characters" />
-            <RequirementRow met={passwordChecks.upper} text="One uppercase letter (A-Z)" />
-            <RequirementRow met={passwordChecks.lower} text="One lowercase letter (a-z)" />
-            <RequirementRow met={passwordChecks.number} text="One number (0-9)" />
-            <RequirementRow met={passwordChecks.special} text="One special character (!@#$%^&*)" />
-          </View>
-
-          {/* 🔥 CONFIRM PASSWORD */}
-          <Text style={styles.label}>Confirm Password</Text>
-          <View
-            style={[
-              styles.inputBox,
-              confirmPassword.length > 0 && password === confirmPassword && styles.inputSuccess,
-              confirmPassword.length > 0 && password !== confirmPassword && styles.inputError,
-            ]}
-          >
-            <Icon name="lock-outline" size={20} color={theme.BRAND_GRADIENT_END} />
-            <TextInput
-              placeholder="Re-enter password"
-              secureTextEntry={!showConfirmPassword}
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-              <Icon
-                name={showConfirmPassword ? 'visibility-off' : 'visibility'}
-                size={22}
-                color={theme.BRAND_GRADIENT_END}
-              />
-            </TouchableOpacity>
-          </View>
-          {confirmPassword.length > 0 && password !== confirmPassword && (
-            <Text style={[styles.helperText, styles.helperError]}>
-              ✗ Passwords do not match
-            </Text>
-          )}
-          {confirmPassword.length > 0 && password === confirmPassword && (
-            <Text style={[styles.helperText, styles.helperSuccess]}>
-              ✓ Passwords match
-            </Text>
-          )}
-
-          {/* 🔥 SUBMIT BUTTON (Disabled until form is ready) */}
-          <LinearGradient
-            colors={isFormReady()
-              ? [theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]
-              : ['#CCCCCC', '#999999']
-            }
-            style={styles.submitBtn}
-          >
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={isSubmitting || !isFormReady()}
-              style={styles.submitTouch}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitText}>
-                  {isFormReady() ? 'Create Account' : 'Complete All Fields'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </LinearGradient>
-
-          {/* 🔥 LOGIN LINK */}
-          <View style={styles.loginRow}>
-            <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-              <Text style={styles.loginLink}>Login</Text>
-            </TouchableOpacity>
-          </View>
+      {/* ERROR MESSAGE */}
+      {submitError ? (
+        <View style={styles.errorBox}>
+          <Icon name="error-outline" size={18} color={T.red} />
+          <Text style={styles.errorText}>{submitError}</Text>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      ) : null}
+
+      {/* 🔥 FIRST NAME & LAST NAME (Row) */}
+      <View style={styles.row}>
+        <AuthField
+          containerStyle={styles.halfInput}
+          label="FIRST NAME"
+          icon="person-outline"
+          placeholder="John"
+          value={firstName}
+          onChangeText={setFirstName}
+          autoCapitalize="words"
+          right={firstName.length > 0 ? <Icon name="check-circle" size={18} color={T.green} /> : undefined}
+        />
+
+        <AuthField
+          containerStyle={styles.halfInput}
+          label="LAST NAME"
+          icon="person-outline"
+          placeholder="Doe"
+          value={lastName}
+          onChangeText={setLastName}
+          autoCapitalize="words"
+          right={lastName.length > 0 ? <Icon name="check-circle" size={18} color={T.green} /> : undefined}
+        />
+      </View>
+
+      {/* 🔥 USERNAME WITH REAL-TIME CHECK */}
+      <AuthField
+        label="USERNAME"
+        icon="alternate-email"
+        placeholder="johndoe123"
+        value={username}
+        onChangeText={handleUsernameChange}
+        autoCapitalize="none"
+        autoCorrect={false}
+        tone={statusTone(usernameStatus)}
+        right={getStatusIcon(usernameStatus)}
+        helper={usernameMessage || '3-20 characters, letters, numbers, underscore only'}
+        helperTone={usernameMessage ? statusTone(usernameStatus) : 'default'}
+      />
+
+      {/* 🔥 EMAIL WITH REAL-TIME CHECK */}
+      <AuthField
+        label="EMAIL ADDRESS"
+        icon="email"
+        placeholder="john@example.com"
+        value={email}
+        onChangeText={handleEmailChange}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        tone={statusTone(emailStatus)}
+        right={getStatusIcon(emailStatus)}
+        helper={emailMessage || undefined}
+      />
+
+      {/* 🔥 PASSWORD WITH STRENGTH METER */}
+      <AuthField
+        label="PASSWORD"
+        icon="lock-outline"
+        placeholder="Enter password"
+        secureTextEntry={!showPassword}
+        value={password}
+        onChangeText={setPassword}
+        autoCapitalize="none"
+        containerStyle={{ marginBottom: 8 }}
+        right={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+      />
+
+      {/* PASSWORD STRENGTH BAR */}
+      {password.length > 0 && (
+        <View style={styles.strengthWrap}>
+          <View style={styles.strengthBarContainer}>
+            <View
+              style={[
+                styles.strengthBar,
+                {
+                  width: `${strengthInfo.percent}%`,
+                  backgroundColor: strengthInfo.color,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.strengthLabel, { color: strengthInfo.color }]}>
+            {strengthInfo.label}
+          </Text>
+        </View>
+      )}
+
+      {/* PASSWORD REQUIREMENTS */}
+      <ChecklistBox>
+        <RequirementRow met={passwordChecks.length} text="At least 8 characters" />
+        <RequirementRow met={passwordChecks.upper} text="One uppercase (A-Z)" />
+        <RequirementRow met={passwordChecks.lower} text="One lowercase (a-z)" />
+        <RequirementRow met={passwordChecks.number} text="One number (0-9)" />
+        <RequirementRow met={passwordChecks.special} text="One special (!@#$%^&*)" />
+      </ChecklistBox>
+
+      {/* 🔥 CONFIRM PASSWORD */}
+      <AuthField
+        label="CONFIRM PASSWORD"
+        icon="lock-outline"
+        placeholder="Re-enter password"
+        secureTextEntry={!showConfirmPassword}
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        autoCapitalize="none"
+        containerStyle={{ marginTop: 12 }}
+        tone={confirmTone}
+        right={<PasswordToggle visible={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />}
+        helper={
+          confirmPassword.length > 0
+            ? password === confirmPassword
+              ? '✓ Passwords match'
+              : '✗ Passwords do not match'
+            : undefined
+        }
+      />
+
+      {/* 🔥 SUBMIT BUTTON (Disabled until form is ready) */}
+      <AuthButton
+        label={isFormReady() ? 'Create Account' : 'Complete All Fields'}
+        icon={isFormReady() ? 'arrow-forward' : undefined}
+        onPress={handleSubmit}
+        disabled={isSubmitting || !isFormReady()}
+        loading={isSubmitting}
+        style={{ marginTop: 10 }}
+      />
+
+      {/* 🔥 LOGIN LINK */}
+      <View style={styles.loginRow}>
+        <Text style={styles.loginText}>Already have an account? </Text>
+        <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+          <Text style={styles.loginLink}>Login</Text>
+        </TouchableOpacity>
+      </View>
+    </AuthShell>
   );
 }
 
 // 🔥 REUSABLE REQUIREMENT ROW COMPONENT
 function RequirementRow({ met, text }: { met: boolean; text: string }) {
-  return (
-    <View style={styles.requirementRow}>
-      <Icon
-        name={met ? 'check-circle' : 'radio-button-unchecked'}
-        size={16}
-        color={met ? '#2E7D32' : '#999'}
-      />
-      <Text
-        style={[styles.requirementText, { color: met ? '#2E7D32' : '#666' }]}
-      >
-        {text}
-      </Text>
-    </View>
-  );
+  return <CheckItem label={text} valid={met} />;
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: 25,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-  },
-  backText: {
-    color: '#fff',
-    marginLeft: 5,
-    fontWeight: '600',
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  logo: {
-    width: 45,
-    height: 45,
-    marginRight: 10,
-  },
-  brandName: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '800',
-  },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 10,
-  },
-  heroSubtitle: {
-    color: '#EAF7FA',
-    fontSize: 14,
-    marginTop: 5,
-  },
-  card: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginTop: -20,
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    elevation: 6,
-  },
-  cardTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: theme.TEXT_PRIMARY,
-  },
-  cardSubtitle: {
-    color: theme.TEXT_SECONDARY,
-    marginTop: 4,
-    marginBottom: 20,
-  },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
   },
   halfInput: {
-    width: '48%',
+    flexGrow: 1,
+    flexBasis: 150,
+    paddingHorizontal: 6,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.TEXT_PRIMARY,
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  inputBox: {
+  strengthWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F8FA',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  inputSuccess: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#E8F5E9',
-  },
-  inputError: {
-    borderColor: '#D32F2F',
-    backgroundColor: '#FFEBEE',
-  },
-  input: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: theme.TEXT_PRIMARY,
-  },
-  helperText: {
-    fontSize: 12,
-    marginTop: 5,
-    marginLeft: 4,
-    color: '#888',
-  },
-  helperSuccess: {
-    color: '#2E7D32',
-    fontWeight: '600',
-  },
-  helperError: {
-    color: '#D32F2F',
-    fontWeight: '600',
+    marginBottom: 10,
   },
   strengthBarContainer: {
-    height: 5,
-    backgroundColor: '#E0E0E0',
+    flex: 1,
+    height: 6,
+    backgroundColor: T.alt,
     borderRadius: 3,
-    marginTop: 8,
     overflow: 'hidden',
   },
   strengthBar: {
@@ -811,66 +589,41 @@ const styles = StyleSheet.create({
   },
   strengthLabel: {
     fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
+    fontWeight: '800',
+    marginLeft: 10,
+    minWidth: 48,
     textAlign: 'right',
-  },
-  requirementsBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  requirementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 3,
-  },
-  requirementText: {
-    marginLeft: 8,
-    fontSize: 12,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEBEE',
+    backgroundColor: '#FCF4F2',
+    borderWidth: 1,
+    borderColor: '#F0D2CC',
     padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   errorText: {
-    color: '#D32F2F',
+    color: T.red,
     marginLeft: 8,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
-  submitBtn: {
-    height: 54,
-    borderRadius: 16,
-    justifyContent: 'center',
-    marginTop: 25,
-  },
-  submitTouch: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
   loginRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 20,
   },
   loginText: {
-    color: theme.TEXT_SECONDARY,
+    color: T.muted,
+    fontSize: 14,
   },
   loginLink: {
-    color: theme.BRAND_GRADIENT_END,
-    fontWeight: '700',
+    color: T.copper,
+    fontWeight: '900',
+    fontSize: 14,
   },
 });

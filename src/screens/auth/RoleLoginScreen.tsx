@@ -1,29 +1,11 @@
-// ─────────────────────────────────────────────────────────────
-// FILE: src/screens/auth/RoleLoginScreen.tsx
-//
-// Production-safe New ERP manual login.
-//
-// Key navigation rules:
-//   - Back always returns to New ERP Property Selection.
-//   - Successful login explicitly replaces this route with
-//     /new/(tabs).
-//   - The parent app/new/role-login.tsx also redirects when the
-//     session store becomes authenticated, giving us two safe paths
-//     into the New ERP dashboard without allowing Legacy routing.
-// ─────────────────────────────────────────────────────────────
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  StyleSheet,
-  Switch,
-  Text,
-  View
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 import {
   AuthButton,
   AuthField,
@@ -39,7 +21,6 @@ import {
 } from '../../lib/biometricAuth';
 import { T } from '../../theme';
 
-// ---------- Password Validation Types ----------
 type PasswordValidation = {
   minLength: boolean;
   hasUppercase: boolean;
@@ -47,12 +28,21 @@ type PasswordValidation = {
   hasNumber: boolean;
 };
 
-// ---------- Validation Item Component ----------
 const ValidationItem = ({ label, valid }: { label: string; valid: boolean }) => (
   <CheckItem label={label} valid={valid} pendingIcon="cancel" />
 );
 
-export function RoleLoginScreen() {
+const validatePassword = (pwd: string): PasswordValidation => ({
+  minLength: pwd.length >= 8,
+  hasUppercase: /[A-Z]/.test(pwd),
+  hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
+  hasNumber: /\d/.test(pwd),
+});
+
+const isPasswordValid = (v: PasswordValidation) => Object.values(v).every(Boolean);
+
+/* ---------- FORM COMPONENT (owns ALL form state) ---------- */
+function RoleLoginForm() {
   const router = useRouter();
 
   const [username, setUsername] = useState('');
@@ -63,50 +53,30 @@ export function RoleLoginScreen() {
   const [bioSupported, setBioSupported] = useState(false);
   const [bioLabel, setBioLabel] = useState('screen lock');
   const [rememberMe, setRememberMe] = useState(true);
-  const [getNotitoken, setNotitoken] = useState('');
-  const [getDeviceId, setDeviceId] = useState('');
-  // ---------- Password Validation State ----------
-  const [validation, setValidation] = useState<PasswordValidation>({
-    minLength: false,
-    hasUppercase: false,
-    hasSpecialChar: false,
-    hasNumber: false,
-  });
+  const [getNotitoken, setGetNotitoken] = useState('');
+  const [getDeviceId, setGetDeviceId] = useState('');
+  // Keep password validation derived from the current value.
+  // This avoids a second state update/render on every mobile key press.
+  const validation = useMemo(() => validatePassword(password), [password]);
 
-  // ---------- Validation Functions ----------
-  const validatePassword = (pwd: string): PasswordValidation => {
-    return {
-      minLength: pwd.length >= 8,
-      hasUppercase: /[A-Z]/.test(pwd),
-      hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
-      hasNumber: /\d/.test(pwd),
-    };
-  };
-
-  const isPasswordValid = (v: PasswordValidation) => Object.values(v).every(Boolean);
-
-  const handlePasswordChange = (text: string) => {
+  const handlePasswordChange = useCallback((text: string) => {
     setPassword(text);
-    setValidation(validatePassword(text));
-  };
+  }, []);
 
-  const requestPermissions = async () => {
+  const requestPermissions = useCallback(async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
       console.log('Notification permission denied');
       return false;
     }
     return true;
-  };
+  }, []);
 
-  const getFCMToken = async () => {
+  const getFCMToken = useCallback(async () => {
     try {
       const hasPermission = await requestPermissions();
       if (!hasPermission) return null;
-
       const token = (await Notifications.getExpoPushTokenAsync()).data;
-      console.log('Expo Push Token:', token);
-
       if (token) {
         await AsyncStorage.setItem('notification_token', token);
         return token;
@@ -115,44 +85,32 @@ export function RoleLoginScreen() {
       console.error('Error getting Expo push token:', error);
       return null;
     }
-  };
+  }, [requestPermissions]);
 
   useEffect(() => {
-    const deviceId = Device.osInternalBuildId || "test-device";
-    console.log("Device ID:", deviceId);
-    setDeviceId(deviceId);
-    getFCMToken().then(token => {
-      if (token) {
-        setNotitoken(token);
-      }
+    const deviceId = Device.osInternalBuildId || 'test-device';
+    setGetDeviceId(deviceId);
+    getFCMToken().then((token) => {
+      if (token) setGetNotitoken(token);
     });
-  }, []);
+  }, [getFCMToken]);
 
   useEffect(() => {
     let active = true;
-
     void (async () => {
       const supported = await isBiometricSupported();
-
       if (!active) return;
-
       setBioSupported(supported);
-
       if (supported) {
         const label = await getBiometricLabel();
-
-        if (active) {
-          setBioLabel(label);
-        }
+        if (active) setBioLabel(label);
       }
     })();
-
     return () => {
       active = false;
     };
   }, []);
 
-  // ---------- Form Validity ----------
   const canSubmit = useMemo(
     () =>
       username.trim().length > 0 &&
@@ -161,44 +119,36 @@ export function RoleLoginScreen() {
     [username, validation, loading]
   );
 
-  const openNewErpDashboard = () => {
+  const openNewErpDashboard = useCallback(() => {
     router.replace('/new/(tabs)');
-  };
+  }, [router]);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!canSubmit) return;
-
-    // Extra safety check
     if (!isPasswordValid(validation)) {
       AppAlert.alert('Error', 'Password does not meet security requirements');
       return;
     }
 
     setLoading(true);
-
     try {
       const rememberAction =
         bioSupported && rememberMe
           ? 'save'
           : bioSupported
-            ? 'clear'
-            : undefined;
-
-      const noti_token = getNotitoken;
+          ? 'clear'
+          : undefined;
 
       const outcome = await performLogin(
         username,
         password,
         rememberAction,
-        noti_token,
-        getDeviceId,
+        getNotitoken,
+        getDeviceId
       );
 
       if (!outcome.success) {
-        AppAlert.alert(
-          'Login failed',
-          outcome.message || 'Unable to login.'
-        );
+        AppAlert.alert('Login failed', outcome.message || 'Unable to login.');
         return;
       }
 
@@ -206,48 +156,32 @@ export function RoleLoginScreen() {
         AppAlert.alert(
           'Note',
           outcome.message,
-          [
-            {
-              text: 'OK',
-              onPress: openNewErpDashboard,
-            },
-          ],
-          {
-            cancelable: false,
-          }
+          [{ text: 'OK', onPress: openNewErpDashboard }],
+          { cancelable: false }
         );
         return;
       }
 
       openNewErpDashboard();
     } catch (error: any) {
-      AppAlert.alert(
-        'Login failed',
-        error?.message || 'Unable to login.'
-      );
+      AppAlert.alert('Login failed', error?.message || 'Unable to login.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const goBack = () => {
-    router.replace('/new/property-select');
-  };
+  }, [
+    canSubmit,
+    validation,
+    bioSupported,
+    rememberMe,
+    username,
+    password,
+    getNotitoken,
+    getDeviceId,
+    openNewErpDashboard,
+  ]);
 
   return (
-    <AuthShell
-      eyebrow="NEW ERP SYSTEM"
-      title="Sign in"
-      subtitle="Username and password only. Year, property, group and store are derived automatically from your ERP user defaults."
-      onBack={goBack}
-      brandTitle="Welcome to the New ERP"
-      brandSubtitle="Login creates your business context and permission context for every screen you open."
-      highlights={[
-        { icon: 'verified-user', title: 'Secure ERP session', desc: 'Role-based permissions applied to every module.' },
-        { icon: 'apartment', title: 'Property aware', desc: 'Connects to the property you selected in the previous step.' },
-        { icon: 'fingerprint', title: 'Remember me', desc: 'Sign in faster next time with your device screen lock.' },
-      ]}
-    >
+    <>
       <View style={styles.contextCard}>
         <View style={styles.contextIcon}>
           <Icon name="shield" size={18} color={T.copper} />
@@ -282,15 +216,19 @@ export function RoleLoginScreen() {
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="off"
-        textContentType="oneTimeCode"
-        importantForAutofill="noExcludeDescendants"
+        textContentType="password"
+        importantForAutofill="no"
         secureTextEntry={!showPassword}
         placeholder="Enter password"
         onSubmitEditing={handleLogin}
-        right={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />}
+        right={
+          <PasswordToggle
+            visible={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+          />
+        }
       />
 
-      {/* ---------- Live Password Validation ---------- */}
       <ChecklistBox>
         <ValidationItem label="Minimum 8 characters" valid={validation.minLength} />
         <ValidationItem label="1 uppercase letter" valid={validation.hasUppercase} />
@@ -312,16 +250,12 @@ export function RoleLoginScreen() {
           <View style={styles.bioIconWrap}>
             <Icon name="fingerprint" size={20} color={T.copper} />
           </View>
-
           <View style={{ flex: 1 }}>
             <Text style={styles.bioTitle}>Remember me</Text>
-
             <Text style={styles.bioSub}>
-              We&apos;ll confirm with your {bioLabel} and save this
-              login for next time.
+              We&apos;ll confirm with your {bioLabel} and save this login for next time.
             </Text>
           </View>
-
           <Switch
             value={rememberMe}
             onValueChange={setRememberMe}
@@ -329,9 +263,43 @@ export function RoleLoginScreen() {
           />
         </View>
       )}
+    </>
+  );
+}
+
+/* ---------- SHELL (does NOT re-render on typing) ---------- */
+export function RoleLoginScreen() {
+  const router = useRouter();
+
+  const goBack = useCallback(() => {
+    router.replace('/new/property-select');
+  }, [router]);
+
+  const highlights = useMemo(
+    () => [
+      { icon: 'verified-user', title: 'Secure ERP session', desc: 'Role-based permissions applied to every module.' },
+      { icon: 'apartment', title: 'Property aware', desc: 'Connects to the property you selected in the previous step.' },
+      { icon: 'fingerprint', title: 'Remember me', desc: 'Sign in faster next time with your device screen lock.' },
+    ],
+    []
+  );
+
+  return (
+    <AuthShell
+      eyebrow="NEW ERP SYSTEM"
+      title="Sign in"
+      subtitle="Username and password only. Year, property, group and store are derived automatically from your ERP user defaults."
+      onBack={goBack}
+      brandTitle="Welcome to the New ERP"
+      brandSubtitle="Login creates your business context and permission context for every screen you open."
+      highlights={highlights}
+    >
+      <RoleLoginForm />
     </AuthShell>
   );
 }
+
+export default RoleLoginScreen;
 
 const styles = StyleSheet.create({
   contextCard: {
@@ -362,17 +330,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 3,
   },
-  contextTitle: {
-    fontSize: 15,
-    color: T.ink,
-    fontWeight: '900',
-    marginBottom: 2,
-  },
-  contextSub: {
-    fontSize: 12,
-    color: T.muted,
-    lineHeight: 17,
-  },
+  contextTitle: { fontSize: 15, color: T.ink, fontWeight: '900', marginBottom: 2 },
+  contextSub: { fontSize: 12, color: T.muted, lineHeight: 17 },
   bioBox: {
     flexDirection: 'row',
     gap: 12,
@@ -392,17 +351,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bioTitle: {
-    color: T.ink,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  bioSub: {
-    color: T.muted,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-  },
+  bioTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
+  bioSub: { color: T.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
 });
-
-export default RoleLoginScreen;

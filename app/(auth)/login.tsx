@@ -742,27 +742,30 @@ import {
 } from '@/common/utils/sqliteCacheManager';
 import { saveCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 import { getLoginSource } from '@/src/platform/runtime';
-import Icon from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Device from 'expo-device';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     Image,
-    ScrollView,
     StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
     View
 } from 'react-native';
 import main from '../../assets/images/main.png';
 import { API, initAPI } from '../../common/API/dynamicAPI';
-import { theme } from '../../components/theme';
+import {
+    AuthButton,
+    AuthField,
+    AuthShell,
+    CheckItem,
+    ChecklistBox,
+    Divider,
+    FieldLabel,
+    OptionCard,
+    PasswordToggle,
+} from '../../src/components/auth/AuthUI';
 
 type Nav = any;
 
@@ -776,16 +779,7 @@ type PasswordValidation = {
 
 // ---------- Validation Item Component ----------
 const ValidationItem = ({ label, valid }: { label: string; valid: boolean }) => (
-    <View style={styles.validationRow}>
-        <Icon
-            name={valid ? "check-circle" : "cancel"}
-            size={18}
-            color={valid ? "green" : "red"}
-        />
-        <Text style={[styles.validationText, { color: valid ? "green" : "red" }]}>
-            {label}
-        </Text>
-    </View>
+    <CheckItem label={label} valid={valid} pendingIcon="cancel" />
 );
 
 export default function LoginScreen() {
@@ -1067,306 +1061,113 @@ export default function LoginScreen() {
 
     // ---------- RENDER ----------
     return (
-        <ScrollView
-            style={{
-                backgroundColor: theme.NEUTRAL_BG,
-                flex: 1,
-            }}
-            contentContainerStyle={{
-                paddingBottom: 40
-            }}
+        <AuthShell
+            eyebrow="LEGACY ERP SYSTEM"
+            title="Sign in"
+            subtitle="Select your property and sign in with your ERP username and password."
+            onBack={() => router.replace('/(all)/lookup-select')}
+            brandTitle="Welcome back to your Textile ERP"
+            brandSubtitle="Production, collections, receivables and sales analysis for every Madhusudan property."
+            highlights={[
+                { icon: 'business', title: 'Property based login', desc: 'Sudamo / Knits and Rayons on one sign-in screen.' },
+                { icon: 'sync', title: 'Master data sync', desc: 'Party, item and shade data cached for faster work.' },
+                { icon: 'verified-user', title: 'Secure session', desc: 'Your menu and permissions load from your ERP role.' },
+            ]}
+            cardHeader={
+                <View style={styles.groupLogoWrap}>
+                    <Image source={main} style={styles.logo} />
+                </View>
+            }
         >
-            <View style={styles.heroContainer}>
-                <View style={{ alignSelf: 'flex-start' }}>
-                    <TouchableOpacity onPress={() => router.replace('/(all)/lookup-select')} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Icon name="arrow-back" size={22} color={theme.BRAND_GRADIENT_END} />
-                        <Text style={{ color: theme.BRAND_GRADIENT_END }}>Back</Text>
-                    </TouchableOpacity>
-                </View>
-                <Image
-                    source={main}
-                    style={styles.logo}
-                />
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                        Textile ERP Platform
-                    </Text>
-                </View>
-            </View>
-
-            <View style={styles.loginCard}>
-                {/* Property Selection */}
-                <Text style={styles.label}>Select Property</Text>
+            {/* Property Selection */}
+            <FieldLabel>SELECT PROPERTY</FieldLabel>
+            <View style={styles.propertyRow}>
                 {propertyData.map((item) => (
-                    <TouchableOpacity
-                        key={item.value}
-                        style={[
-                            styles.selectBtn,
-                            selectedProperty === item.value && styles.selected
-                        ]}
-                        onPress={() => setSelectedProperty(item.value)}
-                    >
-                        <Icon name="business" size={20} color={theme.BRAND_GRADIENT_END} />
-                        <Text style={{ marginLeft: 10 }}>{item.label}</Text>
-                    </TouchableOpacity>
+                    <View key={item.value} style={styles.propertyCell}>
+                        <OptionCard
+                            compact
+                            title={item.label}
+                            icon="business"
+                            active={selectedProperty === item.value}
+                            onPress={() => setSelectedProperty(item.value)}
+                        />
+                    </View>
                 ))}
-
-                {/* Username */}
-                <View style={styles.inputBox}>
-                    <Icon name="person-outline" size={22} color={theme.BRAND_GRADIENT_END} />
-                    <TextInput
-                        placeholder="Username"
-                        style={styles.input}
-                        value={username}
-                        onChangeText={setUsername}
-                    />
-                </View>
-
-                {/* Password */}
-                <View style={styles.inputBox}>
-                    <Icon name="lock-outline" size={22} color={theme.BRAND_GRADIENT_END} />
-                    <TextInput
-                        placeholder="Password"
-                        secureTextEntry={!showPassword}
-                        style={styles.input}
-                        value={password}
-                        onChangeText={handlePasswordChange}
-                        textContentType="password"
-                        autoComplete="password"
-                    />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                        <Icon name={showPassword ? "visibility-off" : "visibility"} size={22} color={theme.BRAND_GRADIENT_END} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Live Password Validation */}
-                <View style={styles.validationContainer}>
-                    <ValidationItem label="Minimum 8 characters" valid={validation.minLength} />
-                    <ValidationItem label="At least 1 uppercase letter" valid={validation.hasUppercase} />
-                    <ValidationItem label="At least 1 special character" valid={validation.hasSpecialChar} />
-                    <ValidationItem label="At least 1 number" valid={validation.hasNumber} />
-                </View>
-
-                {/* Login Button */}
-                <LinearGradient
-                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                    style={[styles.button, { opacity: isFormValid ? 1 : 0.6 }]}
-                >
-                    <TouchableOpacity
-                        onPress={handleLogin}
-                        disabled={!isFormValid || isLoading}
-                        style={styles.btnTouch}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.btnText}>Login</Text>
-                        )}
-                    </TouchableOpacity>
-                </LinearGradient>
-
-                <View style={{ marginTop: 20 }}>
-                    <TouchableOpacity
-                        style={styles.secondaryBtn}
-                        onPress={() => router.push('/signup')}
-                    >
-                        <Text style={styles.secondaryText}>
-                            Create Account
-                        </Text>
-                    </TouchableOpacity>
-                </View>
             </View>
-        </ScrollView>
+
+            {/* Username */}
+            <AuthField
+                label="USERNAME"
+                icon="person-outline"
+                placeholder="Username"
+                value={username}
+                onChangeText={setUsername}
+            />
+
+            {/* Password */}
+            <AuthField
+                label="PASSWORD"
+                icon="lock-outline"
+                placeholder="Password"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={handlePasswordChange}
+                textContentType="password"
+                autoComplete="password"
+                onSubmitEditing={() => {
+                    if (isFormValid && !isLoading) handleLogin();
+                }}
+                right={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+            />
+
+            {/* Live Password Validation */}
+            <ChecklistBox>
+                <ValidationItem label="Minimum 8 characters" valid={validation.minLength} />
+                <ValidationItem label="1 uppercase letter" valid={validation.hasUppercase} />
+                <ValidationItem label="1 special character" valid={validation.hasSpecialChar} />
+                <ValidationItem label="1 number" valid={validation.hasNumber} />
+            </ChecklistBox>
+
+            {/* Login Button */}
+            <AuthButton
+                label="Login"
+                icon="arrow-forward"
+                onPress={handleLogin}
+                disabled={!isFormValid || isLoading}
+                loading={isLoading}
+                style={{ marginTop: 18 }}
+            />
+
+            <Divider label="NEW HERE?" />
+
+            <AuthButton
+                label="Create Account"
+                variant="secondary"
+                onPress={() => router.push('/signup')}
+            />
+        </AuthShell>
     );
 }
 
 const styles = StyleSheet.create({
-    logoImage: {
-        width: 30,
-        height: 30,
-    },
-    logoText: {
-        fontWeight: 'bold',
-        color: theme.BRAND_GRADIENT_END
-    },
-    hero: {
-        alignItems: 'center',
-        marginBottom: 30
-    },
-    heroTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: theme.BRAND_GRADIENT_END
-    },
-    heroSub: {
-        fontSize: 16,
-        marginTop: 5,
-        fontWeight: '600'
-    },
-    heroDesc: {
-        textAlign: 'center',
-        marginTop: 10,
-        color: '#666',
-        lineHeight: 22
-    },
-    heroContainer: {
-        alignItems: 'center',
-        paddingTop: 60,
-        paddingHorizontal: 30
-    },
-    brand: {
-        fontSize: 34,
-        fontWeight: '800',
-        color: theme.BRAND_GRADIENT_END,
-        marginTop: 15
-    },
-    tagline: {
-        fontSize: 17,
-        fontWeight: '600',
-        marginTop: 5,
-        color: theme.TEXT_PRIMARY
-    },
-    desc: {
-        marginTop: 15,
-        textAlign: 'center',
-        color: theme.TEXT_SECONDARY,
-        lineHeight: 24,
-        maxWidth: 320
+    groupLogoWrap: {
+        alignItems: 'flex-start',
+        marginBottom: 18,
     },
     logo: {
-        width: 220,
-        height: 90,
+        width: 150,
+        height: 47,
         resizeMode: 'contain',
-        alignSelf: 'center',
     },
-    loginCard: {
-        backgroundColor: '#fff',
-        marginHorizontal: 20,
-        marginTop: 25,
-        borderRadius: 24,
-        padding: 22,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 15,
-        elevation: 6
-    },
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        padding: 30,
-        backgroundColor: theme.NEUTRAL_BG,
-    },
-    header: {
-        paddingTop: 60,
-        paddingBottom: 25,
-        paddingHorizontal: 20
-    },
-    title: {
-        color: '#fff',
-        fontSize: 28,
-        fontWeight: '700',
-        marginTop: 15
-    },
-    label: {
-        marginBottom: 10,
-        fontWeight: '600'
-    },
-    selectBtn: {
+    propertyRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        marginBottom: 10,
+        flexWrap: 'wrap',
+        marginHorizontal: -5,
+        marginBottom: 6,
     },
-    selected: {
-        borderWidth: 2,
-        borderColor: theme.BRAND_GRADIENT_END
-    },
-    inputBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F5F8FA',
-        borderRadius: 14,
-        paddingHorizontal: 15,
-        height: 56,
-        marginBottom: 14
-    },
-    input: {
-        flex: 1,
-        marginLeft: 10,
-        height: 50,
-        paddingVertical: 0,   // ✅ Fix for text overlapping/centering
-        color: '#000',
-        fontSize: 16,
-    },
-    button: {
-        height: 56,
-        borderRadius: 16,
-        justifyContent: 'center',
-        marginTop: 10
-    },
-    btnTouch: {
-        alignItems: 'center',
-    },
-    btnText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    secondaryBtn: {
-        marginTop: 10,
-        alignItems: 'center',
-    },
-    secondaryText: {
-        color: theme.BRAND_GRADIENT_END,
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    guestText: {
-        color: theme.BRAND_GRADIENT_END,
-        fontWeight: '700',
-        marginLeft: 4
-    },
-    guestBtn: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: 56,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#D8E4E8',
-        backgroundColor: '#fff'
-    },
-    reviewText: {
-        textAlign: 'center',
-        color: '#666',
-        marginTop: 15,
-        lineHeight: 22
-    },
-    badge: {
-        backgroundColor: '#E8F7FA',
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 30,
-        marginTop: 10
-    },
-    badgeText: {
-        color: theme.BRAND_GRADIENT_END,
-        fontWeight: '600'
-    },
-    // ----- New styles for validation -----
-    validationContainer: {
-        marginTop: 6,
-        marginBottom: 12,
-    },
-    validationRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 2,
-    },
-    validationText: {
-        marginLeft: 6,
-        fontSize: 13,
-        fontWeight: '500',
+    propertyCell: {
+        flexGrow: 1,
+        flexBasis: 160,
+        paddingHorizontal: 5,
     },
 });

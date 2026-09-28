@@ -395,9 +395,9 @@
 //         textAlign: 'center',
 //     },
 // });
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';

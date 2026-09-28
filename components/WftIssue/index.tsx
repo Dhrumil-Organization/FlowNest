@@ -100,10 +100,10 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     const [showSuccess, setShowSuccess] = useState(false);
     const [resetFlag, setResetFlag] = useState(false);
     // Entry mode selector: choose the original/previous screen or the independent new copy.
-    // const [showIssueModeModal, setShowIssueModeModal] = useState(true);
-    const [showIssueModeModal, setShowIssueModeModal] = useState(false);
-    // const [issueMode, setIssueMode] = useState<'old' | 'new' | null>(null);
-    const [issueMode, setIssueMode] = useState<'old' | 'new' | null>('old');
+    const [showIssueModeModal, setShowIssueModeModal] = useState(true);
+    // const [showIssueModeModal, setShowIssueModeModal] = useState(false);
+    const [issueMode, setIssueMode] = useState<'old' | 'new' | null>(null);
+    // const [issueMode, setIssueMode] = useState<'old' | 'new' | null>('old');
     // const [filteredData, setFilteredData] = useState([]);
     console.log("getallpropertydata", getAllPropertyData)
 

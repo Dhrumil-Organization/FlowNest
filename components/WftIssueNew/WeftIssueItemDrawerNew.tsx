@@ -1744,6 +1744,7 @@ const WeftIssueItemDrawer = ({
                     ExpProdQty: item.ExpProdQty || 0,
                     DsnRcpSrNo: FormState.values.srno,
                     DsnCode: FormState.values.DsnCode,
+                    ExpProdQtyType: issueMode == 'new' ? '1' : '0'
                 })),
                 ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };

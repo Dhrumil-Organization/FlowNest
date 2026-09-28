@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Dimensions,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -293,6 +294,140 @@ function ComparativeChart({ months, states }) {
 }
 
 // ── Expandable expense block with icon ───────────────────────────
+
+// ── Daily Expense + Utility Trends (Client Artifact) ─────────────
+function TrendBars({ rows, valueKey, valueFormatter, selected, onSelect, barColor = '#c2823a' }) {
+  const max = Math.max(...rows.map(r => Number(r[valueKey] || 0)), 0.000001);
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingVertical: 6 }}>
+      {rows.map((r, i) => {
+        const v = Number(r[valueKey] || 0);
+        const active = selected === i;
+        return (
+          <TouchableOpacity key={`${r.date_ymd || r.day}-${i}`} onPress={() => onSelect(i)}
+            style={{ width: 38, alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Text style={{ fontSize: 9, color: active ? '#111827' : '#9ca3af', marginBottom: 3 }}>
+              {active ? valueFormatter(v) : ''}
+            </Text>
+            <View style={{ height: 92, width: 22, justifyContent: 'flex-end', backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden' }}>
+              <View style={{ width: '100%', height: `${Math.max(3, (v / max) * 100)}%`, backgroundColor: barColor, opacity: active ? 1 : 0.62 }} />
+            </View>
+            <Text style={{ fontSize: 9, color: active ? '#111827' : '#6b7280', marginTop: 4 }}>{r.day}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function ExpenseUtilityTrends({ d }) {
+  const expenseRows = d.expense_daily_trend || [];
+  const utilityRows = d.utility_daily_trend || [];
+  const utilityDefs = d.utility_rates || [];
+  const [expenseIndex, setExpenseIndex] = useState(Math.max(0, expenseRows.length - 1));
+  const [utilityKey, setUtilityKey] = useState(utilityDefs[0]?.key || 'mw_rapier_looms');
+  const [utilityIndex, setUtilityIndex] = useState(0);
+
+  if (!expenseRows.length && !utilityRows.length) return null;
+  const er = expenseRows[Math.min(expenseIndex, Math.max(0, expenseRows.length - 1))] || {};
+  const selectedUtilityRows = utilityRows.filter(r => r.key === utilityKey);
+  const ur = selectedUtilityRows[Math.min(utilityIndex, Math.max(0, selectedUtilityRows.length - 1))] || {};
+  const avgExpense = expenseRows.length ? expenseRows.reduce((a,r)=>a+Number(r.cost_per_pick||0),0)/expenseRows.length : 0;
+  const utilPositive = selectedUtilityRows.map(r=>Number(r.cost_per_mtr||0)).filter(v=>v>0);
+  const avgUtil = utilPositive.length ? utilPositive.reduce((a,v)=>a+v,0)/utilPositive.length : 0;
+
+  return (
+    <View>
+      <Text style={S.sectionLabel}>DAILY EXPENSE TREND</Text>
+      <View style={[S.chartCard, { paddingBottom: 12 }]}>
+        <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
+          <View style={{ flex:1 }}>
+            <Text style={S.chartTitle}>Cost / pick vs checked production</Text>
+            <Text style={S.chartSub}>tap a day for cost composition</Text>
+          </View>
+          <View style={{ alignItems:'flex-end' }}>
+            <Text style={{ fontSize:10, color:'#9ca3af' }}>MONTH AVG</Text>
+            <Text style={{ fontSize:14, fontWeight:'700', color:'#0f172a' }}>₹{f3(avgExpense)}/pk</Text>
+          </View>
+        </View>
+        <TrendBars rows={expenseRows} valueKey="cost_per_pick" valueFormatter={v=>`₹${f3(v)}`} selected={expenseIndex} onSelect={setExpenseIndex} />
+        {!!er.date_ymd && <View style={{ backgroundColor:'#f8fafc', borderRadius:10, padding:10, marginTop:6 }}>
+          <Text style={{ fontSize:12, fontWeight:'700', color:'#111827', marginBottom:5 }}>Day {er.day} · {fN(er.production_mtr)} m checked</Text>
+          <Text style={{ fontSize:11, color:'#4b5563', lineHeight:17 }}>
+            Electricity {fL(er.electricity)} · Wages {fL(er.salary)} · Stores allocated {fL(er.stores_allocated)}\n
+            Total {fL(er.total_cost)} · ₹{f2(er.cost_per_mtr)}/m · ₹{f3(er.cost_per_pick)}/pick
+          </Text>
+        </View>}
+      </View>
+
+      <Text style={S.sectionLabel}>UTILITY TREND</Text>
+      <View style={[S.chartCard, { paddingBottom: 12 }]}>
+        <Text style={S.chartTitle}>Electricity cost / metre</Text>
+        <Text style={S.chartSub}>same-day utility cost against the production it feeds</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:6, paddingVertical:10 }}>
+          {utilityDefs.map(u => <TouchableOpacity key={u.key} onPress={()=>{setUtilityKey(u.key);setUtilityIndex(0);}}
+            style={{ paddingHorizontal:10, paddingVertical:7, borderRadius:16, backgroundColor:utilityKey===u.key?'#0f172a':'#f3f4f6' }}>
+            <Text style={{ fontSize:10, fontWeight:'600', color:utilityKey===u.key?'#fff':'#4b5563' }}>{u.label}</Text>
+          </TouchableOpacity>)}
+        </ScrollView>
+        <View style={{ flexDirection:'row', gap:14, marginBottom:4 }}>
+          <Text style={{ fontSize:11, color:'#6b7280' }}>Month avg <Text style={{fontWeight:'700',color:'#111827'}}>₹{f3(avgUtil)}/m</Text></Text>
+          {!!ur.date_ymd && <Text style={{ fontSize:11, color:'#6b7280' }}>Selected <Text style={{fontWeight:'700',color:'#111827'}}>{fN(ur.kwh)} kWh</Text></Text>}
+        </View>
+        <TrendBars rows={selectedUtilityRows} valueKey="cost_per_mtr" valueFormatter={v=>`₹${f3(v)}`} selected={utilityIndex} onSelect={setUtilityIndex} barColor="#185FA5" />
+        {!!ur.date_ymd && <Text style={{ fontSize:11, color:'#4b5563', lineHeight:17, marginTop:6 }}>
+          Day {ur.day}: {fN(ur.kwh)} kWh · {fL(ur.amount)} electricity · {fN(ur.production_mtr)} m production · ₹{f3(ur.cost_per_mtr)}/m · ₹{Number(ur.cost_per_pick||0).toFixed(4)}/pick
+        </Text>}
+      </View>
+    </View>
+  );
+}
+
+function DailyTrendSheet({ open, onClose, d, trend }) {
+  if (!open || !trend) return null;
+  const isUtility = trend.kind === 'utility';
+  const isRapier = trend.kind === 'rapier';
+  const isWaterjet = trend.kind === 'waterjet';
+  const rows = isUtility
+    ? (d.utility_daily_trend || []).filter(r => r.key === trend.key)
+    : (d.expense_daily_trend || []);
+  const valueOf = r => isUtility ? Number(r.cost_per_mtr || 0)
+    : isRapier ? Number(r.rapier_cost_per_pick || 0)
+    : isWaterjet ? Number(r.waterjet_cost_per_pick || 0)
+    : Number(r.cost_per_pick || 0);
+  const positive = rows.map(valueOf).filter(v => v > 0);
+  const avg = positive.length ? positive.reduce((a,v)=>a+v,0) / positive.length : 0;
+  const best = positive.length ? Math.min(...positive) : 0;
+  const worst = positive.length ? Math.max(...positive) : 0;
+  const [selected, setSelected] = useState(Math.max(0, rows.length - 1));
+  React.useEffect(() => { setSelected(Math.max(0, rows.length - 1)); }, [trend?.kind, trend?.key, rows.length]);
+  const row = rows[Math.min(selected, Math.max(0, rows.length - 1))] || {};
+  const title = isUtility ? (trend.label || 'Utility') : isRapier ? 'Rapier' : isWaterjet ? 'Waterjet' : 'Total (Rapier + Waterjet)';
+  const prod = r => isUtility ? Number(r.production_mtr || 0) : isRapier ? Number(r.rapier_mtr || 0) : isWaterjet ? Number(r.waterjet_mtr || 0) : Number(r.production_mtr || 0);
+  const picks = r => isRapier ? Number(r.rapier_avg_picks || 0) : isWaterjet ? Number(r.waterjet_avg_picks || 0) : Number(r.avg_picks || 0);
+  const cost = r => isUtility ? Number(r.amount || 0) : isRapier ? Number(r.rapier_total_cost || 0) : isWaterjet ? Number(r.waterjet_total_cost || 0) : Number(r.total_cost || 0);
+  return <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={{flex:1,backgroundColor:'rgba(15,23,42,0.38)',justifyContent:'center',padding:18}}>
+      <View style={{backgroundColor:'#fff',borderRadius:16,maxHeight:'88%',padding:14}}>
+        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+          <View style={{flex:1,paddingRight:10}}><Text style={{fontSize:17,fontWeight:'700',color:'#111827'}}>{title}</Text>
+            <Text style={{fontSize:10.5,color:'#6b7280',marginTop:3,lineHeight:15}}>{isUtility ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds." : "Daily cost per pick — electricity, wages and allocated stores ÷ metres ÷ picks."}</Text></View>
+          <TouchableOpacity onPress={onClose} style={{padding:6}}><Text style={{fontSize:20,color:'#6b7280'}}>×</Text></TouchableOpacity>
+        </View>
+        <View style={{flexDirection:'row',gap:7,marginBottom:8}}>
+          {[['MONTH AVG',avg],['BEST DAY',best],['WORST DAY',worst]].map(([l,v])=><View key={l} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:9,padding:8}}><Text style={{fontSize:9,color:'#6b7280'}}>{l}</Text><Text style={{fontSize:14,fontWeight:'700',marginTop:2}}>₹{isUtility?f3(v):f3(v)}{isUtility?'/m':'/pk'}</Text></View>)}
+        </View>
+        <TrendBars rows={rows.map(r=>({...r,_v:valueOf(r)}))} valueKey="_v" valueFormatter={v=>`₹${f3(v)}`} selected={selected} onSelect={setSelected} barColor={isUtility?'#185FA5':isWaterjet?'#185FA5':'#c2823a'} />
+        {!!row.date_ymd && <View style={{backgroundColor:'#f8fafc',borderRadius:9,padding:9,marginVertical:6}}><Text style={{fontSize:11.5,fontWeight:'700'}}>Day {row.day}</Text><Text style={{fontSize:10.5,color:'#4b5563',marginTop:3}}>{isUtility ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row))}/m` : `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row))}/pick`}</Text></View>}
+        <ScrollView style={{maxHeight:210}} nestedScrollEnabled>
+          <View style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#e5e7eb'}}><Text style={{flex:0.8,fontSize:9,fontWeight:'700'}}>DATE</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'kWh':'PROD m'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'PROD m':'PICKS'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>COST</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'₹/m':'₹/PICK'}</Text></View>
+          {rows.map((r,i)=><TouchableOpacity key={`${r.date_ymd}-${i}`} onPress={()=>setSelected(i)} style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f3f4f6',backgroundColor:i===selected?'#f8fafc':'#fff'}}><Text style={{flex:0.8,fontSize:10}}>{r.day}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?r.kwh:prod(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?prod(r):picks(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fL(cost(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10,fontWeight:'700'}}>₹{f3(valueOf(r))}</Text></TouchableOpacity>)}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>;
+}
+
 function ExpBlock({ icon, iconColor, iconBg, title, sub, amt, editLabel, onEdit, children }) {
   const [open, setOpen] = useState(false);
   return (
@@ -319,11 +454,11 @@ function ExpBlock({ icon, iconColor, iconBg, title, sub, amt, editLabel, onEdit,
 }
 
 // ── Bar row (electricity sub-meter) ──────────────────────────────
-function BarRow({ label, kwh, cost, pct, costPct }) {
+function BarRow({ label, kwh, cost, pct, costPct, onTrend }) {
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-        <Text style={{ fontSize: 12, color: '#374151' }}>{label}</Text>
+        <TouchableOpacity disabled={!onTrend} onPress={onTrend} style={{flexDirection:'row',alignItems:'center',gap:5}}><Text style={{ fontSize: 12, color: '#374151' }}>{label}</Text>{!!onTrend && <Text style={{fontSize:9,fontWeight:'700',color:'#185FA5'}}>daily ›</Text>}</TouchableOpacity>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={{ fontSize: 12, color: '#374151' }}>
             {fN(kwh)} kWh · {fL(cost)}
@@ -612,12 +747,11 @@ function KPIGrid({ d, label }) {
 }
 
 // ── Mgmt card ─────────────────────────────────────────────────────
-function MgmtCard({ name, borderColor, prod, pk, elec, sal, store, cpp, cpmc }) {
+function MgmtCard({ name, borderColor, prod, pk, elec, sal, store, cpp, cpmc, onTrend }) {
   return (
     <View style={[S.mgmtCard, { borderLeftColor: borderColor }]}>
       <View style={S.mgmtHeader}>
-        <Text style={S.mgmtName}>{name}</Text>
-        <Text style={S.mgmtSub}>{f2(prod / 1e5)} L m · {f2(pk)} pk</Text>
+        <View><Text style={S.mgmtName}>{name}</Text><Text style={S.mgmtSub}>{f2(prod / 1e5)} L m · {f2(pk)} pk</Text></View>{!!onTrend && <TouchableOpacity onPress={onTrend} style={{paddingHorizontal:8,paddingVertical:5,borderRadius:12,backgroundColor:'#f3f4f6'}}><Text style={{fontSize:9.5,fontWeight:'700',color:'#6b7280'}}>daily trend ›</Text></TouchableOpacity>}
       </View>
       <View style={S.mgmtBody}>
         {[['#185FA5', 'Electricity', elec], ['#c2823a', 'Salary', sal], ['#1D9E75', 'Stores', store]].map(([c, l, v]) => (
@@ -776,6 +910,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   const [activeTab, setActiveTab] = useState(0);
   const [view, setView] = useState('report');
   const [pastOpen, setPastOpen] = useState({});
+  const [trendSheet, setTrendSheet] = useState(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const m = months[activeTab];
@@ -820,6 +955,7 @@ export default function ExpenseScreen({ token, apiBase }) {
       {/* <SafeAreaView style={S.safe} edges={['top']}> */}
       <SafeAreaView style={{ flex: 0, backgroundColor: T.nav }} edges={['top']} />
       <StatusBar style="light" backgroundColor={T.nav} />
+      <DailyTrendSheet open={!!trendSheet} onClose={()=>setTrendSheet(null)} d={d || {}} trend={trendSheet} />
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
         <View style={S.headerRow}>
@@ -871,9 +1007,9 @@ export default function ExpenseScreen({ token, apiBase }) {
 
             {/* Management summary */}
             <Text style={S.sectionLabel}>MANAGEMENT SUMMARY</Text>
-            <MgmtCard name="Rapier" borderColor="#c2823a" prod={d.prod_rapier} pk={d.avg_pick_mw} elec={d.elec_rapier} sal={d.sal_rapier} store={d.store_rapier} cpp={d.cpp_rapier} cpmc={d.cpmc_rapier || 0} />
-            <MgmtCard name="Waterjet" borderColor="#185FA5" prod={d.prod_wjet} pk={d.avg_pick_wjet} elec={d.elec_wjet} sal={d.sal_wjet} store={d.store_wjet} cpp={d.cpp_wjet} cpmc={d.cpmc_wjet || 0} />
-            <MgmtCard name="Total" borderColor="#e5e7eb" prod={d.prod_total} pk={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} cpp={d.cpp_total} cpmc={d.cpmc} />
+            <MgmtCard name="Rapier" borderColor="#c2823a" prod={d.prod_rapier} pk={d.avg_pick_mw} elec={d.elec_rapier} sal={d.sal_rapier} store={d.store_rapier} cpp={d.cpp_rapier} cpmc={d.cpmc_rapier || 0} onTrend={()=>setTrendSheet({kind:'rapier'})} />
+            <MgmtCard name="Waterjet" borderColor="#185FA5" prod={d.prod_wjet} pk={d.avg_pick_wjet} elec={d.elec_wjet} sal={d.sal_wjet} store={d.store_wjet} cpp={d.cpp_wjet} cpmc={d.cpmc_wjet || 0} onTrend={()=>setTrendSheet({kind:'waterjet'})} />
+            <MgmtCard name="Total" borderColor="#e5e7eb" prod={d.prod_total} pk={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} cpp={d.cpp_total} cpmc={d.cpmc} onTrend={()=>setTrendSheet({kind:'total'})} />
 
             {/* Expense breakdown */}
             <Text style={S.sectionLabel}>EXPENSE BREAKDOWN</Text>
@@ -883,17 +1019,18 @@ export default function ExpenseScreen({ token, apiBase }) {
               sub={`${fN(d.kwh_total)} kWh @ ₹${d.unit_rate}`} amt={`${fLn(d.elec_total)} L`}
               editLabel="Edit ›" onEdit={() => setView('daily-units')}>
               {[
-                ['MW Rapier — Looms', d.kwh_mw_looms, d.elec_mw_looms],
-                ['MW Rapier — Luwa (humid.)', d.kwh_mw_luwa, d.elec_mw_luwa],
-                ['Sud Rapier — Looms', d.kwh_sd_looms, d.elec_sd_looms],
-                ['Sud Rapier — Luwa (humid.)', d.kwh_sd_luwa, d.elec_sd_luwa],
-                ['Sud W-Jet — Looms', d.kwh_wj_looms, d.elec_wj_looms],
-                ['Warping (shared)', d.kwh_warping, d.elec_warping],
-                ['Miscellaneous (shared)', d.kwh_misc, d.elec_misc],
-              ].map(([label, kwh, cost]) => (
-                <BarRow key={label} label={label} kwh={kwh} cost={cost}
+                ['mw_rapier_looms', 'MW Rapier — Looms', d.kwh_mw_looms, d.elec_mw_looms],
+                ['mw_rapier_luwa', 'MW Rapier — Luwa (humid.)', d.kwh_mw_luwa, d.elec_mw_luwa],
+                ['sip_rapier_looms', 'Sud Rapier — Looms', d.kwh_sd_looms, d.elec_sd_looms],
+                ['sip_rapier_luwa', 'Sud Rapier — Luwa (humid.)', d.kwh_sd_luwa, d.elec_sd_luwa],
+                ['sip_waterjet_looms', 'Sud W-Jet — Looms', d.kwh_wj_looms, d.elec_wj_looms],
+                ['warping_shared', 'Warping (shared)', d.kwh_warping, d.elec_warping],
+                ['misc_shared', 'Miscellaneous (shared)', d.kwh_misc, d.elec_misc],
+              ].map(([key, label, kwh, cost]) => (
+                <BarRow key={key} label={label} kwh={kwh} cost={cost}
                   pct={d.kwh_total > 0 ? (kwh / d.kwh_total) * 100 : 0}
-                  costPct={d.elec_total > 0 ? (cost / d.elec_total) * 100 : 0} />
+                  costPct={d.elec_total > 0 ? (cost / d.elec_total) * 100 : 0}
+                  onTrend={()=>setTrendSheet({kind:'utility',key,label})} />
               ))}
               <Text style={{ fontSize: 11, color: '#000', marginTop: 4 }}>
                 Warping + Misc are shared — allocated ⅔ Rapier, ⅓ Waterjet in costing.

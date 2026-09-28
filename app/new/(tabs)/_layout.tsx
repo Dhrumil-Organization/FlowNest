@@ -14,6 +14,7 @@ import {
   Animated,
   LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,7 +23,6 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
-  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -61,6 +61,8 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order' },
   'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
   // 'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
+  'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
+  'Receivables-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Receivables' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },

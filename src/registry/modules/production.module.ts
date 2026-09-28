@@ -431,8 +431,8 @@ registerUiNodes([
     permission: 'production.event',
     action: 'view',
     order: 110,
-  }, 
-  
+  },
+
   {
     id: 'nav.payable',
     kind: 'navigation',
@@ -458,7 +458,7 @@ registerUiNodes([
     title: 'Receivables',
     permission: 'production.receivables',
     action: 'view',
-    route: 'receivables-screen',
+    route: 'Receivables-Screen',
     icon: 'assignment',
     order: 110,
   },

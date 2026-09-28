@@ -7,40 +7,50 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { API } from '../../common/API/dynamicAPI';
 
+import {
+  getCurrentErpProperty,
+  normalizeErpProperty,
+  resolveDynamicApiBaseUrl,
+  setDynamicApiBaseUrl,
+  subscribeErpContext,
+} from '../../common/API/dynamicAPI';
+
+// NEW ERP and Legacy ERP now share ONE host resolver (common/API/dynamicAPI.ts).
+//   sudamo_knits -> https://apig.tms-webapp.com
+//   rayons       -> https://apiy.tms-webapp.com
 const NEW_ERP_API_URLS = {
   sudamo_knits: 'https://apig.tms-webapp.com',
-  rayons: 'https://apiy.tms-webapp.com', 
+  rayons: 'https://apiy.tms-webapp.com',
 } as const;
-// const NEW_ERP_API_URLS = {
-//   sudamo_knits: 'http://192.168.13.100:4017',
-//   rayons: 'http://192.168.13.100:4017',
-// } as const;
 
 export type NewErpProperty = keyof typeof NEW_ERP_API_URLS;
 
 // Keep these exports because existing New ERP screens already import them.
-// They are live bindings and are refreshed from selected_property.
-export let API_BASE_URL: string = NEW_ERP_API_URLS.sudamo_knits;
+// They are live bindings and are refreshed from selected_property AND from
+// any property switch made through the shared dynamicAPI module.
+export let API_BASE_URL: string = resolveDynamicApiBaseUrl(getCurrentErpProperty());
 export let API: string = API_BASE_URL;
 
+subscribeErpContext(({ api }) => {
+  API_BASE_URL = api;
+  API = api;
+});
+
 export function resolveNewErpApiBaseUrl(property: string | null | undefined): string {
-  return property === 'rayons'
-    ? NEW_ERP_API_URLS.rayons
-    : NEW_ERP_API_URLS.sudamo_knits;
+  return resolveDynamicApiBaseUrl(property);
 }
 
 export async function initNewErpAPI(): Promise<string> {
-  const property = await AsyncStorage.getItem('selected_property');
-  API_BASE_URL = resolveNewErpApiBaseUrl(property);
+  const property = normalizeErpProperty(await AsyncStorage.getItem('selected_property'));
+  // Also updates the shared legacy `API` used by every production screen.
+  API_BASE_URL = setDynamicApiBaseUrl(property);
   API = API_BASE_URL;
-
-  console.log('NEW ERP API initialized:', { property, api: API_BASE_URL });
   return API_BASE_URL;
 }
 
 export async function setNewErpProperty(property: NewErpProperty): Promise<string> {
   await AsyncStorage.setItem('selected_property', property);
-  API_BASE_URL = resolveNewErpApiBaseUrl(property);
+  API_BASE_URL = setDynamicApiBaseUrl(property);
   API = API_BASE_URL;
 
   console.log('NEW ERP property selected:', { property, api: API_BASE_URL });

@@ -33,8 +33,11 @@
 // in the OUTER `app/new/(tabs)/`, never under `src/app/new/(tabs)/`.
 // ------------------------------------------------------------------
 
+import { API } from '@/common/API/dynamicAPI';
 import { registerUiNodes } from '../../core/ui-registry/uiRegistry';
 import { registerPermissionArea } from '../permissionRegistry';
+
+console.log('Registering production module...', API);
 
 // ---------------------------------------------------------------------------
 // 1. PERMISSIONS
@@ -158,6 +161,13 @@ registerPermissionArea({
         {
           key: 'payable',
           name: 'Payable',
+          type: 'screen',
+          displayOrder: 70,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+        {
+          key: 'receivables',
+          name: 'Receivables',
           type: 'screen',
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
@@ -438,6 +448,25 @@ registerUiNodes([
     kind: 'screen',
     title: 'Payable',
     permission: 'production.payable',
+    action: 'view',
+    order: 110,
+  },
+  // Receivable 
+  {
+    id: 'nav.receivables',
+    kind: 'navigation',
+    title: 'Receivables',
+    permission: 'production.receivables',
+    action: 'view',
+    route: 'receivables-screen',
+    icon: 'assignment',
+    order: 110,
+  },
+  {
+    id: 'screen.receivables',
+    kind: 'screen',
+    title: 'Receivables',
+    permission: 'production.receivables',
     action: 'view',
     order: 110,
   },

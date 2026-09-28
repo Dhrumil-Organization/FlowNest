@@ -2,7 +2,8 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 
-const API_BASE_URL = `${API}/api`;
+// Resolved per call from the LIVE shared host (apig/apiy).
+const getApiBaseUrl = () => `${API}/api`;
 
 export async function getQuarterSummary({
   fy = '2026-2027',
@@ -16,7 +17,7 @@ export async function getQuarterSummary({
   const token = await AsyncStorage.getItem('access_token');
 
   const response = await axios.post(
-    `${API_BASE_URL}/quarter-summary`,
+    `${getApiBaseUrl()}/quarter-summary`,
     {
       fy,
       quarter,

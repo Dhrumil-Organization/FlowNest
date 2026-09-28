@@ -8,9 +8,12 @@
 
 import axios from 'axios';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import { API } from '../../common/API/dynamicAPI';
+import { API, getApiBaseUrl } from '../../common/API/dynamicAPI';
 
-// Your Laravel API base URL
+// Your Laravel API base URL.
+// NOTE: kept for backward compatibility only — it is the host at module load.
+// Requests below always use the LIVE host (sudamo_knits -> apig, rayons -> apiy)
+// so a property switch is honoured without a refresh.
 export const BASE_URL = API;
 
 const api = axios.create({
@@ -19,6 +22,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async config => {
+  config.baseURL = getApiBaseUrl();
   const token = await AsyncStorage.getItem('access_token'); // saved at login
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -26,7 +26,7 @@ export const PermissionKeys = {
     greyPackingScanner: 'grey_packing.scanner',
     production: 'production',
     productionOrderTracking: 'production.production_order_tracking',
-    // payable: 'production.payable',
+    payable: 'production.payable',
     sudamoProductionOrder: 'production.sudamo_production_order',
     creditLimitRequest: 'production.credit_limit_request',
   },

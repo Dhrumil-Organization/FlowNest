@@ -49,7 +49,15 @@ registerPermissionArea({
           type: 'screen',
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
-        },          
+        },
+        {
+          key: 'receivables',
+          name: 'Receivables',
+          type: 'screen',
+          displayOrder: 70,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+
       ],
     },
   ],

@@ -162,6 +162,15 @@ registerPermissionArea({
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
         },
+        {
+          key: 'receivables',
+          name: 'Receivables',
+          type: 'screen',
+          displayOrder: 70,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+
+
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -421,8 +430,8 @@ registerUiNodes([
     permission: 'production.event',
     action: 'view',
     order: 110,
-  }, 
-  
+  },
+
   {
     id: 'nav.payable',
     kind: 'navigation',
@@ -440,6 +449,24 @@ registerUiNodes([
     permission: 'production.payable',
     action: 'view',
     order: 110,
-  }
+  },
+  {
+    id: 'nav.receivables',
+    kind: 'navigation',
+    title: 'Receivables',
+    permission: 'production.receivables',
+    action: 'view',
+    route: 'Receivables-Screen',
+    icon: 'assignment',
+    order: 110,
+  },
+  {
+    id: 'screen.receivables',
+    kind: 'screen',
+    title: 'Receivables',
+    permission: 'production.receivables',
+    action: 'view',
+    order: 110,
+  },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

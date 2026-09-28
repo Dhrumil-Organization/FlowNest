@@ -1,26 +1,25 @@
-import { getLoginSource } from '@/src/platform/runtime';
-import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import AppAlert from '@/common/utils/appAlert';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
+import { getLoginSource } from '@/src/platform/runtime';
 /////// [3] /////////
 import { initDatabase } from '@/common/API/DatabaseManager';
 import { API, initAPI } from '@/common/API/dynamicAPI';
 import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
 import { HOME_TOUR } from '@/common/TourJson';
 import TourOverlay from '@/common/TourOverlay';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { setCustomUsername } from '@/common/utils/feedbackStorage';
 import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 import { fetchAndCacheGlobalData, initGlobalCacheDB } from '@/common/utils/sqliteCacheManager';
 import Header from '@/components/Header';
 import { getCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     FlatList,
     ScrollView,
@@ -546,6 +545,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         // { name: 'ProcesFs complete auth.', icon: 'autorenew', route: 'process-complete-auth', color: '#dd5c98' },
         // { name: 'Febric Stock', icon: 'autorenew', route: 'febric-stock', color: '#dd5c98' },
         { name: 'Daily Payment Report', icon: 'payments', route: 'daily-payment-report', color: '#ff2ced' },
+        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#F97316' },
     ];
 
     const ALL_APPS = [
@@ -592,7 +592,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Yarn Manufacturing', route: 'yarn-manufacturing', icon: 'touch-app', color: '#008080', category: 'details' },
         { name: 'Profile', route: 'profile', icon: 'person-pin', color: '#000000', category: 'profile' },
         { name: 'Sales Order Entry', route: 'sales-order-entry', icon: 'shopping-cart-checkout', color: '#48cbef', category: 'Production' },
-        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production'  },
+        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Doff Entry', route: 'doff-entry', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Yarn Sales Order', route: 'yarn-sales-order', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
@@ -614,6 +614,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
         { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Fabric Stock Verification', route: 'fabric-stock-verification', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#F97316', category: 'Production'},
     ];
 
     useEffect(() => {
@@ -795,11 +796,15 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                     {
                     //                         "title": "Fabric Stock Verification",
                     //                         "href": "/"
-                    //                     }, 
+                    //                     },
                     //                     {
                     //                         "title": "Yarn Purchase Order",
                     //                         "href": "/"
-                    //                     },                                       
+                    //                     },
+                    //                     {
+                    //                         "title": "Weft Carton Issue",
+                    //                         "href": "/"
+                    //                     },
                     //                 ]
                     //             }
                     //         ]

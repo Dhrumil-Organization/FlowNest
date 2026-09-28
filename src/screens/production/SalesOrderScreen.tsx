@@ -1,27 +1,11 @@
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import GreySalesOrder from '../../components/GreySalesOrderNEW';
+import { ErpSessionGate } from '../../core/session/erpSession';
 
+// Token + API host come from the common ErpSessionGate:
+//   - sudamo_knits -> apig, rayons -> apiy (login selection AND header switch)
+//   - screen renders only after the correct token/host are known
+//   - screen remounts fresh when property or token changes (no refresh needed)
 export function SalesOrderScreen() {
-  const [token, setToken] = useState('');
-  const [username, setUsername] = useState('User');
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem('access_token'),
-        AsyncStorage.getItem('user_details'),
-        AsyncStorage.getItem('cache_deviceId'),
-      ]);
-      if (!mounted) return;
-      setToken(storedToken || '');
-      setUsername(storedUser || 'User');
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return <GreySalesOrder token={token || ''} isConnected={true} username={username} />
+  return <ErpSessionGate>{(s) => <GreySalesOrder token={s.token} isConnected={true} username={s.username} />}</ErpSessionGate>;
 }

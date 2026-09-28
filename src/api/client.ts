@@ -7,14 +7,14 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { API } from '../../common/API/dynamicAPI';
 
-const NEW_ERP_API_URLS = {
-  sudamo_knits: 'https://apig.tms-webapp.com',
-  rayons: 'https://apiy.tms-webapp.com', 
-} as const;
 // const NEW_ERP_API_URLS = {
-//   sudamo_knits: 'http://192.168.13.100:4017',
-//   rayons: 'http://192.168.13.100:4017',
+//   sudamo_knits: 'https://apig.tms-webapp.com',
+//   rayons: 'https://apiy.tms-webapp.com', 
 // } as const;
+const NEW_ERP_API_URLS = {
+  sudamo_knits: 'http://192.168.13.100:4017',
+  rayons: 'http://192.168.13.100:4017',
+} as const;
 
 export type NewErpProperty = keyof typeof NEW_ERP_API_URLS;
 

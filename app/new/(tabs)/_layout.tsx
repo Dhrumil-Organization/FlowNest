@@ -55,7 +55,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
-  priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Chart Priority' },
+  priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Dyeing' },
   datalog: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Datalog' },
   'production-order-tracking': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Production Order Tracking' },
   'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order' },

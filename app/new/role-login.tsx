@@ -15,16 +15,12 @@
 // screen after performLogin() has already stored the token.
 // ─────────────────────────────────────────────────────────────
 
+import Icon from '@expo/vector-icons/MaterialIcons';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { AuthButton, AuthShell } from '@/src/components/auth/AuthUI';
 
 import { performLogin } from '@/src/core/authFlow';
 import {
@@ -87,43 +83,43 @@ function AutoOrManualGate({ onManual }: { onManual: () => void }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.center}>
-        <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
-
-        <Text style={styles.title}>Welcome back</Text>
-
-        <Text style={styles.sub}>
-          Auto Login confirms it&apos;s you with your {bioLabel}, then
-          signs you in with your saved details.
-        </Text>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.primaryBtn, busy && styles.btnDisabled]}
-          onPress={handleAutoLogin}
-          disabled={busy}
-          activeOpacity={0.85}
-        >
-          {busy ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryText}>Auto Login</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={onManual}
-          disabled={busy}
-        >
-          <Text style={styles.secondaryText}>
-            Login manually instead
-          </Text>
-        </TouchableOpacity>
+    <AuthShell
+      eyebrow="NEW ERP SYSTEM"
+      title="Welcome back"
+      subtitle={`Auto Login confirms it's you with your ${bioLabel}, then signs you in with your saved details.`}
+      brandTitle="Welcome back to the New ERP"
+      brandSubtitle="Your saved login is protected by your device screen lock."
+    >
+      <View style={styles.bioHero}>
+        <View style={styles.bioCircle}>
+          <Icon name="fingerprint" size={40} color={T.copper} />
+        </View>
+        <Text style={styles.bioHeroText}>Confirm with {bioLabel}</Text>
       </View>
-    </SafeAreaView>
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Icon name="error-outline" size={18} color={T.red} />
+          <Text style={styles.error}>{error}</Text>
+        </View>
+      ) : null}
+
+      <AuthButton
+        label="Auto Login"
+        icon="arrow-forward"
+        onPress={handleAutoLogin}
+        disabled={busy}
+        loading={busy}
+      />
+
+      <AuthButton
+        label="Login manually instead"
+        variant="secondary"
+        onPress={onManual}
+        disabled={busy}
+        style={{ marginTop: 12 }}
+      />
+    </AuthShell>
   );
 }
 
@@ -180,66 +176,42 @@ export default function RoleLoginRoute() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: T.nav,
+  bioHero: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 18,
   },
-  center: {
-    flex: 1,
+  bioCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
   },
-  brand: {
-    fontSize: 10,
-    color: '#6F91AD',
-    fontWeight: '800',
-    letterSpacing: 1.7,
-    marginBottom: 14,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  sub: {
+  bioHeroText: {
+    marginTop: 12,
     fontSize: 13,
-    color: '#A9C0D4',
-    lineHeight: 19,
-    textAlign: 'center',
-    marginBottom: 26,
+    fontWeight: '800',
+    color: T.muted,
   },
-  error: {
-    color: '#E38B8B',
-    fontSize: 12,
-    textAlign: 'center',
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FCF4F2',
+    borderWidth: 1,
+    borderColor: '#F0D2CC',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 16,
   },
-  primaryBtn: {
-    width: '100%',
-    height: 52,
-    borderRadius: 15,
-    backgroundColor: T.copper,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  btnDisabled: {
-    opacity: 0.6,
-  },
-  primaryText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  secondaryBtn: {
-    paddingVertical: 10,
-  },
-  secondaryText: {
-    color: '#A9C0D4',
-    fontSize: 13,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+  error: {
+    flex: 1,
+    color: T.red,
+    fontSize: 12.5,
+    fontWeight: '600',
   },
 });

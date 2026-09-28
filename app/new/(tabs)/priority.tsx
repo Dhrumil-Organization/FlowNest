@@ -1,10 +1,12 @@
 import { PermissionRouteGuard } from '@/src/core/navigation/PermissionRouteGuard';
-import { PriorityScreen } from '@/src/screens/priority/PriorityScreen';
+import { DyeingScreen } from '@/src/screens/dyeing/DyeingScreen';
 
+// Dyeing module (Priority / Daily Update / Mill Hub). Route name kept as
+// `priority` so existing navigation + permission grants stay valid.
 export default function PriorityRoute() {
   return (
     <PermissionRouteGuard resource="priority" action="view">
-      <PriorityScreen />
+      <DyeingScreen />
     </PermissionRouteGuard>
   );
 }

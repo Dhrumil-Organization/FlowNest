@@ -4,7 +4,7 @@ import { SuccessModal } from '@/Shared/SuccessModal';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { API } from '../../common/API/dynamicAPI';
+// import { API } from '../../common/API/dynamicAPI';
 import {
     fetchCurrentYearData,
     fetchPropertyData,
@@ -139,7 +139,8 @@ const ddMMYYYYToISO = (ddMMYYYY?: string): string => {
 // ========== MAIN COMPONENT ==========
 const Collection: React.FC<Props> = ({
     token,
-    username
+    username,
+    API
 }) => {
     // ========== STATE MANAGEMENT (ALL YOUR EXISTING STATES) ==========
     const router = useRouter();

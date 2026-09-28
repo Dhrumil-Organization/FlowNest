@@ -753,14 +753,14 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     useWindowDimensions,
-    View,
-    Platform
+    View
 } from 'react-native';
 import main from '../../assets/images/main.png';
 import { API, initAPI } from '../../common/API/dynamicAPI';

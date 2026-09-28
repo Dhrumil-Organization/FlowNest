@@ -33,8 +33,11 @@
 // in the OUTER `app/new/(tabs)/`, never under `src/app/new/(tabs)/`.
 // ------------------------------------------------------------------
 
+import { API } from '@/common/API/dynamicAPI';
 import { registerUiNodes } from '../../core/ui-registry/uiRegistry';
 import { registerPermissionArea } from '../permissionRegistry';
+
+console.log('Registering production module...', API);
 
 // ---------------------------------------------------------------------------
 // 1. PERMISSIONS
@@ -169,8 +172,6 @@ registerPermissionArea({
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
         },
-
-
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -450,6 +451,7 @@ registerUiNodes([
     action: 'view',
     order: 110,
   },
+  // Receivable 
   {
     id: 'nav.receivables',
     kind: 'navigation',

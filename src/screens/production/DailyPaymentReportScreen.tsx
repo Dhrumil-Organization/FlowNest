@@ -1,29 +1,11 @@
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import DailyPaymentReport from '../../components/DailyPaymentReportNEW';
+import { ErpSessionGate } from '../../core/session/erpSession';
 
+// Token + API host come from the common ErpSessionGate:
+//   - sudamo_knits -> apig, rayons -> apiy (login selection AND header switch)
+//   - screen renders only after the correct token/host are known
+//   - screen remounts fresh when property or token changes (no refresh needed)
 export function DailyPaymentReportScreen() {
-  const [token, setToken] = useState('');
-  const [username, setUsername] = useState('User');
-  const [rightsMenuApps, setrightsMenuApps] = useState([]);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      const [storedToken, storedUser, storedRights] = await Promise.all([
-        AsyncStorage.getItem('access_token'),
-        AsyncStorage.getItem('user_details'),
-        // AsyncStorage.getItem('rightsMenuApps'),
-      ]);
-      if (!mounted) return;
-      setToken(storedToken || '');
-      setUsername(storedUser || 'User');
-      // setrightsMenuApps(storedRights || []);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return <DailyPaymentReport token={token} isConnected={true} username={username} />;
+  return <ErpSessionGate>{(s) => <DailyPaymentReport token={s.token} isConnected={true} username={s.username} />}</ErpSessionGate>;
 }

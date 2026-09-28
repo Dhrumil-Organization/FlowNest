@@ -21,6 +21,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import theme from '../../android/app/src/theme';
 import axios from 'axios';
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import { API } from '../../common/API/dynamicAPI';
 import { useNavigation } from '@react-navigation/native';
 import ChequePreviewModal, { SwipePreview } from './ChequePreview';
 import Footer from '../Footer/Footer';
@@ -137,7 +138,7 @@ const CollectionCard: React.FC<{
             const payloadArr = (getpayload as any[]) || [{}];
             const infoPayload = { ...payloadArr[0], rowdata: [item] };
             const headers = { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json', 'X-Requested-with': 'XMLHttpRequest' };
-            const response = await axios.post(`https://apig.tms-webapp.com/api/prodordertrack`, infoPayload, { headers });
+            const response = await axios.post(`${API}/api/prodordertrack`, infoPayload, { headers });
             if (response?.data?.success && response.data.data) {
                 const { data: respData, caption, stages } = response.data.data;
                 const isValid = (v: any) => v !== null && v !== undefined && v !== '' && !(typeof v === 'number' && v === 0);

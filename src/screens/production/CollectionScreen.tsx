@@ -1,29 +1,11 @@
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import CollectionList from '../../components/CollectionListNEW';
+import { ErpSessionGate } from '../../core/session/erpSession';
 
+// Token + API host come from the common ErpSessionGate:
+//   - sudamo_knits -> apig, rayons -> apiy (login selection AND header switch)
+//   - screen renders only after the correct token/host are known
+//   - screen remounts fresh when property or token changes (no refresh needed)
 export function CollectionScreen() {
-  const [token, setToken] = useState('');
-  const [username, setUsername] = useState('User');
-  const [deviceId, setDeviceId] = useState();
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      const [storedToken, storedUser, storedDeviceId] = await Promise.all([
-        AsyncStorage.getItem('access_token'),
-        AsyncStorage.getItem('user_details'),
-        AsyncStorage.getItem('cache_deviceId'),
-      ]);
-      if (!mounted) return;
-      setToken(storedToken || '');
-      setUsername(storedUser || 'User');
-      setDeviceId(storedDeviceId as any);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return <CollectionList token={token || ''} username={username} />;
+  return <ErpSessionGate>{(s) => <CollectionList token={s.token} username={s.username} API={s.API} />}</ErpSessionGate>;
 }

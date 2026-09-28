@@ -662,6 +662,52 @@ export const PriorityAPI = {
     client.post('/save_priority_status', payload),
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+// NEW: Dyeing module (Priority / Daily Update / Mill Hub).
+// Backend: SalesOrderPartyPriorityController — see routes added under
+// "//dyeing module" in api.php. Every body carries { prptype, yearno } so
+// the repository connects to the right property/year database, exactly
+// like the priority endpoints above.
+// These are called from src/screens/dyeing/dyeingApi.ts (currently
+// commented there — the screens run on hard-coded JSON until the backend
+// is deployed).
+// ─────────────────────────────────────────────────────────────────────────
+export const DyeingAPI = {
+  // Charts -> shades (per-shade OrderSrNo/AllocationId) -> lots -> history
+  priorityBrowse: (body: { prptype: string; yearno: string | number }) =>
+    client.post('/dyeing/priority_browse', body),
+
+  // Row-wise status for ONE colour: one lot (old body) or many lots
+  // (`Lots: [...]`, optional `SplitFromLotId`). All-or-nothing. Append-only history.
+  saveStatus: (payload: Record<string, any>) =>
+    client.post('/dyeing/save_status', payload),
+
+  // Lot CRUD for ONE colour: add / edit / remove / split — one lot (old body)
+  // or many lots at once (`Lots: [...]`, optional `SplitFromLotId`)
+  saveLot: (payload: Record<string, any>) =>
+    client.post('/dyeing/save_lot', payload),
+
+  // { prptype, yearno, fromdate: 'YYYY-MM-DD', todate: 'YYYY-MM-DD' }
+  dailyUpdate: (body: Record<string, any>) =>
+    client.post('/dyeing/daily_update', body),
+
+  // { prptype, yearno, fromdate, todate } — returns history up to todate
+  millHub: (body: Record<string, any>) =>
+    client.post('/dyeing/mill_hub', body),
+
+  // Outward (challan) help for one chart + the lot nos already saved on it.
+  // GET /dyeing/outward_details?prptype=S&chartno=CH-2-01&yearno=27
+  outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number }) =>
+    client.get('/dyeing/outward_details', { params }),
+
+  // Add / edit the lot no. of ONE outward line (uid + srno of the challan).
+  // /dyeing/save_outward_details?prptype=S&chartno=CH-2-01&yearno=27&uid=370000208&srno=2&lotno=123
+  saveOutwardDetails: (params: Record<string, any>) =>
+    client.get('/dyeing/save_outward_details', { params }),
+  saveOutwardDetailsPost: (params: Record<string, any>) =>
+    client.post('/dyeing/save_outward_details', params, { params }),
+};
+
 export const GreyPackingAPI = {
   transactionTypes: (params: Record<string, any>) =>
     client.get('/get_criterion', { params }),

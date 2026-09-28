@@ -17,11 +17,10 @@
 //   • Wide    (>= 1024)     split screen: navy brand panel | form card
 // ─────────────────────────────────────────────────────────────
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -34,7 +33,7 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-  useWindowDimensions,
+  useWindowDimensions
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -55,13 +54,17 @@ export const NAVY = {
 export const AUTH_BREAKPOINTS = { tablet: 768, wide: 1024, desktop: 1180 } as const;
 
 export function useAuthResponsive() {
-  const { width, height } = useWindowDimensions();
+  // IMPORTANT:
+  // Do not use the viewport height here. On native mobile, opening the
+  // keyboard changes the reported window height. Feeding that value back
+  // into the auth layout can cause repeated layout/focus renders.
+  const { width } = useWindowDimensions();
   const isWide = width >= AUTH_BREAKPOINTS.wide;
   const isTablet = width >= AUTH_BREAKPOINTS.tablet && !isWide;
   const isMobile = width < AUTH_BREAKPOINTS.tablet;
   const isDesktop = width >= AUTH_BREAKPOINTS.desktop;
   const gutter = isWide ? 40 : isTablet ? 32 : 18;
-  return { width, height, isWide, isTablet, isMobile, isDesktop, gutter };
+  return { width, isWide, isTablet, isMobile, isDesktop, gutter };
 }
 
 // Removes the default browser focus ring on react-native-web inputs; the
@@ -133,7 +136,7 @@ export function AuthShell({
   maxWidth = 480,
   children,
 }: AuthShellProps) {
-  const { isWide, isTablet, gutter, height } = useAuthResponsive();
+  const { isWide, isTablet, gutter } = useAuthResponsive();
   const insets = useSafeAreaInsets();
 
   const backButton = onBack ? (
@@ -181,14 +184,15 @@ export function AuthShell({
           <Text style={styles.brandFooter}>Developed by Madhusudan Group · Textile Innovation</Text>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1 }}>
           <ScrollView
             style={{ flex: 1, backgroundColor: T.bg }}
             contentContainerStyle={[
               styles.splitScroll,
-              { minHeight: height, paddingHorizontal: gutter, paddingTop: 40 + insets.top, paddingBottom: 40 + insets.bottom },
+              { paddingHorizontal: gutter, paddingTop: 40 + insets.top, paddingBottom: 40 + insets.bottom },
             ]}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             showsVerticalScrollIndicator={false}
           >
             <View style={{ width: '100%', maxWidth }}>
@@ -202,7 +206,7 @@ export function AuthShell({
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     );
   }
@@ -213,11 +217,12 @@ export function AuthShell({
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1 }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
@@ -241,7 +246,7 @@ export function AuthShell({
             </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -275,44 +280,59 @@ export function AuthField({
   helperTone,
   containerStyle,
   style,
-  onFocus,
-  onBlur,
   ...inputProps
 }: AuthFieldProps) {
-  const [focused, setFocused] = useState(false);
+  // Deliberately no focused React state here.
+  // Focusing a native TextInput must not cause the shared auth tree to
+  // re-render. The previous focus state could participate in keyboard/layout
+  // feedback on some native devices.
   const borderColor =
-    tone === 'success' ? T.green : tone === 'error' ? T.red : tone === 'warning' ? T.amber : focused ? T.copper : T.border;
+    tone === 'success'
+      ? T.green
+      : tone === 'error'
+        ? T.red
+        : tone === 'warning'
+          ? T.amber
+          : T.border;
 
   return (
     <View style={[{ marginBottom: 14 }, containerStyle]}>
       {label ? <FieldLabel>{label}</FieldLabel> : null}
+
       <View
         style={[
           styles.inputBox,
           { borderColor },
-          focused && tone === 'default' && styles.inputBoxFocused,
           tone === 'success' && { backgroundColor: '#F3F8F5' },
           tone === 'error' && { backgroundColor: '#FCF4F2' },
         ]}
       >
-        {icon ? <Icon name={icon as any} size={19} color={focused ? T.copper : T.muted} style={{ marginRight: 10 }} /> : null}
+        {icon ? (
+          <Icon
+            name={icon as any}
+            size={19}
+            color={T.muted}
+            style={{ marginRight: 10 }}
+          />
+        ) : null}
+
         <TextInput
-          placeholderTextColor={T.muted}
           {...inputProps}
-          onFocus={(e) => {
-            setFocused(true);
-            onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setFocused(false);
-            onBlur?.(e);
-          }}
+          placeholderTextColor={T.muted}
           style={[styles.input, webNoOutline, style]}
         />
+
         {right ? <View style={{ marginLeft: 8 }}>{right}</View> : null}
       </View>
+
       {helper ? (
-        <Text style={[styles.helper, { color: TONE_COLOR[helperTone ?? tone] }, (helperTone ?? tone) !== 'default' && { fontWeight: '700' }]}>
+        <Text
+          style={[
+            styles.helper,
+            { color: TONE_COLOR[helperTone ?? tone] },
+            (helperTone ?? tone) !== 'default' && { fontWeight: '700' },
+          ]}
+        >
           {helper}
         </Text>
       ) : null}

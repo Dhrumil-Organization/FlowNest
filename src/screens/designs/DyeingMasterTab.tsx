@@ -10,6 +10,19 @@ export type JobWorkParty = {
   short_name?: string | null;
 };
 
+export type MainErpShade = {
+  prp_code: string;
+  shd_code: number;
+  shd_name: string;
+  short_name?: string | null;
+};
+
+export type DyeingDesign = {
+  id: string;
+  code: string;
+  dsn_code?: string | null;
+};
+
 export type DyeingPartyShade = {
   id?: string | number | null;
   party_acc_code: string;
@@ -28,10 +41,15 @@ export type DyeingColour = {
 
 export type DyeingMasterApi = {
   listColours: () => Promise<DyeingColour[]>;
+  searchMainShades: (search: string) => Promise<MainErpShade[]>;
+  searchDesigns: (search: string) => Promise<DyeingDesign[]>;
   searchJobWorkParties: (search: string) => Promise<JobWorkParty[]>;
   saveColour: (payload: {
     name: string;
     hex: string;
+    erp_shade_code: number;
+    main_design_id: string;
+    design_shade_name?: string;
     mappings: Array<{
       party_acc_code: string;
       party_name: string;
@@ -163,6 +181,85 @@ function JobWorkPartyPicker({
   );
 }
 
+function SearchPicker<T>({
+  visible, title, subtitle, placeholder, valueLabel, search, keyOf, primary, secondary, onClose, onPick,
+}: {
+  visible: boolean;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  valueLabel?: string | null;
+  search: (text: string) => Promise<T[]>;
+  keyOf: (item: T) => string;
+  primary: (item: T) => string;
+  secondary: (item: T) => string | null;
+  onClose: () => void;
+  onPick: (item: T) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState<T[]>([]);
+  const [loading, setLoading] = useState(false);
+  const seq = useRef(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    setQ('');
+    setItems([]);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const mySeq = ++seq.current;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const data = await search(q.trim());
+        if (mySeq === seq.current) setItems(Array.isArray(data) ? data : []);
+      } catch {
+        if (mySeq === seq.current) setItems([]);
+      } finally {
+        if (mySeq === seq.current) setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [q, visible, search]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={s.overlay} onPress={onClose}>
+        <Pressable style={s.partySheet} onPress={() => {}}>
+          <View style={s.sheetHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetTitle}>{title}</Text>
+              <Text style={s.sheetSub}>{subtitle}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={s.closeBtn}><Text style={s.closeText}>×</Text></TouchableOpacity>
+          </View>
+          <TextInput autoFocus value={q} onChangeText={setQ} placeholder={placeholder} placeholderTextColor="#A49D94" style={s.input} />
+          {valueLabel ? <View style={s.currentParty}><Text style={s.currentPartyText}>Current: {valueLabel}</Text></View> : null}
+          {loading ? <View style={s.loader}><ActivityIndicator color={P.copper} /></View> : (
+            <FlatList
+              data={items}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={keyOf}
+              style={{ maxHeight: 380 }}
+              ListEmptyComponent={<Text style={s.empty}>No matching record found.</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={s.partyRow} onPress={() => { onPick(item); onClose(); }} activeOpacity={0.7}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.partyName}>{primary(item)}</Text>
+                    {secondary(item) ? <Text style={s.partySub}>{secondary(item)}</Text> : null}
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   const [colours, setColours] = useState<DyeingColour[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,6 +267,11 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [hex, setHex] = useState('#3A568A');
+  const [mainShade, setMainShade] = useState<MainErpShade | null>(null);
+  const [design, setDesign] = useState<DyeingDesign | null>(null);
+  const [designShadeName, setDesignShadeName] = useState('');
+  const [mainShadePicker, setMainShadePicker] = useState(false);
+  const [designPicker, setDesignPicker] = useState(false);
   const [rows, setRows] = useState<DraftRow[]>([
     { key: rowKey(), party: null, partyShadeNo: '' },
   ]);
@@ -203,6 +305,11 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   const reset = () => {
     setName('');
     setHex('#3A568A');
+    setMainShade(null);
+    setDesign(null);
+    setDesignShadeName('');
+    setMainShadePicker(false);
+    setDesignPicker(false);
     setRows([{ key: rowKey(), party: null, partyShadeNo: '' }]);
     setCreating(false);
     setPartyRowKey(null);
@@ -211,6 +318,14 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   const save = async () => {
     if (!name.trim()) {
       Alert.alert('Dyeing', 'Enter Colour / Shade Name.');
+      return;
+    }
+    if (!mainShade) {
+      Alert.alert('Dyeing', 'Select the existing ERP Main Shade (DAPShade).');
+      return;
+    }
+    if (!design) {
+      Alert.alert('Dyeing', 'Select the design for this mill shade mapping.');
       return;
     }
     if (!validRows.length) {
@@ -224,6 +339,9 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
       await api.saveColour({
         name: name.trim(),
         hex: normalizeHex(hex),
+        erp_shade_code: mainShade.shd_code,
+        main_design_id: design.id,
+        design_shade_name: designShadeName.trim() || name.trim(),
         mappings: validRows.map(r => ({
           party_acc_code: r.party!.acc_code,
           party_name: r.party!.name,
@@ -250,7 +368,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Yarn Dyeing Master</Text>
             <Text style={s.subtitle}>
-              colour → Job Work Party shade no. · each pairing maps to an ERP shade
+              main ERP shade → design → Job Work Party shade no. · stock keeps one main shade
             </Text>
           </View>
           <TouchableOpacity
@@ -287,6 +405,39 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
                 style={[s.input, { flex: 1 }]}
               />
             </View>
+
+            <Text style={[s.label, { marginTop: 14 }]}>Main ERP Shade (DAPShade)</Text>
+            <Text style={s.help}>Select the existing stock/accounting shade. Mill shade numbers will not create new DAPShade codes.</Text>
+            <TouchableOpacity style={s.select} onPress={() => setMainShadePicker(true)} activeOpacity={0.7}>
+              <View style={{ flex: 1 }}>
+                <Text style={mainShade ? s.selectValue : s.selectPlaceholder}>
+                  {mainShade ? mainShade.shd_name : 'Search existing ERP Main Shade'}
+                </Text>
+                {mainShade ? <Text style={s.selectCode}>ERP {mainShade.shd_code}{mainShade.short_name ? ` · ${mainShade.short_name}` : ''}</Text> : null}
+              </View>
+              <Text style={s.chev}>⌄</Text>
+            </TouchableOpacity>
+
+            <Text style={[s.label, { marginTop: 14 }]}>Design</Text>
+            <Text style={s.help}>The same main colour may have different mill shade numbers for different designs.</Text>
+            <TouchableOpacity style={s.select} onPress={() => setDesignPicker(true)} activeOpacity={0.7}>
+              <View style={{ flex: 1 }}>
+                <Text style={design ? s.selectValue : s.selectPlaceholder}>
+                  {design ? design.code : 'Search Design'}
+                </Text>
+                {design ? <Text style={s.selectCode}>{design.dsn_code ? `DsnCode ${design.dsn_code}` : design.id}</Text> : null}
+              </View>
+              <Text style={s.chev}>⌄</Text>
+            </TouchableOpacity>
+
+            <Text style={[s.label, { marginTop: 12 }]}>Design Shade / Reference Name</Text>
+            <TextInput
+              value={designShadeName}
+              onChangeText={setDesignShadeName}
+              placeholder={name.trim() ? `${name.trim()} for this design` : 'Optional design-specific display name'}
+              placeholderTextColor="#AAA39A"
+              style={s.input}
+            />
 
             <Text style={[s.label, { marginTop: 14 }]}>Job Work Party Shade Numbers</Text>
             <Text style={s.help}>
@@ -406,6 +557,34 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
           );
         })}
       </ScrollView>
+
+      <SearchPicker<MainErpShade>
+        visible={mainShadePicker}
+        title="Select Main ERP Shade"
+        subtitle="Existing DAPShade only · this is the stock/accounting identity"
+        placeholder="Search shade name, short name or ERP code"
+        valueLabel={mainShade ? `${mainShade.shd_name} · ERP ${mainShade.shd_code}` : null}
+        search={api.searchMainShades}
+        keyOf={(x) => `${x.prp_code}_${x.shd_code}`}
+        primary={(x) => x.shd_name}
+        secondary={(x) => `ERP ${x.shd_code}${x.short_name ? ` · ${x.short_name}` : ''}`}
+        onClose={() => setMainShadePicker(false)}
+        onPick={setMainShade}
+      />
+
+      <SearchPicker<DyeingDesign>
+        visible={designPicker}
+        title="Select Design"
+        subtitle="Mill shade references are stored design-wise"
+        placeholder="Search design code or DsnCode"
+        valueLabel={design ? design.code : null}
+        search={api.searchDesigns}
+        keyOf={(x) => x.id}
+        primary={(x) => x.code}
+        secondary={(x) => x.dsn_code ? `DsnCode ${x.dsn_code}` : x.id}
+        onClose={() => setDesignPicker(false)}
+        onPick={setDesign}
+      />
 
       <JobWorkPartyPicker
         visible={!!partyRowKey}

@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator,
+    View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal,
     KeyboardAvoidingView, Platform, RefreshControl, SafeAreaView, useWindowDimensions,
 } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { showSuccess, showError } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
+import SearchableDropdown from '@/Shared/SearchableDropdown';
+import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 
 import { s, C, tagStyle } from './styles';
 import * as api from './api';
@@ -37,8 +39,85 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     const [date, setDate] = useState(new Date());
     const [shift, setShift] = useState(1);
     const [datePicker, setDatePicker] = useState(false);
+
+    // Property / financial year filters (same selection flow as the old WftIssue screen).
+    const [propertyList, setPropertyList] = useState<any[]>([]);
+    const [yearList, setYearList] = useState<any[]>([]);
+    const [selectedPrpCode, setSelectedPrpCode] = useState(prpCode || '');
+    const [selectedYearNo, setSelectedYearNo] = useState(yearNo || '');
+    const [selectedProperty, setSelectedProperty] = useState<any>(null);
+    const [selectedYear, setSelectedYear] = useState<any>(null);
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [filterDateType, setFilterDateType] = useState<'from' | 'to' | null>(null);
+    const [fromDate, setFromDate] = useState(new Date());
+    const [toDate, setToDate] = useState(new Date());
     const ymd = toYmd(date);
     const dmy = toDmy(date);
+
+    useEffect(() => {
+        setSelectedPrpCode(prpCode || '');
+    }, [prpCode]);
+
+    useEffect(() => {
+        setSelectedYearNo(yearNo || '');
+    }, [yearNo]);
+
+    useEffect(() => {
+        if (!token) return;
+        let alive = true;
+        fetchAllPropertyData(token)
+            .then((rows: any[]) => {
+                if (!alive) return;
+                const list = Array.isArray(rows) ? rows : [];
+                setPropertyList(list);
+                const current = list.find((p: any) => String(p.PrpCode) === String(selectedPrpCode));
+                setSelectedProperty(current || null);
+            })
+            .catch(() => { if (alive) setPropertyList([]); });
+        return () => { alive = false; };
+    }, [token]);
+
+    useEffect(() => {
+        if (!token || !selectedPrpCode) {
+            setYearList([]);
+            setSelectedYear(null);
+            return;
+        }
+        let alive = true;
+        fetchAllYeardata(token, selectedPrpCode)
+            .then((rows: any[]) => {
+                if (!alive) return;
+                const list = Array.isArray(rows) ? rows : [];
+                setYearList(list);
+                const current = list.find((y: any) => String(y.YearNo) === String(selectedYearNo));
+                setSelectedYear(current || null);
+            })
+            .catch(() => { if (alive) setYearList([]); });
+        return () => { alive = false; };
+    }, [token, selectedPrpCode]);
+
+    useEffect(() => {
+        if (!selectedYearNo || yearList.length === 0) return;
+        const current = yearList.find((y: any) => String(y.YearNo) === String(selectedYearNo));
+        setSelectedYear(current || null);
+    }, [selectedYearNo, yearList]);
+
+    const activePrpCode = selectedPrpCode || prpCode;
+    const activeYearNo = selectedYearNo || yearNo;
+
+    const handlePropertyChange = (item: any) => {
+        const next = item?.PrpCode || '';
+        setSelectedPrpCode(next);
+        setSelectedProperty(item || null);
+        setSelectedYearNo('');
+        setSelectedYear(null);
+    };
+
+    const handleYearChange = (item: any) => {
+        setSelectedYearNo(item?.YearNo || '');
+        setSelectedYear(item || null);
+    };
+
 
     const [tab, setTab] = useState<'issue' | 'beams'>('issue');
     const { width: screenWidth } = useWindowDimensions();
@@ -51,11 +130,11 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     useEffect(() => {
         let alive = true;
         setBeamsLoading(true);
-        api.fetchBeams(token, prpCode, yearNo, dmy)
+        api.fetchBeams(token, activePrpCode, activeYearNo, dmy)
             .then(list => alive && setBeams(list.map((b: any) => ({ ...b, UId: b.UId ?? b.BeamUId, BeamNo: b.BeamNo }))))
             .finally(() => alive && setBeamsLoading(false));
         return () => { alive = false; };
-    }, [prpCode, yearNo, dmy]);
+    }, [activePrpCode, activeYearNo, dmy]);
 
     /* ---------------- carton ---------------- */
     const [mode, setMode] = useState<'scan' | 'manual'>('scan');
@@ -81,7 +160,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     const clientRef = useRef<string | null>(null); // kept across retries of the same entry
 
     /* ---------------- beams tab ---------------- */
-    const [scope, setScope] = useState<'date' | 'week'>('date');
     const [issues, setIssues] = useState<any[]>([]);
     const [issuesLoading, setIssuesLoading] = useState(false);
 
@@ -99,7 +177,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         }
         setScanErr('');
         setLoadingCarton(true);
-        const r = await api.cartonBalance(token, prpCode, yearNo, parsed.CartNo, { ...parsed, ...hint });
+        const r = await api.cartonBalance(token, activePrpCode, activeYearNo, parsed.CartNo, { ...parsed, ...hint });
         setLoadingCarton(false);
 
         if (!r.ok || !r.payload?.data) {
@@ -110,11 +188,11 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         setCartonLines(r.payload.lines || []);
         setCartonDone(false);
         resetEntry();
-    }, [token, prpCode, yearNo]);
+    }, [token, activePrpCode, activeYearNo]);
 
     const refreshCarton = useCallback(async () => {
         if (!carton) return;
-        const r = await api.cartonBalance(token, prpCode, yearNo, carton.CartNo, carton);
+        const r = await api.cartonBalance(token, activePrpCode, activeYearNo, carton.CartNo, carton);
         if (r.ok && r.payload?.data) {
             setCarton({ ...carton, ...r.payload.data });
             setCartonLines(r.payload.lines || []);
@@ -125,7 +203,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             setCartonLines(r.payload?.lines || []);
             setCartonDone(true);
         }
-    }, [carton, token, prpCode, yearNo]);
+    }, [carton, token, activePrpCode, activeYearNo]);
 
     const clearCarton = () => {
         setCarton(null);
@@ -139,12 +217,12 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         if (tab !== 'issue' || mode !== 'manual' || carton) return;
         const t = setTimeout(async () => {
             setSearching(true);
-            const r = await api.searchCartons(token, prpCode, yearNo, search.trim());
+            const r = await api.searchCartons(token, activePrpCode, activeYearNo, search.trim());
             setSearching(false);
             setResults(r.ok ? api.listOf({ data: r.payload?.data }) : []);
         }, 400);
         return () => clearTimeout(t);
-    }, [search, mode, tab, carton, token, prpCode, yearNo]);
+    }, [search, mode, tab, carton, token, activePrpCode, activeYearNo]);
 
     /* ======================================================================
        Entry
@@ -176,7 +254,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         setPreview(undefined);
         if (!line.beam || !line.dsn) return;
         let alive = true;
-        api.findIssue(token, prpCode, ymd, line.beam.UId, line.dsn.DsnCode).then(r => {
+        api.findIssue(token, activePrpCode, ymd, line.beam.UId, line.dsn.DsnCode).then(r => {
             if (alive) setPreview(r.payload?.data || null);
         });
         return () => { alive = false; };
@@ -199,12 +277,12 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         setSaving(true);
 
         const exp = await api.fetchExpProdQty(token, {
-            prpcode: prpCode, yearno: yearNo, wt: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+            prpcode: activePrpCode, yearno: activeYearNo, wt: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
             dsnrcpsrno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
         });
 
         const r = await api.saveLine(token, {
-            prpcode: prpCode, yearno: yearNo, IssDate: ymd, Shift: shift, StkType: stkType,
+            prpcode: activePrpCode, yearno: activeYearNo, IssDate: ymd, Shift: shift, StkType: stkType,
             BeamUId: line.beam.UId, DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
             ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
             Chees: ch, Wt: w, ClientRefId: clientRef.current,
@@ -236,7 +314,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Delete', style: 'destructive', onPress: async () => {
-                        const r = await api.deleteLine(token, { prpcode: prpCode, yearno: yearNo, uid: l.UId, srno: l.SrNo, subsr: l.SubSr });
+                        const r = await api.deleteLine(token, { prpcode: activePrpCode, yearno: activeYearNo, uid: l.UId, srno: l.SrNo, subsr: l.SubSr });
                         if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
                         const hd = r.payload?.data?.header_deleted ? ` IssNo ${l.IssNo} had no lines left and was removed.` : '';
                         showSuccess?.(`Line deleted.${hd}`);
@@ -255,7 +333,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Delete issue', style: 'destructive', onPress: async () => {
-                        const r = await api.deleteIssue(token, { prpcode: prpCode, uid: iss.UId });
+                        const r = await api.deleteIssue(token, { prpcode: activePrpCode, yearno: activeYearNo, uid: iss.UId });
                         if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
                         showSuccess?.(`IssNo ${iss.IssNo} deleted.`);
                         afterChange();
@@ -270,10 +348,15 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
        ====================================================================== */
     const loadIssues = useCallback(async () => {
         setIssuesLoading(true);
-        const r = await api.issueList(token, scope === 'date' ? { prpcode: prpCode, issdate: ymd } : { prpcode: prpCode, days: 7 });
+        const r = await api.issueList(token, {
+            prpcode: activePrpCode,
+            yearno: activeYearNo,
+            fromdate: toYmd(fromDate),
+            todate: toYmd(toDate),
+        });
         setIssuesLoading(false);
         setIssues(r.ok ? api.listOf({ data: r.payload?.data }) : []);
-    }, [scope, ymd, token, prpCode]);
+    }, [fromDate, toDate, token, activePrpCode, activeYearNo]);
 
     useEffect(() => { if (tab === 'beams') loadIssues(); }, [tab, loadIssues]);
 
@@ -433,7 +516,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                             </View>
 
                             <LineFields
-                                token={token} prpcode={prpCode} yearno={yearNo} stkType={stkType} dmy={dmy}
+                                token={token} prpcode={activePrpCode} yearno={activeYearNo} stkType={stkType} dmy={dmy}
                                 beams={beams} beamsLoading={beamsLoading} mitmcode={carton.MItmCode}
                                 value={line} onChange={v => { touchEntry(); setLine(v); }} isMobile={isMobile}
                             />
@@ -476,15 +559,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     /* ---------------- Beams tab ---------------- */
     const renderBeams = () => (
         <>
-            <View style={s.seg}>
-                <TouchableOpacity style={[s.segBtn, scope === 'date' && s.segBtnOn]} onPress={() => setScope('date')}>
-                    <Text style={[s.segText, scope === 'date' && s.segTextOn]}>{ymdShow(ymd)}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.segBtn, scope === 'week' && s.segBtnOn]} onPress={() => setScope('week')}>
-                    <Text style={[s.segText, scope === 'week' && s.segTextOn]}>Last 7 days</Text>
-                </TouchableOpacity>
-            </View>
-
             {!issuesLoading && issues.length === 0 && (
                 <View style={s.empty}>
                     <Text style={s.emptyTitle}>No weft issue here</Text>
@@ -544,15 +618,42 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             />
 
             {tab === 'beams' && <View style={s.headerMeta}>
+                <View style={[s.headerFilterItem, isMobile && s.headerFilterItemMobile]}>
+                    <Text style={s.headerFilterLabel}>Property</Text>
+                    <SearchableDropdown
+                        key={`header-prp-${activePrpCode}`}
+                        data={propertyList}
+                        labelKey="LngName"
+                        valueKey="PrpCode"
+                        placeholder="Choose property..."
+                        pageSize={10}
+                        initialValue={selectedProperty}
+                        onSelect={handlePropertyChange}
+                        multiple={false}
+                        emptyMessage="No properties available"
+                    />
+                </View>
+
+                <View style={[s.headerFilterItem, isMobile && s.headerFilterItemMobile]}>
+                    <Text style={s.headerFilterLabel}>Year</Text>
+                    <SearchableDropdown
+                        key={`header-year-${activeYearNo}`}
+                        data={yearList}
+                        labelKey="YearName"
+                        valueKey="YearNo"
+                        placeholder="Choose year..."
+                        pageSize={10}
+                        initialValue={selectedYear}
+                        onSelect={handleYearChange}
+                        multiple={false}
+                        emptyMessage="No years data available"
+                    />
+                </View>
+
                 <TouchableOpacity style={s.headerChip} onPress={() => setDatePicker(true)}>
                     <Icon name="event" size={16} color={C.primary} />
                     <Text style={s.headerChipText}>{dmy}</Text>
                 </TouchableOpacity>
-                {[1, 2, 3].map(n => (
-                    <TouchableOpacity key={n} style={[s.headerChip, shift === n && s.headerChipActive]} onPress={() => setShift(n)}>
-                        <Text style={[s.headerChipText, shift === n && s.headerChipTextActive]}>Shift {n}</Text>
-                    </TouchableOpacity>
-                ))}
                 <Text style={s.headerNote}>{isToday(date) ? 'Today' : 'Back-dated'}</Text>
             </View>}
 
@@ -582,9 +683,104 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 mode="date"
                 date={date}
                 maximumDate={new Date()}
-                onConfirm={d => { setDatePicker(false); setDate(d); resetEntry(); }}
+                onConfirm={d => {
+                    setDatePicker(false);
+                    setDate(d);
+                    setFromDate(d);
+                    if (d > toDate) setToDate(d);
+                }}
                 onCancel={() => setDatePicker(false)}
             />
+
+            <DateTimePickerModal
+                isVisible={filterDateType !== null}
+                mode="date"
+                date={filterDateType === 'from' ? fromDate : toDate}
+                maximumDate={new Date()}
+                onConfirm={d => {
+                    setFilterDateType(null);
+                    if (filterDateType === 'from') {
+                        setFromDate(d);
+                        if (d > toDate) setToDate(d);
+                    } else {
+                        setToDate(d);
+                    }
+                }}
+                onCancel={() => setFilterDateType(null)}
+            />
+
+            <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+                <View style={s.modalWrap}>
+                    <View style={s.filterSheet}>
+                        <View style={s.sheetHandle} />
+                        <View style={s.filterSheetHeader}>
+                            <Text style={s.sheetTitle}>Filter Records</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                                <TouchableOpacity onPress={() => {
+                                    setSelectedPrpCode(prpCode || '');
+                                    setSelectedYearNo(yearNo || '');
+                                    setSelectedProperty(propertyList.find((p: any) => String(p.PrpCode) === String(prpCode)) || null);
+                                    setSelectedYear(yearList.find((y: any) => String(y.YearNo) === String(yearNo)) || null);
+                                    const today = new Date();
+                                    setFromDate(today);
+                                    setToDate(today);
+                                }}>
+                                    <Text style={s.filterReset}>Reset</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setFilterOpen(false)} accessibilityLabel="Close filters">
+                                    <Icon name="close" size={24} color={C.ink} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 12 }}>
+                            <Text style={s.filterLabel}>Property</Text>
+                            <SearchableDropdown
+                                key={`filter-prp-${activePrpCode}`}
+                                data={propertyList}
+                                labelKey="LngName"
+                                valueKey="PrpCode"
+                                placeholder="Choose property..."
+                                pageSize={10}
+                                initialValue={selectedProperty}
+                                onSelect={handlePropertyChange}
+                                multiple={false}
+                                emptyMessage="No properties available"
+                            />
+
+                            <Text style={[s.filterLabel, { marginTop: 12 }]}>Year</Text>
+                            <SearchableDropdown
+                                key={`filter-year-${activeYearNo}`}
+                                data={yearList}
+                                labelKey="YearName"
+                                valueKey="YearNo"
+                                placeholder="Choose year..."
+                                pageSize={10}
+                                initialValue={selectedYear}
+                                onSelect={handleYearChange}
+                                multiple={false}
+                                emptyMessage="No years data available"
+                            />
+
+                            <Text style={[s.filterLabel, { marginTop: 12 }]}>From Date</Text>
+                            <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('from')}>
+                                <Text style={s.filterDateText}>{ymdShow(fromDate)}</Text>
+                            </TouchableOpacity>
+
+                            <Text style={[s.filterLabel, { marginTop: 12 }]}>To Date</Text>
+                            <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('to')}>
+                                <Text style={s.filterDateText}>{ymdShow(toDate)}</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+
+                        <TouchableOpacity style={[s.btn, s.btnPrimary, { marginTop: 8 }]} onPress={() => {
+                            setFilterOpen(false);
+                        }}>
+                            <Text style={s.btnPrimaryText}>Apply Filters</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             <ScannerModal
                 visible={scannerOpen}
@@ -595,7 +791,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             <EditLineSheet
                 visible={!!editLine}
                 line={editLine}
-                token={token} prpcode={prpCode} yearno={yearNo} stkType={stkType} dmy={dmy} expProdQtyType={expProdQtyType}
+                token={token} prpcode={activePrpCode} yearno={activeYearNo} stkType={stkType} dmy={dmy} expProdQtyType={expProdQtyType}
                 beams={beams} beamsLoading={beamsLoading}
                 onClose={() => setEditLine(null)}
                 onSaved={msg => { setEditLine(null); showSuccess?.(msg); afterChange(); }}

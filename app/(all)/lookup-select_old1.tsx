@@ -966,13 +966,12 @@ import AppAlert from '@/common/utils/appAlert';
 //         paddingHorizontal: 10,
 //     },
 // });
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     Dimensions,
     Platform,
     ScrollView,
@@ -981,7 +980,7 @@ import {
     Text,
     TouchableOpacity,
     useWindowDimensions,
-    View,
+    View
 } from 'react-native';
 
 const { width } = Dimensions.get('window');

@@ -1494,7 +1494,7 @@
 //           <>
 //             <KPIGrid d={d} label={m.fullLabel} />
 
-//             {/* Cost composition donut */}
+            {/* Cost composition donut */}
 //             <View style={S.compositionCard}>
 //               <Text style={S.compositionTitle}>
 //                 Cost composition · {m.shortLabel} '{m.displayYear}
@@ -2396,6 +2396,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -2403,6 +2404,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Svg, { Circle, Polyline } from "react-native-svg";
 import { useHeaderExtrasStore } from "../../core/layout/headerExtras";
 // SafeAreaView import removed — no longer used, the tabs layout now owns
 // the top safe-area inset for every tab screen (see (tabs)/_layout.tsx).
@@ -2876,46 +2878,20 @@ function ComparativeChart({ months, states }) {
           ))}
         </View>
 
-        {/* Cost/pick line overlay */}
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            height: CHART_H,
-            flexDirection: "row",
-            alignItems: "flex-end",
-            justifyContent: "space-around",
-          }}
-        >
-          {chartData.map((item, i) => {
-            const y =
-              CHART_H - (maxCpp > 0 ? (item.cpp / maxCpp) * CHART_H : 0);
-            return (
-              <View
-                key={i}
-                style={{
-                  width: BAR_W + 10,
-                  alignItems: "center",
-                  position: "relative",
-                }}
-              >
-                <View
-                  style={{
-                    position: "absolute",
-                    top: y - 4,
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: "#0f172a",
-                    borderWidth: 1.5,
-                    borderColor: "#fff",
-                  }}
-                />
-              </View>
-            );
-          })}
+        {/* Cost/pick line overlay. Connected SVG line remains visible on web and native. */}
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: CHART_H }}>
+          <Svg width="100%" height={CHART_H} viewBox={`0 0 600 ${CHART_H}`} preserveAspectRatio="none">
+            <Polyline points={chartData.map((item, i) => {
+              const x = chartData.length > 1 ? 50 + (i * 500) / (chartData.length - 1) : 300;
+              const y = CHART_H - (maxCpp > 0 ? (item.cpp / maxCpp) * (CHART_H - 12) : 0) - 6;
+              return `${x},${Math.max(6, Math.min(CHART_H - 6, y))}`;
+            }).join(" ")} fill="none" stroke="#0f172a" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+            {chartData.map((item, i) => {
+              const x = chartData.length > 1 ? 50 + (i * 500) / (chartData.length - 1) : 300;
+              const y = CHART_H - (maxCpp > 0 ? (item.cpp / maxCpp) * (CHART_H - 12) : 0) - 6;
+              return <Circle key={i} cx={x} cy={Math.max(6, Math.min(CHART_H - 6, y))} r="4" fill="#0f172a" stroke="#fff" strokeWidth="1.5" />;
+            })}
+          </Svg>
         </View>
 
         {/* Tooltip */}
@@ -2989,6 +2965,78 @@ function ComparativeChart({ months, states }) {
 }
 
 // ── Expandable expense block with icon ───────────────────────────
+// ── Daily Expense + Utility Trends (Client Artifact) ─────────────
+function TrendBars({ rows, valueKey, valueFormatter, selected, onSelect, barColor = '#c2823a' }) {
+  const max = Math.max(...rows.map(r => Number(r[valueKey] || 0)), 0.000001);
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingVertical: 6 }}>
+      {rows.map((r, i) => {
+        const v = Number(r[valueKey] || 0);
+        const active = selected === i;
+        return (
+          <TouchableOpacity key={`${r.date_ymd || r.day}-${i}`} onPress={() => onSelect(i)}
+            style={{ width: 38, alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Text style={{ fontSize: 9, color: active ? '#111827' : '#9ca3af', marginBottom: 3 }}>
+              {active ? valueFormatter(v) : ''}
+            </Text>
+            <View style={{ height: 92, width: 22, justifyContent: 'flex-end', backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden' }}>
+              <View style={{ width: '100%', height: `${Math.max(3, (v / max) * 100)}%`, backgroundColor: barColor, opacity: active ? 1 : 0.62 }} />
+            </View>
+            <Text style={{ fontSize: 9, color: active ? '#111827' : '#6b7280', marginTop: 4 }}>{r.day}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function DailyTrendSheet({ open, onClose, d, trend }) {
+  const safeTrend = trend || {};
+  const isUtility = safeTrend.kind === 'utility';
+  const isRapier = safeTrend.kind === 'rapier';
+  const isWaterjet = safeTrend.kind === 'waterjet';
+  const rows = isUtility
+    ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key)
+    : (d.expense_daily_trend || []);
+  const valueOf = r => isUtility ? Number(r.cost_per_mtr || 0)
+    : isRapier ? Number(r.rapier_cost_per_pick || 0)
+    : isWaterjet ? Number(r.waterjet_cost_per_pick || 0)
+    : Number(r.cost_per_pick || 0);
+  const positive = rows.map(valueOf).filter(v => v > 0);
+  const avg = positive.length ? positive.reduce((a,v)=>a+v,0) / positive.length : 0;
+  const best = positive.length ? Math.min(...positive) : 0;
+  const worst = positive.length ? Math.max(...positive) : 0;
+  const [selected, setSelected] = useState(Math.max(0, rows.length - 1));
+  React.useEffect(() => { setSelected(Math.max(0, rows.length - 1)); }, [safeTrend.kind, safeTrend.key, rows.length]);
+  const row = rows[Math.min(selected, Math.max(0, rows.length - 1))] || {};
+  const title = isUtility ? (safeTrend.label || 'Utility') : isRapier ? 'Rapier' : isWaterjet ? 'Waterjet' : 'Total (Rapier + Waterjet)';
+  const prod = r => isUtility ? Number(r.production_mtr || 0) : isRapier ? Number(r.rapier_mtr || 0) : isWaterjet ? Number(r.waterjet_mtr || 0) : Number(r.production_mtr || 0);
+  const picks = r => isRapier ? Number(r.rapier_avg_picks || 0) : isWaterjet ? Number(r.waterjet_avg_picks || 0) : Number(r.avg_picks || 0);
+  const cost = r => isUtility ? Number(r.amount || 0) : isRapier ? Number(r.rapier_total_cost || 0) : isWaterjet ? Number(r.waterjet_total_cost || 0) : Number(r.total_cost || 0);
+  if (!open || !trend) return null;
+  return <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={{flex:1,backgroundColor:'rgba(15,23,42,0.38)',justifyContent:'center',padding:18}}>
+      <View style={{backgroundColor:'#fff',borderRadius:16,maxHeight:'88%',padding:14}}>
+        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+          <View style={{flex:1,paddingRight:10}}><Text style={{fontSize:17,fontWeight:'700',color:'#111827'}}>{title}</Text>
+            <Text style={{fontSize:10.5,color:'#6b7280',marginTop:3,lineHeight:15}}>{isUtility ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds." : "Daily cost per pick — electricity, wages and allocated stores ÷ metres ÷ picks."}</Text></View>
+          <TouchableOpacity onPress={onClose} style={{padding:6}}><Text style={{fontSize:20,color:'#6b7280'}}>×</Text></TouchableOpacity>
+        </View>
+        <View style={{flexDirection:'row',gap:7,marginBottom:8}}>
+          {[['MONTH AVG',avg],['BEST DAY',best],['WORST DAY',worst]].map(([l,v])=><View key={l} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:9,padding:8}}><Text style={{fontSize:9,color:'#6b7280'}}>{l}</Text><Text style={{fontSize:14,fontWeight:'700',marginTop:2}}>₹{isUtility?f3(v):f3(v)}{isUtility?'/m':'/pk'}</Text></View>)}
+        </View>
+        <TrendBars rows={rows.map(r=>({...r,_v:valueOf(r)}))} valueKey="_v" valueFormatter={v=>`₹${f3(v)}`} selected={selected} onSelect={setSelected} barColor={isUtility?'#185FA5':isWaterjet?'#185FA5':'#c2823a'} />
+        {!!row.date_ymd && <View style={{backgroundColor:'#f8fafc',borderRadius:9,padding:9,marginVertical:6}}><Text style={{fontSize:11.5,fontWeight:'700'}}>Day {row.day}</Text><Text style={{fontSize:10.5,color:'#4b5563',marginTop:3}}>{isUtility ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row))}/m` : `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row))}/pick`}</Text></View>}
+        <ScrollView style={{maxHeight:210}} nestedScrollEnabled>
+          <View style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#e5e7eb'}}><Text style={{flex:0.8,fontSize:9,fontWeight:'700'}}>DATE</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'kWh':'PROD m'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'PROD m':'PICKS'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>COST</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'₹/m':'₹/PICK'}</Text></View>
+          {rows.map((r,i)=><TouchableOpacity key={`${r.date_ymd}-${i}`} onPress={()=>setSelected(i)} style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f3f4f6',backgroundColor:i===selected?'#f8fafc':'#fff'}}><Text style={{flex:0.8,fontSize:10}}>{r.day}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?r.kwh:prod(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?prod(r):picks(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fL(cost(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10,fontWeight:'700'}}>₹{f3(valueOf(r))}</Text></TouchableOpacity>)}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>;
+}
+
+
 function ExpBlock({
   icon,
   iconColor,
@@ -3048,6 +3096,7 @@ function BarRow({
   perPick,
   rateAvailable = true,
   pickRateAvailable = true,
+  onTrend,
 }) {
   return (
     <View style={{ marginBottom: 14 }}>
@@ -3060,7 +3109,10 @@ function BarRow({
           marginBottom: 5,
         }}
       >
-        <Text style={{ fontSize: 12, color: "#374151", flex: 1 }}>{label}</Text>
+        <TouchableOpacity disabled={!onTrend} onPress={onTrend} activeOpacity={0.72} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={{ fontSize: 12, color: "#374151" }}>{label}</Text>
+          {!!onTrend && <Text style={{ fontSize: 9.5, fontWeight: "700", color: "#185FA5" }}>daily ›</Text>}
+        </TouchableOpacity>
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 12, color: "#374151" }}>
             {fN(kwh)} kWh · {fL(cost)}
@@ -3211,81 +3263,60 @@ function DayInputTable({ days, cols, rows, setRows, onAddDay }) {
 // ── Daily Units view ──────────────────────────────────────────────
 
 function DailyUnitsView({ d, onBack }) {
-  const COLS = [
-    "MW Loom",
-    "MW Luwa",
-    "Sud Loom",
-    "Sud Luwa",
-    "WJet Loom",
-    "Warp",
-    "M",
-  ];
-  const initRows = (d.daily || []).map((r) => ({
-    date: r.date,
-    values: [
-      r.mw_looms,
-      r.mw_luwa,
-      r.sd_looms,
-      r.sd_luwa,
-      r.wj_looms,
-      r.warping,
-      r.misc,
-    ],
-  }));
-  const [rows, setRows] = useState(initRows);
-  const totalKwh = rows.reduce(
-    (s, r) => s + r.values.reduce((a, v) => a + (Number(v) || 0), 0),
-    0
-  );
-
-  const addDay = () => {
-    const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${
-      rows[0]?.date?.split("-")[1] || "Jun"
-    }`;
-    setRows((prev) => [
-      ...prev,
-      { date: nextDate, values: Array(COLS.length).fill("") },
-    ]);
+  const rows = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
+  const [openDay, setOpenDay] = useState(rows.length ? rows.length - 1 : -1);
+  const totalKwh = rows.reduce((sum, r) => sum + Number(r.total_kwh || 0), 0);
+  const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const monthLabel = d.label || '';
+  const fmtDate = (ymd) => {
+    const x = String(ymd || '');
+    if (x.length !== 8) return x;
+    const dt = new Date(Number(x.slice(0,4)), Number(x.slice(4,6))-1, Number(x.slice(6,8)));
+    return `${String(dt.getDate()).padStart(2,'0')}-${dt.toLocaleString('en-US',{month:'short'})}`;
   };
+  const meterRows = (r) => [
+    ['MW Rapier — Looms', r.mw_rapier_looms],
+    ['Sud Rapier — Looms', r.sip_rapier_looms],
+    ['Sud W-Jet — Looms', r.sip_waterjet_looms],
+  ];
+  const moreRows = (r) => [
+    ['MW Rapier — Luwa (humid.)', r.mw_rapier_luwa],
+    ['Sud Rapier — Luwa (humid.)', r.sip_rapier_luwa],
+    ['Warping (shared)', r.warping_shared],
+    ['Miscellaneous (shared)', r.misc_shared],
+  ];
 
   return (
     <View>
-      <TouchableOpacity onPress={onBack} style={{ marginBottom: 14 }}>
+      <TouchableOpacity onPress={onBack} style={{ marginBottom: 12 }}>
         <Text style={S.subBack}>‹ Back to report</Text>
       </TouchableOpacity>
-      <Text style={S.subTitle}>Daily units consumed</Text>
+      <Text style={S.subTitle}>Electricity units</Text>
       <Text style={S.subDesc}>
-        Sub-meter readings in kWh per day. "Misc" is the unmetered residual.
-        Monthly totals flow straight into the dashboard and electricity cost.
+        Read-only daily sub-meter readings from Expense Costing. Tap a day to audit the meter split. No value is entered or saved from this screen.
       </Text>
 
-      <DayInputTable
-        days={d.days}
-        cols={COLS}
-        rows={rows}
-        setRows={setRows}
-        onAddDay={addDay}
-      />
-
-      <TouchableOpacity style={S.addDayBtn} onPress={addDay}>
-        <Text style={S.addDayText}>+ Add a day</Text>
-      </TouchableOpacity>
-
-      <View style={S.footCard}>
-        <View>
-          <Text style={S.footLabel}>TOTAL UNITS</Text>
-          <Text style={{ fontSize: 16, fontWeight: "600" }}>
-            {fN(totalKwh)}{" "}
-            <Text style={{ fontSize: 13, color: "#9ca3af" }}>kWh</Text>
-          </Text>
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={S.footLabel}>ELECTRICITY @ ₹{d.unit_rate}</Text>
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#c2823a" }}>
-            {fL(d.elec_total)}
-          </Text>
-        </View>
+      <View style={{borderWidth:1,borderColor:'#e5e7eb',borderRadius:12,padding:12,marginBottom:10,flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <View><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>MONTH TO DATE {monthLabel ? `· ${monthLabel}` : ''}</Text><Text style={{fontSize:20,fontWeight:'700',marginTop:3}}>{fN(totalKwh)} <Text style={{fontSize:12,color:'#6b7280'}}>kWh</Text></Text></View>
+        <View style={{alignItems:'flex-end'}}><Text style={{fontSize:9,color:'#6b7280'}}>ELECTRICITY @ ₹{f2(d.unit_rate || 0)}</Text><Text style={{fontSize:17,fontWeight:'700',color:'#185FA5',marginTop:3}}>{fL(totalAmount)}</Text></View>
       </View>
+
+      {rows.length === 0 ? <View style={{padding:18,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10}}><Text style={{fontSize:12,color:'#6b7280'}}>No daily electricity readings are available for this month.</Text></View> : rows.map((r, i) => {
+        const open = openDay === i;
+        return <View key={`${r.date_ymd}-${i}`} style={{borderWidth:1,borderColor:open?'#cbd5e1':'#e5e7eb',borderRadius:10,marginBottom:7,overflow:'hidden',backgroundColor:'#fff'}}>
+          <TouchableOpacity onPress={()=>setOpenDay(open?-1:i)} style={{padding:11,flexDirection:'row',alignItems:'center'}} activeOpacity={0.75}>
+            <View style={{width:25,height:25,borderRadius:6,backgroundColor:open?'#185FA5':'#f3f4f6',alignItems:'center',justifyContent:'center',marginRight:9}}><Text style={{fontSize:11,fontWeight:'700',color:open?'#fff':'#6b7280'}}>{Number(r.day || i+1)}</Text></View>
+            <View style={{flex:1}}><Text style={{fontSize:12,fontWeight:'700'}}>{fmtDate(r.date_ymd)}</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{fN(r.total_kwh)} kWh</Text></View>
+            <Text style={{fontSize:11,fontWeight:'700',color:'#185FA5',marginRight:8}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:11,color:'#6b7280'}}>{open?'⌃':'⌄'}</Text>
+          </TouchableOpacity>
+          {open && <View style={{borderTopWidth:1,borderTopColor:'#f1f5f9',paddingHorizontal:11,paddingBottom:10}}>
+            {meterRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:7,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:11,color:'#374151'}}>{label}</Text><Text style={{fontSize:11,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
+            <Text style={{fontSize:9,fontWeight:'700',color:'#6b7280',marginTop:9,marginBottom:2}}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
+            {moreRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6}}><Text style={{fontSize:10.5,color:'#4b5563'}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
+            <View style={{marginTop:6,paddingTop:8,borderTopWidth:1,borderTopColor:'#e5e7eb',flexDirection:'row',justifyContent:'space-between'}}><View><Text style={{fontSize:10,fontWeight:'700'}}>DAY TOTAL</Text><Text style={{fontSize:9,color:'#6b7280',marginTop:2}}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {r.is_reconciled === false ? `difference ${fN(r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{alignItems:'flex-end'}}><Text style={{fontSize:13,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:10,color:'#6b7280',marginTop:2}}>{fL(r.amount || 0)}</Text></View></View>
+          </View>}
+        </View>;
+      })}
     </View>
   );
 }
@@ -3586,14 +3617,18 @@ function MgmtCard({
   store,
   cpp,
   cpmc,
+  onTrend,
 }) {
   return (
     <View style={[S.mgmtCard, { borderLeftColor: borderColor }]}>
       <View style={S.mgmtHeader}>
-        <Text style={S.mgmtName}>{name}</Text>
-        <Text style={S.mgmtSub}>
-          {f2(prod / 1e5)} L m · {f2(pk)} pk
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={S.mgmtName}>{name}</Text>
+          <Text style={S.mgmtSub}>{f2(prod / 1e5)} L m · {f2(pk)} pk</Text>
+        </View>
+        {!!onTrend && <TouchableOpacity onPress={onTrend} activeOpacity={0.72} style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, backgroundColor: "#f3f4f6" }}>
+          <Text style={{ fontSize: 9.5, fontWeight: "700", color: "#6b7280" }}>daily trend ›</Text>
+        </TouchableOpacity>}
       </View>
       <View style={S.mgmtBody}>
         {[
@@ -3782,105 +3817,113 @@ function MonthSettings({ d, monthKey }) {
 
 // ── Expense input coverage ─────────────────────────────────────────
 function ExpenseCoverageNotice({ d, month }) {
-  // Coverage must use Sheet2/live daily rows. Sheet1 is intentionally
-  // capped to the common complete costing date and cannot independently
-  // show later electricity entry dates.
-  const daily = Array.isArray(d?.coverage_daily)
-    ? d.coverage_daily
-    : (Array.isArray(d?.daily) ? d.daily : []);
-  if (!month || daily.length === 0) return null;
+  /*
+   * Coverage is authoritative from the live dashboard API.
+   *
+   * Do NOT derive this from coverage_daily/daily here. In the JSON path,
+   * `daily` is the checking-production trend and does not contain the legacy
+   * XLSX fields `total_kwh` / `sal_t`. Recalculating coverage from that array
+   * therefore makes every month look as if Electricity and Salary are missing.
+   */
+  const coverage = d?.coverage;
+  if (!month || !coverage) return null;
 
-  const lastDayFor = (predicate) => {
-    let last = 0;
-    daily.forEach((row) => {
-      if (!predicate(row)) return;
-      const day = Number(String(row?.date || '').slice(0, 2));
-      if (Number.isFinite(day) && day > last) last = day;
+  const heads = Array.isArray(coverage.coverage_heads)
+    ? coverage.coverage_heads
+    : [];
+  const pendingExpenses = Array.isArray(coverage.pending_expenses)
+    ? coverage.pending_expenses
+    : [];
+
+  const requestedYmd = Number(coverage.requested_upto_ymd || 0);
+  const completeYmd = Number(coverage.complete_through_ymd || 0);
+  const isComplete = coverage.is_complete === true
+    || String(coverage.coverage_status || '').toLowerCase() === 'complete';
+
+  const formatYmd = (ymd) => {
+    const value = String(Number(ymd || 0));
+    if (!/^\d{8}$/.test(value)) return null;
+    const year = Number(value.slice(0, 4));
+    const monthIndex = Number(value.slice(4, 6)) - 1;
+    const day = Number(value.slice(6, 8));
+    const dt = new Date(year, monthIndex, day);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
-    return last;
   };
 
-  const electricityLast = lastDayFor(
-    (row) => Number(row?.total_kwh || 0) > 0,
-  );
-  const salaryLast = lastDayFor(
-    (row) => Number(row?.sal_t || 0) > 0,
-  );
+  const formatShortYmd = (ymd) => {
+    const value = String(Number(ymd || 0));
+    if (!/^\d{8}$/.test(value)) return null;
+    const year = Number(value.slice(0, 4));
+    const monthIndex = Number(value.slice(4, 6)) - 1;
+    const day = Number(value.slice(6, 8));
+    const dt = new Date(year, monthIndex, day);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+    });
+  };
 
-  const now = new Date();
-  const isCurrentMonth =
-    Number(month.calYear) === now.getFullYear()
-    && Number(month.calMonth) === now.getMonth();
-  const requestedDay = isCurrentMonth
-    ? now.getDate()
-    : new Date(Number(month.calYear), Number(month.calMonth) + 1, 0).getDate();
+  const requestedText = formatYmd(requestedYmd);
+  const completeText = formatYmd(completeYmd);
 
-  const requiredPresent = electricityLast > 0 && salaryLast > 0;
-  const completeDay = requiredPresent
-    ? Math.min(electricityLast, salaryLast, requestedDay)
-    : 0;
+  // coverage_heads is the preferred full list. Keep a small compatibility
+  // fallback for older API responses that only expose pending_expenses.
+  const displayHeads = heads.length > 0
+    ? heads
+    : pendingExpenses;
 
-  const monthName = new Date(
-    Number(month.calYear),
-    Number(month.calMonth),
-    1,
-  ).toLocaleDateString('en-GB', { month: 'short' });
-
-  const coverageHeads = [
-    { key: 'electricity', label: 'Electricity', lastDay: electricityLast },
-    { key: 'salary', label: 'Salary', lastDay: salaryLast },
-  ].map((head) => {
-    const isCurrent = head.lastDay >= requestedDay;
-    const pendingFromDay = !isCurrent
-      ? (head.lastDay > 0 ? head.lastDay + 1 : 1)
-      : null;
-
-    return {
-      ...head,
-      isCurrent,
-      pendingFromDay,
-      pendingDays: pendingFromDay
-        ? Math.max(0, requestedDay - pendingFromDay + 1)
-        : 0,
-    };
-  });
-
-  const pending = coverageHeads.filter((head) => !head.isCurrent);
-  const dayMonth = (day) => `${String(day).padStart(2, '0')} ${monthName}`;
-
-  const completeText = completeDay > 0
-    ? `01–${String(completeDay).padStart(2, '0')} ${monthName} ${month.calYear}`
-    : `No fully complete expense day yet for ${month.fullLabel}`;
+  const hasPending = !isComplete || pendingExpenses.length > 0;
 
   return (
     <View style={S.coverageCard}>
       <View style={{ flex: 1 }}>
         <Text style={S.coverageKicker}>EXPENSE DATA COVERAGE</Text>
         <Text style={S.coverageTitle}>
-          {pending.length === 0 ? 'Entered through' : 'Complete through'} {completeText}
+          {isComplete
+            ? `Entered through ${completeText || requestedText || month.fullLabel}`
+            : `Complete through ${completeText || 'No fully complete expense day yet'}`}
         </Text>
-        {pending.length > 0 ? (
+
+        {hasPending ? (
           <View style={S.coverageHeadList}>
-            {coverageHeads.map((head) => (
-              <View key={head.key} style={S.coverageHeadRow}>
-                <Text style={S.coverageHeadLabel}>{head.label}</Text>
-                <Text style={head.isCurrent ? S.coverageHeadCurrent : S.coverageHeadPending}>
-                  {head.lastDay > 0
-                    ? `Entered through ${dayMonth(head.lastDay)}`
-                    : `No entry in ${monthName}`}
-                  {head.isCurrent
-                    ? ' · current'
-                    : ` · pending ${dayMonth(head.pendingFromDay)}–${dayMonth(requestedDay)} (${head.pendingDays}d)`}
-                </Text>
-              </View>
-            ))}
+            {displayHeads.map((head) => {
+              const current = String(head?.status || '').toLowerCase() === 'current';
+              const lastText = formatShortYmd(head?.last_entered_ymd);
+              const fromText = formatShortYmd(head?.pending_from_ymd);
+              const toText = formatShortYmd(head?.pending_to_ymd || requestedYmd);
+              const pendingDays = Number(head?.pending_days || 0);
+
+              return (
+                <View key={head?.key || head?.label} style={S.coverageHeadRow}>
+                  <Text style={S.coverageHeadLabel}>{head?.label || head?.key}</Text>
+                  <Text style={current ? S.coverageHeadCurrent : S.coverageHeadPending}>
+                    {lastText ? `Entered through ${lastText}` : 'No entry'}
+                    {current
+                      ? ' · current'
+                      : ` · pending ${fromText || '?'}–${toText || '?'} (${pendingDays}d)`}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ) : (
-          <Text style={S.coverageOk}>All required daily expense heads are current through {dayMonth(requestedDay)}.</Text>
+          <Text style={S.coverageOk}>
+            All required daily expense heads are current through {requestedText || completeText || month.fullLabel}.
+          </Text>
         )}
       </View>
-      <View style={[S.coverageBadge, pending.length > 0 ? S.coverageBadgeWarn : S.coverageBadgeOk]}>
-        <Text style={S.coverageBadgeText}>{pending.length > 0 ? 'PARTIAL' : 'CURRENT'}</Text>
+
+      <View style={[
+        S.coverageBadge,
+        hasPending ? S.coverageBadgeWarn : S.coverageBadgeOk,
+      ]}>
+        <Text style={S.coverageBadgeText}>{hasPending ? 'PARTIAL' : 'CURRENT'}</Text>
       </View>
     </View>
   );
@@ -4028,6 +4071,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   // Always tracks the currently selected month (see `m` below), so it never
   // needs its own year/month picker.
   const [avgPicksOpen, setAvgPicksOpen] = useState(false);
+  const [trendSheet, setTrendSheet] = useState(null);
   const scrollRef = useRef < ScrollView > null;
 
   const m = months[activeTab];
@@ -4091,6 +4135,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   // ── Main report ───────────────────────────────────────────────
   return (
     <View style={S.safe}>
+      <DailyTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} />
       <ScrollView
         style={S.body}
         showsVerticalScrollIndicator={false}
@@ -4163,6 +4208,43 @@ export default function ExpenseScreen({ token, apiBase }) {
             <ExpenseCoverageNotice d={d} month={m} />
             <KPIGrid d={d} label={m.fullLabel} />
 
+            {/* Section conversion rates — Client Artifact, LIVE MTD.
+                Conversion only = electricity + wages. Overheads are intentionally
+                excluded until Maintenance / Other and persistent freezing are proven. */}
+            {d.conversion_rates && (
+              <View style={{
+                backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
+                borderColor: "#e5e7eb", padding: 14, marginBottom: 14,
+              }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>Section conversion rates</Text>
+                  <View style={{ backgroundColor: "#FFF7E6", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#B26A00" }}>LIVE MTD</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 10.5, color: "#6b7280", lineHeight: 15, marginBottom: 10 }}>
+                  Electricity + wages ÷ Σ(metres × picks). Overheads are not included. Rate is live through {String(d.conversion_rates.calculated_through_ymd || "—")}.
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {[
+                    ["Rapier · MW + SIP", d.conversion_rates.rapier, "#c2823a"],
+                    ["Waterjet", d.conversion_rates.waterjet, "#185FA5"],
+                  ].map(([label, x, color]) => (
+                    <View key={label} style={{ flex: 1, borderWidth: 1, borderColor: "#e5e7eb", borderTopWidth: 4, borderTopColor: color, borderRadius: 10, padding: 10 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#111827", marginBottom: 7 }}>{label}</Text>
+                      <Text style={{ fontSize: 9.5, color: "#6b7280" }}>Electricity + wages</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#111827", marginTop: 2 }}>₹{Number(x?.rate_per_pick_mtr || 0).toFixed(4)}/pk·m</Text>
+                      <Text style={{ fontSize: 9.5, color: "#6b7280", marginTop: 4 }}>≈ ₹{Number(x?.approx_per_mtr || 0).toFixed(2)}/m @ {Number(x?.avg_picks || 0).toFixed(1)} picks</Text>
+                      <Text style={{ fontSize: 9, color: "#9ca3af", marginTop: 4 }}>{fL(Number(x?.conversion_amount || 0))} conversion</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={{ fontSize: 9.5, color: "#6b7280", marginTop: 9, lineHeight: 14 }}>
+                  Sale freeze and month-close freeze are intentionally not written yet. They will be enabled only after the actual ERP roll-to-sale persistence path is verified.
+                </Text>
+              </View>
+            )}
+
             {/* Cost composition donut */}
             <View style={S.compositionCard}>
               <Text style={S.compositionTitle}>
@@ -4188,6 +4270,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               store={d.store_rapier}
               cpp={d.cpp_rapier}
               cpmc={d.cpmc_rapier || 0}
+              onTrend={() => setTrendSheet({ kind: "rapier" })}
             />
             <MgmtCard
               name="Waterjet"
@@ -4199,6 +4282,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               store={d.store_wjet}
               cpp={d.cpp_wjet}
               cpmc={d.cpmc_wjet || 0}
+              onTrend={() => setTrendSheet({ kind: "waterjet" })}
             />
             <MgmtCard
               name="Total"
@@ -4210,6 +4294,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               store={d.store_total}
               cpp={d.cpp_total}
               cpmc={d.cpmc}
+              onTrend={() => setTrendSheet({ kind: "total" })}
             />
 
             {/* Expense breakdown */}
@@ -4223,7 +4308,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               title="Utilities / units consumed"
               sub={`${fN(d.kwh_total)} kWh @ ₹${d.unit_rate}`}
               amt={`${fLn(d.elec_total)} L`}
-              // editLabel="Edit ›"
+              editLabel="View daily units ›"
               onEdit={() => setView("daily-units")}
             >
               {utilityRows.map((row) => (
@@ -4238,6 +4323,7 @@ export default function ExpenseScreen({ token, apiBase }) {
                   perPick={row.cost_per_pick}
                   rateAvailable={row.rate_available !== false}
                   pickRateAvailable={row.pick_rate_available !== false}
+                  onTrend={() => setTrendSheet({ kind: "utility", key: row.key, label: row.label })}
                 />
               ))}
               <Text style={{ fontSize: 11, color: "#000", marginTop: 4 }}>

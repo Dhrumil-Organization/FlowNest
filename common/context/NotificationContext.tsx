@@ -86,7 +86,8 @@ const parseParams = (value: unknown): Record<string, any> => {
 const LEGACY_NOTIFICATION_ROUTES: Array<{ name: string; route: string }> = [
     ['Credit Limit Request', 'credit-limit'],
     ['Outstanding Days Request', 'outstanding-days-request'],
-    ['Receivables', 'receivables'],
+    // ['Receivables', 'Receivables-Screen'],
+    ['Receivables' , 'Receivables-Screen'],
     ['Collection', 'Collection'],
     ['Yarn Purchase Order', 'yarn-purchase-order'],
     ['Production Order Tracking', 'production-order-tracking'],

@@ -6,8 +6,10 @@ export type ExpenseDashboardData = {
     period: { yearno: number; monthno: string; month_start_ymd: number; upto_date_ymd: number; requested_upto_ymd?: number; complete_through_ymd?: number | null; last_expense_entry_ymd?: number | null; label: string; display_range?: string; working_days: number; ongoing: boolean; coverage_status?: 'complete' | 'partial' | 'incomplete'; is_complete?: boolean; pending_expenses?: { key: string; label: string; last_entered_ymd?: number | null; pending_from_ymd: number; pending_to_ymd: number; pending_days: number }[]; source_coverage?: Record<string, number | null> };
     summary: { total_cost: number; cost_per_pick: number; avg_picks: number; production_mtr: number; cost_per_machine_day: number; units: number; unit_rate: number; costing_looms: number; producing_looms_diagnostic: number; machine_days: number };
     composition: { electricity: number; salary: number; stores: number; total: number };
-    production: { mw_rapier_mtr: number; sip_rapier_mtr: number; sip_waterjet_mtr: number; rapier_total_mtr: number; total_mtr: number; latest_date_ymd?: number | null; daily_trend?: { date_ymd: number; day: string; rapier_mtr: number; waterjet_mtr: number; combined_mtr: number; mw_rapier_mtr: number; sip_rapier_mtr: number }[] };
-    division: Record<string, unknown>;
+    production: { mw_rapier_mtr: number; sip_rapier_mtr: number; sip_waterjet_mtr: number; rapier_total_mtr: number; total_mtr: number; latest_date_ymd?: number | null; daily_trend?: Array<{ date_ymd: number; day: string; rapier_mtr: number; waterjet_mtr: number; combined_mtr: number; mw_rapier_mtr: number; sip_rapier_mtr: number }> };
+    utilities?: { total_kwh:number; unit_rate:number; total_amount:number; rate_rows?: Array<Record<string, unknown>>; [key:string]:unknown };
+    trends?: { expense_daily?: Array<Record<string, any>>; utility_daily?: Array<Record<string, any>>; stores_daily_basis?: string; maintenance_included?: boolean; other_included?: boolean; source_rule?: string };
+    division: Record<string, any>;
     unit_reconciliation: Record<string, unknown>;
     picks: Record<string, unknown>;
     meta: Record<string, unknown>;
@@ -45,7 +47,7 @@ export async function fetchExpenseDashboardCard(args: {
             },
             timeout: 30000,
         });
-        console.log("args.token", args.token);
+        // Never log bearer tokens in production.
         const params = {
             prptype: String(args.prptype || 'S').toUpperCase(),
             yearno: String(args.yearno),
@@ -55,7 +57,7 @@ export async function fetchExpenseDashboardCard(args: {
             prpcodes: args.prpcodes,
         };
 
-        console.log("Expense API :", params, res);
+        if (__DEV__) console.log("Expense dashboard API", params);
         const data = res.data?.response?.data;
         if (!res.data?.success || !data) {
             throw new Error(res.data?.message || 'Production cost data is unavailable.');

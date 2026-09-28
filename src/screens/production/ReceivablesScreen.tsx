@@ -1,5 +1,5 @@
 import React from 'react';
-import PayableNew from '../../components/PayableNew';
+import Receivables from '../../components/ReceivablesNew';
 import { ErpSessionGate } from '../../core/session/erpSession';
 
 // Token + API host come from the common ErpSessionGate:
@@ -7,5 +7,5 @@ import { ErpSessionGate } from '../../core/session/erpSession';
 //   - screen renders only after the correct token/host are known
 //   - screen remounts fresh when property or token changes (no refresh needed)
 export function ReceivablesScreen() {
-  return <ErpSessionGate>{(s) => <PayableNew token={s.token} username={s.username} />}</ErpSessionGate>;
+  return <ErpSessionGate>{(s) => <Receivables token={s.token} username={s.username} />}</ErpSessionGate>;
 }

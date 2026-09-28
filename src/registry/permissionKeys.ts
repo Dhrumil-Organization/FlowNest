@@ -41,7 +41,10 @@ export const PermissionKeys = {
     orderEntry: 'orders.new_order',
     orderAuthorization: 'orders.authorization',
     orderTracking: 'orders.tracking',
-    priority: 'priority',
+    priority: 'priority', // Dyeing module (display name "Dyeing")
+    dyeingPriority: 'priority.chart_priority',
+    dyeingDailyUpdate: 'priority.daily_update',
+    dyeingMillHub: 'priority.mill_hub',
     datalog: 'datalog',
   },
   administration: {

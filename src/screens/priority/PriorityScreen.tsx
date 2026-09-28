@@ -1,87 +1,50 @@
 // FILE: src/screens/priority/PriorityScreen.tsx
-// Chart Priority — reorder the sales-order allocation charts for the
-// current property + financial year, then save the new order back.
+// Dyeing → Priority tab. Reorder the sales-order allocation charts for the
+// current property + financial year, save that order back, and track every
+// colour's dyeing status LOT-WISE and ROW-WISE.
 //
 // Conventions match every other migrated tab screen:
-//   - theme:             T, S from '@/src/theme'
-//   - business context:  useBusinessContext() from '@/src/core/business'
-//                         (prpCode / yearNo come from the session set at
-//                         login — never a screen-local constant)
-//   - permissions:        usePermission() from '@/src/core/permissions'
-//                         (resource key 'priority', actions view/edit/save)
-//   - API:                 PriorityAPI from '@/src/api/legacyClient'
-//                         (axios instance already attaches the bearer token)
-//   - header:              this screen renders NO header of its own — the
-//                         single AppHeader in (tabs)/_layout.tsx owns that
-//                         (HEADER_CONTENT['priority']). This screen only
-//                         pushes a small "Unsaved / Saved" badge into the
-//                         header's right slot via useHeaderExtrasStore,
-//                         exactly like OrdersScreen's "Saved ✓" pill.
+//   - theme:             T from '@/src/theme'
+//   - business context:  useBusinessContext() (prpGroup / yearNo from session)
+//   - permissions:        passed in by DyeingScreen (resource
+//                         'priority.chart_priority' — see priority.permission.ts)
+//   - API:                 DyeingService from '@/src/screens/dyeing/dyeingApi'
+//                         (hard-coded JSON right now; real calls are commented
+//                         in that file)
+//   - header:              no header of its own — only the "Unsaved / Saved"
+//                         badge is pushed into the global AppHeader.
 //
 // ---------------------------------------------------------------------------
-// NOTE ON PRIORITY SEMANTICS (read this before touching sort/save logic):
-//   - `ClientPriority` is whatever the client originally set. It is DISPLAY
-//     ONLY here — we never recompute or overwrite it locally. Whatever value
-//     came from the browse API for a shade is the value we send straight
-//     back on save, untouched.
-//   - `SelfPriority` is OUR priority (this screen). Moving a card up/down
-//     updates it, and only SelfPriority is recalculated/sent as the new
-//     value on save.
-//   - Every card shows BOTH values (a "Client #" meta chip + a "Self" badge)
-//     so the user can see what the client asked for vs. what they've set.
+// WHAT CHANGED vs the old Priority screen (and WHY)
+//   1. Status is now ROW-WISE. The old sheet saved one payload per chart with
+//      the chart's OrderSrNo for every shade, and the old browse matched shade
+//      names to codes by position across two un-ordered STRING_AGGs — so a
+//      status could land on the wrong shade ("common" status). Every shade now
+//      carries its OWN OrderSrNo / AllocationId / ShdCode from the backend,
+//      and each save posts exactly one lot of one colour.
+//   2. A colour can be split into dyeing LOTS (own lot no., qty, status,
+//      append-only dated history). The colour status = its slowest lot.
+//   3. New hard-coded status 'Lorry Cut' (re-dye / re-process with a reason).
+//   4. Card chips show, per colour, the FIRST LETTER of each lot's status in
+//      that status's colour + the lot no. (S / D / F / J / ✂).
+//   5. Client priority is display-only everywhere (card + sheet, lock icon);
+//      it is sent back unchanged on save.
 //
+// UNCHANGED: default ordering rules, drag-handle reorder (FlatList + fixed
+// row height + O(1) index math + edge auto-scroll), filter-safe reorder,
+// search disabling drag, Save → re-browse, save_priority_party payload.
+// ---------------------------------------------------------------------------
 // NOTE ON DEFAULT ORDERING (decided independently, per chart):
 //   1. Self priority present                -> sort by Self priority.
-//   2. Self priority missing, Client present -> sort by Client priority
-//      (this is exactly the "nothing has been saved from this screen yet"
-//      case — the list defaults to the order the client originally asked
-//      for, until we save our own order).
-//   3. Both missing                          -> no sort key; the chart drops
-//      to the bottom (stable, original browse order among such charts) and
-//      gets its own fresh Self priority (its position) the next time we
-//      save.
-//   This is a pure ORDERING decision only — Client priority is NEVER copied
-//   into Self priority and vice-versa. Only the real saved value (or the
-//   lack of one) is ever shown for each field, and only Self priority is
-//   ever sent back as the reordered value on save. After every save the
-//   screen re-browses; once the backend returns a real Self priority for a
-//   chart, rule (1) takes over for it from then on.
+//   2. Self priority missing, Client present -> sort by Client priority.
+//   3. Both missing                          -> bottom, original browse order.
+//   Client priority is NEVER copied into Self priority and vice-versa.
 //
-// NOTE ON REORDERING (mobile UX):
-//   Reorder is started ONLY from the dedicated drag-handle icon. Normal card
-//   touches keep their normal behaviour, while the handle uses PanResponder.
-//   While holding/moving, the insertion point is shown as a highlighted line;
-//   the array is changed only when the handle is released.
-//
-// NOTE ON SHADE DATA SOURCE:
-//   Every browse row can now carry a `shadeDetails` array:
-//     { shadeName, shadeCode, status }
-//   This is the authoritative source for each shade's name/code/status.
-//   `ShadeAllocation` / `Shdcodes` are left completely untouched and are
-//   still used only to work out each shade's quantity (by matching name).
-//   If a row has no shadeDetails (older data), we fall back to parsing
-//   ShadeAllocation/Shdcodes the old way so nothing breaks.
-//
-// NOTE ON DATA SOURCE:
-//   Priority browse/order/status are backend-only. No priority/order/status
-//   data is read from AsyncStorage or any browser cache. After each successful
-//   save, the screen browses again and renders the backend response.
-//
-// NOTE ON GROUPING KEY (chart identity):
-//   A single browse response can legitimately contain the SAME ChartNo used
-//   under more than one party/order (ParCode / OrderUId). Grouping by ChartNo
-//   alone can silently merge two unrelated charts into one card and mix their
-//   shades. The real identity of a chart for this screen is therefore the
-//   triple (ChartNo, ParCode, OrderUId) — every row is grouped by that
-//   composite key, so two rows only ever land on the same card when ChartNo,
-//   ParCode AND OrderUId all match.
+// NOTE ON GROUPING KEY (chart identity): ChartNo + ParCode + OrderUId.
 // ---------------------------------------------------------------------------
 
-import { PriorityAPI } from '@/src/api/legacyClient';
 import { useBusinessContext } from '@/src/core/business';
-// Priority browse, priority order save, and shade-status save use the real API.
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
-import { usePermission } from '@/src/core/permissions';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -89,7 +52,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -98,21 +60,37 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ColourStatusSheet } from '../dyeing/ColourStatusSheet';
+import { DyeingService, isSaved, messageOf, unwrapBody } from '../dyeing/dyeingApi';
+import {
+  deriveColourStatus,
+  DyeEvent,
+  DyeLot,
+  normalizeStatus,
+  num,
+  parseAnyDate,
+  PriorityChart,
+  PriorityShade,
+  qtyLabel,
+  ShadeStatus,
+  STATUS_COLORS,
+  STATUS_LETTER,
+  STATUS_OPTIONS,
+  withVirtualRemainder,
+} from '../dyeing/dyeingModel';
+
+export type PriorityPerms = {
+  canEdit: boolean; // drag / reorder
+  canSave: boolean; // save priority order
+  canStatus: boolean; // row-wise status update (incl. Lorry Cut)
+  canLot: boolean; // add / edit / remove lots
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const numberValue = (value: any) => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : 0;
-};
-
-const qtyLabel = (value: any) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '0';
-  return num.toLocaleString('en-IN', { maximumFractionDigits: 3 });
-};
+const numberValue = num;
 
 const normalizeDate = (value: any) => {
   const raw = String(value ?? '').trim();
@@ -127,219 +105,63 @@ const formatDate = (value: any) => {
 
 const normName = (value: any) => String(value ?? '').trim().toUpperCase();
 
+const positiveOrNull = (value: any) => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 /* -------------------------------------------------------------------------- */
-/*  Shade status (hard-coded options — no backend enum for this yet)          */
+/*  Normalisers for the backend lot / event shapes                             */
 /* -------------------------------------------------------------------------- */
 
-const STATUS_OPTIONS = ['Sent for job', 'Dying', 'Finish', 'Job inward'] as const;
-type ShadeStatus = (typeof STATUS_OPTIONS)[number];
-
-const STATUS_COLORS: Record<ShadeStatus, string> = {
-  'Sent for job': T.amber,
-  'Dying': T.red,
-  'Finish': T.green,
-  'Job inward': T.copper,
+const toEvent = (raw: any): DyeEvent | null => {
+  const status = normalizeStatus(raw?.Status ?? raw?.status);
+  if (!status) return null;
+  return {
+    Id: raw?.Id ?? raw?.id ?? `${status}-${raw?.StatusDate}`,
+    Status: status,
+    StatusDate: parseAnyDate(raw?.StatusDate ?? raw?.statusdate),
+    Qty: num(raw?.Qty ?? raw?.qty),
+    IsRework: !!Number(raw?.IsRework ?? raw?.isrework ?? 0),
+    LorryCutReason: raw?.LorryCutReason ?? raw?.lorrycutreason ?? null,
+    Remarks: raw?.Remarks ?? raw?.remarks ?? null,
+    ChallanNo: raw?.ChallanNo ?? raw?.challanno ?? null,
+    AgainstChallanNo: raw?.AgainstChallanNo ?? raw?.againstchallanno ?? null,
+    MillName: raw?.MillName ?? raw?.millname ?? null,
+    Rate: raw?.Rate != null && raw?.Rate !== '' ? num(raw.Rate) : null,
+    CreatedBy: raw?.CreatedBy ?? raw?.createdby ?? null,
+    CreatedAt: raw?.CreatedAt ?? raw?.createdat ?? null,
+    FromLotNo: raw?.FromLotNo ?? undefined,
+    Source: raw?.Source ?? null,
+  };
 };
 
-const shadeKeyOf = (shade: { ShdCode: string; ShdName: string }) =>
-  shade.ShdCode || shade.ShdName;
+const toEvents = (list: any): DyeEvent[] =>
+  (Array.isArray(list) ? list : []).map(toEvent).filter(Boolean) as DyeEvent[];
 
-type PriorityShade = {
-  ShdCode: string;
-  ShdName: string;
-  AllocationQty: number;
-  AllocationId: number | null;
-  ClientPriority: number | null;
-  SelfPriority: number | null;
-  Status: ShadeStatus | null;
+const toLot = (raw: any): DyeLot => {
+  const history = toEvents(raw?.history);
+  return {
+    LotId: raw?.LotId != null ? Number(raw.LotId) : null,
+    LotNo: String(raw?.LotNo ?? '').trim(),
+    LotQty: num(raw?.LotQty),
+    Status: normalizeStatus(raw?.Status),
+    StatusDate: parseAnyDate(raw?.StatusDate) || null,
+    LorryCutCount: num(raw?.LorryCutCount) || history.filter((h) => h.Status === 'Lorry Cut').length,
+    ParentId: raw?.ParentId != null && raw?.ParentId !== '' ? Number(raw.ParentId) : null,
+    history,
+    inheritedHistory: toEvents(raw?.inheritedHistory),
+  };
 };
 
-type PriorityChart = {
-  key: string;
-  ChartNo: string;
-  LastDate: string;
-  OrderUId: number;
-  OrderSrNo: number;
-  ParCode: string;
-  PartyName: string;
-  DesignCode: string;
-  DesignName: string;
-  ApcChartName: string;
-  qty: number;
-  shades: PriorityShade[];
-  savedClientPriority: number | null; // what the client originally set — display only
-  savedSelfPriority: number | null; // our own priority — drives sort order
-  displayPriority: number; // live position in the list (== new SelfPriority)
-};
+/* -------------------------------------------------------------------------- */
+/*  Ordering (unchanged rules)                                                 */
+/* -------------------------------------------------------------------------- */
 
-function groupChartsForPriority(rows: any[]): PriorityChart[] {
-  const grouped = new Map<string, PriorityChart>();
-
-  rows.forEach((row) => {
-    const chartNo = String(row?.ChartNo ?? row?.chartno ?? '').trim();
-    const date = normalizeDate(row?.LastDate) || String(row?.LastDate ?? '').trim();
-    if (!chartNo && !date) return;
-
-    // ParCode + OrderUId are part of a chart's identity (see NOTE ON GROUPING
-    // KEY above), so both must be resolved BEFORE building the group key.
-    const parCode = String(row?.ParCode ?? row?.parcode ?? '').trim();
-    const rowOrderUId = numberValue(row?.OrderUId ?? row?.orderuid ?? row?.OrderUID);
-
-    const rawAllocation = String(
-      row?.ShadeAllocation ?? row?.shadeallocation ?? '',
-    ).trim();
-    if (!rawAllocation) return;
-
-    // qty-by-name map, purely from ShadeAllocation (untouched, as received)
-    const qtyByName = new Map<string, number>();
-    rawAllocation
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .forEach((part) => {
-        const idx = part.indexOf(':');
-        const name = idx === -1 ? part.trim() : part.slice(0, idx).trim();
-        const qty = idx === -1 ? 0 : numberValue(part.slice(idx + 1).trim());
-        qtyByName.set(normName(name), (qtyByName.get(normName(name)) || 0) + qty);
-      });
-
-    const rawCodes = String(
-      row?.Shdcodes ?? row?.shdcodes ?? row?.ShdCode ?? row?.shdcode ?? row?.ShadeCode ?? '',
-    ).trim();
-    const codesArr = rawCodes
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean);
-
-    const rowClientPriority =
-      row?.ClientPriority ?? row?.Clientpriority ?? row?.clientpriority ?? null
-        ? Number(row?.ClientPriority ?? row?.Clientpriority ?? row?.clientpriority)
-        : null;
-    // Real SelfPriority only — never seeded from ClientPriority here. The
-    // Self-vs-Client fallback for ORDERING happens once per chart, further
-    // below (see NOTE ON DEFAULT ORDERING). Keeping this field pure means
-    // the "Self" badge and the save payload only ever carry a value we
-    // actually own, never a borrowed Client value.
-    const rowSelfPriority = (() => {
-      const rawValue = row?.SelfPriority ?? row?.selfpriority;
-      const hasValue = !(rawValue === null || rawValue === undefined || String(rawValue).trim() === '');
-      const parsed = hasValue ? Number(rawValue) : null;
-      return parsed != null && parsed > 0 ? parsed : null;
-    })();
-    const rowAllocationId =
-      row?.AllocationId ?? row?.allocationid ?? row?.AllocationID ?? null
-        ? Number(row?.AllocationId ?? row?.allocationid ?? row?.AllocationID)
-        : null;
-    const rowApcChartName = String(
-      row?.ApcChartName ?? row?.APCChartName ?? row?.apcchartname ?? row?.apcChartName ?? '',
-    ).trim();
-
-    const normalizeStatus = (value: any): ShadeStatus | null => {
-      if (value === null || value === undefined) return null;
-      const trimmed = String(value).trim();
-      if (!trimmed || trimmed.toLowerCase() === 'none') return null;
-      return (STATUS_OPTIONS as readonly string[]).includes(trimmed)
-        ? (trimmed as ShadeStatus)
-        : null;
-    };
-
-    // --- Chart identity = ChartNo + ParCode + OrderUId (composite key) -----
-    // Two rows only ever collapse onto the same card when ALL THREE match.
-    // This stops two different parties/orders that happen to reuse the same
-    // ChartNo from being merged into one card with mixed shades.
-    const groupKey = chartNo
-      ? `CHART:${chartNo}::PAR:${parCode}::ORD:${rowOrderUId}`
-      : `DATE:${date}::PAR:${parCode}::ORD:${rowOrderUId}`;
-
-    const current =
-      grouped.get(groupKey) ||
-      ({
-        key: groupKey,
-        ChartNo: chartNo,
-        LastDate: date,
-        OrderUId: rowOrderUId,
-        OrderSrNo: numberValue(row?.OrderSrNo ?? row?.ordersrno ?? row?.OrderSRNo),
-        ParCode: parCode,
-        PartyName: String(row?.PartyName ?? row?.partyname ?? '').trim(),
-        DesignCode: String(row?.dsncode ?? row?.DsnCode ?? '').trim(),
-        DesignName: String(row?.dsnname ?? row?.DsnName ?? '').trim(),
-        ApcChartName: rowApcChartName,
-        qty: 0,
-        shades: [],
-        savedClientPriority: null,
-        savedSelfPriority: null,
-      } as PriorityChart);
-
-    if (!current.ChartNo && chartNo) current.ChartNo = chartNo;
-    if (!current.LastDate && date) current.LastDate = date;
-    if (!current.OrderUId) current.OrderUId = rowOrderUId;
-    if (!current.OrderSrNo) current.OrderSrNo = numberValue(row?.OrderSrNo ?? row?.ordersrno ?? row?.OrderSRNo);
-    if (!current.ParCode) current.ParCode = parCode;
-    if (!current.PartyName) current.PartyName = String(row?.PartyName ?? row?.partyname ?? '').trim();
-    if (!current.DesignCode) current.DesignCode = String(row?.dsncode ?? row?.DsnCode ?? '').trim();
-    if (!current.DesignName) current.DesignName = String(row?.dsnname ?? row?.DsnName ?? '').trim();
-    if (!current.ApcChartName && rowApcChartName) current.ApcChartName = rowApcChartName;
-
-    // --- Authoritative shade list: prefer `shadeDetails`, fall back to the
-    //     old ShadeAllocation/Shdcodes comma-split parsing when absent. ----
-    const rawShadeDetails = Array.isArray(row?.shadeDetails ?? row?.ShadeDetails)
-      ? (row?.shadeDetails ?? row?.ShadeDetails)
-      : null;
-
-    const shadeSeeds: { name: string; code: string; status: ShadeStatus | null }[] =
-      rawShadeDetails
-        ? rawShadeDetails
-          .map((sd: any) => ({
-            name: String(sd?.shadeName ?? sd?.ShadeName ?? '').trim(),
-            code: String(sd?.shadeCode ?? sd?.ShadeCode ?? '').trim(),
-            status: normalizeStatus(sd?.status ?? sd?.Status),
-          }))
-          .filter((sd: any) => !!sd.name)
-        : [...qtyByName.keys()].map((upperName, i) => ({
-          name: upperName,
-          code: codesArr[i] ?? codesArr[0] ?? '',
-          status: null,
-        }));
-
-    shadeSeeds.forEach(({ name, code, status }) => {
-      if (!name) return;
-      const qty = qtyByName.get(normName(name)) ?? 0;
-
-      const shade: PriorityShade = {
-        ShdCode: code,
-        ShdName: name,
-        AllocationQty: qty,
-        AllocationId: rowAllocationId,
-        ClientPriority: rowClientPriority,
-        SelfPriority: rowSelfPriority,
-        Status: status,
-      };
-
-      const existing = current.shades.find(
-        (item) => normName(item.ShdName) === normName(shade.ShdName),
-      );
-      if (existing) {
-        if (shade.ShdCode) existing.ShdCode = shade.ShdCode;
-        if (shade.AllocationId != null) existing.AllocationId = shade.AllocationId;
-        if (shade.ClientPriority != null) existing.ClientPriority = shade.ClientPriority;
-        if (shade.SelfPriority != null) existing.SelfPriority = shade.SelfPriority;
-        if (shade.Status != null) existing.Status = shade.Status;
-      } else {
-        current.shades.push(shade);
-      }
-    });
-
-    current.qty = current.shades.reduce((sum, item) => sum + item.AllocationQty, 0);
-    grouped.set(groupKey, current);
-  });
-
-  const charts = Array.from(grouped.values());
-
+function sortAndNumber(charts: PriorityChart[]) {
   charts.forEach((chart, idx) => {
     (chart as any)._originalOrder = idx;
-  });
-
-  charts.forEach((chart) => {
     const clientVals = chart.shades
       .map((item) => item.ClientPriority)
       .filter((value): value is number => value != null && value > 0);
@@ -350,10 +172,6 @@ function groupChartsForPriority(rows: any[]): PriorityChart[] {
       .filter((value): value is number => value != null && value > 0);
     chart.savedSelfPriority = selfVals.length ? Math.min(...selfVals) : null;
 
-    // ORDERING KEY ONLY — see NOTE ON DEFAULT ORDERING at the top of this
-    // file. Self wins whenever it exists; Client is used purely to decide
-    // order when Self hasn't been saved yet; neither value is ever mutated
-    // by this decision.
     (chart as any)._sortPriority =
       chart.savedSelfPriority != null
         ? chart.savedSelfPriority
@@ -365,32 +183,154 @@ function groupChartsForPriority(rows: any[]): PriorityChart[] {
   charts.sort((a, b) => {
     const aKey = (a as any)._sortPriority as number | null;
     const bKey = (b as any)._sortPriority as number | null;
-    const aHas = aKey != null;
-    const bHas = bKey != null;
-    if (aHas && bHas) return aKey! - bKey!;
-    if (aHas && !bHas) return -1;
-    if (!aHas && bHas) return 1;
+    if (aKey != null && bKey != null) return aKey - bKey;
+    if (aKey != null) return -1;
+    if (bKey != null) return 1;
     return (a as any)._originalOrder - (b as any)._originalOrder;
   });
 
-  charts.forEach((chart, idx) => {
-    chart.displayPriority = idx + 1;
-  });
-
+  charts.forEach((chart, idx) => { chart.displayPriority = idx + 1; });
   return charts;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  NEW browse shape: { Charts: [{..., shades: [{..., lots: [{..., history}]}]}]} */
+/* -------------------------------------------------------------------------- */
+
+export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
+  const grouped = new Map<string, PriorityChart>();
+
+  rawCharts.forEach((row) => {
+    const chartNo = String(row?.ChartNo ?? row?.chartno ?? '').trim();
+    const parCode = String(row?.ParCode ?? row?.parcode ?? '').trim();
+    const orderUId = numberValue(row?.OrderUId ?? row?.orderuid);
+    const date = normalizeDate(row?.LastDate) || String(row?.LastDate ?? '').trim();
+    const key = chartNo
+      ? `CHART:${chartNo}::PAR:${parCode}::ORD:${orderUId}`
+      : `DATE:${date}::PAR:${parCode}::ORD:${orderUId}`;
+
+    const current = grouped.get(key) || ({
+      key,
+      ChartNo: chartNo,
+      LastDate: date,
+      OrderUId: orderUId,
+      OrderSrNo: numberValue(row?.OrderSrNo ?? row?.ordersrno),
+      ParCode: parCode,
+      PartyName: String(row?.PartyName ?? row?.partyname ?? '').trim(),
+      DesignCode: String(row?.dsncode ?? row?.DsnCode ?? '').trim(),
+      DesignName: String(row?.dsnname ?? row?.DsnName ?? '').trim(),
+      ApcChartName: String(row?.apcchartname ?? row?.ApcChartName ?? '').trim(),
+      qty: 0,
+      shades: [],
+      savedClientPriority: null,
+      savedSelfPriority: null,
+      displayPriority: 0,
+    } as PriorityChart);
+
+    const chartClient = positiveOrNull(row?.ClientPriority ?? row?.Clientpriority ?? row?.clientpriority);
+    const chartSelf = positiveOrNull(row?.SelfPriority ?? row?.selfpriority);
+
+    (Array.isArray(row?.shades) ? row.shades : []).forEach((sd: any) => {
+      const shdCode = String(sd?.ShdCode ?? sd?.shadeCode ?? '').trim();
+      const shdName = String(sd?.ShdName ?? sd?.shadeName ?? '').trim();
+      if (!shdCode && !shdName) return;
+      const orderSrNo = numberValue(sd?.OrderSrNo ?? row?.OrderSrNo ?? 1) || 1;
+      const qty = num(sd?.Qty ?? sd?.AllocationQty);
+      const legacy = normalizeStatus(sd?.Status ?? sd?.status);
+      const savedLots = (Array.isArray(sd?.lots) ? sd.lots : []).map(toLot);
+      const colourHistory = toEvents(sd?.colourHistory);
+
+      // identity of a shade row inside a chart = ShdCode + OrderSrNo
+      const existing = current.shades.find(
+        (x) => x.ShdCode === shdCode && x.OrderSrNo === orderSrNo && normName(x.ShdName) === normName(shdName),
+      );
+      if (existing) {
+        existing.AllocationQty += qty;
+        existing.colourHistory = [...existing.colourHistory, ...colourHistory];
+        existing.lots = withVirtualRemainder(
+          [...existing.lots.filter((l) => !l.virtual), ...savedLots],
+          existing.AllocationQty,
+          existing.Status,
+        );
+        existing.Status = deriveColourStatus(existing.lots) ?? existing.Status;
+        return;
+      }
+
+      const lots = withVirtualRemainder(savedLots, qty, legacy);
+      current.shades.push({
+        ShdCode: shdCode,
+        ShdName: shdName || shdCode,
+        OrderSrNo: orderSrNo,
+        AllocationId: sd?.AllocationId != null && sd?.AllocationId !== '' ? Number(sd.AllocationId) : null,
+        AllocationQty: qty,
+        ClientPriority: positiveOrNull(sd?.ClientPriority) ?? chartClient,
+        SelfPriority: positiveOrNull(sd?.SelfPriority) ?? chartSelf,
+        Status: savedLots.length ? deriveColourStatus(lots) : legacy,
+        colourHistory,
+        lots,
+      });
+    });
+
+    current.qty = current.shades.reduce((sum, s) => sum + s.AllocationQty, 0);
+    if (current.shades.length) grouped.set(key, current);
+  });
+
+  return sortAndNumber(Array.from(grouped.values()));
+}
+
+/* -------------------------------------------------------------------------- */
+/*  OLD browse shape (prioritybrowseparty → AllocationDetails) — kept so the   */
+/*  tab still works if the old endpoint is switched back on. No lots there:    */
+/*  each colour becomes one un-split lot carrying the old status.              */
+/* -------------------------------------------------------------------------- */
+
+function chartsFromLegacyBrowse(rows: any[]): PriorityChart[] {
+  const rawCharts: any[] = [];
+  const byKey = new Map<string, any>();
+  rows.forEach((row) => {
+    const chartNo = String(row?.ChartNo ?? row?.chartno ?? '').trim();
+    const parCode = String(row?.ParCode ?? row?.parcode ?? '').trim();
+    const orderUId = numberValue(row?.OrderUId ?? row?.orderuid);
+    const key = `${chartNo}|${parCode}|${orderUId}`;
+    let target = byKey.get(key);
+    if (!target) {
+      target = { ...row, ChartNo: chartNo, ParCode: parCode, OrderUId: orderUId, shades: [] };
+      byKey.set(key, target);
+      rawCharts.push(target);
+    }
+    const qtyByName = new Map<string, number>();
+    String(row?.ShadeAllocation ?? '').split(',').map((p) => p.trim()).filter(Boolean).forEach((part) => {
+      const idx = part.lastIndexOf(':');
+      const name = idx === -1 ? part : part.slice(0, idx).trim();
+      qtyByName.set(normName(name), (qtyByName.get(normName(name)) || 0) + (idx === -1 ? 0 : num(part.slice(idx + 1))));
+    });
+    const details = Array.isArray(row?.shadeDetails) ? row.shadeDetails : [];
+    details.forEach((sd: any) => {
+      const name = String(sd?.shadeName ?? '').trim();
+      target.shades.push({
+        ShdCode: String(sd?.shadeCode ?? '').trim(),
+        ShdName: name,
+        OrderSrNo: numberValue(row?.OrderSrNo) || 1,
+        Qty: qtyByName.get(normName(name)) ?? 0,
+        Status: sd?.status ?? null,
+        ClientPriority: row?.ClientPriority ?? row?.Clientpriority,
+        SelfPriority: row?.SelfPriority,
+        lots: [],
+      });
+    });
+  });
+  return chartsFromDyeingBrowse(rawCharts);
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Screen                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export function PriorityScreen() {
-  const { prpCode, yearNo, isReady, prpGroup } = useBusinessContext();
-  console.log('priority prpCode', prpGroup, 'yearNo', yearNo);
-  const { canDo } = usePermission();
-  const canEdit = canDo('priority', 'edit');
-  const canSave = canDo('priority', 'save');
+type StatusFilter = ShadeStatus | 'ALL' | 'NONE';
+
+export function PriorityScreen({ perms }: { perms: PriorityPerms }) {
+  const { yearNo, isReady, prpGroup } = useBusinessContext();
+  const { canEdit, canSave } = perms;
 
   const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
   const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
@@ -402,52 +342,30 @@ export function PriorityScreen() {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusModalKey, setStatusModalKey] = useState<string | null>(null);
-  // Status legend now doubles as a filter: 'ALL' (default) shows every chart;
-  // picking a status shows ONLY charts that have at least one shade currently
-  // in that status. This is a pure view-level filter — `charts` (the real,
-  // full order) is never touched by it, so Self priority numbers and the
-  // save payload stay correct regardless of what's filtered on screen.
-  const [statusFilter, setStatusFilter] = useState<ShadeStatus | 'ALL'>('ALL');
-  // Free-text search across chart no / party / design / APC name / shade
-  // names & codes. While the box has text, drag-reorder is disabled (see
-  // where `dragEnabled` is computed below) — reordering only makes sense
-  // against the real, unfiltered order.
+  // View-only filter: a chart matches when any of its lots is CURRENTLY at
+  // that status ('NONE' = has a colour/lot with no status yet). `charts`
+  // itself is never filtered, so Self priority + save payload stay correct.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [searchText, setSearchText] = useState('');
 
-  // `silent` = true for the manual "Refresh" button: keeps the current list
-  // on screen (no full-screen spinner) while re-fetching in the background.
   const loadBrowse = useCallback(async (silent = false) => {
-
     if (!isReady) {
       setLoading(false);
       return;
     }
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     setError(null);
 
     try {
-
-      console.log('[Priority] Browse request ->', { prptype: prpGroup, yearno: yearNo });
-      // Real API — api/prioritybrowse
-      const response: any = await PriorityAPI.browse({ prptype: prpGroup, yearno: yearNo });
-      // --- Mock fallback (disabled now that the real API is connected) ------
-      // const response: any = await mockBrowsePriority();
-      console.log('[Priority] Browse response ->', response);
-      const body: any = response?.data ?? response;
-      console.log('[Priority] Browse response body ->', body);
-      const payload = body?.response?.data ?? body?.data ?? body ?? {};
-      const inner = payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
-        ? payload.data
-        : payload;
-      const rawDetails = Array.isArray(inner?.AllocationDetails) ? inner.AllocationDetails : [];
-      console.log('[Priority] Browse raw AllocationDetails ->', rawDetails);
-      const groupedCharts = groupChartsForPriority(rawDetails);
-      console.log('[Priority] Browse grouped & sorted charts ->', groupedCharts);
-      setCharts(groupedCharts);
+      console.log('[Dyeing/Priority] Browse request ->', { prptype: prpGroup, yearno: yearNo });
+      const response: any = await DyeingService.browse({ prptype: prpGroup, yearno: yearNo });
+      const inner = unwrapBody(response);
+      const grouped = Array.isArray(inner?.Charts)
+        ? chartsFromDyeingBrowse(inner.Charts)
+        : chartsFromLegacyBrowse(Array.isArray(inner?.AllocationDetails) ? inner.AllocationDetails : []);
+      console.log('[Dyeing/Priority] grouped & sorted charts ->', grouped.length);
+      setCharts(grouped);
       setDirty(false);
     } catch (err: any) {
       if (!silent) setCharts([]);
@@ -458,9 +376,7 @@ export function PriorityScreen() {
     }
   }, [isReady, prpGroup, yearNo]);
 
-  const handleRefresh = useCallback(() => {
-    void loadBrowse(true);
-  }, [loadBrowse]);
+  const handleRefresh = useCallback(() => { void loadBrowse(true); }, [loadBrowse]);
 
   useFocusEffect(
     useCallback(() => {
@@ -487,22 +403,8 @@ export function PriorityScreen() {
     }, [dirty, setHeaderExtras, clearHeaderExtras]),
   );
 
-  // Reorder happens ONLY through the drag handle. We do not persist anything
-  // locally: the browse API remains the source of truth after a successful
-  // save.
-  //
-  // `visibleList` is whatever ChartList was actually given to render — the
-  // FULL `charts` array when the status filter is 'ALL', or the FILTERED
-  // subset when a status is selected. `fromIndex`/`toIndex` are positions
-  // within THAT list, not necessarily within the full `charts` array.
-  //
-  // To keep this accurate under a filter: work out the new relative order of
-  // just the visible charts (a normal splice), then rebuild the full array by
-  // walking it once and, at every slot that belongs to a visible chart,
-  // pulling the next chart off that new relative order. Charts NOT in the
-  // visible list are never touched and keep their exact original position —
-  // this is what lets you reorder inside a filtered view without disturbing
-  // every other chart's Self priority.
+  // Filter-safe reorder (unchanged): only the visible charts are permuted,
+  // every hidden chart keeps its exact slot.
   const reorderCharts = useCallback((fromIndex: number, toIndex: number, visibleList: PriorityChart[]) => {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
       fromIndex >= visibleList.length || toIndex >= visibleList.length) return;
@@ -524,74 +426,54 @@ export function PriorityScreen() {
     setDirty(true);
   }, []);
 
-  const onSave = useCallback(async (prpGroup, yearNo) => {
+  const onSave = useCallback(async () => {
     if (saving || !charts.length) return;
 
-    // Never send an incomplete chart. ChartNo is the identity used by the
-    // priority backend, so a blank value must stop the save rather than
-    // silently sending a partial/wrong record.
     const invalidChart = charts.find(
       (chart) =>
         !String(chart.ChartNo ?? '').trim() ||
-        !Number.isFinite(Number(chart.OrderUId)) ||
-        !Number.isFinite(Number(chart.OrderSrNo)),
+        !Number.isFinite(Number(chart.OrderUId)),
     );
     if (invalidChart) {
-      setError(
-        `Cannot save priority: ChartNo / OrderUId / OrderSrNo is missing for one chart.`,
-      );
+      setError('Cannot save priority: ChartNo / OrderUId is missing for one chart.');
       return;
     }
 
+    // Grouped by OrderUId + the SHADE's own OrderSrNo (a chart's colours can
+    // come from different SO lines), same payload shape as before.
     const orderGroups = new Map<string, {
-      orderUId: number;
-      orderSrNo: number;
-      parCode: string;
-      charts: PriorityChart[];
+      OrderUId: number; OrderSrNo: number; ParCode: string; items: any[];
     }>();
 
     charts.forEach((chart) => {
-      const key = `${chart.OrderUId}-${chart.OrderSrNo}`;
-      const group = orderGroups.get(key) || {
-        orderUId: chart.OrderUId,
-        orderSrNo: chart.OrderSrNo,
-        parCode: chart.ParCode,
-        charts: [],
-      };
-      group.charts.push(chart);
-      orderGroups.set(key, group);
-    });
-
-    const payloads = Array.from(orderGroups.values()).map((group) => ({
-      OrderUId: group.orderUId,
-      OrderSrNo: group.orderSrNo,
-      ParCode: group.parCode,
-      prptype: prpGroup,
-      yearno: Number(yearNo) || yearNo,
-      items: group.charts.flatMap((chart) => {
-        const selfPriorityForThisChart = chart.displayPriority;
-
-        return chart.shades.map((shade) => ({
+      const selfPriorityForThisChart = chart.displayPriority;
+      chart.shades.forEach((shade) => {
+        const srNo = shade.OrderSrNo || chart.OrderSrNo;
+        const key = `${chart.OrderUId}-${srNo}-${chart.ParCode}`;
+        const group = orderGroups.get(key) || {
+          OrderUId: chart.OrderUId, OrderSrNo: srNo, ParCode: chart.ParCode, items: [],
+        };
+        group.items.push({
           AllocationId: shade.AllocationId ?? null,
           ShdCode: shade.ShdCode,
           ShdName: shade.ShdName,
           Status: shade.Status ? shade.Status : 'none',
-          ClientPriority: shade.ClientPriority,
+          ClientPriority: shade.ClientPriority ?? 0, // unchanged, as received
           SelfPriority: selfPriorityForThisChart,
           ChartNo: chart.ChartNo,
           OrderUId: chart.OrderUId,
-          OrderSrNo: chart.OrderSrNo,
+          OrderSrNo: srNo,
           ParCode: chart.ParCode,
-        }));
-      }),
-    }));
+        });
+        orderGroups.set(key, group);
+      });
+    });
 
-    if (payloads.some((payload) =>
-      payload.items.some((item) => !String(item.ChartNo ?? '').trim()),
-    )) {
-      setError('Cannot save priority: one or more items has an empty ChartNo.');
-      return;
-    }
+    const payloads = Array.from(orderGroups.values()).map((group) => ({
+      ...group,
+      prptype: prpGroup,
+      yearno: Number(yearNo) || yearNo,
+    }));
 
     if (!payloads.length || payloads.some((payload) => !payload.items.length)) {
       setError('There are no shades to prioritise right now.');
@@ -600,29 +482,13 @@ export function PriorityScreen() {
 
     setSaving(true);
     setError(null);
-
     try {
-      console.log('[Priority] Save priority request ->', payloads);
-      const response: any = await PriorityAPI.save(payloads);
-      console.log('[Priority] Save priority response ->', response);
-
-      const body = response?.data ?? response;
-      console.log('[Priority] Save priority response body ->', body);
-      const saved =
-        body === true ||
-        body?.status === true ||
-        body?.success === true ||
-        body?.response === true ||
-        body?.data === true;
-
-      if (!saved) {
-        throw new Error(body?.message || 'Priority save failed.');
-      }
-
-      // IMPORTANT: do not trust the local reordered array after save.
-      // Re-browse the backend and render exactly what was persisted.
+      console.log('[Dyeing/Priority] Save priority request ->', payloads);
+      const response: any = await DyeingService.savePriorityOrder(payloads);
+      console.log('[Dyeing/Priority] Save priority response ->', response);
+      if (!isSaved(response)) throw new Error(messageOf(response, 'Priority save failed.'));
       setDirty(false);
-      await loadBrowse(true);
+      await loadBrowse(true); // backend is the source of truth
     } catch (err: any) {
       setError(err?.message || 'Unable to save priority order.');
     } finally {
@@ -631,22 +497,60 @@ export function PriorityScreen() {
   }, [saving, charts, prpGroup, yearNo, loadBrowse]);
 
   const handleStatusSaved = useCallback(async () => {
-    // Status is backend-owned. Once save_priority_status returns true,
-    // immediately browse again so the UI shows the server's actual status.
-    await loadBrowse(true);
-  }, [loadBrowse]);
+    // Unsaved reorder must not be lost by a status save: only re-browse when
+    // the order is clean; otherwise keep the local order and just refresh
+    // the one chart's data from the backend.
+    if (!dirty) {
+      await loadBrowse(true);
+      return;
+    }
+    try {
+      const response: any = await DyeingService.browse({ prptype: prpGroup, yearno: yearNo });
+      const inner = unwrapBody(response);
+      const fresh = Array.isArray(inner?.Charts) ? chartsFromDyeingBrowse(inner.Charts) : [];
+      const byKey = new Map(fresh.map((c) => [c.key, c]));
+      setCharts((current) => current.map((chart) => {
+        const f = byKey.get(chart.key);
+        return f ? { ...f, displayPriority: chart.displayPriority } : chart;
+      }));
+    } catch (err: any) {
+      setError(err?.message || 'Status saved, but refresh failed — tap refresh.');
+    }
+  }, [dirty, loadBrowse, prpGroup, yearNo]);
 
   const activeStatusChart = useMemo(
     () => charts.find((c) => c.key === statusModalKey) ?? null,
     [charts, statusModalKey],
   );
 
-  // Pure view filter — see the note above `reorderCharts`. `charts` itself
-  // (the real, saved order) is never filtered or mutated by this.
+  const knownMills = useMemo(() => {
+    const set = new Set<string>();
+    charts.forEach((c) => c.shades.forEach((s) => {
+      s.colourHistory.forEach((h) => { if (h.MillName) set.add(h.MillName); });
+      s.lots.forEach((l) => l.history.forEach((h) => { if (h.MillName) set.add(h.MillName); }));
+    }));
+    return Array.from(set).sort();
+  }, [charts]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: charts.length, NONE: 0 };
+    STATUS_OPTIONS.forEach((o) => { counts[o] = 0; });
+    charts.forEach((chart) => {
+      const seen = new Set<string>();
+      chart.shades.forEach((s) => s.lots.forEach((l) => seen.add(l.Status ?? 'NONE')));
+      seen.forEach((k) => { counts[k] = (counts[k] || 0) + 1; });
+    });
+    return counts;
+  }, [charts]);
+
   const visibleCharts = useMemo(() => {
     let list = statusFilter === 'ALL'
       ? charts
-      : charts.filter((chart) => chart.shades.some((shade) => shade.Status === statusFilter));
+      : charts.filter((chart) =>
+        chart.shades.some((shade) =>
+          shade.lots.some((lot) => (statusFilter === 'NONE' ? !lot.Status : lot.Status === statusFilter)),
+        ),
+      );
 
     const query = searchText.trim().toLowerCase();
     if (query) {
@@ -659,20 +563,16 @@ export function PriorityScreen() {
           chart.ApcChartName,
           ...chart.shades.map((shade) => shade.ShdName),
           ...chart.shades.map((shade) => shade.ShdCode),
+          ...chart.shades.flatMap((shade) => shade.lots.map((lot) => lot.LotNo)),
         ]
           .join(' ')
           .toLowerCase();
         return haystack.includes(query);
       });
     }
-
     return list;
   }, [charts, statusFilter, searchText]);
 
-  // Reordering only makes sense against the real order — while the person is
-  // actively searching, dragging is switched off (the drag handle simply
-  // doesn't render; see ChartCard's `canEdit` gate). Clearing the box brings
-  // it straight back.
   const dragEnabled = canEdit && searchText.trim() === '';
 
   if (loading) {
@@ -702,8 +602,11 @@ export function PriorityScreen() {
         <Icon name="layers" size={30} color={T.muted} />
         <Text style={s.emptyTitle}>No charts to prioritise</Text>
         <Text style={s.emptyText}>
-          No allocation charts were found for this property / year.
+          {error || 'No allocation charts were found for this property / year.'}
         </Text>
+        <TouchableOpacity onPress={() => loadBrowse()} style={[s.iconBtn, { marginTop: 12, width: 'auto', paddingHorizontal: 12 }]}>
+          <Text style={{ color: T.copper, fontWeight: '800', fontSize: 12 }}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -723,8 +626,9 @@ export function PriorityScreen() {
         canSave={canSave}
         saving={saving}
         dirty={dirty}
-        onSave={() => onSave(prpGroup, yearNo)}
+        onSave={onSave}
         statusFilter={statusFilter}
+        counts={statusCounts}
         onStatusFilterChange={setStatusFilter}
       />
 
@@ -733,7 +637,7 @@ export function PriorityScreen() {
         <TextInput
           value={searchText}
           onChangeText={setSearchText}
-          placeholder="Search chart no, party, design, shade…"
+          placeholder="Search chart, party, design, colour, lot no…"
           placeholderTextColor={T.muted}
           style={s.searchInput}
           autoCapitalize="none"
@@ -741,10 +645,7 @@ export function PriorityScreen() {
           returnKeyType="search"
         />
         {!!searchText && (
-          <TouchableOpacity
-            onPress={() => setSearchText('')}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
+          <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Icon name="close" size={16} color={T.muted} />
           </TouchableOpacity>
         )}
@@ -763,16 +664,19 @@ export function PriorityScreen() {
           <Text style={s.emptyTitle}>No matching charts</Text>
           <Text style={s.emptyText}>
             {searchText.trim()
-              ? `Nothing matches "${searchText.trim()}"${statusFilter !== 'ALL' ? ` with status "${statusFilter}"` : ''}.`
-              : `Nothing currently has a shade marked "${statusFilter}". Try a different status or tap All.`}
+              ? `Nothing matches "${searchText.trim()}".`
+              : 'Nothing is currently at this status. Try a different status or tap All.'}
           </Text>
         </View>
       )}
 
-      <ShadeStatusModal
+      <ColourStatusSheet
         visible={!!statusModalKey}
         chart={activeStatusChart}
-        canSave={canSave}
+        perms={{ canStatus: perms.canStatus, canLot: perms.canLot }}
+        prpGroup={prpGroup}
+        yearNo={yearNo}
+        knownMills={knownMills}
         onClose={() => setStatusModalKey(null)}
         onSaved={handleStatusSaved}
       />
@@ -781,19 +685,11 @@ export function PriorityScreen() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Status legend — shown once, right under the top error bar / above list.  */
-/*  Also hosts the compact Refresh (icon-only) and Save actions.             */
+/*  Status legend = filter chips (with counts) + Refresh + Save                */
 /* -------------------------------------------------------------------------- */
 
 function StatusLegend({
-  refreshing,
-  onRefresh,
-  canSave,
-  saving,
-  dirty,
-  onSave,
-  statusFilter,
-  onStatusFilterChange,
+  refreshing, onRefresh, canSave, saving, dirty, onSave, statusFilter, counts, onStatusFilterChange,
 }: {
   refreshing: boolean;
   onRefresh: () => void;
@@ -801,22 +697,19 @@ function StatusLegend({
   saving: boolean;
   dirty: boolean;
   onSave: () => void;
-  statusFilter: ShadeStatus | 'ALL';
-  onStatusFilterChange: (value: ShadeStatus | 'ALL') => void;
+  statusFilter: StatusFilter;
+  counts: Record<string, number>;
+  onStatusFilterChange: (value: StatusFilter) => void;
 }) {
   return (
     <View style={s.legendBar}>
-      <View style={s.legendRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={s.legendRow}>
         <TouchableOpacity
           onPress={() => onStatusFilterChange('ALL')}
-          style={[
-            s.legendPill,
-            statusFilter === 'ALL' && { borderColor: T.ink, backgroundColor: `${T.ink}12` },
-          ]}
-          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+          style={[s.legendPill, statusFilter === 'ALL' && { borderColor: T.ink, backgroundColor: `${T.ink}12` }]}
         >
           <Text style={[s.legendText, statusFilter === 'ALL' && { color: T.ink, fontWeight: '900' }]}>
-            All
+            All {counts.ALL ?? 0}
           </Text>
         </TouchableOpacity>
 
@@ -827,31 +720,34 @@ function StatusLegend({
             <TouchableOpacity
               key={option}
               onPress={() => onStatusFilterChange(active ? 'ALL' : option)}
-              style={[
-                s.legendPill,
-                active && { borderColor: color, backgroundColor: `${color}18` },
-              ]}
-              hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+              style={[s.legendPill, active && { borderColor: color, backgroundColor: `${color}18` }]}
             >
-              <View style={[s.legendDot, { backgroundColor: color }]} />
-              <Text style={[s.legendText, active && { color, fontWeight: '900' }]}>{option}</Text>
+              <View style={[s.legendLetter, { backgroundColor: color }]}>
+                <Text style={s.legendLetterText}>{STATUS_LETTER[option]}</Text>
+              </View>
+              <Text style={[s.legendText, active && { color, fontWeight: '900' }]}>
+                {option} {counts[option] ?? 0}
+              </Text>
             </TouchableOpacity>
           );
         })}
-      </View>
+
+        <TouchableOpacity
+          onPress={() => onStatusFilterChange(statusFilter === 'NONE' ? 'ALL' : 'NONE')}
+          style={[s.legendPill, statusFilter === 'NONE' && { borderColor: T.muted, backgroundColor: `${T.muted}18` }]}
+        >
+          <View style={[s.legendLetter, { backgroundColor: T.alt }]}>
+            <Text style={[s.legendLetterText, { color: T.muted }]}>–</Text>
+          </View>
+          <Text style={[s.legendText, statusFilter === 'NONE' && { color: T.ink, fontWeight: '900' }]}>
+            Not started {counts.NONE ?? 0}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <View style={s.legendActions}>
-        <TouchableOpacity
-          onPress={onRefresh}
-          disabled={refreshing}
-          style={s.iconBtn}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={T.copper} />
-          ) : (
-            <Icon name="refresh" size={16} color={T.copper} />
-          )}
+        <TouchableOpacity onPress={onRefresh} disabled={refreshing} style={s.iconBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          {refreshing ? <ActivityIndicator size="small" color={T.copper} /> : <Icon name="refresh" size={16} color={T.copper} />}
         </TouchableOpacity>
 
         {canSave && (
@@ -860,11 +756,7 @@ function StatusLegend({
             disabled={saving || !dirty}
             style={[s.saveSmallBtn, { opacity: saving || !dirty ? 0.5 : 1 }]}
           >
-            {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Icon name="save" size={14} color="#fff" />
-            )}
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="save" size={14} color="#fff" />}
             <Text style={s.saveSmallBtnText}>Save</Text>
           </TouchableOpacity>
         )}
@@ -874,191 +766,43 @@ function StatusLegend({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Shade status modal                                                        */
+/*  Colour chip on the card: NAME + per-lot [letter | lot no] + ✂ count        */
 /* -------------------------------------------------------------------------- */
 
-function ShadeStatusModal({
-  visible,
-  chart,
-  canSave,
-  onClose,
-  onSaved,
-}: {
-  visible: boolean;
-  chart: PriorityChart | null;
-  canSave: boolean;
-  onClose: () => void;
-  onSaved: () => void | Promise<void>;
-}) {
-  const { prpCode, yearNo, isReady, prpGroup } = useBusinessContext();
-  const [draft, setDraft] = useState<Record<string, ShadeStatus | null>>({});
-  const [saving, setSaving] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (visible && chart) {
-      const initial: Record<string, ShadeStatus | null> = {};
-      chart.shades.forEach((shade) => {
-        initial[shadeKeyOf(shade)] = shade.Status ?? null;
-      });
-      setDraft(initial);
-      setModalError(null);
-    }
-  }, [visible, chart]);
-
-  const toggleStatus = useCallback((shadeKey: string, status: ShadeStatus) => {
-    setDraft((current) => ({
-      ...current,
-      [shadeKey]: current[shadeKey] === status ? null : status,
-    }));
-  }, []);
-
-  const handleSave = useCallback(async (prpGroup, yearNo) => {
-    if (!chart || saving) return;
-    setSaving(true);
-    setModalError(null);
-
-    const payload = {
-      ChartNo: chart.ChartNo,
-      OrderUId: chart.OrderUId,
-      OrderSrNo: chart.OrderSrNo,
-      ParCode: chart.ParCode,
-      prptype: prpGroup,
-      yearno: Number(yearNo) || yearNo,
-      shades: chart.shades.map((shade) => {
-        const key = shadeKeyOf(shade);
-        const selected = draft[key] ?? null;
-        return {
-          ShdCode: shade.ShdCode,
-          ShdName: shade.ShdName,
-          AllocationId: shade.AllocationId ?? null,
-          Status: selected ? selected : 'none',
-        };
-      }),
-    };
-
-    try {
-      console.log('[Priority] save_priority_status request ->', payload);
-      const response: any = await PriorityAPI.saveShadeStatus(payload);
-      console.log('[Priority] save_priority_status response ->', response);
-
-      const body = response?.data ?? response;
-      console.log('[Priority] save_priority_status response body ->', body);
-      const saved =
-        body === true ||
-        body?.status === true ||
-        body?.success === true ||
-        body?.response === true ||
-        body?.data === true;
-
-      if (!saved) {
-        throw new Error(body?.message || 'Unable to save shade status.');
-      }
-
-      // Do NOT update the card from draft data. The backend is authoritative.
-      await onSaved();
-      onClose();
-    } catch (err: any) {
-      setModalError(err?.message || 'Unable to save shade status.');
-    } finally {
-      setSaving(false);
-    }
-  }, [chart, draft, saving, onSaved, onClose]);
-
-  if (!chart) return null;
-
+const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShade }) {
+  const colourColor = shade.Status ? STATUS_COLORS[shade.Status] : null;
+  const lotsToShow = shade.lots.filter((lot) => lot.Status || !lot.virtual);
+  const cuts = shade.lots.reduce((sum, lot) => sum + lot.LorryCutCount, 0);
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={ms.overlay}>
-        <View style={ms.sheet}>
-          <View style={ms.header}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={ms.title} numberOfLines={1}>{chart.ChartNo || '—'}</Text>
-              <Text style={ms.subtitle} numberOfLines={1}>
-                {chart.DesignName || chart.ApcChartName || ' '}
+    <View
+      style={[
+        s.chip,
+        colourColor ? { borderColor: colourColor, backgroundColor: `${colourColor}12` } : null,
+      ]}
+    >
+      <Text style={s.chipText} numberOfLines={1}>{shade.ShdName}</Text>
+      {lotsToShow.map((lot, idx) => {
+        const color = lot.Status ? STATUS_COLORS[lot.Status] : T.muted;
+        return (
+          <View key={`${lot.LotId ?? 'v'}-${idx}`} style={[s.lotPill, { borderColor: `${color}66` }]}>
+            <View style={[s.lotLetter, { backgroundColor: lot.Status ? color : T.alt }]}>
+              <Text style={[s.lotLetterText, !lot.Status && { color: T.muted }]}>
+                {lot.Status ? STATUS_LETTER[lot.Status] : '–'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={ms.closeBtn}>
-              <Icon name="close" size={20} color={T.muted} />
-            </TouchableOpacity>
+            {!!lot.LotNo && <Text style={[s.lotNoText, { color }]} numberOfLines={1}>{lot.LotNo}</Text>}
           </View>
-
-          {!!modalError && (
-            <View style={s.errorBar}>
-              <Icon name="error-outline" size={16} color="#fff" />
-              <Text style={s.errorText}>{modalError}</Text>
-            </View>
-          )}
-
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={ms.body}>
-            {chart.shades.map((shade, idx) => {
-              const key = shadeKeyOf(shade);
-              const selected = draft[key] ?? null;
-              return (
-                <View key={`${key}-${idx}`} style={ms.shadeRow}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={ms.shadeName} numberOfLines={1}>{shade.ShdName}</Text>
-                    <Text style={ms.shadeMeta} numberOfLines={1}>
-                      {shade.ShdCode ? `Code ${shade.ShdCode} · ` : ''}{qtyLabel(shade.AllocationQty)} m
-                    </Text>
-                  </View>
-                  <View style={ms.statusOptions}>
-                    {STATUS_OPTIONS.map((option) => {
-                      const isSelected = selected === option;
-                      const color = STATUS_COLORS[option];
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          onPress={() => toggleStatus(key, option)}
-                          style={[
-                            ms.statusPill,
-                            {
-                              borderColor: isSelected ? color : T.border,
-                              backgroundColor: isSelected ? `${color}22` : T.sub,
-                            },
-                          ]}
-                        >
-                          <View style={[ms.statusPillDot, { backgroundColor: color }]} />
-                          <Text
-                            style={[ms.statusPillText, { color: isSelected ? color : T.muted }]}
-                            numberOfLines={1}
-                          >
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              );
-            })}
-            <View style={{ height: 12 }} />
-          </ScrollView>
-
-          {canSave && (
-            <View style={ms.footer}>
-              <TouchableOpacity
-                onPress={() => handleSave(prpGroup, yearNo)}
-                disabled={saving}
-                style={[s.saveBtn, { opacity: saving ? 0.6 : 1 }]}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Icon name="save" size={18} color="#fff" />
-                )}
-                <Text style={s.saveBtnText}>Save status</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-    </Modal>
+        );
+      })}
+      {cuts > 0 && <Text style={s.cutText}>✂{cuts}</Text>}
+    </View>
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Chart list — precise handle-only drag reorder, virtualized AND accurate   */
+/*  at scale. (Unchanged mechanics — see comments below.)                    */
+/* -------------------------------------------------------------------------- */
 /*  at scale (thousands to 1,00,000+ charts).                                */
 /*                                                                            */
 /*  Two separate problems had to be solved together here:                    */
@@ -1113,7 +857,7 @@ const LIST_UPDATE_BATCH_PERIOD = 50;
 
 // --- Fixed row geometry — see DRAG ACCURACY note above. Every card is this ---
 // --- exact height; this is what makes drop-target index math exact & O(1). --
-const CARD_BOX_HEIGHT = 138; // the card's own box height (its `s.card` style)
+const CARD_BOX_HEIGHT = 146; // the card's own box height (its `s.card` style)
 const ROW_GAP = 6;           // matches `s.card.marginBottom` below
 const ITEM_HEIGHT = CARD_BOX_HEIGHT + ROW_GAP; // total vertical space one row consumes
 const LIST_PADDING_TOP = 8;  // matches `s.listContent.padding` below
@@ -1260,30 +1004,9 @@ const ChartCard = React.memo(function ChartCard({
               style={s.chipScroll}
               contentContainerStyle={s.chipScrollContent}
             >
-              {chart.shades.map((shade, si) => {
-                const statusColor = shade.Status ? STATUS_COLORS[shade.Status] : null;
-                return (
-                  <View
-                    key={`${shade.ShdCode || shade.ShdName}-${si}`}
-                    style={[
-                      s.chip,
-                      statusColor
-                        ? {
-                          borderColor: statusColor,
-                          backgroundColor: `${statusColor}18`,
-                        }
-                        : null,
-                    ]}
-                  >
-                    {!!statusColor && (
-                      <View style={[s.chipDot, { backgroundColor: statusColor }]} />
-                    )}
-                    <Text style={s.chipText} numberOfLines={1}>
-                      {shade.ShdName}
-                    </Text>
-                  </View>
-                );
-              })}
+              {chart.shades.map((shade, si) => (
+                <ShadeChip key={`${shade.ShdCode || shade.ShdName}-${shade.OrderSrNo}-${si}`} shade={shade} />
+              ))}
             </ScrollView>
           </View>
         </View>
@@ -1632,42 +1355,6 @@ const hs = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700', marginLeft: 4 },
 });
 
-const ms = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: T.bg,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    maxHeight: '86%',
-    minHeight: '55%',
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: T.border,
-  },
-  title: { fontSize: 16, fontWeight: '900', color: T.ink },
-  subtitle: { fontSize: 12, fontWeight: '600', color: T.muted, marginTop: 2 },
-  closeBtn: { padding: 6, marginLeft: 8 },
-  body: { padding: 14 },
-  shadeRow: {
-    borderWidth: 1, borderColor: T.border, borderRadius: 12,
-    padding: 12, marginBottom: 10, backgroundColor: T.surface,
-  },
-  shadeName: { fontSize: 13, fontWeight: '800', color: T.ink },
-  shadeMeta: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 2 },
-  statusOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  statusPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
-  },
-  statusPillDot: { width: 7, height: 7, borderRadius: 4 },
-  statusPillText: { fontSize: 11, fontWeight: '700' },
-  footer: {
-    padding: 14, borderTopWidth: 1, borderTopColor: T.border, backgroundColor: T.bg,
-  },
-});
-
 const s = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
@@ -1682,15 +1369,18 @@ const s = StyleSheet.create({
   errorText: { color: '#fff', fontSize: 12, fontWeight: '600', marginLeft: 6, flex: 1 },
 
   legendBar: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 12, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: T.border,
     backgroundColor: T.surface,
   },
   legendRow: {
-    flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6,
-    minWidth: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 6,
   },
+  legendLetter: {
+    width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+  },
+  legendLetterText: { color: '#fff', fontSize: 8.5, fontWeight: '900' },
   legendPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderWidth: 1, borderColor: 'transparent', borderRadius: 20,
@@ -1776,6 +1466,8 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: T.sub, borderWidth: 1, borderColor: T.border,
   },
+  numText: { fontSize: 11, fontWeight: '900', color: T.ink },
+  numTextSmall: { fontSize: 10, fontWeight: '800', color: T.muted },
   priorityLabel: { fontSize: 9.5, fontWeight: '800', color: T.muted },
 
   statusOpenBtn: {
@@ -1839,10 +1531,20 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3,
     borderColor: T.border, backgroundColor: T.sub,
-    maxWidth: 220,
+    maxWidth: 360,
   },
-  chipDot: { width: 6, height: 6, borderRadius: 3 },
-  chipText: { fontSize: 9.5, fontWeight: '600', color: T.ink, maxWidth: 180 },
+  chipText: { fontSize: 9.5, fontWeight: '700', color: T.ink, maxWidth: 150 },
+  lotPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderWidth: 1, borderRadius: 9, paddingLeft: 1, paddingRight: 4, paddingVertical: 1,
+    backgroundColor: T.surface,
+  },
+  lotLetter: {
+    width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+  },
+  lotLetterText: { color: '#fff', fontSize: 8.5, fontWeight: '900' },
+  lotNoText: { fontSize: 9, fontWeight: '800', maxWidth: 80 },
+  cutText: { fontSize: 9.5, fontWeight: '900', color: T.purple },
 
   draggingCard: {
     borderColor: T.copper,

@@ -5,7 +5,7 @@ import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { API } from '../../common/API/dynamicAPI';
+// import { API } from '../../common/API/dynamicAPI';
 import {
     fetchCurrentYearData,
     fetchPropertyData,
@@ -139,7 +139,8 @@ const ddMMYYYYToISO = (ddMMYYYY?: string): string => {
 // ========== MAIN COMPONENT ==========
 const CollectionEdit: React.FC<Props> = ({
     token,
-    username
+    username,
+    API
 }) => {
     // ========== STATE MANAGEMENT ==========
     const router = useRouter();

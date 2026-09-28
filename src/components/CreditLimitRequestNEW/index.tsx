@@ -11,7 +11,7 @@ import {
     useWindowDimensions
 } from 'react-native';
 
-import { API } from '@/common/API/dynamicAPI';
+// import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
 import PartyHistoryModal from '@/components/CreditLimitRequest/PartyHistoryModal'; // 👈 path adjust
 import FullScreenLoader from '@/components/FullScreenLoader';
@@ -27,7 +27,7 @@ interface Props {
 }
 
 // export default function CreditLimit() {
-const CreditLimitRequestNEW: React.FC<Props> = ({ token, username }) => {
+const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
     // const { token, username } = useAuth();
     const flatListRef = useRef<FlatList>(null);
     const flatHistoryListRef = useRef<FlatList>(null);

@@ -16,7 +16,7 @@ import FullScreenLoader from '@/components/FullScreenLoader';
 // import HeaderBar from '../HeaderBar/HeaderBar';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { API } from '../../common/API/dynamicAPI';
+// import { API } from '../../common/API/dynamicAPI';
 import { fetchCurrentYearData, fetchPropertyData, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 import HeaderBar from '../../components/HeaderNew';
 import theme from '../theme';
@@ -95,7 +95,7 @@ interface AllHistoryData {
     crdays: string;
 }
 
-const CollectionList: React.FC<Props> = ({ token, username }) => {
+const CollectionList: React.FC<Props> = ({ token, username, API }) => {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchhistoryQuery, setSearchhistoryQuery] = useState('');

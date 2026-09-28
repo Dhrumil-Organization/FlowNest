@@ -14,6 +14,7 @@ import {
   Animated,
   LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,7 +23,6 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
-  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -55,11 +55,12 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
-  priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Chart Priority' },
+  priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Dyeing' },
   datalog: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Datalog' },
   'production-order-tracking': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Production Order Tracking' },
   'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order' },
   'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
+  // 'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
   'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
   'Receivables-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Receivables' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
@@ -202,8 +203,22 @@ export default function TabsLayout() {
     return visibleItems.filter((item) => `${item.title} ${item.routeName}`.toLowerCase().includes(query));
   }, [sidebarSearch, visibleItems]);
 
+  // FRESH SCREEN ON MENU NAVIGATION:
+  // Tabs keep every visited screen mounted, so opening a module again from
+  // the sidebar / footer / More sheet used to show whatever was left there
+  // last time (old filters, old list, old token). Every menu tap now bumps
+  // that route's "visit" counter; `screenLayout` below keys the screen on
+  // it, so the screen fully remounts and loads fresh — same as a refresh,
+  // on both mobile and web. Drill-downs (router.push from inside a screen)
+  // and router.back() are NOT affected, so their state is kept as before.
+  const [routeVisits, setRouteVisits] = useState<Record<string, number>>({});
+  const markFreshVisit = (routeName: string) => {
+    setRouteVisits((prev) => ({ ...prev, [routeName]: (prev[routeName] || 0) + 1 }));
+  };
+
   const goTo = (routeName: string) => {
     setMoreOpen(false);
+    markFreshVisit(routeName);
     const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
     router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
   };
@@ -235,8 +250,17 @@ export default function TabsLayout() {
           <View style={{ flex: 1, backgroundColor: T.bg }}>
             <Tabs
               key={sessionEpoch}
+              screenLayout={({ children, route }: { children: React.ReactNode; route: { name: string } }) => (
+                <React.Fragment key={`${route.name}:${routeVisits[route.name] || 0}`}>
+                  {children}
+                </React.Fragment>
+              )}
               screenOptions={{
                 headerShown: false,
+                // Nested stacks (reports, designs, costing) go back to their
+                // first screen when you leave the tab, so re-opening them
+                // from the menu starts clean.
+                popToTopOnBlur: true,
                 sceneStyle: {
                   backgroundColor: 'rgba(255,255,255,0)',
                   paddingBottom: sceneBottomPadding,
@@ -252,6 +276,7 @@ export default function TabsLayout() {
                   barLeft={barLeftOffset}
                   barRight={barRightOffset}
                   onMorePress={() => { setMoreSearch(''); setMoreOpen(true); }}
+                  onNavigateRoute={markFreshVisit}
                 />
               )}
             >
@@ -435,6 +460,8 @@ type GlassTabBarProps = {
   barLeft: number;
   barRight: number;
   onMorePress: () => void;
+  /** Called right before a footer tab navigates, so the screen opens fresh. */
+  onNavigateRoute?: (routeName: string) => void;
 };
 
 function GlassTabBar({
@@ -447,6 +474,7 @@ function GlassTabBar({
   barLeft,
   barRight,
   onMorePress,
+  onNavigateRoute,
 }: GlassTabBarProps) {
   const items: NavItem[] = useMemo(
     () => (hasOverflow ? [...primaryItems, { routeName: 'more', title: 'More', icon: 'more-horiz' }] : primaryItems),
@@ -502,6 +530,7 @@ function GlassTabBar({
     const targetRoute = state.routes.find((r) => r.name === item.routeName);
     const event = navigation.emit({ type: 'tabPress', target: targetRoute?.key, canPreventDefault: true });
     if (!event.defaultPrevented) {
+      onNavigateRoute?.(item.routeName);
       navigation.navigate(item.routeName as never);
     }
   };

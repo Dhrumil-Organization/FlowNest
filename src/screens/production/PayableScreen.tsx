@@ -1,27 +1,11 @@
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import React, { useEffect, useState } from 'react';
-import ProdOrderTracking from '../../components/ProdOrderTrackingNEW';
+import React from 'react';
 import PayableNew from '../../components/PayableNew';
+import { ErpSessionGate } from '../../core/session/erpSession';
 
+// Token + API host come from the common ErpSessionGate:
+//   - sudamo_knits -> apig, rayons -> apiy (login selection AND header switch)
+//   - screen renders only after the correct token/host are known
+//   - screen remounts fresh when property or token changes (no refresh needed)
 export function PayableScreen() {
-  const [token, setToken] = useState('');
-  const [username, setUsername] = useState('User');
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem('access_token'),
-        AsyncStorage.getItem('user_details'),
-      ]);
-      if (!mounted) return;
-      setToken(storedToken || '');
-      setUsername(storedUser || 'User');
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return <PayableNew token={token} username={username} />;
+  return <ErpSessionGate>{(s) => <PayableNew token={s.token} username={s.username} />}</ErpSessionGate>;
 }

@@ -1,9 +1,9 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios, { AxiosError } from 'axios';
-import { resolveNewErpApiBaseUrl } from '@/src/api/client';
+import { resolveNewErpApiBaseUrl } from '../../../src/api/client';
 
 export type ExpenseDashboardData = {
-    period: { yearno: number; monthno: string; month_start_ymd: number; upto_date_ymd: number; requested_upto_ymd?: number; complete_through_ymd?: number | null; last_expense_entry_ymd?: number | null; label: string; display_range?: string; working_days: number; ongoing: boolean; coverage_status?: 'complete' | 'partial' | 'incomplete'; is_complete?: boolean; pending_expenses?: Array<{ key: string; label: string; last_entered_ymd?: number | null; pending_from_ymd: number; pending_to_ymd: number; pending_days: number }>; source_coverage?: Record<string, number | null> };
+    period: { yearno: number; monthno: string; month_start_ymd: number; upto_date_ymd: number; requested_upto_ymd?: number; complete_through_ymd?: number | null; last_expense_entry_ymd?: number | null; label: string; display_range?: string; working_days: number; ongoing: boolean; coverage_status?: 'complete' | 'partial' | 'incomplete'; is_complete?: boolean; pending_expenses?: { key: string; label: string; last_entered_ymd?: number | null; pending_from_ymd: number; pending_to_ymd: number; pending_days: number }[]; source_coverage?: Record<string, number | null> };
     summary: { total_cost: number; cost_per_pick: number; avg_picks: number; production_mtr: number; cost_per_machine_day: number; units: number; unit_rate: number; costing_looms: number; producing_looms_diagnostic: number; machine_days: number };
     composition: { electricity: number; salary: number; stores: number; total: number };
     production: { mw_rapier_mtr: number; sip_rapier_mtr: number; sip_waterjet_mtr: number; rapier_total_mtr: number; total_mtr: number; latest_date_ymd?: number | null; daily_trend?: Array<{ date_ymd: number; day: string; rapier_mtr: number; waterjet_mtr: number; combined_mtr: number; mw_rapier_mtr: number; sip_rapier_mtr: number }> };

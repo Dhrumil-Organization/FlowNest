@@ -108,7 +108,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
     console.log("FormState.values", FormState.values);
     console.log("FormState.values.PrpCode", FormState.values.PrpCode);
     console.log("issueMode", issueMode);
-    
+
     const cancelToken = useRef(null);
 
     const getRequestConfig = (props: any) => ({
@@ -173,7 +173,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
     const handleDetailNext = (data?: { hasIssueDesignAccess?: boolean; StkType?: string }) => {
         // Process House (P) does not require the intermediate item-selection screen.
         // Go directly to the next drawer instead.
-        
+
         // if (data?.StkType === 'P') {
         //     if (typeof data.hasIssueDesignAccess === 'boolean') {
         //         setHasIssueDesignAccess(data.hasIssueDesignAccess);
@@ -356,7 +356,8 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
                 // txntype: 'creel_yarn_issue',
                 fromdate: FormState.values.fromdate,
                 todate: FormState.values.todate,
-                status: ''
+                status: '',
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("browse historyPayload:", payload);

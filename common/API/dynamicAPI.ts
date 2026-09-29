@@ -15,7 +15,7 @@ import AsyncStorage from '@/common/utils/compatibleStorage';
 // ─────────────────────────────────────────────────────────────
 export type ErpProperty = 'sudamo_knits' | 'rayons';
 
-const IS_LOCAL =true;
+const IS_LOCAL = true;
 const LOCAL_API_URL = 'http://192.168.13.100:4017';
 
 const LIVE_API_URLS: Record<ErpProperty, string> = {

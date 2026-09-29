@@ -48,47 +48,8 @@ export const parseCartonCode = (raw: string): { CartNo: string; PUId?: any; PSrN
     return null;
 };
 
-/**
- * Full QR parser. Same 3 label formats as the old WeftIssueItemDrawer.handleBarCodeScanned.
- * The QR already carries carton, item, shade, grade, weight and chees, so no search / browse
- * call is needed after a scan. A plain carton number (no "~") returns only CartNo.
- */
-export type ParsedQr = {
-    CartNo: string; PUId?: any; PSrNo?: any; PSubSr?: any; TranType?: any;
-    ItmCode?: any; ItmName?: string; MerCode?: any; MerName?: string;
-    GrdCode?: any; GrdName?: string; ShdCode?: any; ShdName?: string;
-    Denier?: any; Wt?: any; Chees?: any;
-};
-
-export const parseCartonQr = (raw: string): ParsedQr | null => {
-    const value = String(raw || '').trim();
-    if (!value) return null;
-    const p = value.split('~');
-    const g = (i: number) => (p[i] ?? '').toString().trim();
-
-    if (p.length === 1) return { CartNo: value };
-
-    if (p.length === 16) {
-        return {
-            PUId: g(0), PSrNo: g(1), PSubSr: g(2), TranType: g(3), CartNo: g(4),
-            ItmCode: g(5), ItmName: g(6), MerCode: g(7), MerName: g(8),
-            GrdCode: g(9), GrdName: g(10), ShdCode: g(11), ShdName: g(12),
-            Wt: g(13) || 0, Chees: g(14) || 0,
-        };
-    }
-    if (p.length >= 13) {
-        return {
-            PUId: g(1), PSrNo: g(2), PSubSr: g(3), TranType: g(4), CartNo: g(5),
-            ItmCode: g(6), MerCode: g(7), GrdCode: g(8), ShdCode: g(9), Denier: g(10),
-            Wt: g(11) || 0, Chees: g(12) || 0,
-        };
-    }
-    if (p.length >= 11) {
-        return {
-            PUId: g(0), PSrNo: g(1), PSubSr: g(2), TranType: g(3), CartNo: g(4),
-            ItmCode: g(5), MerCode: g(6), GrdCode: g(7), ShdCode: g(8), Denier: g(9),
-            Wt: g(10) || 0, Chees: 0,
-        };
-    }
-    return null;
+/** Filter design recipe rows to the ones that use this carton's main item. */
+export const recipeRowsForCarton = (rows: any[], mitmcode: string) => {
+    if (!mitmcode) return rows; // main item unknown: show all, user picks
+    return rows.filter(r => String(r.mitmcode ?? r.MItmCode ?? '').trim() === String(mitmcode).trim());
 };

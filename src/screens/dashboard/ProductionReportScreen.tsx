@@ -2,6 +2,7 @@ import { T } from '@/src/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  LayoutChangeEvent,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  ReportContainer,
+  SplitPane,
+  useReportLayout,
+} from '@/src/components/dashboard/ResponsiveReport';
 
 function parseJson(value: string | string[] | undefined, fallback: any) {
   try {
@@ -52,6 +58,7 @@ type CategoryRow = {
 export default function ProductionReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const layout = useReportLayout();
 
   const production = useMemo(
     () =>
@@ -107,6 +114,7 @@ export default function ProductionReportScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
+        <ReportContainer onLayout={layout.onLayout}>
         <View style={s.breadcrumb}>
           <TouchableOpacity
             style={s.back}
@@ -141,6 +149,10 @@ export default function ProductionReportScreen() {
           </View>
         </View>
 
+        <SplitPane
+          layout={layout}
+          ratio={layout.wide ? 0.55 : 0.5}
+          left={
         <View style={s.card}>
           <View style={s.cardHeader}>
             <Text style={s.cardHeaderText}>⚙  BY MACHINE</Text>
@@ -172,12 +184,15 @@ export default function ProductionReportScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
+          }
+          right={
         <CategorySummaryCard
           title="▦  BY CATEGORY (ITEM)"
           rows={production?.by_category || []}
           totalMtd={Number(production?.total?.mtd_meters || 0)}
           reconciliation={production?.category_reconciliation}
+        />
+          }
         />
 
         <View style={s.card}>
@@ -196,6 +211,7 @@ export default function ProductionReportScreen() {
             </View>
           )}
         </View>
+        </ReportContainer>
       </ScrollView>
     </SafeAreaView>
   );
@@ -308,13 +324,20 @@ function Kpi({ label, value }: { label: string; value: string }) {
 
 function ScrollableDailyBars({ data }: { data: DailyTrendPoint[] }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // UI only: measured width so bars spread across wide screens
+  const [availWidth, setAvailWidth] = useState(0);
+  const onTrendLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    setAvailWidth(prev => (Math.abs(prev - w) > 1 ? w : prev));
+  };
 
   const max = Math.max(
     1,
     ...data.map(row => Number(row.meters || 0)),
   );
 
-  const pointWidth = 48;
+  const pointWidth =
+    data.length > 0 ? Math.max(48, Math.floor(availWidth / data.length)) : 48;
   const contentWidth = Math.max(320, data.length * pointWidth);
 
   const selected =
@@ -323,7 +346,7 @@ function ScrollableDailyBars({ data }: { data: DailyTrendPoint[] }) {
       : null;
 
   return (
-    <View style={s.trendWrap}>
+    <View style={s.trendWrap} onLayout={onTrendLayout}>
       {selected ? (
         <View style={s.selectedTrendValue}>
           <Text style={s.selectedTrendDay}>DAY {selected.day}</Text>

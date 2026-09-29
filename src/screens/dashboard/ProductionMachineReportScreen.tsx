@@ -2,6 +2,7 @@ import { T } from '@/src/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  LayoutChangeEvent,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  ReportContainer,
+  SplitPane,
+  useReportLayout,
+} from '@/src/components/dashboard/ResponsiveReport';
 
 function parseJson(value: string | string[] | undefined, fallback: any) {
   try {
@@ -123,6 +129,7 @@ function axisLabelIndexes(length: number): Set<number> {
 export default function ProductionMachineReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const layout = useReportLayout();
 
   const machine = useMemo(
     () => parseJson(params.machine, {}),
@@ -159,6 +166,7 @@ export default function ProductionMachineReportScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
+        <ReportContainer onLayout={layout.onLayout}>
         <View style={s.breadcrumb}>
           <TouchableOpacity
             style={s.back}
@@ -203,13 +211,19 @@ export default function ProductionMachineReportScreen() {
           </View>
         </View>
 
+        <SplitPane
+          layout={layout}
+          ratio={0.5}
+          left={
         <CategorySummaryCard
           title="▦  CATEGORY MIX"
           rows={machine?.by_category || []}
           totalMtd={mtd}
           reconciliation={machine?.category_reconciliation}
         />
-
+          }
+          right={
+        <View>
         <ChartCard
           title="⚙  PRODUCTION TREND"
           leftLabel="YESTERDAY"
@@ -227,6 +241,10 @@ export default function ProductionMachineReportScreen() {
           mode="bar"
           emptyText="Month-by-month production trend is not available for this machine."
         />
+        </View>
+          }
+        />
+        </ReportContainer>
       </ScrollView>
     </SafeAreaView>
   );
@@ -514,13 +532,22 @@ function ChartCard({
 
 function LineTrend({ data }: { data: TrendPoint[] }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // UI only: measured width so the line spreads across wide screens
+  const [availWidth, setAvailWidth] = useState(0);
+  const onChartLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    setAvailWidth(prev => (Math.abs(prev - w) > 1 ? w : prev));
+  };
 
   const chartHeight = 112;
   const graphTop = 28;
   const graphBottom = 86;
   const graphHeight = graphBottom - graphTop;
   const sidePadding = 22;
-  const pointGap = 56;
+  const pointGap =
+    data.length > 1
+      ? Math.max(56, (availWidth - sidePadding * 2) / (data.length - 1))
+      : 56;
 
   const contentWidth = Math.max(
     320,
@@ -553,7 +580,7 @@ function LineTrend({ data }: { data: TrendPoint[] }) {
       : null;
 
   return (
-    <View style={s.lineChartOuter}>
+    <View style={s.lineChartOuter} onLayout={onChartLayout}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator

@@ -22,7 +22,8 @@
 //   6. 🗑 on a table row -> confirm -> POST /dyeing/remove_lotno
 //      { uid, srno, chartno, shdcode, prptype, yearno } (uid + srno from /dyeing/lotnos)
 //      -> table + help reload (the outward becomes selectable again).
-//   Add / update / remove all send the shade code (`shdcode`) of this shade.
+//   List, help, advance, add, update and remove all send THIS shade's
+//   `shdcode` + `shdname`.
 //   SHADE-WISE: every shade has its OWN block (like its status) — the table
 //   shows only this shade's lot nos. (split on `soshdcode`).
 //   OUTWARD on screen = uuid + usrno (unique row). Save / remove send
@@ -129,7 +130,8 @@ export function OutwardLotSection({
         uuid: row.payloadUuid, // API `uuid` as received
         usrno: row.payloadUsrno, // API `usrno` as received
         lotno: clean,
-        shdcode: String(shdCode ?? '').trim(),
+        shdcode: String(shdCode ?? '').trim(), // THIS shade's code
+        shdname: String(shdName ?? '').trim(), // THIS shade's name
       };
       console.log('[Dyeing] save_outward_details request ->', params);
       const response: any = await DyeingService.saveOutwardDetails(params);
@@ -173,7 +175,8 @@ export function OutwardLotSection({
         uuid: row.payloadUuid, // API `uuid` as received
         usrno: row.payloadUsrno, // API `usrno` as received
         chartno: row.chartNo || chartNo,
-        shdcode: String(row.shdCode || shdCode || '').trim(),
+        shdcode: String(shdCode ?? '').trim(), // THIS shade's code (delete is shade-wise)
+        shdname: String(shdName ?? '').trim(), // THIS shade's name
         prptype: prpGroup,
         yearno: asNum(yearNo),
       };

@@ -1,13 +1,14 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import PickerModal from './PickerModal';
 import { s, C } from '../styles';
 import { fetchDesigns, fetchRecipe } from '../api';
+import { recipeRowsForCarton } from '../helpers';
 
 export type Beam = { UId: any; BeamNo: string; [k: string]: any };
 export type Design = { DsnCode: any; DsnName?: string; [k: string]: any };
-export type LineValue = { beam: Beam | null; stkType?: 'I' | 'P'; dsn: Design | null; rsr: number | null; rsrRow?: any };
+export type LineValue = { beam: Beam | null; dsn: Design | null; rsr: number | null; rsrRow?: any };
 
 type Props = {
     token: string;
@@ -17,34 +18,24 @@ type Props = {
     dmy: string;            // dd-mm-yyyy for the help APIs
     beams: Beam[];
     beamsLoading?: boolean;
-    mitmcode: string;       // kept for compatibility with existing callers
+    mitmcode: string;       // carton main item code (recipe filter)
     value: LineValue;
     onChange: (v: LineValue) => void;
     isMobile?: boolean;
 };
 
-/** Module level on purpose: declared inside LineFields it was re-created (unmount + mount) on every render. */
-const Select = ({ text, placeholder, onPress, disabled, loading }: any) => (
-    <TouchableOpacity style={[s.select, disabled && s.disabled]} onPress={onPress} disabled={disabled}>
-        <Text style={text ? s.selectText : s.selectPlaceholder} numberOfLines={1}>{text || placeholder}</Text>
-        {loading ? <ActivityIndicator size="small" color={C.indigo} /> : <Icon name="expand-more" size={20} color={C.ink2} />}
-    </TouchableOpacity>
-);
-
 /**
  * Beam -> Design -> Recipe SrNo (DsnRcpSrNo).
- * Stock type is selected with the beam: In House = I, Process House = P.
- * The selected stock type is sent to the design help API.
+ * Recipe rows come from designwise_mainitem_for_weftissue_help and are filtered to the
+ * carton's main item: 1 match = auto, 2+ = pick, 0 = blocked.
  */
 const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading, mitmcode, value, onChange, isMobile = false }: Props) => {
     const [designs, setDesigns] = useState<Design[]>([]);
     const [dLoading, setDLoading] = useState(false);
     const [rows, setRows] = useState<any[] | null>(null); // filtered recipe rows; null = not loaded
     const [rLoading, setRLoading] = useState(false);
-    const [pick, setPick] = useState<'beam' | 'stkType' | 'dsn' | null>(null);
+    const [pick, setPick] = useState<'beam' | 'dsn' | null>(null);
     const reqId = useRef(0);
-    const valueRef = useRef(value); // always the latest value (avoids stale closure in the async recipe callback)
-    valueRef.current = value;
 
     /* designs of the selected beam */
     useEffect(() => {
@@ -52,48 +43,36 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
         if (!value.beam) return;
         let alive = true;
         setDLoading(true);
-        fetchDesigns(token, prpcode, yearno, dmy, value.stkType || stkType, value.beam.UId)
+        fetchDesigns(token, prpcode, yearno, dmy, stkType, value.beam.UId)
             .then(list => { if (alive) setDesigns(list); })
             .finally(() => alive && setDLoading(false));
         return () => { alive = false; };
-    }, [value.beam?.UId, value.stkType, dmy, token, prpcode, yearno, stkType]);
+    }, [value.beam?.UId, dmy]);
 
     /* recipe of the selected design */
     useEffect(() => {
         setRows(null);
+        if (!value.dsn) return;
         const my = ++reqId.current;
-        if (!value.dsn) { setRLoading(false); return; }
         setRLoading(true);
-        fetchRecipe(token, prpcode, yearno, value.dsn.DsnCode, value.stkType || stkType)
+        fetchRecipe(token, prpcode, yearno, value.dsn.DsnCode)
             .then(list => {
                 if (my !== reqId.current) return;
-                const cur = valueRef.current;
-
-                // The recipe API response is the source of truth.
-                // Do NOT filter the response again by the carton's MItmCode.
-                // If the selected design returns recipe rows, the design has a
-                // valid recipe for this flow.
-                const f = Array.isArray(list) ? list : [];
+                const f = recipeRowsForCarton(list, mitmcode);
                 setRows(f);
-
-                const stillValid = f.find(r => Number(r.srno) === Number(cur.rsr));
-
-                // One recipe position -> select it automatically.
-                if (f.length === 1 && !stillValid) {
-                    onChange({
-                        ...cur,
-                        rsr: Number(f[0].srno),
-                        rsrRow: f[0]
-                    });
-                }
-                // If the previously selected SrNo is not present in the
-                // newly selected design recipe, clear it.
-                else if (!stillValid && cur.rsr) {
-                    onChange({ ...cur, rsr: null, rsrRow: undefined });
-                }
+                const stillValid = f.find(r => Number(r.srno) === Number(value.rsr));
+                if (f.length === 1 && !stillValid) onChange({ ...value, rsr: Number(f[0].srno), rsrRow: f[0] });
+                else if (!stillValid && value.rsr) onChange({ ...value, rsr: null, rsrRow: undefined });
             })
             .finally(() => my === reqId.current && setRLoading(false));
-    }, [value.dsn?.DsnCode, value.stkType, stkType]);
+    }, [value.dsn?.DsnCode, mitmcode]);
+
+    const Select = ({ text, placeholder, onPress, disabled, loading }: any) => (
+        <TouchableOpacity style={[s.select, disabled && s.disabled]} onPress={onPress} disabled={disabled}>
+            <Text style={text ? s.selectText : s.selectPlaceholder} numberOfLines={1}>{text || placeholder}</Text>
+            {loading ? <ActivityIndicator size="small" color={C.indigo} /> : <Icon name="expand-more" size={20} color={C.ink2} />}
+        </TouchableOpacity>
+    );
 
     return (
         <View>
@@ -107,17 +86,6 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
                         onPress={() => setPick('beam')}
                     />
                 </View>
-                <View style={s.col}>
-                    <Text style={s.label}>Stock Type</Text>
-                    <Select
-                        text={(value.stkType || stkType) === 'P' ? 'Process House' : 'In House'}
-                        placeholder="Select stock type"
-                        disabled={!value.beam}
-                        onPress={() => setPick('stkType' as any)}
-                    />
-                </View>
-            </View>
-            <View style={[s.row2, isMobile && s.row2Mobile]}>
                 <View style={s.col}>
                     <Text style={s.label}>Design</Text>
                     <Select
@@ -149,7 +117,7 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
             {!!value.dsn && !rLoading && rows !== null && rows.length > 1 && (
                 <View style={{ marginBottom: 6 }}>
                     <Text style={s.label}>
-                        {`Design ${value.dsn.DsnCode} has ${rows.length} recipe positions. Pick one.`}
+                        {mitmcode ? `This yarn is used at ${rows.length} positions in design ${value.dsn.DsnCode}. Pick one.` : 'Pick the weft position for this carton.'}
                     </Text>
                     {rows.map(r => {
                         const on = Number(r.srno) === Number(value.rsr);
@@ -172,22 +140,7 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
                 subOf={b => [b.WarpLen ? `Warp ${b.WarpLen}` : '', b.TranDate || ''].filter(Boolean).join(', ')}
                 emptyText="No beam available for weft issue on this date."
                 onClose={() => setPick(null)}
-                onSelect={b => { setPick(null); onChange({ beam: b, stkType: value.stkType || stkType as 'I' | 'P', dsn: null, rsr: null, rsrRow: undefined }); }}
-            />
-            <PickerModal
-                visible={pick === 'stkType'}
-                title="Select stock type"
-                items={[
-                    { code: 'I', name: 'In House' },
-                    { code: 'P', name: 'Process House' },
-                ]}
-                labelOf={(x: any) => x.name}
-                emptyText="No stock type available."
-                onClose={() => setPick(null)}
-                onSelect={(x: any) => {
-                    setPick(null);
-                    onChange({ ...value, stkType: x.code as 'I' | 'P', dsn: null, rsr: null, rsrRow: undefined });
-                }}
+                onSelect={b => { setPick(null); onChange({ beam: b, dsn: null, rsr: null, rsrRow: undefined }); }}
             />
             <PickerModal
                 visible={pick === 'dsn'}
@@ -203,4 +156,4 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
     );
 };
 
-export default memo(LineFields);
+export default LineFields;

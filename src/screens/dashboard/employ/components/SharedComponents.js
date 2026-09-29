@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { DashboardInsetContext } from '@/src/components/dashboard/DashboardGrid';
 
 export const COLORS = {
   bg: '#F0F2F5',
@@ -29,9 +30,17 @@ export const COLORS = {
 };
 
 // ─── Section Card ────────────────────────────────────────────────────────────
-export const SectionCard = ({ children, style }) => (
-  <View style={[styles.sectionCard, style]}>{children}</View>
-);
+// Inside the Business Dashboard grid (DashboardInsetContext = 0) cards sit
+// flush with the column so every card lines up like the ERP dashboard;
+// everywhere else the legacy 12px side margin stays.
+export const SectionCard = ({ children, style }) => {
+  const inset = React.useContext(DashboardInsetContext);
+  return (
+    <View style={[styles.sectionCard, inset !== null && { marginHorizontal: inset, marginBottom: 14, borderRadius: 14 }, style]}>
+      {children}
+    </View>
+  );
+};
 
 // ─── Section Header (colored band) ───────────────────────────────────────────
 export const SectionHeader = ({

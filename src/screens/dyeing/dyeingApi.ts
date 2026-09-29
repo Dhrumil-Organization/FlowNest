@@ -84,7 +84,7 @@ export const DyeingService = {
    */
   saveOutwardDetails: async (params: {
     prptype: string; chartno: string; yearno: string | number; uid: string | number; srno: string | number; lotno: string;
-    shdcode: string;
+    shdcode: string; uuid?: any; usrno?: any;
   }) => {
     if (USE_MOCK) return mockSaveOutwardDetails(params);
     try {
@@ -116,6 +116,8 @@ export const DyeingService = {
 export type RemoveLotNoPayload = {
   uid: number | string;
   srno: number | string;
+  uuid?: any; // outward uuid as received
+  usrno?: any; // outward usrno as received
   chartno: string;
   shdcode: string;
   prptype: string;

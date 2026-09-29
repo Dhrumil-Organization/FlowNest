@@ -6,7 +6,8 @@ import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode
 import ExpenseDashboardCard from '@/src/components/dashboard/ExpenseDashboardCard';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { usePermission } from '@/src/core/permissions';
-import { RegistryRenderer } from '@/src/core/ui-registry';
+import { RegistryLayoutItem, RegistryRenderer } from '@/src/core/ui-registry';
+import { columnsForWidth, DashboardGrid, DashboardInsetContext, DashCols, DASH_GAP, Slot } from '@/src/components/dashboard/DashboardGrid';
 import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
@@ -47,30 +48,38 @@ function TargetSummary({ cards, label, onOpen, amountMode }: { cards: DashboardC
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={onOpen} style={styles.targetCard}>
       <View style={styles.targetHeader}>
-        <View>
-          <Text style={styles.targetTitle}>{label}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.targetTitle} numberOfLines={1}>{label}</Text>
           <Text style={styles.targetSub}>Tap for target breakdown</Text>
         </View>
         <Text style={styles.targetArrow}>›</Text>
       </View>
 
       <View style={styles.targetBody}>
-        <View style={styles.ringOuter}>
-          <View style={styles.ringInner}>
-            <Text style={styles.ringValue}>{Math.round(Math.min(999, billedPct))}%</Text>
-            <Text style={styles.ringLabel}>billed</Text>
+        <View style={styles.targetMain}>
+          <View style={styles.ringOuter}>
+            <View style={styles.ringInner}>
+              <Text style={styles.ringValue}>{Math.round(Math.min(999, billedPct))}%</Text>
+              <Text style={styles.ringLabel}>billed</Text>
+            </View>
+          </View>
+
+          <View style={styles.targetMetrics}>
+            <Text style={styles.darkKicker}>SALES</Text>
+            <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{formatDashboardAmount(so?.actual || 0, amountMode)}</Text></Text>
+            <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{formatDashboardAmount(billing?.actual || 0, amountMode)}</Text></Text>
+            <Text style={[styles.darkKicker, { marginTop: 12 }]}>COLLECTION</Text>
+            <ProgressBar value={collection?.achievement_pct || 0} />
+            <Text style={styles.collectionLine}>
+              {formatDashboardAmount(collection?.actual || 0, amountMode)} / {formatDashboardAmount(collection?.target || 0, amountMode)}
+            </Text>
           </View>
         </View>
-
-        <View style={styles.targetMetrics}>
-          <Text style={styles.darkKicker}>SALES</Text>
-          <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{formatDashboardAmount(so?.actual || 0, amountMode)}</Text></Text>
-          <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{formatDashboardAmount(billing?.actual || 0, amountMode)}</Text></Text>
-          <Text style={[styles.darkKicker, { marginTop: 12 }]}>COLLECTION</Text>
-          <ProgressBar value={collection?.achievement_pct || 0} />
-          <Text style={styles.collectionLine}>
-            {formatDashboardAmount(collection?.actual || 0, amountMode)} / {formatDashboardAmount(collection?.target || 0, amountMode)}
-          </Text>
+        <View style={styles.legendRow}>
+          <View style={[styles.legendDot, { backgroundColor: T.copper }]} />
+          <Text style={styles.legendText}>SO %</Text>
+          <View style={[styles.legendDot, { backgroundColor: T.blue, marginLeft: 12 }]} />
+          <Text style={styles.legendText}>Billed %</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -94,7 +103,7 @@ function MonthlyReportCard({
       style={styles.monthlyReportCard}
     >
       <View style={styles.monthlyReportIcon}>
-        <Text style={styles.monthlyReportIconText}>↗</Text>
+        <Text style={styles.monthlyReportIconText}>📈</Text>
       </View>
 
       <View style={styles.monthlyReportMain}>
@@ -109,6 +118,46 @@ function MonthlyReportCard({
 
       <Text style={styles.monthlyReportArrow}>›</Text>
     </TouchableOpacity>
+  );
+}
+
+/**
+ * ERP-style arrangement of the (permission-visible) dashboard cards. UI only.
+ *   Production Cost  — full width on top (all sizes)
+ *   Monthly Target + Monthly Report — head of column 1, handed to the
+ *     operational section so Sales follows them in the same column
+ *   Operational (Sales / Production / Collection / Payment / Outstanding) —
+ *     split into 1 / 2 / 3 columns inside EmployDashboardSection
+ */
+function renderDashboardLayout(items: RegistryLayoutItem[], columns: DashCols) {
+  const byId = new Map(items.map((it) => [it.id, it]));
+  const take = (id: string) => {
+    const it = byId.get(id);
+    byId.delete(id);
+    return it;
+  };
+  const cost = take('dashboard.costing_summary');
+  const target = take('dashboard.monthly_target');
+  const report = take('dashboard.monthly_report');
+  const ops = take('dashboard.operational_details');
+  const others = Array.from(byId.values());
+
+  const lead = [target, report].filter(Boolean).map((it) => it!.wrap(it!.element));
+
+  return (
+    <>
+      {cost ? cost.wrap(cost.element) : null}
+      {ops && React.isValidElement(ops.element) ? (
+        ops.wrap(React.cloneElement(ops.element as React.ReactElement<any>, { lead, columns }))
+      ) : (
+        <DashboardGrid columns={columns} layout={{ 2: [['target', 'report'], ['ops']], 3: [['target'], ['report'], ['ops']] }}>
+          <Slot name="target">{target ? target.wrap(target.element) : null}</Slot>
+          <Slot name="report">{report ? report.wrap(report.element) : null}</Slot>
+          <Slot name="ops">{ops ? ops.wrap(ops.element) : null}</Slot>
+        </DashboardGrid>
+      )}
+      {others.map((it) => it.wrap(it.element))}
+    </>
   );
 }
 
@@ -145,6 +194,11 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const [username, setUsername] = useState('');
   const [getToken, setToken] = useState('');
   const [getPrp, setPrp] = useState('');
+
+  // Responsive layout (UI only): columns from the dashboard's CONTENT width,
+  // so the desktop sidebar is already excluded — same as the ERP dashboard.
+  const [contentWidth, setContentWidth] = useState(0);
+  const columns: DashCols = columnsForWidth(contentWidth);
 
   const now = new Date();
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
@@ -289,6 +343,13 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { load(true); loadExpense(true); }} tintColor={T.copper} />}
       >
+       <View
+         style={styles.inner}
+         onLayout={(e) => {
+           const w = Math.round(e.nativeEvent.layout.width);
+           if (Math.abs(w - contentWidth) > 1) setContentWidth(w);
+         }}
+       >
         <View style={styles.segment}>
           <TouchableOpacity
             disabled={!ownerAllowed}
@@ -332,7 +393,9 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                 </View>
               </DashboardSection> */}
             {/* )} */}
+            <DashboardInsetContext.Provider value={0}>
             <RegistryRenderer
+              layout={(items) => renderDashboardLayout(items, columns)}
               kind="dashboard-card"
               parentId="screen.dashboard"
               context={{
@@ -403,6 +466,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
               }}
               empty={<EmptyState message="No dashboard cards are assigned to this user." />}
             />
+            </DashboardInsetContext.Provider>
 
             {/* <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
               <View style={styles.metricRow}>
@@ -425,6 +489,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
             </DashboardSection> */}
           </>
         )}
+       </View>
       </ScrollView>
     </View>
   );
@@ -439,7 +504,9 @@ const styles = StyleSheet.create({
   logoutButton: { borderWidth: 1, borderColor: '#294155', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   logoutText: { color: '#E5EEF5', fontWeight: '800', fontSize: 11 },
   scroll: { flex: 1 },
-  content: { padding: 14, paddingBottom: 100 },
+  content: { padding: 14, paddingBottom: 100, flexGrow: 1 },
+  // ERP dashboard: content column centred with a max width on large screens
+  inner: { width: '100%', maxWidth: 1320, alignSelf: 'center' },
   segment: { flexDirection: 'row', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 13, overflow: 'hidden', marginBottom: 14 },
   segmentButton: { flex: 1, paddingVertical: 13, alignItems: 'center' },
   segmentActive: { backgroundColor: T.nav },
@@ -458,21 +525,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    marginBottom: 14,
+    marginBottom: DASH_GAP,
+    ...S.card,
   },
   monthlyReportIcon: {
     width: 46,
     height: 46,
-    borderRadius: 23,
-    backgroundColor: T.nav,
+    borderRadius: 12,
+    backgroundColor: T.alt,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   monthlyReportIconText: {
-    color: T.copper,
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 21,
   },
   monthlyReportMain: { flex: 1, minWidth: 0 },
   monthlyReportKicker: {
@@ -507,22 +573,26 @@ const styles = StyleSheet.create({
   retryButton: { alignSelf: 'flex-start', backgroundColor: T.nav, borderRadius: 9, paddingHorizontal: 15, paddingVertical: 10, marginTop: 14 },
   retryText: { color: '#fff', fontWeight: '900', fontSize: 12 },
   metricRow: { flexDirection: 'row', gap: 16 },
-  targetCard: { backgroundColor: T.nav, borderRadius: 16, marginBottom: 14, overflow: 'hidden', ...S.card },
-  targetHeader: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#21394C' },
+  targetCard: { backgroundColor: T.surface, borderRadius: 14, marginBottom: DASH_GAP, overflow: 'hidden', borderWidth: 1, borderColor: T.border, ...S.card },
+  targetHeader: { backgroundColor: T.nav, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   targetTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
   targetSub: { color: '#92A8BA', fontSize: 10, marginTop: 2 },
   targetArrow: { color: '#fff', fontSize: 25 },
-  targetBody: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 18 },
-  ringOuter: { width: 92, height: 92, borderRadius: 46, borderWidth: 9, borderColor: T.copper, alignItems: 'center', justifyContent: 'center' },
-  ringInner: { width: 64, height: 64, borderRadius: 32, borderWidth: 6, borderColor: T.blue, alignItems: 'center', justifyContent: 'center' },
-  ringValue: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  ringLabel: { color: '#8EA5B8', fontSize: 9, marginTop: -1 },
-  targetMetrics: { flex: 1 },
-  darkKicker: { color: '#7590A6', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-  darkLine: { color: '#E8F0F5', fontSize: 12, fontWeight: '700', marginTop: 4 },
+  targetBody: { padding: 16 },
+  targetMain: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  legendDot: { width: 9, height: 9, borderRadius: 2, marginRight: 5 },
+  legendText: { color: T.muted, fontSize: 10, fontWeight: '700' },
+  ringOuter: { width: 104, height: 104, borderRadius: 52, borderWidth: 10, borderColor: T.copper, alignItems: 'center', justifyContent: 'center' },
+  ringInner: { width: 74, height: 74, borderRadius: 37, borderWidth: 8, borderColor: T.blue, alignItems: 'center', justifyContent: 'center' },
+  ringValue: { color: T.ink, fontSize: 21, fontWeight: '900' },
+  ringLabel: { color: T.muted, fontSize: 9, marginTop: -1 },
+  targetMetrics: { flex: 1, minWidth: 0 },
+  darkKicker: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  darkLine: { color: T.ink, fontSize: 12, fontWeight: '700', marginTop: 4 },
   copper: { color: T.copper, fontWeight: '900' },
-  blueText: { color: '#8DB4E6', fontWeight: '900' },
-  collectionLine: { color: '#ABC0D0', fontSize: 10, marginTop: 5, fontWeight: '700' },
+  blueText: { color: T.blue, fontWeight: '900' },
+  collectionLine: { color: T.muted, fontSize: 10, marginTop: 5, fontWeight: '700' },
   reportLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 15, padding: 14, gap: 12, marginBottom: 14, ...S.card },
   reportIcon: { width: 43, height: 43, borderRadius: 11, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
   reportEmoji: { fontSize: 21 },

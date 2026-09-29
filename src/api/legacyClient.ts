@@ -700,12 +700,32 @@ export const DyeingAPI = {
   outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number }) =>
     client.get('/dyeing/outward_details', { params }),
 
+  // Every outward line of ONE SO line (shade) with its saved lot no.
+  // GET /dyeing/outward_details_all?prptype=S&yearno=27&orderuid=370000635&ordersrno=1
+  outwardDetailsAll: (params: { prptype: string; yearno: string | number; orderuid: string | number; ordersrno: string | number }) =>
+    client.get('/dyeing/outward_details_all', { params }),
+
+  // Saved lot nos of one chart + SO line (the table under the status sheet).
+  // GET /dyeing/lotnos?prptype=S&chartno=CH-2-01&yearno=27&orderuid=370000635&ordersrno=2
+  lotNos: (params: { prptype: string; chartno: string; yearno: string | number; orderuid: string | number; ordersrno: string | number }) =>
+    client.get('/dyeing/lotnos', { params }),
+
   // Add / edit the lot no. of ONE outward line (uid + srno of the challan).
   // /dyeing/save_outward_details?prptype=S&chartno=CH-2-01&yearno=27&uid=370000208&srno=2&lotno=123
   saveOutwardDetails: (params: Record<string, any>) =>
     client.get('/dyeing/save_outward_details', { params }),
   saveOutwardDetailsPost: (params: Record<string, any>) =>
     client.post('/dyeing/save_outward_details', params, { params }),
+
+  // Remove the lot no. of ONE outward line (uid + srno from /dyeing/lotnos).
+  // POST /dyeing/remove_lotno { uid, srno, chartno, shdcode, prptype, yearno }
+  removeLotNo: (payload: Record<string, any>) =>
+    client.post('/dyeing/remove_lotno', payload),
+
+  // Remove the LATEST status of ONE shade (only the last one can be removed).
+  // POST /dyeing/remove_status { OrderUId, OrderSrNo, ChartNo, ParCode, ShdCode, Status, prptype, yearno }
+  removeStatus: (payload: Record<string, any>) =>
+    client.post('/dyeing/remove_status', payload),
 };
 
 export const GreyPackingAPI = {

@@ -153,7 +153,7 @@ export function NotificationProvider({
         { name: 'Inquiry', route: 'Inquiry' },
         { name: 'Sudamo Production Order', route: 'sudamo-production-order' },
         { name: 'New Account Request', route: 'new-account-request' },
-        { name: 'Yarn Stock Verification', route: 'yarn-stock-verification' },
+        { name: 'Yarn Stock Verification', route: 'yarnstockverification' },
         { name: 'Sales Order(Inactive)', route: 'sales order-inactive' },
         { name: 'Purchase Order Tracking', route: 'purchase-order-tracking' },
         { name: 'Item Authorization', route: 'item-authorization' },

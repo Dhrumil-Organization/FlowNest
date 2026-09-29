@@ -1,17 +1,20 @@
 import { NotificationProvider } from '@/common/context/NotificationContext';
 import { AppHeader } from '@/src/components/layout/AppHeader';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
+import { TopInsetHandled } from '@/src/core/layout/topInset';
 import { APP_NAVIGATION } from '@/src/core/navigation';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Keyboard,
   LayoutChangeEvent,
   Modal,
   Platform,
@@ -32,9 +35,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 // floating math below (bar position + the paddingBottom every screen needs
 // so its content isn't hidden behind the bar) stays in one place and can't
 // drift out of sync.
-const TAB_BAR_HEIGHT = 75;
-const TAB_BAR_SIDE_MARGIN = 14;
-const TAB_BAR_GROUND_GAP = 10; // visual gap above iOS home indicator / Android system navigation
+// COMPACT: 75 -> 62 (phones) / 64 (tablets) so screens get more room, and on
+// tablets the bar is centred with a max width instead of stretching edge to edge.
+const TAB_BAR_HEIGHT = 62;
+const TAB_BAR_HEIGHT_TABLET = 64;
+const TAB_BAR_MAX_WIDTH = 560;
+const TAB_BAR_SIDE_MARGIN = 12;
+const TAB_BAR_GROUND_GAP = 8; // visual gap above iOS home indicator / Android system navigation
+const TAB_BAR_CONTENT_GAP = 10; // breathing room between the last row of a screen and the bar
+const IS_IOS = Platform.OS === 'ios';
 
 // FIX: this is now the ONE place a header is rendered for every tab screen.
 // Previously DashboardScreen, DesignsScreen, PermissionManagerScreen and
@@ -110,20 +119,39 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && windowWidth >= 1180;
+  const isTabletWidth = !isDesktop && windowWidth >= 768;
+  const tabBarHeight = isTabletWidth ? TAB_BAR_HEIGHT_TABLET : TAB_BAR_HEIGHT;
   const ready = hydrated && Boolean(appSession);
+
+  // Hide the floating bar while the keyboard is open, so it never sits on
+  // top of the input being typed into (Android resizes the window upward).
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    const showEvt = IS_IOS ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = IS_IOS ? 'keyboardWillHide' : 'keyboardDidHide';
+    const a = Keyboard.addListener(showEvt, () => setKeyboardOpen(true));
+    const b = Keyboard.addListener(hideEvt, () => setKeyboardOpen(false));
+    return () => { a.remove(); b.remove(); };
+  }, []);
 
   // SYSTEM-SAFE FLOATING TAB BAR:
   // safe-area-context reports the physical bottom obstruction for both
   // platforms (iOS home indicator, Android gesture/3-button navigation).
   // Add only a small visual ground gap above that obstruction.
   const barBottomOffset = Math.max(0, insets.bottom) + TAB_BAR_GROUND_GAP;
-  const barLeftOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.left + 8);
-  const barRightOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.right + 8);
+  const centeredGutter = Math.max(0, (windowWidth - TAB_BAR_MAX_WIDTH) / 2);
+  const barLeftOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.left + 8, centeredGutter);
+  const barRightOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.right + 8, centeredGutter);
 
   // The tab bar is absolute, so reserve its full footprint in every scene.
   // This prevents the last report/list row from sitting behind the pill on
   // either iOS or Android.
-  const sceneBottomPadding = isDesktop ? 24 : TAB_BAR_HEIGHT + barBottomOffset + 16;
+  const sceneBottomPadding = isDesktop
+    ? 24
+    : keyboardOpen
+      ? 0
+      : tabBarHeight + barBottomOffset + TAB_BAR_CONTENT_GAP;
   const onDashboard = pathname === '/new' || pathname === '/new/' || pathname.endsWith('/new/(tabs)') || pathname.endsWith('/new/(tabs)/');
 
   const activeRouteName = onDashboard
@@ -201,6 +229,8 @@ export default function TabsLayout() {
   const hasOverflow = overflowItems.length > 0;
 
   const [moreOpen, setMoreOpen] = useState(false);
+  // More sheet grid: 4 columns on phones, 6 on tablets / phones in landscape.
+  const moreCellWidth = windowWidth >= 700 ? '16.66%' : '25%';
   const [moreSearch, setMoreSearch] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
 
@@ -237,10 +267,12 @@ export default function TabsLayout() {
   };
 
   return (
+    <TopInsetHandled.Provider value={true}>
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.nav }}>
       <View style={layoutStyles.root}>
         {isDesktop ? (
           <DesktopSidebar
+            windowWidth={windowWidth}
             items={filteredSidebarItems}
             activeRouteName={activeRouteName || 'index'}
             search={sidebarSearch}
@@ -279,9 +311,10 @@ export default function TabsLayout() {
                   paddingBottom: sceneBottomPadding,
                 },
               }}
-              tabBar={isDesktop ? () => null : (props) => (
+              tabBar={isDesktop || keyboardOpen ? () => null : (props) => (
                 <GlassTabBar
                   {...props}
+                  barHeight={tabBarHeight}
                   primaryItems={primaryItems}
                   overflowItems={overflowItems}
                   hasOverflow={hasOverflow}
@@ -327,6 +360,7 @@ export default function TabsLayout() {
               style={[
                 moreStyles.sheet,
                 { paddingBottom: 12 + Math.max(0, insets.bottom) },
+                windowWidth >= 700 && moreStyles.sheetWide,
               ]}
             >
               <BlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
@@ -362,7 +396,7 @@ export default function TabsLayout() {
                 keyboardShouldPersistTaps="handled"
               >
                 {filteredOverflowItems.length > 0 ? filteredOverflowItems.map((item) => (
-                  <TouchableOpacity key={item.routeName} style={moreStyles.cell} onPress={() => goTo(item.routeName)} activeOpacity={0.7}>
+                  <TouchableOpacity key={item.routeName} style={[moreStyles.cell, { width: moreCellWidth as any }]} onPress={() => goTo(item.routeName)} activeOpacity={0.7}>
                     <View style={moreStyles.iconWrap}>
                       <Icon name={item.icon as any} size={22} color={T.copper} />
                     </View>
@@ -380,11 +414,13 @@ export default function TabsLayout() {
         </Modal>
       ) : null}
     </SafeAreaView>
+    </TopInsetHandled.Provider>
   );
 }
 
 
 type DesktopSidebarProps = {
+  windowWidth: number;
   items: NavItem[];
   activeRouteName: string;
   search: string;
@@ -393,7 +429,11 @@ type DesktopSidebarProps = {
   onClearSearch: () => void;
 };
 
+// DESKTOP SIDEBAR (web >= 1180px): compact rows, width follows the window
+// (224px on laptops, 248px on wide monitors) and it can be collapsed to an
+// icon rail to give tables more room. Same items, search and navigation as before.
 function DesktopSidebar({
+  windowWidth,
   items,
   activeRouteName,
   search,
@@ -401,34 +441,66 @@ function DesktopSidebar({
   onNavigate,
   onClearSearch,
 }: DesktopSidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const width = collapsed ? 68 : windowWidth >= 1440 ? 248 : 224;
+
   return (
-    <View style={desktopStyles.sidebar}>
-      <View style={desktopStyles.brandBlock}>
-        <Text style={desktopStyles.brandEyebrow}>MADHUSUDHAN FABRICS</Text>
-        <Text style={desktopStyles.brandTitle}>Mini ERP</Text>
-      </View>
-      <View style={desktopStyles.sectionLabelRow}>
-        <Icon name="tune" size={16} color="#7C9BB5" />
-        <Text style={desktopStyles.sectionLabel}>WORKFLOW</Text>
-      </View>
-      <View style={desktopStyles.sidebarSearch}>
-        <Icon name="search" size={17} color="#7C93A8" />
-        <TextInput
-          value={search}
-          onChangeText={onSearchChange}
-          placeholder="Search modules"
-          placeholderTextColor="#6E8498"
-          style={desktopStyles.sidebarSearchInput}
-        />
-        {search ? (
-          <TouchableOpacity onPress={onClearSearch} hitSlop={8}>
-            <Icon name="close" size={16} color="#8EA5B8" />
-          </TouchableOpacity>
+    <View style={[desktopStyles.sidebar, { width }]}>
+      <View style={[desktopStyles.brandBlock, collapsed && desktopStyles.brandBlockCollapsed]}>
+        {!collapsed ? (
+          <View style={desktopStyles.brandText}>
+            <Text style={desktopStyles.brandEyebrow} numberOfLines={1}>MADHUSUDHAN FABRICS</Text>
+            <Text style={desktopStyles.brandTitle} numberOfLines={1}>Mini ERP</Text>
+          </View>
         ) : null}
+        <TouchableOpacity
+          onPress={() => setCollapsed((v) => !v)}
+          style={desktopStyles.collapseBtn}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={18} color="#B4C5D2" />
+        </TouchableOpacity>
       </View>
+
+      {!collapsed ? (
+        <>
+          <View style={desktopStyles.sectionLabelRow}>
+            <Icon name="tune" size={14} color="#7C9BB5" />
+            <Text style={desktopStyles.sectionLabel}>WORKFLOW</Text>
+          </View>
+          <View style={desktopStyles.sidebarSearch}>
+            <Icon name="search" size={16} color="#7C93A8" />
+            <TextInput
+              value={search}
+              onChangeText={onSearchChange}
+              placeholder="Search modules"
+              placeholderTextColor="#6E8498"
+              style={desktopStyles.sidebarSearchInput}
+            />
+            {search ? (
+              <TouchableOpacity onPress={onClearSearch} hitSlop={8}>
+                <Icon name="close" size={15} color="#8EA5B8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
+      ) : (
+        <TouchableOpacity
+          onPress={() => setCollapsed(false)}
+          style={desktopStyles.railSearch}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Search modules"
+        >
+          <Icon name="search" size={18} color="#8EA5B8" />
+        </TouchableOpacity>
+      )}
+
       <ScrollView
         style={desktopStyles.navScroll}
-        contentContainerStyle={desktopStyles.navContent}
+        contentContainerStyle={[desktopStyles.navContent, collapsed && desktopStyles.navContentCollapsed]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -438,24 +510,35 @@ function DesktopSidebar({
             <TouchableOpacity
               key={item.routeName}
               onPress={() => onNavigate(item.routeName)}
-              style={[desktopStyles.navItem, active && desktopStyles.navItemActive]}
+              style={[
+                desktopStyles.navItem,
+                collapsed && desktopStyles.navItemCollapsed,
+                active && desktopStyles.navItemActive,
+              ]}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={item.title}
             >
-              <Icon name={item.icon as any} size={18} color={active ? '#FFFFFF' : '#83A0B6'} />
-              <Text style={[desktopStyles.navText, active && desktopStyles.navTextActive]} numberOfLines={1}>
-                {item.title}
-              </Text>
+              {active && !collapsed ? <View style={desktopStyles.activeMarker} /> : null}
+              <Icon name={item.icon as any} size={18} color={active ? T.copper : '#83A0B6'} />
+              {!collapsed ? (
+                <Text style={[desktopStyles.navText, active && desktopStyles.navTextActive]} numberOfLines={1}>
+                  {item.title}
+                </Text>
+              ) : null}
             </TouchableOpacity>
           );
         })}
-        {items.length === 0 ? (
+        {items.length === 0 && !collapsed ? (
           <Text style={desktopStyles.emptyNavText}>No modules found</Text>
         ) : null}
       </ScrollView>
-      <View style={desktopStyles.sidebarFooter}>
-        <Text style={desktopStyles.footerHint}>ERP workspace</Text>
-        <Text style={desktopStyles.footerHintMuted}>Use the search to jump to any module.</Text>
-      </View>
+      {!collapsed ? (
+        <View style={desktopStyles.sidebarFooter}>
+          <Text style={desktopStyles.footerHint}>ERP workspace</Text>
+          <Text style={desktopStyles.footerHintMuted} numberOfLines={2}>Use the search to jump to any module.</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -469,6 +552,7 @@ type GlassTabBarProps = {
   primaryItems: NavItem[];
   overflowItems: NavItem[];
   hasOverflow: boolean;
+  barHeight?: number;
   barBottom: number;
   barLeft: number;
   barRight: number;
@@ -477,12 +561,25 @@ type GlassTabBarProps = {
   onNavigateRoute?: (routeName: string) => void;
 };
 
+// LIQUID-GLASS FLOATING TAB BAR
+// iOS: real system material blur (systemChromeMaterialDark) + light navy
+// tint + a specular top highlight + a sliding glass "lens" that stretches
+// while it moves between tabs (like iOS 26 tab bars). Android can't blur
+// cheaply, so it gets a denser tint of the same look; web uses CSS
+// backdrop-filter through expo-blur. Navigation logic is unchanged.
+const GLASS_TINT = Platform.select({
+  ios: 'rgba(13,27,42,0.42)',
+  android: 'rgba(13,27,42,0.93)',
+  default: 'rgba(13,27,42,0.62)',
+});
+
 function GlassTabBar({
   state,
   navigation,
   primaryItems,
   overflowItems,
   hasOverflow,
+  barHeight = TAB_BAR_HEIGHT,
   barBottom,
   barLeft,
   barRight,
@@ -507,21 +604,46 @@ function GlassTabBar({
   const pillX = useRef(new Animated.Value(0)).current;
   const pillW = useRef(new Animated.Value(0)).current;
   const pillOpacity = useRef(new Animated.Value(0)).current;
+  // 1 = resting; briefly > 1 while the lens slides (liquid stretch).
+  const pillStretch = useRef(new Animated.Value(1)).current;
+  const firstPlacement = useRef(true);
 
   useEffect(() => {
     const l = activeKey ? layouts[activeKey] : undefined;
-    if (l) {
-      Animated.parallel([
-        Animated.spring(pillX, { toValue: l.x, useNativeDriver: false, damping: 20, stiffness: 260, mass: 0.7 }),
-        Animated.spring(pillW, { toValue: l.width, useNativeDriver: false, damping: 20, stiffness: 260, mass: 0.7 }),
-        Animated.timing(pillOpacity, { toValue: 1, duration: 150, useNativeDriver: false }),
-      ]).start();
+    if (!l) return;
+    const lensInset = 4;
+    const toX = l.x + lensInset;
+    const toW = Math.max(0, l.width - lensInset * 2);
+    if (firstPlacement.current) {
+      // First layout: place the lens without sliding in from x = 0.
+      firstPlacement.current = false;
+      pillX.setValue(toX);
+      pillW.setValue(toW);
+      Animated.timing(pillOpacity, { toValue: 1, duration: 160, useNativeDriver: false }).start();
+      return;
     }
+    Animated.parallel([
+      Animated.spring(pillX, { toValue: toX, useNativeDriver: false, damping: 18, stiffness: 220, mass: 0.8 }),
+      Animated.spring(pillW, { toValue: toW, useNativeDriver: false, damping: 18, stiffness: 220, mass: 0.8 }),
+      Animated.timing(pillOpacity, { toValue: 1, duration: 150, useNativeDriver: false }),
+      Animated.sequence([
+        Animated.timing(pillStretch, { toValue: 1.1, duration: 110, useNativeDriver: false }),
+        Animated.spring(pillStretch, { toValue: 1, useNativeDriver: false, damping: 9, stiffness: 180, mass: 0.6 }),
+      ]),
+    ]).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey, layouts]);
 
+  const lensVertical = 6;
   const pillStyle = {
-    transform: [{ translateX: pillX }],
+    top: lensVertical,
+    bottom: lensVertical,
+    borderRadius: (barHeight - lensVertical * 2) / 2,
+    transform: [
+      { translateX: pillX },
+      { scaleX: pillStretch },
+      { scaleY: pillStretch.interpolate({ inputRange: [1, 1.1], outputRange: [1, 0.9] }) },
+    ],
     width: pillW,
     opacity: pillOpacity,
   };
@@ -536,6 +658,9 @@ function GlassTabBar({
   };
 
   const handlePress = (item: NavItem) => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => undefined);
+    }
     if (item.routeName === 'more') {
       onMorePress();
       return;
@@ -548,31 +673,47 @@ function GlassTabBar({
     }
   };
 
+  const radius = barHeight / 2;
+
   return (
     <NotificationProvider>
       <View
         pointerEvents="box-none"
         style={[
           styles.barWrap,
-          { bottom: barBottom, left: barLeft, right: barRight },
+          { bottom: barBottom, left: barLeft, right: barRight, height: barHeight },
         ]}
       >
-        <View style={styles.barShadow}>
-          <View style={styles.barClip}>
-            <BlurView tint="dark" intensity={55} style={StyleSheet.absoluteFillObject} />
-            <View style={[StyleSheet.absoluteFillObject, styles.tintOverlay]} />
+        <View style={[styles.barShadow, { borderRadius: radius }]}>
+          <View style={[styles.barClip, { borderRadius: radius }]}>
+            <BlurView
+              tint={IS_IOS ? 'systemChromeMaterialDark' : 'dark'}
+              intensity={IS_IOS ? 85 : 60}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: GLASS_TINT }]} />
+            {/* specular highlight: light falling on the top half of the glass */}
             <LinearGradient
               pointerEvents="none"
-              colors={[T.nav, T.nav, T.nav]}
-              locations={[0, 0.45, 1]}
+              colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0)']}
+              locations={[0, 0.5, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <View pointerEvents="none" style={styles.glassBorder} />
+            <View pointerEvents="none" style={[styles.glassBorder, { borderRadius: radius }]} />
+            <View pointerEvents="none" style={[styles.glassRimTop, { left: radius * 0.6, right: radius * 0.6 }]} />
 
             <View style={styles.row}>
-              <Animated.View style={[styles.pill, pillStyle]} />
+              <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]}>
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.06)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              </Animated.View>
               {items.map((item) => {
                 const focused = item.routeName === activeKey;
                 return (
@@ -611,16 +752,19 @@ function TabButton({
       onLayout={onLayout}
       onPress={onPress}
       onPressIn={() => {
-        Animated.timing(scale, { toValue: 0.88, duration: 90, useNativeDriver: true }).start();
+        Animated.timing(scale, { toValue: 0.9, duration: 90, useNativeDriver: true }).start();
       }}
       onPressOut={() => {
         Animated.spring(scale, { toValue: 1, damping: 14, stiffness: 260, useNativeDriver: true }).start();
       }}
       style={styles.tabBtn}
-      hitSlop={6}
+      hitSlop={4}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={item.title}
     >
       <Animated.View style={[styles.tabBtnInner, { transform: [{ scale }] }]}>
-        <Icon name={item.icon as any} size={24} color={focused ? T.copper : 'rgba(255,255,255,0.55)'} />
+        <Icon name={item.icon as any} size={22} color={focused ? T.copper : 'rgba(255,255,255,0.62)'} />
         <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} numberOfLines={1}>
           {item.title}
         </Text>
@@ -635,24 +779,31 @@ const layoutStyles = StyleSheet.create({
 });
 
 const desktopStyles = StyleSheet.create({
-  sidebar: { width: 250, backgroundColor: T.nav, borderRightWidth: 1, borderRightColor: '#193149', paddingTop: 18, paddingBottom: 14 },
-  brandBlock: { paddingHorizontal: 18, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#193149' },
-  brandEyebrow: { color: '#7895AD', fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
-  brandTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 4 },
-  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 10 },
-  sectionLabel: { color: '#7895AD', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  sidebarSearch: { marginHorizontal: 14, marginBottom: 9, borderWidth: 1, borderColor: '#294258', borderRadius: 10, minHeight: 38, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 7, backgroundColor: '#112638' },
-  sidebarSearchInput: { flex: 1, color: '#EAF2F7', fontSize: 12, paddingVertical: 7, minWidth: 0 },
+  sidebar: { backgroundColor: T.nav, borderRightWidth: 1, borderRightColor: '#193149', paddingTop: 12, paddingBottom: 10 },
+  brandBlock: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#193149', gap: 8 },
+  brandBlockCollapsed: { paddingLeft: 10, justifyContent: 'center' },
+  brandText: { flex: 1, minWidth: 0 },
+  brandEyebrow: { color: '#7895AD', fontSize: 9, fontWeight: '700', letterSpacing: 1.4 },
+  brandTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginTop: 2 },
+  collapseBtn: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#294258', backgroundColor: '#112638' },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  sectionLabel: { color: '#7895AD', fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2 },
+  sidebarSearch: { marginHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: '#294258', borderRadius: 9, minHeight: 34, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, gap: 6, backgroundColor: '#112638' },
+  sidebarSearchInput: { flex: 1, color: '#EAF2F7', fontSize: 12, paddingVertical: 6, minWidth: 0 },
+  railSearch: { alignSelf: 'center', width: 40, height: 36, marginTop: 10, marginBottom: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#294258', backgroundColor: '#112638' },
   navScroll: { flex: 1 },
-  navContent: { paddingHorizontal: 9, paddingBottom: 12 },
-  navItem: { minHeight: 42, borderRadius: 9, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 3 },
-  navItemActive: { backgroundColor: '#2A3F52' },
-  navText: { flex: 1, color: '#B4C5D2', fontSize: 12, fontWeight: '700' },
-  navTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  navContent: { paddingHorizontal: 8, paddingBottom: 10 },
+  navContentCollapsed: { paddingHorizontal: 10, paddingTop: 4, alignItems: 'stretch' },
+  navItem: { minHeight: 36, borderRadius: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2, position: 'relative' },
+  navItemCollapsed: { justifyContent: 'center', paddingHorizontal: 0, minHeight: 40, marginBottom: 4 },
+  navItemActive: { backgroundColor: '#1F3549' },
+  activeMarker: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2, backgroundColor: T.copper },
+  navText: { flex: 1, color: '#B4C5D2', fontSize: 12.5, fontWeight: '500' },
+  navTextActive: { color: '#FFFFFF', fontWeight: '700' },
   emptyNavText: { color: '#8098AA', fontSize: 12, textAlign: 'center', paddingVertical: 18 },
-  sidebarFooter: { borderTopWidth: 1, borderTopColor: '#193149', paddingHorizontal: 16, paddingTop: 11 },
-  footerHint: { color: '#AFC1CE', fontSize: 10, fontWeight: '800' },
-  footerHintMuted: { color: '#6F879B', fontSize: 9, marginTop: 3 },
+  sidebarFooter: { borderTopWidth: 1, borderTopColor: '#193149', paddingHorizontal: 16, paddingTop: 9 },
+  footerHint: { color: '#AFC1CE', fontSize: 10, fontWeight: '700' },
+  footerHintMuted: { color: '#6F879B', fontSize: 9.5, marginTop: 2 },
 });
 
 const styles = StyleSheet.create({
@@ -663,20 +814,17 @@ const styles = StyleSheet.create({
   barShadow: {
     flex: 1,
     borderRadius: TAB_BAR_HEIGHT / 2,
-    elevation: 14,
+    elevation: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.26,
+    shadowRadius: 20,
   },
   barClip: {
     flex: 1,
     borderRadius: TAB_BAR_HEIGHT / 2,
     overflow: 'hidden',
     backgroundColor: 'transparent',
-  },
-  tintOverlay: {
-    backgroundColor: 'rgba(13,27,42,0.55)',
   },
   glassBorder: {
     position: 'absolute',
@@ -686,26 +834,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: TAB_BAR_HEIGHT / 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  // thin bright rim on the top edge — the "glass edge catching light"
+  glassRimTop: {
+    position: 'absolute',
+    top: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.32)',
   },
   row: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'stretch',
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   pill: {
     position: 'absolute',
-    top: 8,
-    bottom: 8,
-    borderRadius: (TAB_BAR_HEIGHT - 16) / 2,
-    backgroundColor: 'rgba(200,117,51,0.22)',
+    left: 0,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(200,117,51,0.4)',
-    shadowColor: T.copper,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    borderColor: 'rgba(255,255,255,0.24)',
   },
   tabBtn: {
     flex: 1,
@@ -715,16 +865,19 @@ const styles = StyleSheet.create({
   tabBtnInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
+    paddingHorizontal: 4,
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.55)',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.62)',
     marginTop: 1,
+    letterSpacing: 0.1,
   },
   tabLabelActive: {
     color: T.copper,
+    fontWeight: '700',
   },
 });
 
@@ -762,6 +915,8 @@ const moreStyles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
+  // tablets / landscape: centred card instead of a full-width sheet
+  sheetWide: { width: '100%', maxWidth: 720, alignSelf: 'center', height: '62%' },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: T.border, alignSelf: 'center', marginBottom: 10 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 8, minHeight: 42, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 10, gap: 8, backgroundColor: 'rgba(255,255,255,0.72)' },
   searchInput: { flex: 1, minWidth: 0, color: T.ink, fontSize: 12, fontWeight: '700', paddingVertical: 9 },
@@ -771,7 +926,7 @@ const moreStyles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: T.border,
   },
-  sheetTitle: { fontSize: 16, fontWeight: '900', color: T.nav },
+  sheetTitle: { fontSize: 16, fontWeight: '800', color: T.nav },
   closeX: { fontSize: 18, color: '#000' },
   // `flex: 1` — claims all remaining height inside the fixed-height `sheet`
   // (the 50% minus the handle + header above it), so the grid scrolls
@@ -787,5 +942,5 @@ const moreStyles = StyleSheet.create({
     backgroundColor: T.sub, borderWidth: 1, borderColor: T.border,
     alignItems: 'center', justifyContent: 'center', marginBottom: 6,
   },
-  label: { fontSize: 10.5, lineHeight: 13, fontWeight: '800', color: T.ink, textAlign: 'center', minHeight: 26, width: '100%', paddingHorizontal: 3 },
+  label: { fontSize: 10.5, lineHeight: 13, fontWeight: '600', color: T.ink, textAlign: 'center', minHeight: 26, width: '100%', paddingHorizontal: 3 },
 });

@@ -1494,7 +1494,7 @@
 //           <>
 //             <KPIGrid d={d} label={m.fullLabel} />
 
-            {/* Cost composition donut */}
+//             {/* Cost composition donut */}
 //             <View style={S.compositionCard}>
 //               <Text style={S.compositionTitle}>
 //                 Cost composition · {m.shortLabel} '{m.displayYear}
@@ -2395,8 +2395,9 @@ import AsyncStorage from "@/common/utils/compatibleStorage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
-  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -2415,8 +2416,9 @@ import { T } from "../../theme";
 // the rest of this screen. See AvgPicksSection.js for the full logic (it
 // mirrors Salary.js + AvgPicksCalendar.jsx from the web app 1:1).
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-import AvgPicksSection, { AvgPicksTab } from "./AvgPicksSection";
+import { API } from '../../common/API/dynamicAPI';
 import InteractiveDailyTrendChart from "../dashboard/employ/components/InteractiveDailyTrendChart";
+import AvgPicksSection from "./AvgPicksSection";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -2516,7 +2518,7 @@ const SK = StyleSheet.create({
 
 // ── Month tab ─────────────────────────────────────────────────────
 function MonthTab({ label, active, status, onPress }) {
-  console.log("label",label);
+  console.log("label", label);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -2578,9 +2580,9 @@ function DonutChart({ elec, sal, stores, total }) {
           const arcs =
             spanDeg > 180
               ? [
-                  { start: startDeg, span: 180 },
-                  { start: startDeg + 180, span: spanDeg - 180 },
-                ]
+                { start: startDeg, span: 180 },
+                { start: startDeg + 180, span: spanDeg - 180 },
+              ]
               : [{ start: startDeg, span: spanDeg }];
           return arcs.map((arc, j) => (
             <View
@@ -3000,10 +3002,10 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
     : (d.expense_daily_trend || []);
   const valueOf = r => isUtility ? Number(r.cost_per_mtr || 0)
     : isRapier ? Number(r.rapier_cost_per_pick || 0)
-    : isWaterjet ? Number(r.waterjet_cost_per_pick || 0)
-    : Number(r.cost_per_pick || 0);
+      : isWaterjet ? Number(r.waterjet_cost_per_pick || 0)
+        : Number(r.cost_per_pick || 0);
   const positive = rows.map(valueOf).filter(v => v > 0);
-  const avg = positive.length ? positive.reduce((a,v)=>a+v,0) / positive.length : 0;
+  const avg = positive.length ? positive.reduce((a, v) => a + v, 0) / positive.length : 0;
   const best = positive.length ? Math.min(...positive) : 0;
   const worst = positive.length ? Math.max(...positive) : 0;
   const [selected, setSelected] = useState(Math.max(0, rows.length - 1));
@@ -3015,21 +3017,21 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
   const cost = r => isUtility ? Number(r.amount || 0) : isRapier ? Number(r.rapier_total_cost || 0) : isWaterjet ? Number(r.waterjet_total_cost || 0) : Number(r.total_cost || 0);
   if (!open || !trend) return null;
   return <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-    <View style={{flex:1,backgroundColor:'rgba(15,23,42,0.38)',justifyContent:'center',padding:18}}>
-      <View style={{backgroundColor:'#fff',borderRadius:16,maxHeight:'88%',padding:14}}>
-        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
-          <View style={{flex:1,paddingRight:10}}><Text style={{fontSize:17,fontWeight:'700',color:'#111827'}}>{title}</Text>
-            <Text style={{fontSize:10.5,color:'#6b7280',marginTop:3,lineHeight:15}}>{isUtility ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds." : "Daily cost per pick — electricity, wages and allocated stores ÷ metres ÷ picks."}</Text></View>
-          <TouchableOpacity onPress={onClose} style={{padding:6}}><Text style={{fontSize:20,color:'#6b7280'}}>×</Text></TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.38)', justifyContent: 'center', padding: 18 }}>
+      <View style={{ backgroundColor: '#fff', borderRadius: 16, maxHeight: '88%', padding: 14 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <View style={{ flex: 1, paddingRight: 10 }}><Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>{title}</Text>
+            <Text style={{ fontSize: 10.5, color: '#6b7280', marginTop: 3, lineHeight: 15 }}>{isUtility ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds." : "Daily cost per pick — electricity, wages and allocated stores ÷ metres ÷ picks."}</Text></View>
+          <TouchableOpacity onPress={onClose} style={{ padding: 6 }}><Text style={{ fontSize: 20, color: '#6b7280' }}>×</Text></TouchableOpacity>
         </View>
-        <View style={{flexDirection:'row',gap:7,marginBottom:8}}>
-          {[['MONTH AVG',avg],['BEST DAY',best],['WORST DAY',worst]].map(([l,v])=><View key={l} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:9,padding:8}}><Text style={{fontSize:9,color:'#6b7280'}}>{l}</Text><Text style={{fontSize:14,fontWeight:'700',marginTop:2}}>₹{isUtility?f3(v):f3(v)}{isUtility?'/m':'/pk'}</Text></View>)}
+        <View style={{ flexDirection: 'row', gap: 7, marginBottom: 8 }}>
+          {[['MONTH AVG', avg], ['BEST DAY', best], ['WORST DAY', worst]].map(([l, v]) => <View key={l} style={{ flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 9, padding: 8 }}><Text style={{ fontSize: 9, color: '#6b7280' }}>{l}</Text><Text style={{ fontSize: 14, fontWeight: '700', marginTop: 2 }}>₹{isUtility ? f3(v) : f3(v)}{isUtility ? '/m' : '/pk'}</Text></View>)}
         </View>
-        <TrendBars rows={rows.map(r=>({...r,_v:valueOf(r)}))} valueKey="_v" valueFormatter={v=>`₹${f3(v)}`} selected={selected} onSelect={setSelected} barColor={isUtility?'#185FA5':isWaterjet?'#185FA5':'#c2823a'} />
-        {!!row.date_ymd && <View style={{backgroundColor:'#f8fafc',borderRadius:9,padding:9,marginVertical:6}}><Text style={{fontSize:11.5,fontWeight:'700'}}>Day {row.day}</Text><Text style={{fontSize:10.5,color:'#4b5563',marginTop:3}}>{isUtility ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row))}/m` : `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row))}/pick`}</Text></View>}
-        <ScrollView style={{maxHeight:210}} nestedScrollEnabled>
-          <View style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#e5e7eb'}}><Text style={{flex:0.8,fontSize:9,fontWeight:'700'}}>DATE</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'kWh':'PROD m'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'PROD m':'PICKS'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>COST</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'₹/m':'₹/PICK'}</Text></View>
-          {rows.map((r,i)=><TouchableOpacity key={`${r.date_ymd}-${i}`} onPress={()=>setSelected(i)} style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f3f4f6',backgroundColor:i===selected?'#f8fafc':'#fff'}}><Text style={{flex:0.8,fontSize:10}}>{r.day}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?r.kwh:prod(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?prod(r):picks(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fL(cost(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10,fontWeight:'700'}}>₹{f3(valueOf(r))}</Text></TouchableOpacity>)}
+        <TrendBars rows={rows.map(r => ({ ...r, _v: valueOf(r) }))} valueKey="_v" valueFormatter={v => `₹${f3(v)}`} selected={selected} onSelect={setSelected} barColor={isUtility ? '#185FA5' : isWaterjet ? '#185FA5' : '#c2823a'} />
+        {!!row.date_ymd && <View style={{ backgroundColor: '#f8fafc', borderRadius: 9, padding: 9, marginVertical: 6 }}><Text style={{ fontSize: 11.5, fontWeight: '700' }}>Day {row.day}</Text><Text style={{ fontSize: 10.5, color: '#4b5563', marginTop: 3 }}>{isUtility ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row))}/m` : `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row))}/pick`}</Text></View>}
+        <ScrollView style={{ maxHeight: 210 }} nestedScrollEnabled>
+          <View style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}><Text style={{ flex: 0.8, fontSize: 9, fontWeight: '700' }}>DATE</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 9, fontWeight: '700' }}>{isUtility ? 'kWh' : 'PROD m'}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 9, fontWeight: '700' }}>{isUtility ? 'PROD m' : 'PICKS'}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 9, fontWeight: '700' }}>COST</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 9, fontWeight: '700' }}>{isUtility ? '₹/m' : '₹/PICK'}</Text></View>
+          {rows.map((r, i) => <TouchableOpacity key={`${r.date_ymd}-${i}`} onPress={() => setSelected(i)} style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', backgroundColor: i === selected ? '#f8fafc' : '#fff' }}><Text style={{ flex: 0.8, fontSize: 10 }}>{r.day}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 10 }}>{fN(isUtility ? r.kwh : prod(r))}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 10 }}>{fN(isUtility ? prod(r) : picks(r))}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 10 }}>{fL(cost(r))}</Text><Text style={{ flex: 1, textAlign: 'right', fontSize: 10, fontWeight: '700' }}>₹{f3(valueOf(r))}</Text></TouchableOpacity>)}
         </ScrollView>
       </View>
     </View>
@@ -3271,8 +3273,8 @@ function DailyUnitsView({ d, onBack }) {
   const fmtDate = (ymd) => {
     const x = String(ymd || '');
     if (x.length !== 8) return x;
-    const dt = new Date(Number(x.slice(0,4)), Number(x.slice(4,6))-1, Number(x.slice(6,8)));
-    return `${String(dt.getDate()).padStart(2,'0')}-${dt.toLocaleString('en-US',{month:'short'})}`;
+    const dt = new Date(Number(x.slice(0, 4)), Number(x.slice(4, 6)) - 1, Number(x.slice(6, 8)));
+    return `${String(dt.getDate()).padStart(2, '0')}-${dt.toLocaleString('en-US', { month: 'short' })}`;
   };
   const meterRows = (r) => [
     ['MW Rapier — Looms', r.mw_rapier_looms],
@@ -3296,24 +3298,24 @@ function DailyUnitsView({ d, onBack }) {
         Read-only daily sub-meter readings from Expense Costing. Tap a day to audit the meter split. No value is entered or saved from this screen.
       </Text>
 
-      <View style={{borderWidth:1,borderColor:'#e5e7eb',borderRadius:12,padding:12,marginBottom:10,flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-        <View><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>MONTH TO DATE {monthLabel ? `· ${monthLabel}` : ''}</Text><Text style={{fontSize:20,fontWeight:'700',marginTop:3}}>{fN(totalKwh)} <Text style={{fontSize:12,color:'#6b7280'}}>kWh</Text></Text></View>
-        <View style={{alignItems:'flex-end'}}><Text style={{fontSize:9,color:'#6b7280'}}>ELECTRICITY @ ₹{f2(d.unit_rate || 0)}</Text><Text style={{fontSize:17,fontWeight:'700',color:'#185FA5',marginTop:3}}>{fL(totalAmount)}</Text></View>
+      <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View><Text style={{ fontSize: 9, color: '#6b7280', fontWeight: '700' }}>MONTH TO DATE {monthLabel ? `· ${monthLabel}` : ''}</Text><Text style={{ fontSize: 20, fontWeight: '700', marginTop: 3 }}>{fN(totalKwh)} <Text style={{ fontSize: 12, color: '#6b7280' }}>kWh</Text></Text></View>
+        <View style={{ alignItems: 'flex-end' }}><Text style={{ fontSize: 9, color: '#6b7280' }}>ELECTRICITY @ ₹{f2(d.unit_rate || 0)}</Text><Text style={{ fontSize: 17, fontWeight: '700', color: '#185FA5', marginTop: 3 }}>{fL(totalAmount)}</Text></View>
       </View>
 
-      {rows.length === 0 ? <View style={{padding:18,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10}}><Text style={{fontSize:12,color:'#6b7280'}}>No daily electricity readings are available for this month.</Text></View> : rows.map((r, i) => {
+      {rows.length === 0 ? <View style={{ padding: 18, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10 }}><Text style={{ fontSize: 12, color: '#6b7280' }}>No daily electricity readings are available for this month.</Text></View> : rows.map((r, i) => {
         const open = openDay === i;
-        return <View key={`${r.date_ymd}-${i}`} style={{borderWidth:1,borderColor:open?'#cbd5e1':'#e5e7eb',borderRadius:10,marginBottom:7,overflow:'hidden',backgroundColor:'#fff'}}>
-          <TouchableOpacity onPress={()=>setOpenDay(open?-1:i)} style={{padding:11,flexDirection:'row',alignItems:'center'}} activeOpacity={0.75}>
-            <View style={{width:25,height:25,borderRadius:6,backgroundColor:open?'#185FA5':'#f3f4f6',alignItems:'center',justifyContent:'center',marginRight:9}}><Text style={{fontSize:11,fontWeight:'700',color:open?'#fff':'#6b7280'}}>{Number(r.day || i+1)}</Text></View>
-            <View style={{flex:1}}><Text style={{fontSize:12,fontWeight:'700'}}>{fmtDate(r.date_ymd)}</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{fN(r.total_kwh)} kWh</Text></View>
-            <Text style={{fontSize:11,fontWeight:'700',color:'#185FA5',marginRight:8}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:11,color:'#6b7280'}}>{open?'⌃':'⌄'}</Text>
+        return <View key={`${r.date_ymd}-${i}`} style={{ borderWidth: 1, borderColor: open ? '#cbd5e1' : '#e5e7eb', borderRadius: 10, marginBottom: 7, overflow: 'hidden', backgroundColor: '#fff' }}>
+          <TouchableOpacity onPress={() => setOpenDay(open ? -1 : i)} style={{ padding: 11, flexDirection: 'row', alignItems: 'center' }} activeOpacity={0.75}>
+            <View style={{ width: 25, height: 25, borderRadius: 6, backgroundColor: open ? '#185FA5' : '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginRight: 9 }}><Text style={{ fontSize: 11, fontWeight: '700', color: open ? '#fff' : '#6b7280' }}>{Number(r.day || i + 1)}</Text></View>
+            <View style={{ flex: 1 }}><Text style={{ fontSize: 12, fontWeight: '700' }}>{fmtDate(r.date_ymd)}</Text><Text style={{ fontSize: 9.5, color: '#6b7280', marginTop: 2 }}>{fN(r.total_kwh)} kWh</Text></View>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#185FA5', marginRight: 8 }}>{fN(r.total_kwh)} kWh</Text><Text style={{ fontSize: 11, color: '#6b7280' }}>{open ? '⌃' : '⌄'}</Text>
           </TouchableOpacity>
-          {open && <View style={{borderTopWidth:1,borderTopColor:'#f1f5f9',paddingHorizontal:11,paddingBottom:10}}>
-            {meterRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:7,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:11,color:'#374151'}}>{label}</Text><Text style={{fontSize:11,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            <Text style={{fontSize:9,fontWeight:'700',color:'#6b7280',marginTop:9,marginBottom:2}}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
-            {moreRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6}}><Text style={{fontSize:10.5,color:'#4b5563'}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            <View style={{marginTop:6,paddingTop:8,borderTopWidth:1,borderTopColor:'#e5e7eb',flexDirection:'row',justifyContent:'space-between'}}><View><Text style={{fontSize:10,fontWeight:'700'}}>DAY TOTAL</Text><Text style={{fontSize:9,color:'#6b7280',marginTop:2}}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {r.is_reconciled === false ? `difference ${fN(r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{alignItems:'flex-end'}}><Text style={{fontSize:13,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:10,color:'#6b7280',marginTop:2}}>{fL(r.amount || 0)}</Text></View></View>
+          {open && <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingHorizontal: 11, paddingBottom: 10 }}>
+            {meterRows(r).map(([label, v]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#f8fafc' }}><Text style={{ fontSize: 11, color: '#374151' }}>{label}</Text><Text style={{ fontSize: 11, fontWeight: '600' }}>{fN(v)} kWh</Text></View>)}
+            <Text style={{ fontSize: 9, fontWeight: '700', color: '#6b7280', marginTop: 9, marginBottom: 2 }}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
+            {moreRows(r).map(([label, v]) => <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}><Text style={{ fontSize: 10.5, color: '#4b5563' }}>{label}</Text><Text style={{ fontSize: 10.5, fontWeight: '600' }}>{fN(v)} kWh</Text></View>)}
+            <View style={{ marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb', flexDirection: 'row', justifyContent: 'space-between' }}><View><Text style={{ fontSize: 10, fontWeight: '700' }}>DAY TOTAL</Text><Text style={{ fontSize: 9, color: '#6b7280', marginTop: 2 }}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {r.is_reconciled === false ? `difference ${fN(r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{ alignItems: 'flex-end' }}><Text style={{ fontSize: 13, fontWeight: '700', color: '#185FA5' }}>{fN(r.total_kwh)} kWh</Text><Text style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{fL(r.amount || 0)}</Text></View></View>
           </View>}
         </View>;
       })}
@@ -3331,9 +3333,8 @@ function DailySalaryView({ d, onBack }) {
   const [rows, setRows] = useState(initRows);
 
   const addDay = () => {
-    const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${
-      rows[0]?.date?.split("-")[1] || "Jun"
-    }`;
+    const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${rows[0]?.date?.split("-")[1] || "Jun"
+      }`;
     setRows((prev) => [...prev, { date: nextDate, values: ["", "", ""] }]);
   };
 
@@ -3440,9 +3441,8 @@ function DailyInputView({ title, desc, d, onBack }) {
   const [rows, setRows] = useState(initRows);
 
   const addDay = () => {
-    const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${
-      rows[0]?.date?.split("-")[1] || "Jun"
-    }`;
+    const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${rows[0]?.date?.split("-")[1] || "Jun"
+      }`;
     setRows((prev) => [...prev, { date: nextDate, values: ["", "", ""] }]);
   };
 
@@ -3682,10 +3682,10 @@ function PastRow({ month, st, open, onToggle }) {
             {st.status === "loading"
               ? "Loading…"
               : st.status === "error"
-              ? "Failed"
-              : d
-              ? `${f2(d.prod_total_L)} L m · ${d.days} days`
-              : "—"}
+                ? "Failed"
+                : d
+                  ? `${f2(d.prod_total_L)} L m · ${d.days} days`
+                  : "—"}
           </Text>
         </View>
         <View
@@ -3788,7 +3788,7 @@ function MonthSettings({ d, monthKey }) {
         `month_settings_${monthKey}`,
         JSON.stringify({ unitRate, days, storeR, storeW })
       );
-    } catch (_) {}
+    } catch (_) { }
   };
 
   return (
@@ -4072,6 +4072,367 @@ export default function ExpenseScreen({ token, apiBase }) {
   // needs its own year/month picker.
   const [avgPicksOpen, setAvgPicksOpen] = useState(false);
   const [trendSheet, setTrendSheet] = useState(null);
+
+  // TEMPORARY ADMIN CONTROL — September 2026 Conversion Freeze validation.
+  // Remove after TMSMaster reconciliation has been verified.
+  const [conversionReconRunning, setConversionReconRunning] = useState(false);
+  const [conversionReconResult, setConversionReconResult] = useState(null);
+  const [conversionDiagRunning, setConversionDiagRunning] = useState(false);
+  const [conversionDiagResult, setConversionDiagResult] = useState(null);
+  const [conversionReprocessRunning, setConversionReprocessRunning] = useState(false);
+  const [conversionReprocessResult, setConversionReprocessResult] = useState(null);
+
+  const runSeptemberLineageDiagnostic = useCallback(async () => {
+    if (conversionDiagRunning) return;
+
+    setConversionDiagRunning(true);
+    setConversionDiagResult(null);
+
+    try {
+      if (!token) {
+        throw new Error("Authentication token is missing. Please log in again.");
+      }
+
+      const response = await fetch(
+        `${API}/api/admin/conversion-freeze/diagnose-september-2026`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+          confirm: "SEPTEMBER-2026-LINEAGE-DIAGNOSTIC",
+        }),
+        },
+      );
+
+      const raw = await response.text();
+      let body = {};
+      if (raw) {
+        try {
+          body = JSON.parse(raw);
+        } catch (_) {
+          body = { message: raw };
+        }
+      }
+
+      if (!response.ok || body?.success !== true) {
+        throw new Error(
+          body?.error || body?.message || `Diagnostic failed with HTTP ${response.status}.`,
+        );
+      }
+
+      setConversionDiagResult({
+        ok: true,
+        message: body?.message || "September lineage diagnostic completed.",
+        result: body?.result ?? body?.data ?? null,
+      });
+    } catch (error) {
+      setConversionDiagResult({
+        ok: false,
+        message: error instanceof Error ? error.message : "Lineage diagnostic failed.",
+        result: null,
+      });
+    } finally {
+      setConversionDiagRunning(false);
+    }
+  }, [token, conversionDiagRunning]);
+
+  const runSeptemberPendingReprocess = useCallback(() => {
+    if (conversionReprocessRunning) return;
+
+    const executeReprocess = async () => {
+      if (conversionReprocessRunning) return;
+
+      setConversionReprocessRunning(true);
+      setConversionReprocessResult(null);
+
+      try {
+        if (!token) {
+          throw new Error("Authentication token is missing. Please log in again.");
+        }
+
+        const response = await fetch(
+          `${API}/api/admin/conversion-freeze/reprocess-september-pending-2026`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              confirm: "SEPTEMBER-2026-PENDING-REPROCESS",
+            }),
+          },
+        );
+
+        const raw = await response.text();
+        let body = {};
+        if (raw) {
+          try {
+            body = JSON.parse(raw);
+          } catch (_) {
+            body = { message: raw };
+          }
+        }
+
+        if (!response.ok || body?.success !== true) {
+          const resultText = body?.result
+            ? `\n\n${JSON.stringify(body.result, null, 2)}`
+            : "";
+          throw new Error(
+            (body?.error || body?.message ||
+              `Reprocessing failed with HTTP ${response.status}.`) + resultText,
+          );
+        }
+
+        const successMessage =
+          body?.message || "September Conversion PENDING reprocessing completed.";
+
+        setConversionReprocessResult({
+          ok: true,
+          message: successMessage,
+          result: body?.result ?? null,
+        });
+
+        if (Platform.OS === "web") {
+          if (typeof window !== "undefined" && typeof window.alert === "function") {
+            window.alert(successMessage);
+          }
+        } else {
+          Alert.alert("Reprocessing completed", successMessage);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "PENDING reprocessing failed.";
+
+        setConversionReprocessResult({ ok: false, message, result: null });
+
+        if (Platform.OS === "web") {
+          if (typeof window !== "undefined" && typeof window.alert === "function") {
+            window.alert(
+              `PENDING reprocessing failed.\n\n${message}\n\nDo not retry until the result/server log is reviewed.`,
+            );
+          }
+        } else {
+          Alert.alert(
+            "Reprocessing failed",
+            `${message}\n\nDo not retry until the result/server log is reviewed.`,
+          );
+        }
+      } finally {
+        setConversionReprocessRunning(false);
+      }
+    };
+
+    const message =
+      "This will process only the existing active September 2026 PENDING Conversion Sale links that now resolve to OWN_PRODUCTION.\n\n" +
+      "Purchase, Opening, Repack and unresolved rows remain untouched.\n\n" +
+      "Run the controlled reprocessing now?";
+
+    if (Platform.OS === "web") {
+      const confirmed =
+        typeof window !== "undefined" &&
+        typeof window.confirm === "function"
+          ? window.confirm(message)
+          : false;
+      if (confirmed) executeReprocess();
+      return;
+    }
+
+    Alert.alert("Reprocess September PENDING?", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Run reprocessing", onPress: executeReprocess },
+    ]);
+  }, [token, conversionReprocessRunning]);
+
+  const runSeptemberConversionReconcile = useCallback(() => {
+    if (conversionReconRunning) return;
+
+    const executeReconciliation = async () => {
+      // Extra protection against accidental double execution.
+      if (conversionReconRunning) return;
+
+      setConversionReconRunning(true);
+      setConversionReconResult(null);
+
+      try {
+        const base = String(apiBase || "").replace(/\/+$/, "");
+
+        if (!base) {
+          throw new Error("API base URL is not configured.");
+        }
+
+        if (!token) {
+          throw new Error(
+            "Authentication token is missing. Please log in again.",
+          );
+        }
+
+        const url =
+          `${API}/api/admin/conversion-freeze/reconcile-september-2026`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            confirm: "SEPTEMBER-2026-CONVERSION-RECONCILE",
+          }),
+        });
+
+        const raw = await response.text();
+
+        let body = {};
+
+        if (raw) {
+          try {
+            body = JSON.parse(raw);
+          } catch (_) {
+            body = {
+              message: raw,
+            };
+          }
+        }
+
+        if (!response.ok) {
+          const message =
+            body?.error ||
+            body?.message ||
+            `Server returned HTTP ${response.status}.`;
+
+          throw new Error(message);
+        }
+
+        if (body?.success !== true) {
+          throw new Error(
+            body?.error ||
+            body?.message ||
+            "The server did not confirm that reconciliation completed.",
+          );
+        }
+
+        const successMessage =
+          body?.message ||
+          "September Conversion Freeze reconciliation completed.";
+
+        setConversionReconResult({
+          ok: true,
+          message: successMessage,
+          result: body?.result ?? body?.data ?? null,
+        });
+
+        if (Platform.OS === "web") {
+          if (
+            typeof window !== "undefined" &&
+            typeof window.alert === "function"
+          ) {
+            window.alert(successMessage);
+          }
+        } else {
+          Alert.alert(
+            "Reconciliation completed",
+            successMessage,
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Conversion reconciliation failed.";
+
+        setConversionReconResult({
+          ok: false,
+          message,
+          result: null,
+        });
+
+        if (Platform.OS === "web") {
+          if (
+            typeof window !== "undefined" &&
+            typeof window.alert === "function"
+          ) {
+            window.alert(
+              `Reconciliation failed.\n\n${message}\n\n` +
+              "ERP transaction tables were not changed by this screen.",
+            );
+          }
+        } else {
+          Alert.alert(
+            "Reconciliation failed",
+            `${message}\n\nERP transaction tables were not changed by this screen.`,
+          );
+        }
+      } finally {
+        setConversionReconRunning(false);
+      }
+    };
+
+    const title = "Reconcile September 2026?";
+
+    const message =
+      "This will reconcile the September 2026 derived Conversion Freeze " +
+      "records in TMSMaster.\n\n" +
+      "ERP transaction tables and Sales Invoice are not changed.\n\n" +
+      "Run this reconciliation now?";
+
+    // React Native Alert confirmation is unreliable on Expo Web.
+    // Use the browser's native confirm dialog instead.
+    if (Platform.OS === "web") {
+      if (
+        typeof window === "undefined" ||
+        typeof window.confirm !== "function"
+      ) {
+        setConversionReconResult({
+          ok: false,
+          message: "Browser confirmation is not available.",
+          result: null,
+        });
+
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `${title}\n\n${message}`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      void executeReconciliation();
+      return;
+    }
+
+    // Android / iOS
+    Alert.alert(
+      title,
+      message,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Run reconciliation",
+          style: "destructive",
+          onPress: () => {
+            void executeReconciliation();
+          },
+        },
+      ],
+      {
+        cancelable: true,
+      },
+    );
+  }, [apiBase, token, conversionReconRunning]);
+
   const scrollRef = useRef < ScrollView > null;
 
   const m = months[activeTab];
@@ -4179,6 +4540,162 @@ export default function ExpenseScreen({ token, apiBase }) {
           refresh={refresh}
         />
 
+        {/* TEMPORARY READ-ONLY LINEAGE DIAGNOSTIC.
+            This does not insert, update, delete or rerun reconciliation. */}
+        <View style={S.conversionDiagCard}>
+          <Text style={S.conversionReconKicker}>CONVERSION FREEZE · READ ONLY</Text>
+          <Text style={S.conversionReconTitle}>September lineage diagnostic</Text>
+          <Text style={S.conversionReconSub}>
+            Rechecks the existing September PENDING rows with the current lineage resolver. No freeze or link records are changed.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={conversionDiagRunning}
+            onPress={runSeptemberLineageDiagnostic}
+            style={[
+              S.conversionDiagButton,
+              conversionDiagRunning && S.conversionReconButtonDisabled,
+            ]}
+          >
+            <Text style={S.conversionReconButtonText}>
+              {conversionDiagRunning ? "Checking lineage…" : "Run Lineage Diagnostic"}
+            </Text>
+          </TouchableOpacity>
+
+          {!!conversionDiagResult && (
+            <View
+              style={[
+                S.conversionReconResult,
+                conversionDiagResult.ok
+                  ? S.conversionReconResultOk
+                  : S.conversionReconResultError,
+              ]}
+            >
+              <Text
+                style={[
+                  S.conversionReconResultText,
+                  { color: conversionDiagResult.ok ? "#166534" : "#991B1B" },
+                ]}
+              >
+                {conversionDiagResult.ok ? "✓ " : "⚠ "}
+                {conversionDiagResult.message}
+              </Text>
+              {conversionDiagResult.result != null && (
+                <Text style={S.conversionReconResultDetail} selectable>
+                  {JSON.stringify(conversionDiagResult.result, null, 2)}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* TEMPORARY CONTROLLED PENDING REPROCESSOR.
+            Only existing active September PENDING links that resolve to
+            OWN_PRODUCTION are eligible for change. */}
+        <View style={S.conversionReconCard}>
+          <Text style={S.conversionReconKicker}>CONVERSION FREEZE · CONTROLLED REPROCESS</Text>
+          <Text style={S.conversionReconTitle}>September PENDING reprocessing</Text>
+          <Text style={S.conversionReconSub}>
+            Processes only PENDING rows now resolved as own production. Purchase, opening, repack and unresolved rows stay unchanged.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={conversionReprocessRunning}
+            onPress={runSeptemberPendingReprocess}
+            style={[
+              S.conversionReconButton,
+              conversionReprocessRunning && S.conversionReconButtonDisabled,
+            ]}
+          >
+            <Text style={S.conversionReconButtonText}>
+              {conversionReprocessRunning ? "Reprocessing…" : "Reprocess September PENDING"}
+            </Text>
+          </TouchableOpacity>
+
+          {!!conversionReprocessResult && (
+            <View
+              style={[
+                S.conversionReconResult,
+                conversionReprocessResult.ok
+                  ? S.conversionReconResultOk
+                  : S.conversionReconResultError,
+              ]}
+            >
+              <Text
+                style={[
+                  S.conversionReconResultText,
+                  { color: conversionReprocessResult.ok ? "#166534" : "#991B1B" },
+                ]}
+              >
+                {conversionReprocessResult.ok ? "✓ " : "⚠ "}
+                {conversionReprocessResult.message}
+              </Text>
+              {conversionReprocessResult.result != null && (
+                <Text style={S.conversionReconResultDetail} selectable>
+                  {JSON.stringify(conversionReprocessResult.result, null, 2)}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* TEMPORARY: controlled September 2026 Conversion Freeze validation.
+            Backend is fixed to YearNo 27 / 01-09-2026..30-09-2026. */}
+        <View style={S.conversionReconCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={S.conversionReconKicker}>CONVERSION FREEZE · VALIDATION</Text>
+            <Text style={S.conversionReconTitle}>September 2026 reconciliation</Text>
+            <Text style={S.conversionReconSub}>
+              TMSMaster derived costing only · ERP transaction tables remain unchanged.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={conversionReconRunning}
+            onPress={runSeptemberConversionReconcile}
+            style={[
+              S.conversionReconButton,
+              conversionReconRunning && S.conversionReconButtonDisabled,
+            ]}
+          >
+            <Text style={S.conversionReconButtonText}>
+              {conversionReconRunning ? "Running…" : "Reconcile September"}
+            </Text>
+          </TouchableOpacity>
+
+          {!!conversionReconResult && (
+            <View
+              style={[
+                S.conversionReconResult,
+                conversionReconResult.ok
+                  ? S.conversionReconResultOk
+                  : S.conversionReconResultError,
+              ]}
+            >
+              <Text
+                style={[
+                  S.conversionReconResultText,
+                  {
+                    color: conversionReconResult.ok ? "#166534" : "#991B1B",
+                  },
+                ]}
+              >
+                {conversionReconResult.ok ? "✓ " : "⚠ "}
+                {conversionReconResult.message}
+              </Text>
+              {conversionReconResult.ok &&
+                conversionReconResult.result != null && (
+                  <Text style={S.conversionReconResultDetail} selectable>
+                    {JSON.stringify(conversionReconResult.result, null, 2)}
+                  </Text>
+                )}
+            </View>
+          )}
+        </View>
+
         {/* Loading */}
         {st?.status === "loading" && (
           <View>
@@ -4207,43 +4724,6 @@ export default function ExpenseScreen({ token, apiBase }) {
           <>
             <ExpenseCoverageNotice d={d} month={m} />
             <KPIGrid d={d} label={m.fullLabel} />
-
-            {/* Section conversion rates — Client Artifact, LIVE MTD.
-                Conversion only = electricity + wages. Overheads are intentionally
-                excluded until Maintenance / Other and persistent freezing are proven. */}
-            {d.conversion_rates && (
-              <View style={{
-                backgroundColor: "#fff", borderRadius: 14, borderWidth: 1,
-                borderColor: "#e5e7eb", padding: 14, marginBottom: 14,
-              }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>Section conversion rates</Text>
-                  <View style={{ backgroundColor: "#FFF7E6", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#B26A00" }}>LIVE MTD</Text>
-                  </View>
-                </View>
-                <Text style={{ fontSize: 10.5, color: "#6b7280", lineHeight: 15, marginBottom: 10 }}>
-                  Electricity + wages ÷ Σ(metres × picks). Overheads are not included. Rate is live through {String(d.conversion_rates.calculated_through_ymd || "—")}.
-                </Text>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  {[
-                    ["Rapier · MW + SIP", d.conversion_rates.rapier, "#c2823a"],
-                    ["Waterjet", d.conversion_rates.waterjet, "#185FA5"],
-                  ].map(([label, x, color]) => (
-                    <View key={label} style={{ flex: 1, borderWidth: 1, borderColor: "#e5e7eb", borderTopWidth: 4, borderTopColor: color, borderRadius: 10, padding: 10 }}>
-                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#111827", marginBottom: 7 }}>{label}</Text>
-                      <Text style={{ fontSize: 9.5, color: "#6b7280" }}>Electricity + wages</Text>
-                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#111827", marginTop: 2 }}>₹{Number(x?.rate_per_pick_mtr || 0).toFixed(4)}/pk·m</Text>
-                      <Text style={{ fontSize: 9.5, color: "#6b7280", marginTop: 4 }}>≈ ₹{Number(x?.approx_per_mtr || 0).toFixed(2)}/m @ {Number(x?.avg_picks || 0).toFixed(1)} picks</Text>
-                      <Text style={{ fontSize: 9, color: "#9ca3af", marginTop: 4 }}>{fL(Number(x?.conversion_amount || 0))} conversion</Text>
-                    </View>
-                  ))}
-                </View>
-                <Text style={{ fontSize: 9.5, color: "#6b7280", marginTop: 9, lineHeight: 14 }}>
-                  Sale freeze and month-close freeze are intentionally not written yet. They will be enabled only after the actual ERP roll-to-sale persistence path is verified.
-                </Text>
-              </View>
-            )}
 
             {/* Cost composition donut */}
             <View style={S.compositionCard}>
@@ -4651,6 +5131,93 @@ const S = StyleSheet.create({
   },
   refreshText: { color: "#fff", fontSize: 18 },
   body: { flex: 1, paddingHorizontal: 12, paddingTop: 14 },
+
+  conversionDiagCard: {
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  conversionDiagButton: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 11,
+    backgroundColor: "#334155",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+
+  conversionReconCard: {
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#FFFDF9",
+    borderWidth: 1,
+    borderColor: "#E5DED4",
+  },
+  conversionReconKicker: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.05,
+    color: "#8A8177",
+  },
+  conversionReconTitle: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  conversionReconSub: {
+    marginTop: 4,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "#6B7280",
+  },
+  conversionReconButton: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 11,
+    backgroundColor: "#0D1B2A",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  conversionReconButtonDisabled: {
+    opacity: 0.55,
+  },
+  conversionReconButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  conversionReconResult: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  conversionReconResultOk: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  conversionReconResultError: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  conversionReconResultText: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "700",
+  },
+  conversionReconResultDetail: {
+    marginTop: 7,
+    fontSize: 10,
+    lineHeight: 14,
+    color: "#374151",
+  },
 
   coverageCard: {
     marginBottom: 14,

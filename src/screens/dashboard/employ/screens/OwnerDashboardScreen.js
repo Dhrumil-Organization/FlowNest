@@ -2716,6 +2716,14 @@ import {
 } from '../components/SharedComponents';
 import TourOverlay from '../components/TourOverlay';
 import { OWNER_DASHBOARD_TOUR } from './DashboardTours';
+import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
+
+// ERP-dashboard columns (UI only). 'lead' = Monthly Target + Monthly Report
+// handed down from DashboardScreen so Sales follows them in column 1.
+const OWNER_LAYOUT = {
+  2: [['lead', 'sales', 'payment'], ['production', 'collection', 'outstanding']],
+  3: [['lead', 'sales'], ['production', 'collection'], ['outstanding', 'payment']],
+};
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
 const ROW_HEIGHT = 70;
@@ -2775,7 +2783,11 @@ export default function OwnerDashboardScreen({
   getUserPrptype,
   visibleSections = { sales: true, production: true, collection: true, payment: true, outstanding: true },
   showAmountControl = true,
+  lead, // array of cards -> embedded in the Business Dashboard grid (UI only)
+  columns,
 }) {
+  const embedded = Array.isArray(lead);
+  const leadNodes = embedded ? lead : [];
   const router = useRouter();
   const { canAccess } = usePermission();
   const { user } = route.params || {};
@@ -2905,10 +2917,10 @@ export default function OwnerDashboardScreen({
     });
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <>{leadNodes}<DashboardSkeleton /></>;
   if (error)
-    return <ErrorView message={error} onRetry={() => load(getUserPrptype)} />;
-  if (!data) return null;
+    return <>{leadNodes}<ErrorView message={error} onRetry={() => load(getUserPrptype)} /></>;
+  if (!data) return <>{leadNodes}</>;
 
   const { sales, production, collection, payment, outstanding } = data;
 
@@ -3022,7 +3034,7 @@ export default function OwnerDashboardScreen({
         <ScrollView
           style={styles.scroll}
           nestedScrollEnabled={true}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, embedded && styles.contentEmbedded]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -3071,7 +3083,10 @@ export default function OwnerDashboardScreen({
             </View>
           )}
 
+          <DashboardGrid columns={columns || 1} layout={OWNER_LAYOUT}>
+          <Slot name="lead">{leadNodes}</Slot>
           {/* ── SALES SECTION ── */}
+          <Slot name="sales">
           {visibleSections.sales && (
             <SalesDashboardCard
               sales={sales}
@@ -3082,7 +3097,9 @@ export default function OwnerDashboardScreen({
             />
           )}
 
+          </Slot>
           {/* ── PRODUCTION SECTION ── */}
+          <Slot name="production">
           {visibleSections.production && (
             <SectionCard>
               <SectionHeader
@@ -3144,7 +3161,9 @@ export default function OwnerDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ── PAYMENT COLLECTION SECTION ── */}
+          <Slot name="collection">
           {visibleSections.collection && (
             <SectionCard>
               <SectionHeader
@@ -3234,7 +3253,9 @@ export default function OwnerDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ── PAYMENT TO PAY SECTION ── */}
+          <Slot name="payment">
           {visibleSections.payment && payment && (
             <SectionCard>
               <SectionHeader
@@ -3290,7 +3311,9 @@ export default function OwnerDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ── OUTSTANDING SECTION ── */}
+          <Slot name="outstanding">
           {visibleSections.outstanding && (
             <SectionCard>
               <SectionHeader
@@ -3358,6 +3381,8 @@ export default function OwnerDashboardScreen({
               </TableWrapper>
             </SectionCard>
           )}
+          </Slot>
+          </DashboardGrid>
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -3376,6 +3401,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   content: { paddingTop: 8, paddingBottom: 24 },
+  contentEmbedded: { paddingTop: 0, paddingBottom: 0 },
   amountModeBar: { paddingHorizontal: 12, paddingBottom: 8, alignItems: 'flex-end' },
 
   // ── Date bar ──

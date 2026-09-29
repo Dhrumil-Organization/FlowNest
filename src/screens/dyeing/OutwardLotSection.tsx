@@ -126,6 +126,8 @@ export function OutwardLotSection({
         yearno: yearNo,
         uid: row.saveUid, // API `uid` of the picked row (not uuid)
         srno: row.saveSrNo, // API `srno` of the picked row
+        uuid: row.payloadUuid, // API `uuid` as received
+        usrno: row.payloadUsrno, // API `usrno` as received
         lotno: clean,
         shdcode: String(shdCode ?? '').trim(),
       };
@@ -168,6 +170,8 @@ export function OutwardLotSection({
       const payload = {
         uid: asNum(row.saveUid), // API `uid` of the row (not uuid)
         srno: asNum(row.saveSrNo),
+        uuid: row.payloadUuid, // API `uuid` as received
+        usrno: row.payloadUsrno, // API `usrno` as received
         chartno: row.chartNo || chartNo,
         shdcode: String(row.shdCode || shdCode || '').trim(),
         prptype: prpGroup,

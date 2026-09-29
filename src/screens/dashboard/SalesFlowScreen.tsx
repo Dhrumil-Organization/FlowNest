@@ -1,4 +1,5 @@
 import { AmountDisplayModeControl, formatSummaryAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
+import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 import { SubScreenHeader } from '@/src/components/layout/SubScreenHeader';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
@@ -290,6 +291,7 @@ export default function SalesFlowScreen() {
   const [error, setError] = useState('');
   const [sortField, setSortField] = useState<'amount' | 'qty'>('amount');
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const layout = useReportLayout();
   const hasFocusedOnce = useRef(false);
 
   useEffect(() => {
@@ -543,22 +545,8 @@ export default function SalesFlowScreen() {
     reconciliation?.amount_reconciled !== false &&
     reconciliation?.qty_reconciled !== false;
 
-  return (
-    <View style={styles.root}>
-      <SubScreenHeader backLabel="Back" title={isMonthlyReport ? (analyticsMetric === 'BILLING' ? 'Billing Report' : 'Sales Order Report') : 'Sales Report'} />
-
-      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void load(true)}
-              tintColor={T.nav}
-            />
-          }
-        >
+  // Layout blocks (UI only) — placed below per phone / tablet / desktop.
+  const contextCard = (
           <View style={styles.contextCard}>
             <View style={styles.contextTop}>
               <View style={styles.iconCircle}>
@@ -586,12 +574,15 @@ export default function SalesFlowScreen() {
               </View>
             ) : null}
           </View>
+  );
 
+  const periodBlock = (
+          <>
           {/* Six-month period selector is deliberately present on every level. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.monthRow}
+            contentContainerStyle={[styles.monthRow, layout.medium && styles.monthRowTop]}
           >
             {monthChips.map(chip => {
               const active = chip.ym === selectedMonth;
@@ -655,12 +646,15 @@ export default function SalesFlowScreen() {
               <Text style={styles.messageText}>{report.message}</Text>
             </View>
           ) : null}
+          </>
+  );
 
-          <View style={styles.panel}>
+  const panelCard = (
+          <View style={[styles.panel, layout.wide && styles.panelSide]}>
             <View style={styles.panelHeader}>
-              <View>
+              <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
                 <Text style={styles.panelKicker}>SALES BREAKDOWN</Text>
-                <Text style={styles.panelTitle}>{LEVEL_META[level].title}</Text>
+                <Text numberOfLines={1} style={styles.panelTitle}>{LEVEL_META[level].title}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setSortField(current => (current === 'amount' ? 'qty' : 'amount'))}
@@ -757,6 +751,55 @@ export default function SalesFlowScreen() {
               </View>
             ) : null}
           </View>
+  );
+
+  return (
+    <View style={styles.root}>
+      <SubScreenHeader backLabel="Back" title={isMonthlyReport ? (analyticsMetric === 'BILLING' ? 'Billing Report' : 'Sales Order Report') : 'Sales Report'} />
+
+      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              tintColor={T.nav}
+            />
+          }
+        >
+          <ReportContainer onLayout={layout.onLayout}>
+          {layout.wide ? (
+            <SplitPane
+              layout={layout}
+              ratio={0.36}
+              left={(
+                <View>
+                  {contextCard}
+                  {periodBlock}
+                </View>
+              )}
+              right={panelCard}
+            />
+          ) : layout.medium ? (
+            <>
+              <SplitPane
+                layout={layout}
+                ratio={0.5}
+                left={contextCard}
+                right={<View>{periodBlock}</View>}
+              />
+              {panelCard}
+            </>
+          ) : (
+            <>
+              {contextCard}
+              {periodBlock}
+              {panelCard}
+            </>
+          )}
+          </ReportContainer>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -803,6 +846,7 @@ const styles = StyleSheet.create({
   contextPillValue: { color: T.ink, fontSize: 10, fontWeight: '800', marginTop: 1, maxWidth: 230 },
 
   monthRow: { gap: 7, paddingVertical: 12, paddingRight: 8 },
+  monthRowTop: { paddingTop: 0 },
   monthChip: {
     minWidth: 70,
     height: 36,
@@ -843,6 +887,7 @@ const styles = StyleSheet.create({
   messageBox: { marginTop: 10, backgroundColor: '#FFF5E9', borderRadius: 12, padding: 11, borderWidth: 1, borderColor: '#EFD5B6' },
   messageText: { color: '#8A5B25', fontSize: 9, lineHeight: 14 },
 
+  panelSide: { marginTop: 0 },
   panel: {
     marginTop: 12,
     backgroundColor: T.surface,

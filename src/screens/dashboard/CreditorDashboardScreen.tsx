@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, formatAmountActual, formatAmountShort } from './employ/api/api';
+import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
+import { ReportContainer, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 
 const one = (v: any) => Array.isArray(v) ? v[0] : (v || '');
 const n = (v: any) => Number(v || 0);
@@ -132,6 +134,9 @@ export default function CreditorDashboardScreen() {
   const [purchaseStore,setPurchaseStore] = useState('ALL');
   const [rateDetail,setRateDetail] = useState<any>(null);
   const [detailLoading,setDetailLoading] = useState('');
+  const layout = useReportLayout();
+  // UI only: extra spacing between stacked cards inside a grid column
+  const cellStyle = layout.compact ? undefined : styles.gridCell;
 
   const money = useCallback((v:any) =>
     amountMode === 'actual' ? formatAmountActual(n(v)) : formatAmountShort(n(v)),
@@ -286,6 +291,7 @@ export default function CreditorDashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom','left','right']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={T.nav}/>}>
+        <ReportContainer onLayout={layout.onLayout} style={styles.containerGap}>
         <View style={styles.partyCard}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{partyname.trim().slice(0,1).toUpperCase()}</Text></View>
           <View style={styles.partyInfo}>
@@ -303,9 +309,15 @@ export default function CreditorDashboardScreen() {
           <Text style={styles.errorTitle}>Could not refresh dashboard</Text><Text style={styles.muted}>{error} Tap to retry.</Text>
         </TouchableOpacity>}
 
+        <View style={layout.compact ? styles.containerGap : styles.gridWrap}>
+        <DashboardGrid columns={layout.cols} gap={12} layout={{
+          2: [['hero','payments'],['outstanding','po']],
+          3: [['hero','outstanding'],['payments'],['po']],
+        }}>
+        <Slot name="hero"><View style={cellStyle}>
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>NET PAYABLE</Text>
-          <Text style={styles.heroAmount}>{money(finalPosition.net_payable_amount)}</Text>
+          <Text style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{money(finalPosition.net_payable_amount)}</Text>
           <Text style={styles.heroHint}>Final accounting position as on selected date</Text>
           <View style={styles.heroDivider}/>
           <View style={styles.metricRow}><Metric label="TOTAL BILLS" value={money(finalPosition.bill_amount)} light/>
@@ -313,7 +325,9 @@ export default function CreditorDashboardScreen() {
           <View style={styles.positionStrip}><Text style={styles.positionText}>Opening {money(opening.net_amount)}</Text>
             <Text style={styles.positionDot}>•</Text><Text style={styles.positionText}>Current FY {money(currentFy.net_amount)}</Text></View>
         </View>
+        </View></Slot>
 
+        <Slot name="outstanding"><View style={cellStyle}>
         <Section title="Outstanding / Payables" subtitle="Accounting drill-down by payable source">
           <Chips><Chip label="Purchase" active onPress={()=>{}}/><Chip label="Jobwork" disabled/><Chip label="Other" disabled/></Chips>
           <View style={styles.bigRow}><View><Text style={styles.bigAmount}>{money(outstanding.outstanding_amount)}</Text>
@@ -322,7 +336,9 @@ export default function CreditorDashboardScreen() {
           {(data?.outstanding?.ageing||[]).filter((r:any)=>n(r.outstanding_amount)>0).map((r:any)=>
             <View key={r.key} style={styles.lineRow}><Text style={styles.lineLabel}>{r.label} days</Text><Text style={styles.lineValue}>{money(r.outstanding_amount)}</Text></View>)}
         </Section>
+        </View></Slot>
 
+        <Slot name="payments"><View style={cellStyle}>
         <Section title="Payments" subtitle="Payment activity, clearing and bill allocation">
           <View style={styles.metricRow}><Metric label="PAID" value={money(payment.payment_amount)}/><Metric label="CLEARED" value={money(payment.cleared_amount)}/></View>
           <View style={styles.metricRow}><Metric label="ON ACCOUNT" value={money(payment.on_account_amount)}/><Metric label="TO CLEAR" value={money(payment.to_clear_amount)}/></View>
@@ -397,7 +413,9 @@ export default function CreditorDashboardScreen() {
             <Text style={styles.listHint}>{filteredPayments.length} payment{filteredPayments.length===1?'':'s'} · scroll inside this card</Text>
           </>}
         </Section>
+        </View></Slot>
 
+        <Slot name="po"><View style={cellStyle}>
         <Section title="Purchase Orders" subtitle="Month, store and item analysis · negative pending is displayed as zero">
           <View style={styles.metricRow}><Metric label="ORDERED QTY" value={qty(po.ordered_qty)}/><Metric label="RECEIVED QTY" value={qty(po.received_qty)}/></View>
           <View style={styles.metricRow}><Metric label="PENDING QTY" value={qty(po.pending_qty)}/><Metric label="PENDING VALUE" value={money(po.pending_value)}/></View>
@@ -428,6 +446,9 @@ export default function CreditorDashboardScreen() {
           </ScrollView></View></>}
           {detailLoading==='po'&&<LoadingRow/>}
         </Section>
+        </View></Slot>
+        </DashboardGrid>
+        </View>
 
         <Section title="Purchases" subtitle="Verified register totals · drill down by month or item">
           <View style={styles.bigRow}><View><Text style={styles.bigAmount}>{money(sixMonthPurchase)}</Text><Text style={styles.muted}>6-month purchase value</Text></View>
@@ -474,13 +495,14 @@ export default function CreditorDashboardScreen() {
 
         <View style={styles.infoCard}><Text style={styles.infoTitle}>Reconciliation rule</Text>
           <Text style={styles.infoText}>Net Payable remains accounting-derived. Purchase, PO and payment sections are activity drill-downs and are not added again to the payable figure.</Text></View>
+        </ReportContainer>
       </ScrollView>
     </SafeAreaView>
   </View>;
 }
 
 const styles=StyleSheet.create({
-  root:{flex:1,backgroundColor:T.bg},safe:{flex:1},content:{padding:14,paddingBottom:40,gap:12},
+  root:{flex:1,backgroundColor:T.bg},containerGap:{gap:12},gridCell:{marginBottom:12},gridWrap:{marginBottom:-12},safe:{flex:1},content:{padding:14,paddingBottom:40,gap:12},
   center:{flex:1,alignItems:'center',justifyContent:'center'}, muted:{color:T.muted,fontSize:10,fontWeight:'600'},
   partyCard:{backgroundColor:'#fff',borderRadius:16,padding:14,flexDirection:'row',alignItems:'center',gap:12,borderWidth:1,borderColor:T.border},
   avatar:{width:44,height:44,borderRadius:14,backgroundColor:T.nav,alignItems:'center',justifyContent:'center'},avatarText:{color:'#fff',fontSize:18,fontWeight:'900'},

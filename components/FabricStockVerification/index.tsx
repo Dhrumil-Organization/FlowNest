@@ -1,20 +1,23 @@
-import { yarnstockverificatio_styles } from '@/common/Style';
 import AppAlert from '@/common/utils/appAlert';
-import HeaderBar from '@/components/Header';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
-import { fetchAllPropertyData, fetchAllStoredata, fetchAllYeardata } from '../../common/API/Functions';
-import CartonAddDrawer from './CartonAddDrawer';
+import HeaderBar from '@/components/Header';
+import HeaderBarwithBack from '@/components/Header';
+import { yarnstockverificatio_styles } from '@/common/Style';
 import CustomDrawer from './CustomDrawer';
-import { CardPayload, DesignData, ExeData, ItemData, ItemStatus, POTData } from './Modal';
+import CartonAddDrawer from './CartonAddDrawer';
+import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import YarnStockCard from './YarnStockCard';
+import theme from '@/components/theme';
+import { API, PRINTERSLISTAPI, PRINTSTICKER } from '../../common/API/dynamicAPI';
+import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
 // import Snackbar from '@/common/utils/snackbarCompat';
-import { showError, showSnackbar, showSuccess } from '@/common/utils/snackbar';
-import { findFabricStockRow, parseFabricQr } from './fabricQr';
+import { showSnackbar, showSuccess, showError } from '@/common/utils/snackbar';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import FabricQrScannerModal from './FabricQrScannerModal';
+import { findFabricStockRow, parseFabricQr } from './fabricQr';
 
 
 interface Props {
@@ -77,8 +80,6 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
     const [getPrintRow, setPrintRow] = useState({})
     const [getPrinters, setPrinters] = useState([])
     const [printer, setPrinter] = useState('')
-
-    console.log("getAllStockData", getAllStockData);
 
     const rowsPerPage = 20;
 

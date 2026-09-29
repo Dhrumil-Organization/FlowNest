@@ -7,6 +7,8 @@ import {
   DashboardView,
 } from '@/src/api/dashboard';
 import { ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
+import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
@@ -390,6 +392,7 @@ export function MonthlyReportScreen() {
   const [error, setError] = useState('');
   const [selectorOpen, setSelectorOpen] = useState(false);
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const layout = useReportLayout();
 
   const context = appSession?.business_context;
   const yearno =
@@ -861,6 +864,11 @@ export function MonthlyReportScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        <ReportContainer onLayout={layout.onLayout}>
+        <SplitPane
+          layout={layout}
+          left={(
+            <View>
         <View style={styles.segment}>
           <TouchableOpacity
             onPress={() => switchView('owner')}
@@ -938,16 +946,18 @@ export function MonthlyReportScreen() {
             );
           })}
         </ScrollView>
-
+            </View>
+          )}
+          right={(
         <View style={styles.reportHeaderCard}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.reportHeaderKicker}>
               REPORTING PERIOD
             </Text>
-            <Text style={styles.reportHeaderTitle}>
+            <Text numberOfLines={1} style={styles.reportHeaderTitle}>
               {periodTitle}
             </Text>
-            <Text style={styles.executiveFilterNote}>
+            <Text numberOfLines={2} style={styles.executiveFilterNote}>
               {scopeNote}
             </Text>
           </View>
@@ -972,6 +982,8 @@ export function MonthlyReportScreen() {
             </View>
           ) : null}
         </View>
+          )}
+        />
 
         {loading ? (
           <View style={styles.loadingBox}>
@@ -1011,7 +1023,14 @@ export function MonthlyReportScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <>
+          <DashboardGrid
+            columns={layout.cols}
+            layout={{
+              2: [['sales', 'collection'], ['billing']],
+              3: [['sales'], ['billing'], ['collection']],
+            }}
+          >
+            <Slot name="sales">
             <ReportPanel
               card={cardByKey(cards, 'SALES_ORDER')}
               rows={salesRows}
@@ -1021,7 +1040,9 @@ export function MonthlyReportScreen() {
                 openExecutive(row, 'SALES_ORDER')
               }
             />
+            </Slot>
 
+            <Slot name="billing">
             <ReportPanel
               card={cardByKey(cards, 'BILLING')}
               rows={billingRows}
@@ -1031,7 +1052,9 @@ export function MonthlyReportScreen() {
                 openExecutive(row, 'BILLING')
               }
             />
+            </Slot>
 
+            <Slot name="collection">
             <ReportPanel
               card={cardByKey(cards, 'COLLECTION')}
               rows={collectionRows}
@@ -1041,8 +1064,10 @@ export function MonthlyReportScreen() {
                 openExecutive(row, 'COLLECTION')
               }
             />
-          </>
+            </Slot>
+          </DashboardGrid>
         )}
+        </ReportContainer>
       </ScrollView>
 
       <Modal
@@ -1051,13 +1076,13 @@ export function MonthlyReportScreen() {
         animationType="fade"
         onRequestClose={() => setSelectorOpen(false)}
       >
-        <View style={styles.selectorShade}>
+        <View style={[styles.selectorShade, !layout.compact && styles.selectorShadeWide]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setSelectorOpen(false)}
           />
 
-          <View style={styles.selectorSheet}>
+          <View style={[styles.selectorSheet, !layout.compact && styles.selectorSheetWide]}>
             <View style={styles.selectorHeader}>
               <View>
                 <Text style={styles.selectorKicker}>MY VIEW</Text>
@@ -1102,7 +1127,7 @@ export function MonthlyReportScreen() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.selectorName}>
+                      <Text numberOfLines={1} style={styles.selectorName}>
                         {item.name}
                       </Text>
                       <Text style={styles.selectorCode}>
@@ -1138,7 +1163,7 @@ const styles = StyleSheet.create({
   amountModeRow: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   safe: { flex: 1, backgroundColor: T.bg },
-  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { width: '100%', maxWidth: 1320 + 32, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
   backButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 28, color: T.nav, marginTop: -3 },
   kicker: { fontSize: 9, color: T.copper, fontWeight: '900', letterSpacing: 0.9 },
@@ -1270,6 +1295,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.38)',
+  },
+  selectorShadeWide: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  selectorSheetWide: {
+    width: '100%',
+    maxWidth: 600,
+    maxHeight: '80%',
+    borderRadius: 22,
   },
   selectorSheet: {
     maxHeight: '72%',

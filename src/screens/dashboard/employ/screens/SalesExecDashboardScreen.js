@@ -684,13 +684,21 @@ import {
 } from "../components/SharedComponents";
 import TourOverlay from "../components/TourOverlay";
 import { SALES_EXEC_DASHBOARD_TOUR } from "./DashboardTours";
-import { DashboardGrid, Slot } from "@/src/components/dashboard/DashboardGrid";
+import { DashboardGrid, DashboardInsetContext, DASH_GAP, Slot } from "@/src/components/dashboard/DashboardGrid";
+import { REPORT_MAX_WIDTH, ReportContainer, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
 
 // ERP-dashboard columns for My View (UI only). 'lead' = Monthly Target +
 // Monthly Report from DashboardScreen; 'top' = executive chips / profile.
 const MY_VIEW_LAYOUT = {
   2: [["lead", "top", "sales"], ["collection", "outstanding"]],
   3: [["lead", "top", "sales"], ["collection"], ["outstanding"]],
+};
+
+// Standalone (Owner -> executive drill-down) columns, UI only: the profile
+// card ('top') is rendered full width above the grid, sections below.
+const STANDALONE_LAYOUT = {
+  2: [["sales"], ["collection", "outstanding"]],
+  3: [["sales"], ["collection"], ["outstanding"]],
 };
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
@@ -726,6 +734,22 @@ const TableWrapper = ({ rowCount, children }) => {
  * Navigates to:
  *   PartyDashboard when tapping a party row
  */
+// Standalone only: centre content at the ERP max width and let SectionCards sit
+// flush in the grid columns on tablet / desktop. Embedded = children as-is.
+const StandaloneFrame = ({ embedded, pageLayout, wide, children }) => {
+  if (embedded) return <>{children}</>;
+  return (
+    <ReportContainer
+      onLayout={pageLayout.onLayout}
+      style={wide && styles.containerWide}
+    >
+      <DashboardInsetContext.Provider value={wide ? 0 : null}>
+        {children}
+      </DashboardInsetContext.Provider>
+    </ReportContainer>
+  );
+};
+
 const firstParam = (value) => {
   if (Array.isArray(value)) return value[0];
   return value;
@@ -805,6 +829,9 @@ export default function SalesExecDashboardScreen({
 
   const [outstandingSort, setOutstandingSort] = useState("desc");
   const [myInspectExecId, setMyInspectExecId] = useState("");
+  // Standalone screen only: measure content width for the responsive grid.
+  const pageLayout = useReportLayout();
+  const standaloneWide = !embedded && !pageLayout.compact;
 
   console.log('Sales activeTab: ', activeTab);
 
@@ -1071,6 +1098,91 @@ export default function SalesExecDashboardScreen({
   };
 
 
+  // Executive chips / profile card (moved into a variable for layout only).
+  const topNode = (
+    <>
+          {isMyView && executiveScope?.my_selector_allowed ? (
+            <SectionCard style={[styles.scopeSelectorCard, standaloneWide && styles.cardFlush]}>
+              <Text style={styles.scopeSelectorLabel}>MY VIEW · EXECUTIVE</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scopeSelectorRow}
+              >
+                {selectableExecutives.map((item) => {
+                  const code = asString(item?.code).trim();
+                  if (!code) return null;
+                  const active =
+                    code === asString(safeArray(executiveScope?.executive_codes)[0]).trim();
+                  return (
+                    <TouchableOpacity
+                      key={code}
+                      style={[styles.scopeChip, active && styles.scopeChipActive]}
+                      onPress={() => setMyInspectExecId(code)}
+                    >
+                      <Text
+                        style={[
+                          styles.scopeChipText,
+                          active && styles.scopeChipTextActive,
+                        ]}
+                      >
+                        {asString(item?.name, code)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </SectionCard>
+          ) : null}
+
+          {/* ─── Exec Profile Card ─── */}
+          {!isMyView && (
+            <SectionCard style={[styles.profileCard, standaloneWide && styles.cardFlush]}>
+              <View style={styles.profileTop}>
+                <AvatarCircle
+                  name={exec_info.name || execName || "Executive"}
+                  color={exec_info.avatar_color || execColor}
+                  size={44}
+                />
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName} numberOfLines={1}>{exec_info.name || execName || "Executive"}</Text>
+                  <Text style={styles.profileSub} numberOfLines={1}>
+                    {exec_info.city || ""}{exec_info.city ? " · " : ""}{safeNumber(exec_info.total_customers)} customers
+                  </Text>
+                </View>
+                {/* Target Achievement Badge */}
+                {/* <View style={styles.targetBadge}>
+                <Text style={styles.targetLabel}>TARGET</Text>
+                <Text style={styles.targetPct}>
+                  {summary.target_achievement_pct}%
+                </Text>
+              </View> */}
+              </View>
+
+              {/* Summary Cards Row */}
+              <View style={styles.summaryRow}>
+                <SummaryCard
+                  label="TODAY SALE"
+                  value={displayAmount(safeNumber(summary.today_sale))}
+                  rawValue={safeNumber(summary.today_sale)}
+                />
+                <SummaryCard
+                  label="TOTAL BILLED"
+                  value={displayAmount(safeNumber(summary.total_billed_mtd))}
+                  rawValue={safeNumber(summary.total_billed_mtd)}
+                />
+                <SummaryCard
+                  label="OUTSTANDING"
+                  value={displayAmount(safeNumber(summary.outstanding))}
+                  rawValue={safeNumber(summary.outstanding)}
+                />
+              </View>
+            </SectionCard>
+          )}
+
+    </>
+  );
+
   return (
     <>
       {/* {activeTab !== 'myview' ? (
@@ -1127,7 +1239,7 @@ export default function SalesExecDashboardScreen({
         )}
 
         {showAmountControl && (
-          <View style={styles.amountModeBar}>
+          <View style={[styles.amountModeBar, !embedded && styles.centred]}>
             <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
           </View>
         )}
@@ -1144,89 +1256,18 @@ export default function SalesExecDashboardScreen({
             />
           }
         >
-          <DashboardGrid columns={columns || 1} layout={MY_VIEW_LAYOUT}>
+          <StandaloneFrame
+            embedded={embedded}
+            pageLayout={pageLayout}
+            wide={standaloneWide}
+          >
+          {!embedded && topNode}
+          <DashboardGrid
+            columns={embedded ? (columns || 1) : pageLayout.cols}
+            layout={embedded ? MY_VIEW_LAYOUT : STANDALONE_LAYOUT}
+          >
           <Slot name="lead">{leadNodes}</Slot>
-          <Slot name="top">
-          {isMyView && executiveScope?.my_selector_allowed ? (
-            <SectionCard style={styles.scopeSelectorCard}>
-              <Text style={styles.scopeSelectorLabel}>MY VIEW · EXECUTIVE</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scopeSelectorRow}
-              >
-                {selectableExecutives.map((item) => {
-                  const code = asString(item?.code).trim();
-                  if (!code) return null;
-                  const active =
-                    code === asString(safeArray(executiveScope?.executive_codes)[0]).trim();
-                  return (
-                    <TouchableOpacity
-                      key={code}
-                      style={[styles.scopeChip, active && styles.scopeChipActive]}
-                      onPress={() => setMyInspectExecId(code)}
-                    >
-                      <Text
-                        style={[
-                          styles.scopeChipText,
-                          active && styles.scopeChipTextActive,
-                        ]}
-                      >
-                        {asString(item?.name, code)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </SectionCard>
-          ) : null}
-
-          {/* ─── Exec Profile Card ─── */}
-          {!isMyView && (
-            <SectionCard style={styles.profileCard}>
-              <View style={styles.profileTop}>
-                <AvatarCircle
-                  name={exec_info.name || execName || "Executive"}
-                  color={exec_info.avatar_color || execColor}
-                  size={44}
-                />
-                <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>{exec_info.name || execName || "Executive"}</Text>
-                  <Text style={styles.profileSub}>
-                    {exec_info.city || ""}{exec_info.city ? " · " : ""}{safeNumber(exec_info.total_customers)} customers
-                  </Text>
-                </View>
-                {/* Target Achievement Badge */}
-                {/* <View style={styles.targetBadge}>
-                <Text style={styles.targetLabel}>TARGET</Text>
-                <Text style={styles.targetPct}>
-                  {summary.target_achievement_pct}%
-                </Text>
-              </View> */}
-              </View>
-
-              {/* Summary Cards Row */}
-              <View style={styles.summaryRow}>
-                <SummaryCard
-                  label="TODAY SALE"
-                  value={displayAmount(safeNumber(summary.today_sale))}
-                  rawValue={safeNumber(summary.today_sale)}
-                />
-                <SummaryCard
-                  label="TOTAL BILLED"
-                  value={displayAmount(safeNumber(summary.total_billed_mtd))}
-                  rawValue={safeNumber(summary.total_billed_mtd)}
-                />
-                <SummaryCard
-                  label="OUTSTANDING"
-                  value={displayAmount(safeNumber(summary.outstanding))}
-                  rawValue={safeNumber(summary.outstanding)}
-                />
-              </View>
-            </SectionCard>
-          )}
-
-          </Slot>
+          {embedded && <Slot name="top">{topNode}</Slot>}
           {/* ─── SALES SECTION ─── */}
           <Slot name="sales">
           {visibleSections.sales && (
@@ -1428,6 +1469,7 @@ export default function SalesExecDashboardScreen({
           )}
           </Slot>
           </DashboardGrid>
+          </StandaloneFrame>
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -1467,6 +1509,9 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingTop: 10, paddingBottom: 24 },
   contentEmbedded: { paddingTop: 0, paddingBottom: 0 },
+  containerWide: { paddingHorizontal: 12 },
+  centred: { width: "100%", maxWidth: REPORT_MAX_WIDTH, alignSelf: "center" },
+  cardFlush: { marginHorizontal: 0, marginBottom: DASH_GAP },
   profileCard: { marginHorizontal: 12, marginBottom: 12 },
   profileTop: { flexDirection: "row", alignItems: "center", padding: 14 },
   selectorPage: { padding: 12, paddingBottom: 28 },

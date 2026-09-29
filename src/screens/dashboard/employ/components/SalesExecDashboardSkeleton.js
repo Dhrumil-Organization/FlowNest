@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { COLORS } from './SharedComponents';
+import { ReportContainer, ResponsiveGrid, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 
 // ─── Single shimmer bone ──────────────────────────────────────────────────────
 const ShimmerBone = ({ style, shimmerAnim }) => {
@@ -37,8 +38,8 @@ const SummaryCardSkeleton = ({ shimmerAnim }) => (
 );
 
 // ─── Section Card Skeleton ────────────────────────────────────────────────────
-const SectionSkeleton = ({ shimmerAnim, rowCount = 3, showChart = true, showProgress = false }) => (
-  <View style={styles.card}>
+const SectionSkeleton = ({ shimmerAnim, rowCount = 3, showChart = true, showProgress = false, flush = false }) => (
+  <View style={[styles.card, flush && styles.cardFlush]}>
     {/* Header */}
     <View style={styles.headerRow}>
       <ShimmerBone shimmerAnim={shimmerAnim} style={styles.headerIcon} />
@@ -108,8 +109,8 @@ const SectionSkeleton = ({ shimmerAnim, rowCount = 3, showChart = true, showProg
 );
 
 // ─── Profile Card Skeleton ────────────────────────────────────────────────────
-const ProfileCardSkeleton = ({ shimmerAnim }) => (
-  <View style={[styles.card, styles.profileCard]}>
+const ProfileCardSkeleton = ({ shimmerAnim, flush = false }) => (
+  <View style={[styles.card, styles.profileCard, flush && styles.cardFlush]}>
     <View style={styles.profileTop}>
       <ShimmerBone shimmerAnim={shimmerAnim} style={styles.avatar} />
       <View style={styles.profileInfo}>
@@ -128,6 +129,10 @@ const ProfileCardSkeleton = ({ shimmerAnim }) => (
 // ─── Main Skeleton ────────────────────────────────────────────────────────────
 export default function SalesExecDashboardSkeleton({ showProfile = true }) {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  // Responsive (UI only): centred at max width, sections in 2 columns on
+  // tablet / desktop so the placeholder matches the loaded screen.
+  const layout = useReportLayout();
+  const wide = !layout.compact;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -161,16 +166,21 @@ export default function SalesExecDashboardSkeleton({ showProfile = true }) {
               <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbHelp} />
             </View>
 
-            {/* Profile Card Skeleton */}
-            <ProfileCardSkeleton shimmerAnim={shimmerAnim} />
           </>
         )}
 
-        {/* Sales Section Skeleton */}
-        <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={4} showChart={true} />
+        <ReportContainer onLayout={layout.onLayout} style={wide && styles.containerWide}>
+          {/* Profile Card Skeleton */}
+          {showProfile && <ProfileCardSkeleton shimmerAnim={shimmerAnim} flush={wide} />}
 
-        {/* Payment Collection Section Skeleton */}
-        <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={4} showChart={true} showProgress={true} />
+          <ResponsiveGrid cols={wide ? 2 : 1}>
+            {/* Sales Section Skeleton */}
+            <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={4} showChart={true} flush={wide} />
+
+            {/* Payment Collection Section Skeleton */}
+            <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={4} showChart={true} showProgress={true} flush={wide} />
+          </ResponsiveGrid>
+        </ReportContainer>
       </ScrollView>
     </SafeAreaView>
   );
@@ -221,6 +231,8 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   profileCard: { marginBottom: 12 },
+  cardFlush: { marginHorizontal: 0 },
+  containerWide: { paddingHorizontal: 12 },
 
   // ── Profile Top ──
   profileTop: { flexDirection: 'row', alignItems: 'center', padding: 14 },

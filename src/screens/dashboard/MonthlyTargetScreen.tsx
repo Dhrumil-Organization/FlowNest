@@ -7,6 +7,7 @@ import {
   DashboardView,
 } from '@/src/api/dashboard';
 import { ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { ReportContainer, ResponsiveGrid, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
@@ -18,10 +19,12 @@ import {
   RefreshControl,
   SafeAreaView,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from 'react-native';
 
 const METRICS: Array<{ key: DashboardMetricKey; title: string; short: string; tone: string }> = [
@@ -48,17 +51,18 @@ function changeMonth(year: number, month: number, delta: number) {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
-function MetricSummaryCard({ card, selected, onPress, tone, amountMode }: {
+function MetricSummaryCard({ card, selected, onPress, tone, amountMode, style }: {
   card?: DashboardCard;
   selected: boolean;
   onPress: () => void;
   tone: string;
   amountMode: 'compact' | 'actual';
+  style?: StyleProp<ViewStyle>;
 }) {
   const pct = Number(card?.achievement_pct || 0);
   const configured = Boolean(card?.target_configured);
   return (
-    <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={[styles.metricCard, selected && { borderColor: tone, borderWidth: 2 }]}>
+    <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={[styles.metricCard, style, selected && { borderColor: tone, borderWidth: 2 }]}>
       <View style={styles.metricCardTop}>
         <View style={[styles.metricDot, { backgroundColor: tone }]} />
         <Text style={styles.metricCardTitle}>{card?.label || 'Metric'}</Text>
@@ -150,6 +154,7 @@ export function MonthlyTargetScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const layout = useReportLayout();
 
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
@@ -240,13 +245,21 @@ export function MonthlyTargetScreen() {
     } as any);
   };
 
+  const monthlyReportButton = (
+            <TouchableOpacity activeOpacity={0.88} style={styles.monthlyReportButton} onPress={() => router.push({ pathname: '/new/(tabs)/reports/monthly-report', params: { view, monthno: month } } as any)}>
+              <View style={styles.monthlyReportIcon}><Text style={{ fontSize: 18 }}>📈</Text></View>
+              <View style={{ flex: 1 }}><Text style={styles.monthlyReportTitle}>Open Monthly Report</Text><Text style={styles.monthlyReportSub}>Detailed charts, category and executive analysis</Text></View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.kicker}>DASHBOARD · {view.toUpperCase()} VIEW</Text>
-          <Text style={styles.title}>Monthly Target</Text>
+          <Text numberOfLines={1} style={styles.title}>Monthly Target</Text>
         </View>
         <TouchableOpacity style={styles.refreshButton} onPress={() => load(true)}><Text style={styles.refreshText}>↻</Text></TouchableOpacity>
       </View>
@@ -256,6 +269,11 @@ export function MonthlyTargetScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.copper} />}
       >
+        <ReportContainer onLayout={layout.onLayout}>
+        <SplitPane
+          layout={layout}
+          left={(
+            <View>
         <View style={styles.segment}>
           <TouchableOpacity disabled={!ownerAllowed} onPress={() => ownerAllowed && setView('owner')} style={[styles.segmentButton, view === 'owner' && styles.segmentActive, !ownerAllowed && styles.segmentDisabled]}>
             <Text style={[styles.segmentText, view === 'owner' && styles.segmentTextActive]}>Owner</Text>
@@ -269,15 +287,19 @@ export function MonthlyTargetScreen() {
           <Text style={styles.amountModeLabel}>AMOUNT</Text>
           <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
         </View>
-
+            </View>
+          )}
+          right={(
         <View style={styles.monthNavigator}>
           <TouchableOpacity onPress={() => moveMonth(-1)} style={styles.monthArrow}><Text style={styles.monthArrowText}>‹</Text></TouchableOpacity>
-          <View style={{ alignItems: 'center' }}>
+          <View style={{ alignItems: 'center', flex: 1, minWidth: 0 }}>
             <Text style={styles.monthLabel}>{monthLabel(year, month)}</Text>
-            <Text style={styles.periodLabel}>{periodTitle}</Text>
+            <Text numberOfLines={1} style={styles.periodLabel}>{periodTitle}</Text>
           </View>
           <TouchableOpacity onPress={() => moveMonth(1)} style={styles.monthArrow}><Text style={styles.monthArrowText}>›</Text></TouchableOpacity>
         </View>
+          )}
+        />
 
         {loading ? (
           <View style={styles.stateCard}><ActivityIndicator color={T.copper} /><Text style={styles.stateText}>Loading monthly target…</Text></View>
@@ -293,9 +315,9 @@ export function MonthlyTargetScreen() {
           <>
             <View style={styles.hero}>
               <View style={styles.heroTop}>
-                <View>
+                <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
                   <Text style={styles.heroKicker}>MONTHLY BUSINESS TARGET</Text>
-                  <Text style={styles.heroTitle}>{periodTitle}</Text>
+                  <Text numberOfLines={2} style={styles.heroTitle}>{periodTitle}</Text>
                 </View>
                 <View style={styles.heroBadge}><Text style={styles.heroBadgeValue}>{totals.configured}/3</Text><Text style={styles.heroBadgeLabel}>targets</Text></View>
               </View>
@@ -306,6 +328,7 @@ export function MonthlyTargetScreen() {
               </View>
             </View>
 
+            {layout.compact ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
               {METRICS.map((metric) => (
                 <MetricSummaryCard
@@ -318,6 +341,27 @@ export function MonthlyTargetScreen() {
                 />
               ))}
             </ScrollView>
+            ) : (
+            <ResponsiveGrid cols={3} style={styles.cardsGrid}>
+              {METRICS.map((metric) => (
+                <MetricSummaryCard
+                  key={metric.key}
+                  card={cardByKey(cards, metric.key)}
+                  selected={selectedMetric === metric.key}
+                  tone={metric.tone}
+                  amountMode={amountMode}
+                  style={styles.metricCardFill}
+                  onPress={() => setSelectedMetric(metric.key)}
+                />
+              ))}
+            </ResponsiveGrid>
+            )}
+
+            <SplitPane
+              layout={layout}
+              ratio={0.5}
+              left={(
+            <View>
 
             <View style={styles.breakdownCard}>
               <View style={[styles.breakdownHeader, { backgroundColor: METRICS.find((item) => item.key === selectedMetric)?.tone || T.nav }]}>
@@ -340,6 +384,10 @@ export function MonthlyTargetScreen() {
 
             {selectedMetric === 'COLLECTION' ? <ReconciliationBanner value={reconciliation} amountMode={amountMode} /> : null}
 
+            {layout.compact ? null : monthlyReportButton}
+            </View>
+              )}
+              right={(
             <View style={styles.executivesCard}>
               <View style={styles.executivesHeader}>
                 <View>
@@ -352,14 +400,13 @@ export function MonthlyTargetScreen() {
                 <View style={styles.noRows}><Text style={styles.noRowsTitle}>No executive data</Text><Text style={styles.noRowsText}>No rows were returned for this metric and month.</Text></View>
               ) : executives.map((row, index) => <ExecutiveRow key={`${row.executive_code}-${index}`} row={row} rank={index} onPress={() => openExecutive(row)} amountMode={amountMode} />)}
             </View>
+              )}
+            />
 
-            <TouchableOpacity activeOpacity={0.88} style={styles.monthlyReportButton} onPress={() => router.push({ pathname: '/new/(tabs)/reports/monthly-report', params: { view, monthno: month } } as any)}>
-              <View style={styles.monthlyReportIcon}><Text style={{ fontSize: 18 }}>📈</Text></View>
-              <View style={{ flex: 1 }}><Text style={styles.monthlyReportTitle}>Open Monthly Report</Text><Text style={styles.monthlyReportSub}>Detailed charts, category and executive analysis</Text></View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+            {layout.compact ? monthlyReportButton : null}
           </>
         )}
+        </ReportContainer>
       </ScrollView>
     </SafeAreaView>
   );
@@ -369,7 +416,7 @@ const styles = StyleSheet.create({
   amountModeRow: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   safe: { flex: 1, backgroundColor: T.bg },
-  header: { backgroundColor: T.bg, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { width: '100%', maxWidth: 1320 + 30, alignSelf: 'center', backgroundColor: T.bg, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
   backButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
   backText: { color: T.nav, fontSize: 28, marginTop: -3 },
   kicker: { fontSize: 9, color: T.copper, letterSpacing: 1, fontWeight: '900' },
@@ -408,10 +455,12 @@ const styles = StyleSheet.create({
   heroMetricValue: { color: '#fff', fontSize: 17, fontWeight: '900', marginTop: 4 },
   heroMetricValueSmall: { color: '#fff', fontSize: 14, fontWeight: '900', marginTop: 5 },
   cardsRow: { gap: 10, paddingBottom: 13 },
+  cardsGrid: { marginBottom: 13 },
+  metricCardFill: { width: '100%', flex: 1 },
   metricCard: { width: 255, backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 14, ...S.card },
   metricCardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   metricDot: { width: 9, height: 9, borderRadius: 5 },
-  metricCardTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
+  metricCardTitle: { flex: 1, color: T.ink, fontSize: 13, fontWeight: '900' },
   metricActual: { color: T.ink, fontSize: 22, fontWeight: '900', marginTop: 12 },
   metricCaption: { color: T.muted, fontSize: 9, marginTop: 1 },
   metricTargetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 7 },
@@ -450,7 +499,7 @@ const styles = StyleSheet.create({
   executiveMain: { flex: 1, marginLeft: 10 },
   executiveName: { color: T.ink, fontSize: 12, fontWeight: '800' },
   executiveSub: { color: T.muted, fontSize: 9, marginTop: 3 },
-  executiveAmounts: { alignItems: 'flex-end', marginLeft: 8 },
+  executiveAmounts: { alignItems: 'flex-end', marginLeft: 8, flexShrink: 0 },
   executiveActual: { color: T.ink, fontSize: 11, fontWeight: '900' },
   executivePct: { color: T.amber, fontSize: 9, fontWeight: '900', marginTop: 3 },
   chevron: { color: T.muted, fontSize: 22, marginLeft: 8 },

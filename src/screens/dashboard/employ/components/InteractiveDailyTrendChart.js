@@ -31,6 +31,13 @@ export default function InteractiveDailyTrendChart({
   showHint = true,
 }) {
   const [selectedIndex, setSelectedIndex] = useState(null);
+  // Measured container width (UI only) so the chart fills wide columns
+  // instead of leaving empty space; still scrolls when points don't fit.
+  const [boxWidth, setBoxWidth] = useState(0);
+  const onBoxLayout = e => {
+    const w = Math.floor(e?.nativeEvent?.layout?.width || 0);
+    setBoxWidth(prev => (Math.abs(prev - w) > 1 ? w : prev));
+  };
 
   const points = useMemo(() => {
     if (!Array.isArray(data)) return [];
@@ -67,10 +74,16 @@ export default function InteractiveDailyTrendChart({
   const graphTop = 24;
   const graphBottom = height - 8;
   const graphHeight = Math.max(1, graphBottom - graphTop);
-  const contentWidth = Math.max(
+  const naturalWidth = Math.max(
     minWidth,
     sidePadding * 2 + Math.max(0, points.length - 1) * pointGap,
   );
+  const contentWidth = Math.max(naturalWidth, boxWidth);
+  // Spread points across the available width when there is spare room.
+  const effectiveGap =
+    points.length > 1
+      ? Math.max(pointGap, (contentWidth - sidePadding * 2) / (points.length - 1))
+      : pointGap;
 
   const values = points.map(point => point.value);
   const max = Math.max(...values, 1);
@@ -81,7 +94,7 @@ export default function InteractiveDailyTrendChart({
     x:
       points.length === 1
         ? contentWidth / 2
-        : sidePadding + index * pointGap,
+        : sidePadding + index * effectiveGap,
     y:
       graphBottom -
       ((point.value - min) / range) * graphHeight,
@@ -107,7 +120,7 @@ export default function InteractiveDailyTrendChart({
     : 0;
 
   return (
-    <View style={styles.outer}>
+    <View style={styles.outer} onLayout={onBoxLayout}>
       <ScrollView
         horizontal
         nestedScrollEnabled

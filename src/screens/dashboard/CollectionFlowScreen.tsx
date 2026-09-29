@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from './employ/api/api';
 import { DashboardAPI } from '@/src/api/dashboard';
+import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
 
 type Mode = 'collection' | 'outstanding';
 type Level = 'executives' | 'parties' | 'party_detail';
@@ -228,6 +229,7 @@ export default function CollectionFlowScreen() {
   const [expandedParties, setExpandedParties] = useState<Record<string, boolean>>({});
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
   const hasFocusedOnce = useRef(false);
+  const layout = useReportLayout();
 
   useEffect(() => {
     if (!monthChips.some(chip => chip.ym === selectedMonth)) {
@@ -431,122 +433,11 @@ export default function CollectionFlowScreen() {
     0,
   );
 
-  return (
-    <View style={styles.root}>
-      <SubScreenHeader backLabel="Back" title={title} />
+  // UI only: history and breakdown sit side by side on tablet / desktop
+  const splitView = showPaymentHistory && !layout.compact;
 
-      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void load(true)}
-              tintColor={T.nav}
-            />
-          }
-        >
-          <View style={[styles.contextCard, { borderLeftColor: accent }]}>
-            <Text style={[styles.kicker, { color: accent }]}>
-              {mode === 'collection' ? 'PAYMENT COLLECTION' : 'OUTSTANDING'} · {selectedChip?.label?.toUpperCase()}
-            </Text>
-            <Text style={styles.reportTitle}>{panelTitle}</Text>
-            <Text style={styles.reportSub}>
-              {executiveName
-                ? `Executive: ${executiveName}`
-                : partyName
-                  ? `Party: ${partyName}`
-                  : `Complete ${mode === 'collection' ? 'Collection' : 'Outstanding'} card report.`}
-            </Text>
-
-            {executiveName || partyName ? (
-              <View style={styles.contextPills}>
-                {executiveName ? (
-                  <View style={styles.contextPill}>
-                    <Text style={styles.contextPillLabel}>Executive</Text>
-                    <Text style={styles.contextPillValue}>{executiveName}</Text>
-                  </View>
-                ) : null}
-                {partyName ? (
-                  <View style={styles.contextPill}>
-                    <Text style={styles.contextPillLabel}>Party</Text>
-                    <Text style={styles.contextPillValue}>{partyName}</Text>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-
-          {/* Last six months remain visible on every drill-down level. */}
-          <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.monthRow}
-            >
-              {monthChips.map(chip => {
-                const active = chip.ym === selectedMonth;
-                return (
-                  <TouchableOpacity
-                    key={chip.ym}
-                    onPress={() => setSelectedMonth(chip.ym)}
-                    style={[styles.monthChip, active && styles.monthChipActive]}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>
-                      {chip.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-          </ScrollView>
-
-          <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} />
-
-          <View style={[styles.totalCard, { borderLeftColor: accent }]}>
-            <View>
-              <Text style={styles.totalLabel}>
-                {mode === 'collection' ? 'TOTAL COLLECTION' : 'TOTAL OUTSTANDING'}
-              </Text>
-              <Text style={[styles.totalValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.68}>
-                {formatSummaryAmount(report?.total?.amount, amountMode, report?.total?.amount_exact)}
-              </Text>
-            </View>
-            <View style={styles.totalRight}>
-              <Text style={styles.totalLabel}>{level === 'party_detail' ? 'OPEN INVOICES' : 'ROWS'}</Text>
-              <Text style={styles.totalCount}>
-                {level === 'party_detail'
-                  ? Number(report?.ageing?.open_invoice_count || 0)
-                  : Number(report?.total?.row_count || 0)}
-              </Text>
-            </View>
-          </View>
-
-          {hasReconciliation ? (
-            <View style={[styles.reconcile, reconciled ? styles.reconcileOk : styles.reconcileWarn]}>
-              <Text style={[styles.reconcileTitle, { color: reconciled ? T.green : '#B85C00' }]}>
-                {reconciled
-                  ? '✓ Total reconciled with previous screen'
-                  : '↻ Current live total changed from the carried value'}
-              </Text>
-              {!reconciled ? (
-                <Text style={styles.reconcileDetail}>
-                  Previous {formatSummaryAmount(reconciliation?.expected_amount || 0, amountMode, reconciliation?.expected_amount_exact)} · Current {formatSummaryAmount(reconciliation?.list_amount || 0, amountMode, reconciliation?.list_amount_exact)}
-                  {'\n'}The current database value is authoritative.
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          {report?.message ? (
-            <View style={styles.messageBox}>
-              <Text style={styles.messageTitle}>Data availability</Text>
-              <Text style={styles.messageText}>{report.message}</Text>
-            </View>
-          ) : null}
-
-          {showPaymentHistory ? (
-            <View style={styles.historyPanel}>
+  const historyBlock = showPaymentHistory ? (
+            <View style={[styles.historyPanel, splitView && styles.splitPanelTop]}>
               <View style={styles.historyHeader}>
                 <View>
                   <Text style={styles.historyKicker}>PAYMENT COLLECTION</Text>
@@ -638,9 +529,10 @@ export default function CollectionFlowScreen() {
                 })
               )}
             </View>
-          ) : null}
+  ) : null;
 
-          {level === 'party_detail' && mode === 'outstanding' ? (
+  const mainBlock = (
+          (level === 'party_detail' && mode === 'outstanding' ? (
             <View style={styles.ageingPanel}>
               <View style={styles.ageingHeader}>
                 <View>
@@ -910,7 +802,132 @@ export default function CollectionFlowScreen() {
                 </View>
               ) : null}
             </View>
+          ))
+  );
+  return (
+    <View style={styles.root}>
+      <SubScreenHeader backLabel="Back" title={title} />
+
+      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              tintColor={T.nav}
+            />
+          }
+        >
+          <ReportContainer onLayout={layout.onLayout}>
+          <View style={[styles.contextCard, { borderLeftColor: accent }]}>
+            <Text style={[styles.kicker, { color: accent }]}>
+              {mode === 'collection' ? 'PAYMENT COLLECTION' : 'OUTSTANDING'} · {selectedChip?.label?.toUpperCase()}
+            </Text>
+            <Text style={styles.reportTitle}>{panelTitle}</Text>
+            <Text style={styles.reportSub}>
+              {executiveName
+                ? `Executive: ${executiveName}`
+                : partyName
+                  ? `Party: ${partyName}`
+                  : `Complete ${mode === 'collection' ? 'Collection' : 'Outstanding'} card report.`}
+            </Text>
+
+            {executiveName || partyName ? (
+              <View style={styles.contextPills}>
+                {executiveName ? (
+                  <View style={styles.contextPill}>
+                    <Text style={styles.contextPillLabel}>Executive</Text>
+                    <Text style={styles.contextPillValue}>{executiveName}</Text>
+                  </View>
+                ) : null}
+                {partyName ? (
+                  <View style={styles.contextPill}>
+                    <Text style={styles.contextPillLabel}>Party</Text>
+                    <Text style={styles.contextPillValue}>{partyName}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+
+          {/* Last six months remain visible on every drill-down level. */}
+          <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.monthRow}
+            >
+              {monthChips.map(chip => {
+                const active = chip.ym === selectedMonth;
+                return (
+                  <TouchableOpacity
+                    key={chip.ym}
+                    onPress={() => setSelectedMonth(chip.ym)}
+                    style={[styles.monthChip, active && styles.monthChipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>
+                      {chip.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+          </ScrollView>
+
+          <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} />
+
+          <View style={[styles.totalCard, { borderLeftColor: accent }]}>
+            <View>
+              <Text style={styles.totalLabel}>
+                {mode === 'collection' ? 'TOTAL COLLECTION' : 'TOTAL OUTSTANDING'}
+              </Text>
+              <Text style={[styles.totalValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.68}>
+                {formatSummaryAmount(report?.total?.amount, amountMode, report?.total?.amount_exact)}
+              </Text>
+            </View>
+            <View style={styles.totalRight}>
+              <Text style={styles.totalLabel}>{level === 'party_detail' ? 'OPEN INVOICES' : 'ROWS'}</Text>
+              <Text style={styles.totalCount}>
+                {level === 'party_detail'
+                  ? Number(report?.ageing?.open_invoice_count || 0)
+                  : Number(report?.total?.row_count || 0)}
+              </Text>
+            </View>
+          </View>
+
+          {hasReconciliation ? (
+            <View style={[styles.reconcile, reconciled ? styles.reconcileOk : styles.reconcileWarn]}>
+              <Text style={[styles.reconcileTitle, { color: reconciled ? T.green : '#B85C00' }]}>
+                {reconciled
+                  ? '✓ Total reconciled with previous screen'
+                  : '↻ Current live total changed from the carried value'}
+              </Text>
+              {!reconciled ? (
+                <Text style={styles.reconcileDetail}>
+                  Previous {formatSummaryAmount(reconciliation?.expected_amount || 0, amountMode, reconciliation?.expected_amount_exact)} · Current {formatSummaryAmount(reconciliation?.list_amount || 0, amountMode, reconciliation?.list_amount_exact)}
+                  {'\n'}The current database value is authoritative.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {report?.message ? (
+            <View style={styles.messageBox}>
+              <Text style={styles.messageTitle}>Data availability</Text>
+              <Text style={styles.messageText}>{report.message}</Text>
+            </View>
+          ) : null}
+
+          {splitView ? (
+            <SplitPane layout={layout} ratio={0.45} left={historyBlock} right={mainBlock} />
+          ) : (
+            <>
+              {historyBlock}
+              {mainBlock}
+            </>
           )}
+          </ReportContainer>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -1044,6 +1061,7 @@ const styles = StyleSheet.create({
   partyDateLabel: { color: T.ink, fontSize: 11, fontWeight: '800' },
   partyDateEntries: { marginTop: 2, color: T.muted, fontSize: 8, fontWeight: '600' },
 
+  splitPanelTop: { marginTop: 12 },
   historyPanel: {
     marginTop: 14,
     backgroundColor: '#FFFFFF',

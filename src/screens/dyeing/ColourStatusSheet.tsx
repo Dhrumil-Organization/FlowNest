@@ -16,10 +16,10 @@
 //     Add / ✎ update  /dyeing/save_outward_details?prptype&chartno&yearno&uid&srno&lotno
 //     table           GET /dyeing/lotnos?prptype&chartno&yearno&orderuid&ordersrno (reloaded after every save)
 //   orderuid = chart.OrderUId, ordersrno = shade.OrderSrNo (both from browse).
-//   SHADE-WISE (same as status): EVERY shade has its own Outward · Lot block.
-//   Shades that share one SO line share the /dyeing/lotnos call, and the rows
-//   are split by the row's `soshdcode` (rows with no shade info go to the
-//   first shade of the line).
+//   SHADE-WISE (same as status): EVERY shade has its own Outward · Lot block
+//   and its OWN calls — list (lotnos), help (outward_details), advance
+//   (outward_details_all), add / update (save_outward_details) and delete
+//   (remove_lotno) all send that shade's `shdcode` + `shdname`.
 //   Outward identity = uuid + usrno (API `uid` / `srno` are the SO line).
 //   Help / Advance list EVERY outward in EVERY shade: an outward already
 //   taken in a shade can't be taken again in THAT shade, but another shade
@@ -159,14 +159,19 @@ export function ColourStatusSheet({
   const wide = width >= 700;
   const [toast, setToast] = useState<string | null>(null);
 
-  // help: outward lines of the chart (GET /dyeing/outward_details) — also gives ChalNo
-  const [help, setHelp] = useState<OutwardState>({ rows: [], loading: false, error: null });
-  // table: saved lot nos per SO line (GET /dyeing/lotnos, key = OrderSrNo)
-  const [lotsByLine, setLotsByLine] = useState<Record<string, OutwardState>>({});
+  // SHADE-WISE outward / lot data — every call is made per shade and sends
+  // that shade's code + name (shdcode / shdname):
+  //   help     GET /dyeing/outward_details      ?prptype&chartno&yearno&shdcode&shdname
+  //   advance  GET /dyeing/outward_details_all  ?prptype&yearno&orderuid&ordersrno&shdcode&shdname
+  //   table    GET /dyeing/lotnos               ?prptype&chartno&yearno&orderuid&ordersrno&shdcode&shdname
+  // key = shadeKeyOf(shade)
+  const [helpByShade, setHelpByShade] = useState<Record<string, OutwardState>>({});
+  const [lotsByShade, setLotsByShade] = useState<Record<string, OutwardState>>({});
   const chartNo = chart?.ChartNo ?? '';
   const orderUId = chart?.OrderUId;
 
-  // shades that share one SO line (same OrderSrNo) share one outward/lot table
+  // shades that share one SO line (same OrderSrNo) — only used for the note
+  // and for untagged rows (see OutwardLotSection.ownsUntagged)
   const lines = useMemo(() => {
     const map = new Map<number, PriorityShade[]>();
     (chart?.shades ?? []).forEach((sh) => {
@@ -182,60 +187,77 @@ export function ColourStatusSheet({
     return !!body && typeof body === 'object' && (body.success === false || body.status === false);
   };
 
-  const loadHelp = useCallback(async () => {
+  /** shdcode + shdname of a shade, as sent on every outward / lot call. */
+  const shadeParams = (shade: PriorityShade) => ({
+    shdcode: String(shade.ShdCode ?? '').trim(),
+    shdname: String(shade.ShdName ?? '').trim(),
+  });
+
+  /** Help — outward lines of the chart for ONE shade (GET /dyeing/outward_details). */
+  const loadHelp = useCallback(async (shade: PriorityShade) => {
     if (!chartNo) return;
-    setHelp((cur) => ({ ...cur, loading: true, error: null }));
+    const k = shadeKeyOf(shade);
+    setHelpByShade((cur) => ({ ...cur, [k]: { rows: cur[k]?.rows ?? [], loading: true, error: null } }));
     try {
-      const params = { prptype: prpGroup, chartno: chartNo, yearno: yearNo };
+      const params = { prptype: prpGroup, chartno: chartNo, yearno: yearNo, ...shadeParams(shade) };
       console.log('[Dyeing] outward_details request ->', params);
       const response: any = await DyeingService.outwardDetails(params);
       if (failed(response)) throw new Error(messageOf(response, 'Unable to load outward list'));
-      setHelp({ rows: toOutwardRows(response), loading: false, error: null });
+      setHelpByShade((cur) => ({ ...cur, [k]: { rows: toOutwardRows(response), loading: false, error: null } }));
     } catch (err: any) {
-      setHelp({ rows: [], loading: false, error: err?.response?.data?.message || err?.message || 'Unable to load outward list' });
+      setHelpByShade((cur) => ({
+        ...cur,
+        [k]: { rows: [], loading: false, error: err?.response?.data?.message || err?.message || 'Unable to load outward list' },
+      }));
     }
   }, [chartNo, prpGroup, yearNo]);
 
-  const loadLots = useCallback(async (srNo: number) => {
+  /** Table — saved lot nos of ONE shade (GET /dyeing/lotnos). */
+  const loadLots = useCallback(async (shade: PriorityShade) => {
     if (!chartNo || orderUId === undefined || orderUId === null) return;
-    const k = String(srNo);
-    setLotsByLine((cur) => ({ ...cur, [k]: { rows: cur[k]?.rows ?? [], loading: true, error: null } }));
+    const k = shadeKeyOf(shade);
+    setLotsByShade((cur) => ({ ...cur, [k]: { rows: cur[k]?.rows ?? [], loading: true, error: null } }));
     try {
-      const params = { prptype: prpGroup, chartno: chartNo, yearno: yearNo, orderuid: orderUId, ordersrno: srNo };
+      const params = {
+        prptype: prpGroup, chartno: chartNo, yearno: yearNo, orderuid: orderUId, ordersrno: shade.OrderSrNo, ...shadeParams(shade),
+      };
       console.log('[Dyeing] lotnos request ->', params);
       const response: any = await DyeingService.lotNos(params);
       console.log('[Dyeing] lotnos response ->', response?.data ?? response);
       if (failed(response)) throw new Error(messageOf(response, 'Unable to load lot nos.'));
-      setLotsByLine((cur) => ({ ...cur, [k]: { rows: toOutwardRows(response), loading: false, error: null } }));
+      setLotsByShade((cur) => ({ ...cur, [k]: { rows: toOutwardRows(response), loading: false, error: null } }));
     } catch (err: any) {
-      setLotsByLine((cur) => ({
+      setLotsByShade((cur) => ({
         ...cur,
         [k]: { rows: [], loading: false, error: err?.response?.data?.message || err?.message || 'Unable to load lot nos.' },
       }));
     }
   }, [chartNo, orderUId, prpGroup, yearNo]);
 
-  /** Nested "Advance" help — every outward of the SO line (GET /dyeing/outward_details_all). */
-  const loadAdvance = useCallback(async (srNo: number) => {
-    const params = { prptype: prpGroup, yearno: yearNo, orderuid: orderUId ?? '', ordersrno: srNo };
+  /** Nested "Advance" help — every outward of the SO line, for ONE shade (GET /dyeing/outward_details_all). */
+  const loadAdvance = useCallback(async (shade: PriorityShade) => {
+    const params = { prptype: prpGroup, yearno: yearNo, orderuid: orderUId ?? '', ordersrno: shade.OrderSrNo, ...shadeParams(shade) };
     console.log('[Dyeing] outward_details_all request ->', params);
     const response: any = await DyeingService.outwardDetailsAll(params);
     if (failed(response)) throw new Error(messageOf(response, 'Unable to load outwards'));
     return toOutwardRows(response);
   }, [orderUId, prpGroup, yearNo]);
 
-  const lineKeys = useMemo(() => Array.from(lines.keys()).join(','), [lines]);
+  const shadesSig = useMemo(
+    () => (chart?.shades ?? []).map((sh) => shadeKeyOf(sh)).join(','),
+    [chart?.shades],
+  );
 
   useEffect(() => {
     if (!visible) {
       setToast(null);
-      setLotsByLine({});
-      setHelp({ rows: [], loading: false, error: null });
+      setLotsByShade({});
+      setHelpByShade({});
       return;
     }
-    void loadHelp();
-    lineKeys.split(',').filter(Boolean).forEach((k) => { void loadLots(Number(k)); });
-  }, [visible, loadHelp, loadLots, lineKeys]);
+    (chart?.shades ?? []).forEach((sh) => { void loadHelp(sh); void loadLots(sh); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, loadHelp, loadLots, shadesSig]);
 
   useEffect(() => {
     if (!toast) return;
@@ -248,25 +270,22 @@ export function ColourStatusSheet({
   const challanMap = useMemo(() => {
     const byUuid: Record<string, string> = {};
     const byLine: Record<string, string> = {};
-    help.rows.forEach((r) => {
+    (Object.values(helpByShade) as OutwardState[]).flatMap((h) => h.rows).forEach((r) => {
       if (!r.hasChallan) return;
       if (r.uuid) byUuid[r.uuid] = r.challanNo;
       const lk = lineKeyOf(r);
       if (!byLine[lk]) byLine[lk] = r.challanNo;
     });
     return { byUuid, byLine };
-  }, [help.rows]);
+  }, [helpByShade]);
   const challanOf = useCallback((row: OutwardRow) => {
     if (row.hasChallan) return row.challanNo;
     return challanMap.byLine[lineKeyOf(row)] || (row.uuid && challanMap.byUuid[row.uuid]) || row.challanNo;
   }, [challanMap]);
 
-  /** Rows of one SO line that belong to `shade` (untagged rows -> first shade of the line). */
-  const rowsOfShade = useCallback((rows: OutwardRow[], shade: PriorityShade, ownsUntagged: boolean) =>
-    rows.filter((r) => {
-      const m = rowShadeMatch(r, shade);
-      return m === null ? ownsUntagged : m;
-    }), []);
+  /** Rows of this shade's own call: drop rows explicitly tagged to another shade. */
+  const rowsOfShade = useCallback((rows: OutwardRow[], shade: PriorityShade) =>
+    rows.filter((r) => rowShadeMatch(r, shade) !== false), []);
 
   const afterStatusSave = useCallback(async (message: string) => {
     setToast(message);
@@ -314,13 +333,12 @@ export function ColourStatusSheet({
           <ScrollView style={{ flex: 1 }} contentContainerStyle={st.body} keyboardShouldPersistTaps="handled">
             {chart.shades.map((shade) => {
               const group = lines.get(shade.OrderSrNo) ?? [shade];
-              const first = group[0] === shade;
-              const k = String(shade.OrderSrNo);
-              const lineTable = lotsByLine[k] ?? { rows: [], loading: true, error: null };
-              // shade-wise: this shade's own lot rows + its own outward help
-              const table: OutwardState = { ...lineTable, rows: rowsOfShade(lineTable.rows, shade, first) };
-              // help is NOT filtered by shade: the same outward can be taken by every shade (once per shade)
-              const shadeHelp: OutwardState = help;
+              const k = shadeKeyOf(shade);
+              const shadeLots = lotsByShade[k] ?? { rows: [], loading: true, error: null };
+              // shade-wise: this shade's own lot rows (its own lotnos call)
+              const table: OutwardState = { ...shadeLots, rows: rowsOfShade(shadeLots.rows, shade) };
+              // this shade's own help list (NOT filtered — the same outward can be taken by every shade, once per shade)
+              const shadeHelp: OutwardState = helpByShade[k] ?? { rows: [], loading: true, error: null };
               const outwardLots = table.rows.map((r) => r.lotNo).filter(Boolean);
               const others = group.filter((g) => g !== shade).map((g) => g.ShdName).filter(Boolean);
               return (
@@ -337,7 +355,7 @@ export function ColourStatusSheet({
                       title={`Outward · Lot No. — ${shade.ShdName || shade.ShdCode || `Sr ${shade.OrderSrNo}`}`}
                       shdCode={shade.ShdCode}
                       shdName={shade.ShdName}
-                      ownsUntagged={first}
+                      ownsUntagged={group.length === 1}
                       note={others.length ? `Sr ${shade.OrderSrNo} is shared with ${others.join(' · ')} — lot nos. here are for ${shade.ShdName} only` : null}
                       chartNo={chart.ChartNo}
                       orderSrNo={shade.OrderSrNo}
@@ -345,13 +363,13 @@ export function ColourStatusSheet({
                       yearNo={yearNo}
                       help={shadeHelp}
                       table={table}
-                      loadAdvance={() => loadAdvance(shade.OrderSrNo)}
+                      loadAdvance={() => loadAdvance(shade)}
                       challanOf={challanOf}
                       canEdit={perms.canLot}
-                      onRetry={() => { void loadLots(shade.OrderSrNo); void loadHelp(); }}
+                      onRetry={() => { void loadLots(shade); void loadHelp(shade); }}
                       onSaved={async (message) => {
                         setToast(`${shade.ShdName ? `${shade.ShdName} · ` : ''}${message}`);
-                        await Promise.all([loadLots(shade.OrderSrNo), loadHelp(), Promise.resolve(onSaved())]);
+                        await Promise.all([loadLots(shade), loadHelp(shade), Promise.resolve(onSaved())]);
                       }}
                     />
                   )}

@@ -42,15 +42,7 @@ const ScannerModal = ({ visible, onScanned, onClose }: Props) => {
                         </TouchableOpacity>
                     </View>
                 )}
-                {permission?.granted && (
-                    <View pointerEvents="none" style={s.scanFrame}>
-                        <View style={[s.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 14 }]} />
-                        <View style={[s.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 14 }]} />
-                        <View style={[s.corner, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 14 }]} />
-                        <View style={[s.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 14 }]} />
-                    </View>
-                )}
-                <Text style={{ position: 'absolute', top: 54, left: 20, color: '#fff', fontSize: 17, fontWeight: '700' }}>Scan carton</Text>
+                {permission?.granted && <View pointerEvents="none" style={s.scanFrame} />}
                 <TouchableOpacity
                     onPress={onClose}
                     style={{ position: 'absolute', top: 48, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 }}
@@ -58,7 +50,7 @@ const ScannerModal = ({ visible, onScanned, onClose }: Props) => {
                 >
                     <Icon name="close" size={24} color="#fff" />
                 </TouchableOpacity>
-                <Text style={{ position: 'absolute', bottom: 60, alignSelf: 'center', color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, overflow: 'hidden' }}>Point at the carton label</Text>
+                <Text style={{ position: 'absolute', bottom: 60, alignSelf: 'center', color: '#fff' }}>Point at the carton label</Text>
             </View>
         </Modal>
     );

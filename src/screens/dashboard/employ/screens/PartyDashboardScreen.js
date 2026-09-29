@@ -420,6 +420,15 @@ import {
 } from "../components/SharedComponents";
 import TourOverlay from "../components/TourOverlay";
 import { PARTY_DASHBOARD_TOUR } from "./DashboardTours";
+import { DashboardGrid, DashboardInsetContext, Slot } from "@/src/components/dashboard/DashboardGrid";
+import { REPORT_MAX_WIDTH, ReportContainer, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
+
+// Responsive columns (UI only): profile card stays full width on top, the
+// section cards below flow into 2 (tablet) / 3 (desktop) columns.
+const PARTY_LAYOUT = {
+  2: [["sales", "ageing"], ["payment"]],
+  3: [["sales"], ["payment"], ["ageing"]],
+};
 
 const asNumber = (value) => {
   const number = Number(value);
@@ -609,6 +618,7 @@ export default function PartyDashboardScreen({ username }) {
   const displayAmount = value => formatAmount(value, amountMode);
   const [showTour, setShowTour] = useState(false);
   const [ageingExpanded, setAgeingExpanded] = useState(false);
+  const layout = useReportLayout();
 
   const load = useCallback(
     async (prpType) => {
@@ -729,7 +739,7 @@ export default function PartyDashboardScreen({ username }) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.amountModeBar}>
+        <View style={[styles.amountModeBar, styles.centred]}>
         <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
       </View>
 
@@ -745,6 +755,11 @@ export default function PartyDashboardScreen({ username }) {
             />
           }
         >
+          <ReportContainer
+            onLayout={layout.onLayout}
+            style={!layout.compact && styles.containerWide}
+          >
+          <DashboardInsetContext.Provider value={layout.compact ? null : 0}>
           <SectionCard style={styles.profileCard}>
             <View style={styles.profileTop}>
               <AvatarCircle
@@ -753,8 +768,8 @@ export default function PartyDashboardScreen({ username }) {
                 size={44}
               />
               <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{displayPartyName}</Text>
-                <Text style={styles.profileSub}>
+                <Text style={styles.profileName} numberOfLines={1}>{displayPartyName}</Text>
+                <Text style={styles.profileSub} numberOfLines={1}>
                   {partyInfo.city || "—"} · Last order{" "}
                   {partyInfo.last_order_date || "—"}
                 </Text>
@@ -781,6 +796,8 @@ export default function PartyDashboardScreen({ username }) {
             </View>
           </SectionCard>
 
+          <DashboardGrid columns={layout.cols} layout={PARTY_LAYOUT}>
+          <Slot name="sales">
           <SectionCard>
             <SectionHeader
               icon="🧵"
@@ -812,7 +829,9 @@ export default function PartyDashboardScreen({ username }) {
               />
             </View>
           </SectionCard>
+          </Slot>
 
+          <Slot name="payment">
           <SectionCard>
             <SectionHeader
               icon="💰"
@@ -870,7 +889,9 @@ export default function PartyDashboardScreen({ username }) {
               />
             </View>
           </SectionCard>
+          </Slot>
 
+          <Slot name="ageing">
           <SectionCard>
             <SectionHeader
               icon="📋"
@@ -997,6 +1018,10 @@ export default function PartyDashboardScreen({ username }) {
               </View>
             )}
           </SectionCard>
+          </Slot>
+          </DashboardGrid>
+          </DashboardInsetContext.Provider>
+          </ReportContainer>
         </ScrollView>
       </SafeAreaView>
 
@@ -1051,6 +1076,8 @@ const styles = StyleSheet.create({
   breadcrumbHelpText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   scroll: { flex: 1 },
   content: { paddingTop: 10, paddingBottom: 24 },
+  containerWide: { paddingHorizontal: 12 },
+  centred: { width: "100%", maxWidth: REPORT_MAX_WIDTH, alignSelf: "center" },
   profileCard: {},
   profileTop: { flexDirection: "row", alignItems: "center", padding: 14 },
   profileInfo: { flex: 1, marginLeft: 12 },

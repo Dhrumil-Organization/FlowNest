@@ -7,6 +7,19 @@
 //   /dyeing/save_outward_details?prptype&chartno&yearno&uid&srno&lotno
 //        -> add OR edit: saves `lotno` against ONE outward line (uid + srno).
 //
+// RESPONSE SHAPE (outward_details / outward_details_all / lotnos):
+//   { "uuid": "370000208", "usrno": "2",      <- the OUTWARD (challan) line = GRYOutD1 UId + SrNo
+//     "uid":  "370000635", "srno":  "1",      <- the SO line (OrderUId + OrderSrNo) — NOT the outward
+//     "ChartNo": "CH-2-01", "ChartLotNo": "12345", "ChalNo": "00002854/A", "soshdcode": "5" }
+//
+// UNIQUE OUTWARD (on screen) = uuid + usrno: list keys, merge, "already taken
+// in this shade" check, ChalNo lookup. The same uuid can come with several
+// usrno (one challan, many lines) — every line is its own row.
+// SAVE / REMOVE PAYLOAD: `uid` + `srno` are sent EXACTLY as the API's own
+// `uid` / `srno` of the picked row (saveUid / saveSrNo) — NOT uuid / usrno.
+// `soshdcode` = the SO shade the line / lot belongs to (shade-wise split).
+// Old responses without `uuid` still read UId / SrNo as the outward.
+//
 // The response is read tolerantly (any wrapper, any casing, one merged list
 // or separate "outwards" / "saved" lists) so the screen does not break if the
 // backend renames a key. Everything the screen needs goes through
@@ -15,10 +28,17 @@
 import { num, parseAnyDate } from './dyeingModel';
 
 export type OutwardRow = {
-  key: string; // uid|srno
-  uid: string;
-  srno: string;
-  challanNo: string; // shown as "Outward No."
+  key: string; // outward uid|srno|chart|shade — unique per row on screen
+  uuid: string; // raw `uuid` from the API ('' when not sent)
+  uid: string; // OUTWARD UId  (uuid, or UId on old responses) — sent as `uid`
+  srno: string; // OUTWARD SrNo (usrno, or SrNo on old responses) — sent as `srno`
+  soUid: string; // SO line UId (API `uid` when uuid is present)
+  soSrNo: string; // SO line SrNo (API `srno` when uuid is present)
+  saveUid: string; // API `uid` as received — sent as `uid` in save_outward_details / remove_lotno
+  saveSrNo: string; // API `srno` as received — sent as `srno` in save_outward_details / remove_lotno
+  challanNo: string; // shown as "Outward No." (ChalNo when the API has it, else UId/SrNo)
+  hasChallan: boolean; // challanNo came from the API (not the UId/SrNo fallback)
+  chartNo: string; // GRYOutD1.ChartNo of this outward line (save_outward_details needs it)
   date: string; // YYYY-MM-DD or ''
   qty: number | null;
   lotNo: string; // '' = no lot saved yet
@@ -44,34 +64,56 @@ const pick = (row: any, keys: string[]): any => {
 
 const str = (v: any) => (v === undefined || v === null ? '' : String(v).trim());
 
+const UUID_KEYS = ['uuid', 'UUID', 'Uuid', 'UUId'];
+const USRNO_KEYS = ['usrno', 'USrNo', 'uSrNo', 'USRNO', 'Usrno'];
 const UID_KEYS = ['uid', 'UId', 'Uid', 'UID', 'OutwardUId', 'OutUId', 'outuid', 'VouUId', 'ChallanUId', 'DocUId'];
 const SRNO_KEYS = ['srno', 'SrNo', 'Srno', 'SRNO', 'OutwardSrNo', 'OutSrNo', 'VouSrNo', 'LineNo'];
 const CHALLAN_KEYS = [
-  'OutwardNo', 'outwardno', 'ChallanNo', 'challanno', 'ChalanNo', 'chalanno', 'VouNo', 'vouno',
+  'ChalNo', 'chalno', 'OutwardNo', 'outwardno', 'ChallanNo', 'challanno', 'ChalanNo', 'chalanno', 'VouNo', 'vouno',
   'VoucherNo', 'DocNo', 'docno', 'BillNo', 'billno', 'OutNo', 'outno',
 ];
 const DATE_KEYS = ['Date', 'date', 'OutwardDate', 'ChallanDate', 'VouDate', 'voudate', 'DocDate', 'BillDate'];
 const QTY_KEYS = ['Qty', 'qty', 'Mtrs', 'mtrs', 'Meter', 'Meters', 'Quantity', 'NetQty', 'Pcs'];
-const LOT_KEYS = ['LotNo', 'lotno', 'Lotno', 'LOTNO', 'DyeLotNo', 'MillLotNo'];
-const SHD_CODE_KEYS = ['ShdCode', 'shdcode', 'ShadeCode', 'shadecode'];
+const LOT_KEYS = ['ChartLotNo', 'chartlotno', 'LotNo', 'lotno', 'Lotno', 'LOTNO', 'DyeLotNo', 'MillLotNo'];
+const CHART_KEYS = ['ChartNo', 'chartno', 'CHARTNO'];
+const SHD_CODE_KEYS = ['soshdcode', 'SOShdCode', 'SoShdCode', 'ShdCode', 'shdcode', 'ShadeCode', 'shadecode'];
 const SHD_NAME_KEYS = ['ShdName', 'shdname', 'ShadeName', 'shadename', 'Shade', 'shade'];
 const MILL_KEYS = ['MillName', 'millname', 'Mill', 'PartyName', 'partyname', 'AccName', 'accname', 'ProcessHouse'];
 
+/** Outward line identity: outward uid|srno. */
+export const lineKeyOf = (r: { uid: string; srno: string }) => `${r.uid}|${r.srno}`;
+
 const toRow = (raw: any): OutwardRow | null => {
-  const uid = str(pick(raw, UID_KEYS));
-  const srno = str(pick(raw, SRNO_KEYS));
+  const uuid = str(pick(raw, UUID_KEYS));
+  // uuid present -> outward = uuid + usrno, and uid / srno are the SO line
+  const uid = uuid || str(pick(raw, UID_KEYS));
+  const srno = uuid ? str(pick(raw, USRNO_KEYS)) : str(pick(raw, SRNO_KEYS));
+  const soUid = uuid ? str(pick(raw, UID_KEYS)) : '';
+  const soSrNo = uuid ? str(pick(raw, SRNO_KEYS)) : '';
+  // payload values = the response's own uid / srno (old responses: same as uid / srno)
+  const saveUid = str(pick(raw, UID_KEYS));
+  const saveSrNo = str(pick(raw, SRNO_KEYS));
   const challanNo = str(pick(raw, CHALLAN_KEYS));
   if (!uid && !challanNo) return null;
   const qtyRaw = pick(raw, QTY_KEYS);
+  const chartNo = str(pick(raw, CHART_KEYS));
+  const shdCode = str(pick(raw, SHD_CODE_KEYS));
   return {
-    key: `${uid}|${srno}`,
+    key: `${uid}|${srno}|${chartNo}|${shdCode}`,
+    uuid,
     uid,
     srno,
-    challanNo: challanNo || (uid ? `#${uid}${srno ? `/${srno}` : ''}` : ''),
+    soUid,
+    soSrNo,
+    saveUid,
+    saveSrNo,
+    challanNo: challanNo || (uid ? `${uid}${srno ? `/${srno}` : ''}` : ''),
+    hasChallan: !!challanNo,
+    chartNo,
     date: parseAnyDate(pick(raw, DATE_KEYS)),
     qty: qtyRaw !== undefined ? num(qtyRaw) : null,
     lotNo: str(pick(raw, LOT_KEYS)),
-    shdCode: str(pick(raw, SHD_CODE_KEYS)),
+    shdCode,
     shdName: str(pick(raw, SHD_NAME_KEYS)),
     mill: str(pick(raw, MILL_KEYS)),
     raw,
@@ -90,9 +132,10 @@ const collectArrays = (node: any, depth = 0, out: any[][] = []): any[][] => {
 };
 
 /**
- * Normalises the outward_details response. Rows from every list are merged
- * on uid + srno, so a separate "saved lots" list fills the lot no. of the
- * matching outward line.
+ * Normalises the outward_details / outward_details_all / lotnos response.
+ * Rows are merged on their key (outward uid + srno + chart + shade), so the
+ * same line reached through two lists shows once, while every other line
+ * (same uuid, different usrno) shows separately.
  */
 export const toOutwardRows = (response: any): OutwardRow[] => {
   const body = response?.data ?? response;
@@ -108,7 +151,14 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
       }
       merged.set(row.key, {
         ...prev,
-        challanNo: prev.challanNo.startsWith('#') && !row.challanNo.startsWith('#') ? row.challanNo : prev.challanNo,
+        uuid: prev.uuid || row.uuid,
+        soUid: prev.soUid || row.soUid,
+        soSrNo: prev.soSrNo || row.soSrNo,
+        saveUid: prev.saveUid || row.saveUid,
+        saveSrNo: prev.saveSrNo || row.saveSrNo,
+        challanNo: !prev.hasChallan && row.hasChallan ? row.challanNo : prev.challanNo,
+        hasChallan: prev.hasChallan || row.hasChallan,
+        chartNo: prev.chartNo || row.chartNo,
         date: prev.date || row.date,
         qty: prev.qty ?? row.qty,
         lotNo: row.lotNo || prev.lotNo,
@@ -120,6 +170,21 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
   });
   return Array.from(merged.values());
 };
+
+/** Same outward line? outward uid (uuid) + srno (usrno), + chart when both know it. */
+export const sameOutward = (a: OutwardRow, b: OutwardRow) => {
+  if (!a.uid || !b.uid) return false;
+  if (a.uid !== b.uid || a.srno !== b.srno) return false;
+  return !a.chartNo || !b.chartNo || a.chartNo === b.chartNo;
+};
+
+/** Does this row belong to the given shade? (no shade info on the row = undecided -> null) */
+export const rowShadeMatch = (row: OutwardRow, shade: { ShdCode: string; ShdName: string }): boolean | null => {
+  if (row.shdCode) return normShadeKey(row.shdCode) === normShadeKey(shade.ShdCode);
+  if (row.shdName) return normShadeKey(row.shdName) === normShadeKey(shade.ShdName);
+  return null;
+};
+const normShadeKey = (v: any) => String(v ?? '').trim().toUpperCase();
 
 /** Response of save_outward_details: explicit false = failed, otherwise 2xx = saved. */
 export const outwardSaveOk = (response: any) => {

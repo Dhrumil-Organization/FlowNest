@@ -4,6 +4,8 @@
 // the current OLD/NEW ERP and the same rights used by the Home navigation.
 
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import { APP_NAVIGATION } from '@/src/core/navigation';
+import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, {
@@ -13,8 +15,6 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { APP_NAVIGATION } from '@/src/core/navigation';
-import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 
 const STORAGE_KEY = 'cached_notifications';
 
@@ -83,7 +83,7 @@ const parseParams = (value: unknown): Record<string, any> => {
 // HomeScreen builds ALL_APPS and then filters it using the "Mobile App"
 // children from user_menu_apps.  Keep the title -> route pairs here so a
 // notification can only enter a Legacy screen that the Home can actually show.
-const LEGACY_NOTIFICATION_ROUTES: Array<{ name: string; route: string }> = [
+const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Credit Limit Request', 'credit-limit'],
     ['Outstanding Days Request', 'outstanding-days-request'],
     // ['Receivables', 'Receivables-Screen'],
@@ -100,7 +100,7 @@ const LEGACY_NOTIFICATION_ROUTES: Array<{ name: string; route: string }> = [
     ['Inquiry', 'Inquiry'],
     ['Sudamo Production Order', 'sudamo-production-order'],
     ['New Account Request', 'new-account-request'],
-    ['Yarn Stock Verification', 'yarn-stock-verification'],
+    ['Yarn Stock Verification', 'yarnstockverification'],
     ['Sales Order(Inactive)', 'sales order-inactive'],
     ['Purchase Order Tracking', 'purchase-order-tracking'],
     ['Item Authorization', 'item-authorization'],

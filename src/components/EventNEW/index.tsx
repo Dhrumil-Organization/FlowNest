@@ -845,12 +845,21 @@ export default function NewEnquiryScreen({ token, username }) {
     }, 250);
   }, [loadingDesigns, hasMore, designSearchQuery, designsForSelectedItem, displayedDesigns.length]);
 
+  // Screen open -> Event + Property APIs (same calls as the legacy Event screen).
+  // NEW ERP: ErpSessionGate gives the token on the FIRST render, while
+  // user_prptype is still being read from storage — so this must also run when
+  // the prptype arrives (the old `[token]`-only dependency skipped the calls).
+  // Runs once per token + prptype; the session gate remounts the screen on a
+  // new login / property switch, which loads fresh again.
+  const initialLoadKey = useRef('');
   useEffect(() => {
-    if (!token) return;
-    if (!getUserPrptypeFromCache) return;
+    if (!token || !getUserPrptypeFromCache) return;
+    const key = `${token}|${getUserPrptypeFromCache}`;
+    if (initialLoadKey.current === key) return;
+    initialLoadKey.current = key;
     loadEvent(getUserPrptypeFromCache);
     loadPrp(getUserPrptypeFromCache);
-  }, [token]);
+  }, [token, getUserPrptypeFromCache, loadEvent, loadPrp]);
 
   async function checkConnectivity() {
     const result = await isOnline();

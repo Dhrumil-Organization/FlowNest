@@ -37,9 +37,13 @@ type Props = {
   username?: string;
   user?: any;
   visibleSections: DashboardDetailVisibility;
+  /** Cards shown at the head of column 1 (Monthly Target / Monthly Report). UI only. */
+  lead?: React.ReactNode[];
+  /** 1 / 2 / 3 columns from the dashboard's content width (ERP layout). UI only. */
+  columns?: 1 | 2 | 3;
 };
 
-export default function EmployDashboardSection({ activeTab, username, user, visibleSections }: Props) {
+export default function EmployDashboardSection({ activeTab, username, user, visibleSections, lead = [], columns = 1 }: Props) {
   const router = useRouter();
   const { isDesktop } = useDashboardResponsive();
   const [getUserPrptype, setUserPrptype] = useState('');
@@ -71,7 +75,7 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
   console.log('activeTab 111', activeTab);
 
   return (
-    <View style={[styles.wrap, isDesktop && styles.wrapDesktop]}>
+    <View style={styles.wrap}>
       {/* ─── Content ───
           Each child screen manages its own API call + pull-to-refresh, and
           scrolls internally (bounded height) since it sits inside the
@@ -84,6 +88,8 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
           getUserPrptype={getUserPrptype}
           visibleSections={visibleSections}
           showAmountControl={false}
+          lead={lead}
+          columns={columns}
         />
       )}
 
@@ -103,6 +109,8 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
           }}
           visibleSections={visibleSections}
           showAmountControl={false}
+          lead={lead}
+          columns={columns}
         />
       )}
     </View>
@@ -110,7 +118,8 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 14, borderRadius: 15, overflow: 'hidden', width: '100%' },
+  // No clipping / no own max-width: the dashboard grid owns width + columns now.
+  wrap: { width: '100%' },
   wrapDesktop: { maxWidth: 1260, alignSelf: 'center', borderRadius: 14 },
   // Bounded height so the internally-scrolling child dashboards (which each
   // have their own ScrollView + pull-to-refresh) behave inside the parent

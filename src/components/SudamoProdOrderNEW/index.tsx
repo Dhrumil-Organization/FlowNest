@@ -807,288 +807,145 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
 
 
 
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <View style={[
-                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-            ]}>
-                {item.isProcessed && (
-                    <View style={[
-                        crlimtreq_styles.stampContainerPOS,
-                    ]}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-                <View style={crlimtreq_styles.dateContainer}>
-                    <Text style={crlimtreq_styles.dateText}>{item.voudate}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardHeaderContainer}>
-                    <View style={crlimtreq_styles.cardHeader}>
-                        <Text style={crlimtreq_styles.cardHeaderText}>{item.vouno}</Text>
-                    </View>
-                </View>
-                {/* <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
-            </View> */}
-                <View style={crlimtreq_styles.cardContent}>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Item Name:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.itmname || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Type:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.ratetype || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Design:</Text>
-                            <Text style={crlimtreq_styles.valueBold}>
-                                {item.dsnname || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Shade:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.shdname || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Rate:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={
-                                    editableValuesSPO[item.uid]?.rate !== undefined
-                                        ? editableValuesSPO[item.uid].rate
-                                        : formatToIndianCurrency(item.rate || '0')
-                                }
-                                onChangeText={(text) => handleEdit(item.uid, 'rate', text)}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={
-                                    editableValuesSPO[item.uid]?.qty !== undefined
-                                        ? editableValuesSPO[item.uid].qty
-                                        : formatToIndianCurrency(item.qty || '0')
-                                }
-                                onChangeText={(text) => handleEdit(item.uid, 'qty', text)}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View>
-                    {/* <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Production Qty:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={
-                                editableValuesSPO[item.uid]?.qty !== undefined
-                                    ? editableValuesSPO[item.uid].qty
-                                    : formatToIndianCurrency(item.qty || '0')
-                            }
-                            onChangeText={(text) => handleEdit(item.uid, 'qty', text)}
-                            keyboardType="numeric"
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Order Qty.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.orderqty || ''}
-                        </Text>
-                    </View>
-                </View> */}
+    const num = (value: any) => {
+        const n = Number(String(value ?? '').replace(/,/g, ''));
+        return Number.isFinite(n) ? n : 0;
+    };
 
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>SExe:</Text>
-                            <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
-                            <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
-                        </View>
-                    </View>
+    const fmtQty = (value: any) => num(value).toLocaleString('en-IN', { maximumFractionDigits: 3 });
+    const fmtMoney = (value: any) => `₹${num(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const firstValue = (item: any, keys: string[], fallback: any = '') => {
+        for (const key of keys) {
+            const value = item?.[key];
+            if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+        }
+        return fallback;
+    };
+    const safeArray = (value: any) => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string' && value.trim()) {
+            try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch (_) { return []; }
+        }
+        return [];
+    };
 
-                    {/* <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>SExe:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                </View> */}
+    const renderCard = ({ item }: { item: any }) => {
+        const finishedQty = firstValue(item, ['finished_qty', 'finishedqty', 'finishedQty', 'orderqty'], '');
+        const greigeQty = firstValue(item, ['greige_qty', 'greigeqty', 'greigeQty', 'qty'], '');
+        const stockQty = firstValue(item, ['stock_qty', 'stockqty', 'stockQty'], '');
+        const greigeCost = firstValue(item, ['greige_cost', 'greigecost', 'greigePerM', 'planned_cost'], '');
+        const finishedCost = firstValue(item, ['finished_cost', 'finishedcost', 'finishedPerM', 'finalCost'], '');
+        const netBack = firstValue(item, ['sale_netback', 'sale_net_back', 'rateNet', 'weighted_sale_netback'], '');
+        const marginM = firstValue(item, ['planned_margin', 'margin_m', 'marginM'], '');
+        const marginPct = firstValue(item, ['planned_margin_pct', 'margin_pct', 'marginPct'], '');
+        const costUid = firstValue(item, ['costuid', 'cost_uid', 'design_costing_id'], '');
+        const poOwner = firstValue(item, ['po_owner', 'poowner', 'exec', 'sexename'], '');
+        const planned = item?.planned && typeof item.planned === 'object' ? item.planned : {};
+        const lines = safeArray(firstValue(item, ['so_lines', 'solines', 'chosen'], planned?.lines || []));
+        const belowCost = Boolean(item?.below_cost || item?.belowCost || planned?.below || (marginM !== '' && num(marginM) < 0));
+        const hasCommercial = greigeCost !== '' || netBack !== '' || marginM !== '' || lines.length > 0 || stockQty !== '';
+        const isStock = lines.length === 0 && num(stockQty) > 0;
 
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={
-                                    editableValuesSPO[item.uid]?.shkperc !== undefined
-                                        ? editableValuesSPO[item.uid].shkperc
-                                        : formatToIndianCurrency(item.shkperc || '0')
-                                }
-                                onChangeText={(text) => handleEdit(item.uid, 'shkperc', text)}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Remark:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.remark || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={editableValuesSPO[item.uid]?.aremark || ''}
-                                onChangeText={(text) => handleEdit(item.uid, 'aremark', text)}
-                            // keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth. Date:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.authoriseddate || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Job Qty:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>
-                                {item.jobqty || 'N/A'}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Self Prod. Qty:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.selfprodqty || 'N/A'}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth. by:</Text>
-                            <Text style={crlimtreq_styles.valueBold}>
-                                {item.authorisedby || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Status:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.authstatus || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Expected Date:</Text>
-                            <Text style={crlimtreq_styles.valueBold}>
-                                {item.expdate || 'N/A'}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            {/* <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.authstatus || ''}
-                        </Text> */}
-                        </View>
-                    </View>
-
-                    {item.partyList?.length > 0 && (
-                        <View style={crlimtreq_styles.partyContainer}>
-
-                            <View style={crlimtreq_styles.partyHeader}>
-                                <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
-                                    Job Work Party
-                                </Text>
-
-                                <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
-                                    Qty
-                                </Text>
+        return (
+            <View style={[crlimtreq_styles.gridCardWrapper, { paddingHorizontal: 4 }]}> 
+                <View style={[
+                    crlimtreq_styles.card,
+                    { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: belowCost ? '#E9B3B0' : '#D9E2E8', backgroundColor: '#FFFFFF' },
+                    !isConnected && crlimtreq_styles.disabledCard,
+                    item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : null
+                ]}>
+                    {item.isProcessed && (
+                        <View style={crlimtreq_styles.stampContainerPOS}>
+                            <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
+                                <Text style={crlimtreq_styles.stampText}>{item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}</Text>
                             </View>
-
-                            <ScrollView
-                                style={{ maxHeight: 150 }}
-                                nestedScrollEnabled={true}
-                                showsVerticalScrollIndicator={true}
-                            >
-                                {item.partyList.map((party, index) => (
-                                    <View
-                                        key={index}
-                                        style={crlimtreq_styles.partyRow}
-                                    >
-                                        <Text
-                                            style={crlimtreq_styles.partyName1}
-                                            numberOfLines={2}
-                                        >
-                                            {party.Partyname}
-                                        </Text>
-
-                                        <Text style={crlimtreq_styles.partyQty}>
-                                            {party.qty}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </ScrollView>
-
                         </View>
                     )}
 
-                </View>
-                <View style={crlimtreq_styles.cardActions}>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                    </TouchableOpacity>
-                    {/* <TouchableOpacity
-                    onPress={() => {
-                        if (isConnected && !item.isProcessed) {
-                            // const encodedData = encodeData(item.prpcode, item.yearno, item.costuid, 'production_order_sudo', token);
-                            const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`; // URL-encode
-                            console.log("🔵 Encoded URL:", url); // Example: "https://ind.tms-webapp.com/YWJjLzIwMjUvMTIzL3Byb2R1Y3Rpb25fb3JkZXJfc3Vkby90b2tlbjEyMw=="
-                            Linking.openURL(url);
+                    <View style={{ padding: 14, backgroundColor: '#F7FAFC', borderBottomWidth: 1, borderBottomColor: '#E6EDF2' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 17, fontWeight: '800', color: '#15232E' }}>{item.dsnname || item.orderdesign || 'Production Order'}</Text>
+                                <Text style={{ marginTop: 3, fontSize: 12, color: '#667784' }}>{item.itmname || ''}{item.shdname ? ` · ${item.shdname}` : ''}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#006A78' }}>{item.vouno || ''}</Text>
+                                <Text style={{ marginTop: 2, fontSize: 10.5, color: '#7A8994' }}>{item.voudate || ''}</Text>
+                            </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                            <View style={{ backgroundColor: isStock ? '#F1EAF8' : '#E4F1E8', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: isStock ? '#72508F' : '#2A6044' }}>{isStock ? 'STOCK' : 'SO-LINKED'}</Text>
+                            </View>
+                            {poOwner ? <View style={{ backgroundColor: '#EDF3F7', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}><Text style={{ fontSize: 10, fontWeight: '700', color: '#51636F' }}>PO OWNER · {poOwner}</Text></View> : null}
+                            {belowCost ? <View style={{ backgroundColor: '#FDE9E7', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}><Text style={{ fontSize: 10, fontWeight: '900', color: '#B83A32' }}>BELOW COST</Text></View> : null}
+                        </View>
+                    </View>
 
-                        }
-                    }}
-                    disabled={!isConnected || item.isProcessed}
-                >
-                    <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                </TouchableOpacity> */}
-                    <TouchableOpacity
-                        onPress={() => openProductionCosting(item)}
-                        disabled={!isConnected || item.isProcessed}
-                    >
-                        <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                    </TouchableOpacity>
+                    <View style={{ padding: 14 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#7A8994', letterSpacing: 0.5, marginBottom: 8 }}>PRODUCTION</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <View style={{ flex: 1, backgroundColor: '#F7FAFC', borderRadius: 10, padding: 10 }}><Text style={{ fontSize: 9.5, color: '#7A8994', fontWeight: '700' }}>FINISHED</Text><Text style={{ marginTop: 3, fontSize: 15, fontWeight: '800', color: '#172630' }}>{finishedQty !== '' ? `${fmtQty(finishedQty)} m` : '—'}</Text></View>
+                            <View style={{ flex: 1, backgroundColor: '#F7FAFC', borderRadius: 10, padding: 10 }}><Text style={{ fontSize: 9.5, color: '#7A8994', fontWeight: '700' }}>GREIGE</Text><Text style={{ marginTop: 3, fontSize: 15, fontWeight: '800', color: '#172630' }}>{greigeQty !== '' ? `${fmtQty(greigeQty)} m` : '—'}</Text></View>
+                            {stockQty !== '' && num(stockQty) > 0 ? <View style={{ flex: 1, backgroundColor: '#F5F0F9', borderRadius: 10, padding: 10 }}><Text style={{ fontSize: 9.5, color: '#72508F', fontWeight: '700' }}>STOCK</Text><Text style={{ marginTop: 3, fontSize: 15, fontWeight: '800', color: '#72508F' }}>{fmtQty(stockQty)} m</Text></View> : null}
+                        </View>
 
+                        {hasCommercial ? <View style={{ marginTop: 12, borderWidth: 1, borderColor: belowCost ? '#E9B3B0' : '#DCE5EA', borderRadius: 11, padding: 11, backgroundColor: belowCost ? '#FFF9F8' : '#FBFCFD' }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#71808B', letterSpacing: 0.45 }}>COSTING VS SALE · PER GREIGE METRE · PLANNED</Text>
+                            <View style={{ flexDirection: 'row', marginTop: 9 }}>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 8.5, color: '#7A8994', fontWeight: '700' }}>COSTING</Text><Text style={{ marginTop: 2, fontSize: 14, fontWeight: '800', color: '#172630' }}>{greigeCost !== '' ? fmtMoney(greigeCost) : '—'}</Text></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 8.5, color: '#7A8994', fontWeight: '700' }}>WTD AVG SALE · NET-BACK</Text><Text style={{ marginTop: 2, fontSize: 14, fontWeight: '800', color: '#172630' }}>{netBack !== '' ? fmtMoney(netBack) : '—'}</Text></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 8.5, color: '#7A8994', fontWeight: '700' }}>PLANNED MARGIN</Text><Text style={{ marginTop: 2, fontSize: 14, fontWeight: '800', color: marginM !== '' && num(marginM) < 0 ? '#B83A32' : '#28724D' }}>{marginM !== '' ? `${fmtMoney(marginM)}${marginPct !== '' ? ` · ${num(marginPct).toFixed(1)}%` : ''}` : '—'}</Text></View>
+                            </View>
+                            {belowCost ? <View style={{ marginTop: 9, backgroundColor: '#FDE9E7', borderRadius: 7, padding: 8 }}><Text style={{ fontSize: 10.5, fontWeight: '800', color: '#B83A32' }}>⚠ Weighted sale below costing · approval allowed, flagged</Text></View> : null}
+                            {num(stockQty) > 0 ? <Text style={{ marginTop: 7, fontSize: 10, fontWeight: '700', color: '#72508F' }}>Stock {fmtQty(stockQty)} m carved out · no realisation yet</Text> : null}
+                        </View> : null}
 
+                        {lines.length > 0 ? <View style={{ marginTop: 12 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#7A8994', letterSpacing: 0.5, marginBottom: 5 }}>SO ALLOCATION</Text>
+                            {lines.slice(0, 6).map((line: any, index: number) => {
+                                const q = firstValue(line, ['qty', 'finished_qty'], '');
+                                const ge = firstValue(line, ['greigeEq', 'greige_eq'], '');
+                                const price = firstValue(line, ['price', 'rate'], '');
+                                const ownMargin = firstValue(line, ['ownMargin', 'margin'], '');
+                                return <View key={`${line.so || line.vouno || index}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: index < Math.min(lines.length, 6) - 1 ? 1 : 0, borderBottomColor: '#EDF1F4' }}>
+                                    <View style={{ flex: 1 }}><Text style={{ fontSize: 11, fontWeight: '800', color: '#253640' }}>{line.so || line.vouno || `SO ${index + 1}`}</Text><Text style={{ marginTop: 2, fontSize: 9.5, color: '#71808B' }}>{q !== '' ? `${fmtQty(q)} m fin` : ''}{ge !== '' ? ` = ${fmtQty(ge)} m greige` : ''}</Text></View>
+                                    <View style={{ alignItems: 'flex-end' }}><Text style={{ fontSize: 10.5, fontWeight: '700', color: '#253640' }}>{price !== '' ? `${fmtMoney(price)}/m` : ''}</Text>{ownMargin !== '' ? <Text style={{ marginTop: 2, fontSize: 9.5, fontWeight: '800', color: num(ownMargin) < 0 ? '#B83A32' : '#28724D' }}>{num(ownMargin) >= 0 ? '+' : ''}{fmtMoney(ownMargin)}</Text> : null}</View>
+                                </View>;
+                            })}
+                        </View> : null}
 
+                        <View style={{ marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: '#E7EDF1' }}>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#7A8994', fontWeight: '700' }}>COST UID</Text><Text style={{ marginTop: 2, fontSize: 11.5, fontWeight: '800', color: '#253640' }}>{costUid || '—'}</Text></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#7A8994', fontWeight: '700' }}>FINISHED COST</Text><Text style={{ marginTop: 2, fontSize: 11.5, fontWeight: '800', color: '#253640' }}>{finishedCost !== '' ? `${fmtMoney(finishedCost)}/m` : '—'}</Text></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#7A8994', fontWeight: '700' }}>SHRINK</Text><Text style={{ marginTop: 2, fontSize: 11.5, fontWeight: '800', color: '#253640' }}>{firstValue(item, ['shkperc', 'shrink_per', 'shrinkPer'], '') !== '' ? `${fmtQty(firstValue(item, ['shkperc', 'shrink_per', 'shrinkPer'], ''))}%` : '—'}</Text></View>
+                            </View>
+                        </View>
+
+                        <View style={{ marginTop: 12, backgroundColor: '#F8FAFB', borderRadius: 10, padding: 10 }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#7A8994', marginBottom: 7 }}>AUTHORIZATION VALUES</Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#667784' }}>Rate</Text><RNTextInput style={[crlimtreq_styles.editableValueBlack, { marginTop: 3 }]} value={editableValuesSPO[item.uid]?.rate !== undefined ? editableValuesSPO[item.uid].rate : formatToIndianCurrency(item.rate || '0')} onChangeText={(text) => handleEdit(item.uid, 'rate', text)} keyboardType="numeric" /></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#667784' }}>Production Qty</Text><RNTextInput style={[crlimtreq_styles.editableValueBlack, { marginTop: 3 }]} value={editableValuesSPO[item.uid]?.qty !== undefined ? editableValuesSPO[item.uid].qty : formatToIndianCurrency(item.qty || '0')} onChangeText={(text) => handleEdit(item.uid, 'qty', text)} keyboardType="numeric" /></View>
+                                <View style={{ flex: 1 }}><Text style={{ fontSize: 9.5, color: '#667784' }}>Shrink %</Text><RNTextInput style={[crlimtreq_styles.editableValueBlack, { marginTop: 3 }]} value={editableValuesSPO[item.uid]?.shkperc !== undefined ? editableValuesSPO[item.uid].shkperc : formatToIndianCurrency(item.shkperc || '0')} onChangeText={(text) => handleEdit(item.uid, 'shkperc', text)} keyboardType="numeric" /></View>
+                            </View>
+                            <Text style={{ fontSize: 9.5, color: '#667784', marginTop: 8 }}>Authorization Remark</Text>
+                            <RNTextInput style={[crlimtreq_styles.editableValueBlack, { marginTop: 3 }]} value={editableValuesSPO[item.uid]?.aremark || ''} onChangeText={(text) => handleEdit(item.uid, 'aremark', text)} />
+                        </View>
+
+                        {item.partyList?.length > 0 ? <View style={{ marginTop: 12 }}><Text style={{ fontSize: 10, fontWeight: '800', color: '#7A8994', marginBottom: 5 }}>JOB WORK PARTY</Text><ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled showsVerticalScrollIndicator>{item.partyList.map((party: any, index: number) => <View key={index} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#EDF1F4' }}><Text style={{ flex: 1, fontSize: 10.5, color: '#354751' }}>{party.Partyname}</Text><Text style={{ fontSize: 10.5, fontWeight: '800', color: '#354751' }}>{party.qty}</Text></View>)}</ScrollView></View> : null}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: '#E6EDF2', backgroundColor: '#FBFCFD' }}>
+                        <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed} style={{ flex: 1, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: '#E5A6A2', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '800', color: !isConnected || item.isProcessed ? '#B9C1C6' : '#C43F36' }}>Reject</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={() => openProductionCosting(item)} disabled={!isConnected || item.isProcessed} style={{ minHeight: 44, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, borderColor: '#A9C7D4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '800', color: !isConnected || item.isProcessed ? '#B9C1C6' : '#18728A' }}>View Costing</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed} style={{ flex: 1.4, minHeight: 44, borderRadius: 9, backgroundColor: !isConnected || item.isProcessed ? '#C8D1D5' : '#28724D', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>Authorize</Text></TouchableOpacity>
+                    </View>
                 </View>
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
         <View style={crlimtreq_styles.gridCardWrapper}>

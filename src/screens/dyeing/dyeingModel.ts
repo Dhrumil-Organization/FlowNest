@@ -61,6 +61,41 @@ export const STATUS_RANK: Record<ShadeStatus, number> = {
   'Job inward': 5,
 };
 
+/**
+ * FIXED status sequence of one shade (Priority status sheet):
+ *
+ *   (none) → Sent for job → Dying → Finish → Job inward
+ *                                          ↘ Lorry Cut
+ *
+ * Only the NEXT step of the shade's latest status can be sent — no skipping,
+ * no going back, no repeating the same status. After Finish, either
+ * Job inward OR Lorry Cut can come. Job inward / Lorry Cut are final.
+ * To go back, the latest status has to be removed first (one at a time).
+ */
+export const NEXT_STATUSES: Record<ShadeStatus | 'NONE', ShadeStatus[]> = {
+  NONE: ['Sent for job'],
+  'Sent for job': ['Dying'],
+  'Dying': ['Finish'],
+  'Finish': ['Job inward', 'Lorry Cut'],
+  'Job inward': [],
+  'Lorry Cut': [],
+};
+
+export const nextStatusesOf = (current: ShadeStatus | null): ShadeStatus[] =>
+  NEXT_STATUSES[current ?? 'NONE'] ?? [];
+
+export const canMoveTo = (current: ShadeStatus | null, target: ShadeStatus) =>
+  nextStatusesOf(current).includes(target);
+
+/** Display / sequence order (index) — used as a tie-breaker when two events share a date. */
+export const STATUS_SEQ: Record<ShadeStatus, number> = {
+  'Sent for job': 1,
+  'Dying': 2,
+  'Finish': 3,
+  'Job inward': 4,
+  'Lorry Cut': 4,
+};
+
 export const LORRY_CUT_REASONS = [
   'White spots',
   'Patchiness',
@@ -233,6 +268,8 @@ export type DyeEventRow = DyeEvent & {
   DsnName: string;
   RootLotId: number | string; // lot the material was first sent under (split lots share it)
   ChainLotCount: number; // active lots sharing RootLotId
+  LotNos: string; // mill lot nos. saved on this shade's outwards (GRYOutD1.ChartLotNo), "3365/3378"
+  OutwardNos: string; // outward challan nos. of this shade (FAMSAL.ChalNo), "00035/00038"
 };
 
 /* -------------------------------------------------------------------------- */
@@ -463,6 +500,8 @@ export const toEventRow = (raw: any): DyeEventRow | null => {
     DsnName: String(raw?.DsnName ?? ''),
     RootLotId: raw?.RootLotId ?? raw?.LotId,
     ChainLotCount: Math.max(1, num(raw?.ChainLotCount) || 1),
+    LotNos: String(raw?.LotNos ?? '').trim(),
+    OutwardNos: String(raw?.OutwardNos ?? '').trim(),
     Source: raw?.Source ?? null,
   };
 };

@@ -16,7 +16,9 @@
 // in this shade" check, ChalNo lookup. The same uuid can come with several
 // usrno (one challan, many lines) — every line is its own row.
 // SAVE / REMOVE PAYLOAD: `uid` + `srno` are sent EXACTLY as the API's own
-// `uid` / `srno` of the picked row (saveUid / saveSrNo) — NOT uuid / usrno.
+// `uid` / `srno` of the picked row (saveUid / saveSrNo), PLUS `uuid` and
+// `usrno` exactly as received (payloadUuid / payloadUsrno) — add, update
+// (edit lot) and delete (remove_lotno) all send the same four keys.
 // `soshdcode` = the SO shade the line / lot belongs to (shade-wise split).
 // Old responses without `uuid` still read UId / SrNo as the outward.
 //
@@ -36,6 +38,8 @@ export type OutwardRow = {
   soSrNo: string; // SO line SrNo (API `srno` when uuid is present)
   saveUid: string; // API `uid` as received — sent as `uid` in save_outward_details / remove_lotno
   saveSrNo: string; // API `srno` as received — sent as `srno` in save_outward_details / remove_lotno
+  payloadUuid: any; // API `uuid` exactly as received (type kept) — sent as `uuid`
+  payloadUsrno: any; // API `usrno` exactly as received (type kept) — sent as `usrno`
   challanNo: string; // shown as "Outward No." (ChalNo when the API has it, else UId/SrNo)
   hasChallan: boolean; // challanNo came from the API (not the UId/SrNo fallback)
   chartNo: string; // GRYOutD1.ChartNo of this outward line (save_outward_details needs it)
@@ -93,6 +97,8 @@ const toRow = (raw: any): OutwardRow | null => {
   // payload values = the response's own uid / srno (old responses: same as uid / srno)
   const saveUid = str(pick(raw, UID_KEYS));
   const saveSrNo = str(pick(raw, SRNO_KEYS));
+  const payloadUuid = pick(raw, UUID_KEYS) ?? '';
+  const payloadUsrno = pick(raw, USRNO_KEYS) ?? '';
   const challanNo = str(pick(raw, CHALLAN_KEYS));
   if (!uid && !challanNo) return null;
   const qtyRaw = pick(raw, QTY_KEYS);
@@ -107,6 +113,8 @@ const toRow = (raw: any): OutwardRow | null => {
     soSrNo,
     saveUid,
     saveSrNo,
+    payloadUuid,
+    payloadUsrno,
     challanNo: challanNo || (uid ? `${uid}${srno ? `/${srno}` : ''}` : ''),
     hasChallan: !!challanNo,
     chartNo,
@@ -156,6 +164,8 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
         soSrNo: prev.soSrNo || row.soSrNo,
         saveUid: prev.saveUid || row.saveUid,
         saveSrNo: prev.saveSrNo || row.saveSrNo,
+        payloadUuid: prev.payloadUuid !== '' ? prev.payloadUuid : row.payloadUuid,
+        payloadUsrno: prev.payloadUsrno !== '' ? prev.payloadUsrno : row.payloadUsrno,
         challanNo: !prev.hasChallan && row.hasChallan ? row.challanNo : prev.challanNo,
         hasChallan: prev.hasChallan || row.hasChallan,
         chartNo: prev.chartNo || row.chartNo,

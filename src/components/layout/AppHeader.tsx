@@ -158,116 +158,170 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   const displayTitle = isGreyPackingRoute ? 'Grey Packing' : title;
   const displayEyebrow = isGreyPackingRoute ? 'SUDAMO TEXTILE ERP' : eyebrow;
 
+  // COMPACT RESPONSIVE HEADER: same content & actions as before (grey-packing
+  // back button, eyebrow, title, subtitle, version, property switch, `right`
+  // slot, sign out, profile avatar) — just tighter spacing, one-line meta row
+  // and icon buttons sized per breakpoint so more of every screen is visible.
+  const size = isDesktop ? 'desktop' : isTablet ? 'tablet' : 'mobile';
+  const iconSize = isDesktop ? 20 : 18;
+  const showMeta = !isGreyPackingRoute && (!!appVersion || switchUserLogin);
+
   return <View style={s.safe}>
     <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-    <View style={[s.header, isTablet && s.headerTablet, isDesktop && s.headerDesktop, isGreyPackingRoute && s.headerCompact]}>
+    <View style={[s.header, size === 'tablet' && s.headerTablet, size === 'desktop' && s.headerDesktop, isGreyPackingRoute && s.headerCompact]}>
       {isGreyPackingRoute && (
         <TouchableOpacity
           onPress={() => router.back()}
-          style={s.backButton}
+          style={[s.iconBtn, size === 'desktop' && s.iconBtnDesktop, s.backButton]}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <Icon name="arrow-back-ios-new" size={19} color="#fff" />
+          <Icon name="arrow-back-ios-new" size={iconSize - 1} color="#fff" />
         </TouchableOpacity>
       )}
 
       <View style={s.left}>
-      <Text style={[s.eyebrow, isTablet && s.eyebrowTablet]} numberOfLines={1}>{displayEyebrow}</Text>
+        <Text style={[s.eyebrow, size === 'desktop' && s.eyebrowDesktop]} numberOfLines={1}>{displayEyebrow}</Text>
 
-      {displayTitle !== 'Permission Manager' && (
-        <Text
-          style={[s.title, isTablet && s.titleTablet, isDesktop && s.titleDesktop, isGreyPackingRoute && s.titleCompact]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-        >
-          {displayTitle}
-        </Text>
-      )}
+        {displayTitle !== 'Permission Manager' && (
+          <Text
+            style={[s.title, size === 'tablet' && s.titleTablet, size === 'desktop' && s.titleDesktop, isGreyPackingRoute && s.titleCompact]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {displayTitle}
+          </Text>
+        )}
 
-      {!isGreyPackingRoute && !!subtitle && <Text style={[s.subtitle, isTablet && s.subtitleTablet]} numberOfLines={1}>{subtitle}</Text>}
-      {!isGreyPackingRoute && (
-        <View style={s.versionRow}>
-          <Text style={[s.subtitle, s.versionText, isTablet && s.subtitleTablet]} numberOfLines={1}>Version: {appVersion}</Text>
+        {!isGreyPackingRoute && !!subtitle && <Text style={[s.subtitle, size !== 'mobile' && s.subtitleWide]} numberOfLines={1}>{subtitle}</Text>}
 
-          {switchUserLogin && (
-            <View style={s.propertySwitchRow}>
-              <Text style={s.propertySwitchText} numberOfLines={1}>
-                {switchingProperty
-                  ? 'Switching...'
-                  : currentProperty
-                    ? PROPERTY_LABELS[currentProperty]
-                    : 'Switch Property'}
-              </Text>
-              <Switch
-                value={currentProperty === 'rayons'}
-                onValueChange={(value) =>
-                  void switchProperty(value ? 'rayons' : 'sudamo_knits')
-                }
-                disabled={switchingProperty || !currentProperty}
-                trackColor={{ false: '#3A5068', true: T.copper }}
-                thumbColor="#FFFFFF"
-                style={s.propertySwitchToggle}
-              />
-            </View>
-          )}
-        </View>
-      )}
-    </View>
-      <View style={[s.right, isTablet && s.rightTablet]}>
+        {showMeta && (
+          <View style={s.versionRow}>
+            {!!appVersion && (
+              <View style={s.versionChip}>
+                <Text style={s.versionText} numberOfLines={1}>v{appVersion}</Text>
+              </View>
+            )}
+
+            {switchUserLogin && (
+              <View style={s.propertySwitchRow}>
+                <Text style={s.propertySwitchText} numberOfLines={1}>
+                  {switchingProperty
+                    ? 'Switching...'
+                    : currentProperty
+                      ? PROPERTY_LABELS[currentProperty]
+                      : 'Switch Property'}
+                </Text>
+                <Switch
+                  value={currentProperty === 'rayons'}
+                  onValueChange={(value) =>
+                    void switchProperty(value ? 'rayons' : 'sudamo_knits')
+                  }
+                  disabled={switchingProperty || !currentProperty}
+                  trackColor={{ false: '#3A5068', true: T.copper }}
+                  thumbColor="#FFFFFF"
+                  style={s.propertySwitchToggle}
+                />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      <View style={[s.right, size !== 'mobile' && s.rightWide]}>
         {right}
-        {showSignOut && <TouchableOpacity onPress={signOut} style={[s.signOut, isTablet && s.signOutTablet]}>
-          {/* <Text style={s.signOutText}>Sign out</Text> */}
-          <Icon name="logout" size={20} color="#fff" />
+        {showSignOut && <TouchableOpacity
+          onPress={signOut}
+          style={[s.iconBtn, size === 'desktop' && s.iconBtnDesktop]}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Icon name="logout" size={iconSize} color="#fff" />
         </TouchableOpacity>}
         <TouchableOpacity
           onPress={() => router.push('/new/profile' as any)}
-          style={[s.avatar, isTablet && s.avatarTablet]}
+          style={[s.avatar, size === 'desktop' && s.avatarDesktop]}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Open profile"
         >
-          <Text style={s.avatarText}>{initials}</Text>
+          <Text style={[s.avatarText, size === 'desktop' && s.avatarTextDesktop]}>{initials}</Text>
         </TouchableOpacity>
-      </View></View>
+      </View>
+    </View>
   </View>
 }
-// FIX: `title`/`eyebrow` previously had no `numberOfLines`, so a long title
-// shown alongside wide `right` content (e.g. the "Sync Registry" pill next
-// to "Sign out") could squeeze the left column enough to wrap "Business
-// Dashboard" onto 3 lines. `numberOfLines={1}` + `adjustsFontSizeToFit` on
-// the title makes it shrink to fit instead of wrapping; `right` gets
-// `flexShrink:0` so it can no longer be the thing that gets squeezed
-// unpredictably.
+
+// Layout notes: title is single-line + shrink-to-fit, the right cluster is
+// flexShrink:0 so it's never squeezed, and the left column has minWidth:0 so
+// long titles truncate instead of wrapping. Font sizes below are the design
+// sizes — the ERP font hook scales them per screen width.
 const s = StyleSheet.create({
   safe: { backgroundColor: T.nav },
-  headerTablet: { paddingHorizontal: 16, paddingTop: 13, paddingBottom: 6 },
-  headerDesktop: { paddingHorizontal: 22 },
-  safeDummy: {},
-  header: { backgroundColor: T.nav, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 5, flexDirection: 'row', alignItems: 'center' }, headerCompact: { paddingTop: 10, paddingBottom: 12, paddingHorizontal: 18 }, left: { flex: 1, paddingRight: 12, minWidth: 0 }, eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2, color: '#8EA6BA' }, title: { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 }, titleCompact: { fontSize: 22, marginTop: 2 }, subtitle: { fontSize: 13, fontWeight: '700', color: '#9FB0BF', marginTop: 6 },
-  eyebrowTablet: { fontSize: 9 },
-  titleTablet: { fontSize: 22, marginTop: 3 },
-  titleDesktop: { fontSize: 28 },
-  subtitleTablet: { fontSize: 11, marginTop: 4 },
-  versionRow: { flexDirection: 'row', alignItems: 'center', marginTop: -6, gap: 10 },
-  versionText: { marginTop: 0, flexShrink: 0 },
-  propertySwitchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  propertySwitchText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  propertySwitchToggle: { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  rightTablet: { gap: 6 },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    borderWidth: 1.5,
+  header: {
+    backgroundColor: T.nav,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  headerTablet: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
+  headerDesktop: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12 },
+  headerCompact: { paddingTop: 8, paddingBottom: 10 },
+  left: { flex: 1, paddingRight: 10, minWidth: 0 },
+  eyebrow: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#8EA6BA' },
+  eyebrowDesktop: { fontSize: 10, letterSpacing: 1.6 },
+  title: { fontSize: 19, lineHeight: 24, fontWeight: '800', color: '#fff', marginTop: 1, letterSpacing: -0.2 },
+  titleTablet: { fontSize: 21, lineHeight: 26 },
+  titleDesktop: { fontSize: 22, lineHeight: 28 },
+  titleCompact: { fontSize: 18, lineHeight: 23 },
+  subtitle: { fontSize: 11, fontWeight: '500', color: '#9FB0BF', marginTop: 1 },
+  subtitleWide: { fontSize: 12 },
+  versionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, minHeight: 20 },
+  versionChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+    flexShrink: 0,
+  },
+  versionText: { fontSize: 10, fontWeight: '600', color: '#A9BBCA' },
+  propertySwitchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minWidth: 0, height: 20 },
+  propertySwitchText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', flexShrink: 1 },
+  propertySwitchToggle: { transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  rightWide: { gap: 8 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1,
     borderColor: '#2A4055',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  signOut: { borderWidth: 1.5, borderColor: '#2A4055', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 12 },
-  signOutTablet: { borderRadius: 11, paddingHorizontal: 9, paddingVertical: 9 }, signOutText: { color: '#fff', fontWeight: '900', fontSize: 13 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' }, avatarText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }
+  iconBtnDesktop: { width: 38, height: 38, borderRadius: 12 },
+  backButton: { marginRight: 10 },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: T.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  avatarDesktop: { width: 38, height: 38, borderRadius: 19 },
+  avatarText: { color: '#fff', fontWeight: '700', fontSize: 13, letterSpacing: 0.3 },
+  avatarTextDesktop: { fontSize: 14 },
 });

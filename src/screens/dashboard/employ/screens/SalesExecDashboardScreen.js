@@ -684,6 +684,14 @@ import {
 } from "../components/SharedComponents";
 import TourOverlay from "../components/TourOverlay";
 import { SALES_EXEC_DASHBOARD_TOUR } from "./DashboardTours";
+import { DashboardGrid, Slot } from "@/src/components/dashboard/DashboardGrid";
+
+// ERP-dashboard columns for My View (UI only). 'lead' = Monthly Target +
+// Monthly Report from DashboardScreen; 'top' = executive chips / profile.
+const MY_VIEW_LAYOUT = {
+  2: [["lead", "top", "sales"], ["collection", "outstanding"]],
+  3: [["lead", "top", "sales"], ["collection"], ["outstanding"]],
+};
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
 const ROW_HEIGHT = 70;
@@ -746,7 +754,11 @@ export default function SalesExecDashboardScreen({
   username,
   visibleSections = { sales: true, production: false, collection: true, outstanding: true },
   showAmountControl = true,
+  lead, // array of cards -> embedded in the Business Dashboard grid (UI only)
+  columns,
 }) {
+  const embedded = Array.isArray(lead);
+  const leadNodes = embedded ? lead : [];
   const router = useRouter();
   const routerParams = useLocalSearchParams();
   const routeParams = route?.params || route || {};
@@ -966,24 +978,24 @@ export default function SalesExecDashboardScreen({
   );
 
   if (loading) {
-    return <SalesExecDashboardSkeleton showProfile={!isMyView} />;
+    return <>{leadNodes}<SalesExecDashboardSkeleton showProfile={!isMyView} /></>;
   }
 
   if (error) {
     return (
-      <ErrorView
+      <>{leadNodes}<ErrorView
         message={error}
         onRetry={() => load(getUserPrptype, { initial: true })}
-      />
+      /></>
     );
   }
 
   if (!data) {
     return (
-      <ErrorView
+      <>{leadNodes}<ErrorView
         message="Executive dashboard data is unavailable."
         onRetry={() => load(getUserPrptype, { initial: true })}
-      />
+      /></>
     );
   }
 
@@ -992,7 +1004,7 @@ export default function SalesExecDashboardScreen({
 
   if (isMyView && data?.scope_selection_required) {
     return (
-      <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+      <>{leadNodes}<SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
         <ScrollView contentContainerStyle={styles.selectorPage}>
           <SectionCard style={styles.selectorCard}>
             <Text style={styles.selectorTitle}>My View · Select Executive</Text>
@@ -1020,7 +1032,7 @@ export default function SalesExecDashboardScreen({
             </View>
           </SectionCard>
         </ScrollView>
-      </SafeAreaView>
+      </SafeAreaView></>
     );
   }
 
@@ -1123,7 +1135,7 @@ export default function SalesExecDashboardScreen({
         <ScrollView
           style={styles.scroll}
           nestedScrollEnabled={true}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, embedded && styles.contentEmbedded]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1132,6 +1144,9 @@ export default function SalesExecDashboardScreen({
             />
           }
         >
+          <DashboardGrid columns={columns || 1} layout={MY_VIEW_LAYOUT}>
+          <Slot name="lead">{leadNodes}</Slot>
+          <Slot name="top">
           {isMyView && executiveScope?.my_selector_allowed ? (
             <SectionCard style={styles.scopeSelectorCard}>
               <Text style={styles.scopeSelectorLabel}>MY VIEW · EXECUTIVE</Text>
@@ -1211,7 +1226,9 @@ export default function SalesExecDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ─── SALES SECTION ─── */}
+          <Slot name="sales">
           {visibleSections.sales && (
             <SectionCard>
               <SectionHeader
@@ -1267,7 +1284,9 @@ export default function SalesExecDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ─── PAYMENT COLLECTION SECTION ─── */}
+          <Slot name="collection">
           {visibleSections.collection && (
             <SectionCard>
               <SectionHeader
@@ -1349,7 +1368,9 @@ export default function SalesExecDashboardScreen({
             </SectionCard>
           )}
 
+          </Slot>
           {/* ─── OUTSTANDING SECTION ─── */}
+          <Slot name="outstanding">
           {visibleSections.outstanding && (
             <SectionCard>
               <SectionHeader
@@ -1405,6 +1426,8 @@ export default function SalesExecDashboardScreen({
               </TableWrapper>
             </SectionCard>
           )}
+          </Slot>
+          </DashboardGrid>
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -1443,6 +1466,7 @@ const styles = StyleSheet.create({
   breadcrumbActive: { color: COLORS.primary, fontWeight: "600" },
   scroll: { flex: 1 },
   content: { paddingTop: 10, paddingBottom: 24 },
+  contentEmbedded: { paddingTop: 0, paddingBottom: 0 },
   profileCard: { marginHorizontal: 12, marginBottom: 12 },
   profileTop: { flexDirection: "row", alignItems: "center", padding: 14 },
   selectorPage: { padding: 12, paddingBottom: 28 },

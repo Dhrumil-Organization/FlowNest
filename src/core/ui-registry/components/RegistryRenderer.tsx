@@ -38,18 +38,32 @@ class RegistryItemBoundary extends React.PureComponent<RegistryItemBoundaryProps
   }
 }
 
+export type RegistryLayoutItem = {
+  id: string;
+  element: React.ReactNode;
+  wrap: (element: React.ReactNode) => React.ReactNode;
+};
+
 export function RegistryRenderer<TContext>({
   kind,
   parentId,
   context,
   renderers,
   empty = null,
+  layout,
 }: {
   kind: UiNodeKind;
   parentId?: string;
   context: TContext;
   renderers: UiRenderMap<TContext>;
   empty?: React.ReactNode;
+  /**
+   * Optional custom arrangement (e.g. responsive dashboard columns). Gets the
+   * permission-visible nodes in registry order with their raw rendered
+   * element and a `wrap` that adds the per-item error boundary. Visibility
+   * rules are unchanged — this only decides WHERE visible items go.
+   */
+  layout?: (items: RegistryLayoutItem[]) => React.ReactNode;
 }) {
   const { canAccess, canDo } = usePermission();
 
@@ -77,6 +91,25 @@ export function RegistryRenderer<TContext>({
   });
 
   if (visible.length === 0) return <>{empty}</>;
+
+  if (layout) {
+    const items: RegistryLayoutItem[] = [];
+    visible.forEach((node) => {
+      const render = renderers[node.id];
+      if (!render) {
+        console.warn(`[UI Registry] Missing renderer for ${node.id}`);
+        return;
+      }
+      items.push({
+        id: node.id,
+        element: render(context),
+        wrap: (element: React.ReactNode) => (
+          <RegistryItemBoundary key={node.id} nodeId={node.id}>{element}</RegistryItemBoundary>
+        ),
+      });
+    });
+    return <>{layout(items)}</>;
+  }
 
   return (
     <View>

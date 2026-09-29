@@ -9,7 +9,7 @@ import { f2, r3, ymdShow } from '../helpers';
 export type EditableLine = {
     UId: number; SrNo: number; SubSr: number; CartNo: string; Chees: number; Qty: number;
     DsnRcpSrNo: number; IssNo: string; IssDate: any; BeamUId: any; BeamNo: string; DsnCode: any; DsnName?: string;
-    ItmCode?: string; ShdCode?: any;
+    ItmCode?: string; ShdCode?: any; StkType?: string;
 };
 
 type Props = {
@@ -40,6 +40,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         if (!visible || !line) return;
         setVal({
             beam: { UId: line.BeamUId, BeamNo: line.BeamNo },
+            stkType: (line.StkType === 'P' ? 'P' : line.StkType === 'I' ? 'I' : stkType) as 'I' | 'P',
             dsn: { DsnCode: line.DsnCode, DsnName: line.DsnName },
             rsr: Number(line.DsnRcpSrNo),
         });
@@ -105,7 +106,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         const r = await modifyLine(token, {
             prpcode, yearno, uid: line.UId, srno: line.SrNo, subsr: line.SubSr,
             OldChees: line.Chees, OldQty: line.Qty,
-            BeamUId: val.beam.UId, DsnCode: val.dsn.DsnCode, DsnRcpSrNo: val.rsr,
+            BeamUId: val.beam.UId, DsnCode: val.dsn.DsnCode, DsnRcpSrNo: val.rsr, StkType: val.stkType || stkType,
             Chees: ch, Wt: w, ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
         });
         setSaving(false);
@@ -167,4 +168,4 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
     );
 };
 
-export default EditLineSheet;
+export default React.memo(EditLineSheet);

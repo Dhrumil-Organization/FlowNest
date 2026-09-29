@@ -102,6 +102,22 @@ export const fetchRecipe = (t: string, prpcode: string, yearno: any, dsncode: an
         prpcode, yearno, txntype: 'weft_selvedge_issue', dsncode, stktype,
     });
 
+export const itemDetailFromCarton = (
+    token: string,
+    prpcode: string,
+    yearno: any,
+    parsedData: any
+) =>
+    post(token, 'get_item_detail_from_carton', {
+        prpcode,
+        yearno,
+        strcode: parsedData?.yarnstrcode ?? '',
+        itmcode: parsedData?.ItmCode ?? '',
+        mercode: parsedData?.MerCode ?? '',
+        grdcode: parsedData?.GrdCode ?? '',
+        shdcode: parsedData?.ShdCode ?? '',
+    });
+
 /** Fetch expected production quantity from the issue-qty history API. */
 export async function fetchExpProdQty(t: string, p: {
     prpcode: string; yearno: any; reqqty: any; itmcode: any; shdcode: any;

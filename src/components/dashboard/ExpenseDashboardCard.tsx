@@ -144,6 +144,7 @@ import {
   fetchExpenseDashboardCard,
 } from '../../services/Dashboard/expenseDashboardApi';
 import { formatDashboardAmount, useDashboardAmountMode } from './AmountDisplayModeControl';
+import { useReportLayout } from './ResponsiveReport';
 
 type Props = {
   token: string;
@@ -400,6 +401,13 @@ const ExpenseDashboardCard: React.FC<Props> = ({
     ];
   }, [data]);
 
+  // UI only: card width drives the layout. Phone keeps the ring + 2x2 metrics;
+  // tablet puts the 4 metrics in one row; desktop (full-width card on top of
+  // the dashboard) also moves the coverage box beside the ring + metrics.
+  const cardLayout = useReportLayout();
+  const metricsInRow = cardLayout.cols > 1;
+  const sideBySide = cardLayout.cols > 2;
+
   if (loading && !data) {
     return (
       <View style={[styles.card, styles.stateCard]}>
@@ -446,6 +454,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
       activeOpacity={onPress ? 0.92 : 1}
       disabled={!onPress}
       onPress={() => onPress?.(data)}
+      onLayout={cardLayout.onLayout}
       style={styles.card}
     >
       <View style={styles.topRow}>
@@ -490,10 +499,12 @@ const ExpenseDashboardCard: React.FC<Props> = ({
         </TouchableOpacity>
       </View>
 
+      <View style={sideBySide ? styles.wideBody : undefined}>
       <View
         style={[
           styles.coverageBox,
           coverageIncomplete ? styles.coverageWarn : styles.coverageOk,
+          sideBySide && styles.wideCoverage,
         ]}
       >
         <View style={styles.coverageCopy}>
@@ -537,7 +548,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
         />
       </View>
 
-      <View style={styles.contentRow}>
+      <View style={[styles.contentRow, sideBySide && styles.wideContent]}>
         <CostRing
           total={numberValue(summary.total_cost)}
           periodLabel={period.label}
@@ -545,6 +556,35 @@ const ExpenseDashboardCard: React.FC<Props> = ({
           amountMode={amountMode}
         />
 
+        {metricsInRow ? (
+          <View style={[styles.metricsArea, styles.metricsAreaWide]}>
+            <View style={styles.metricsColumn}>
+              <CompactMetric
+                label="COST / PICK"
+                value={formatDashboardAmount(summary.cost_per_pick, amountMode, undefined, 3)}
+                accent
+              />
+            </View>
+            <View style={styles.metricsColumn}>
+              <CompactMetric
+                label="AVG PICKS"
+                value={formatNumber(summary.avg_picks, 1)}
+              />
+            </View>
+            <View style={styles.metricsColumn}>
+              <CompactMetric
+                label="PRODUCTION"
+                value={formatMetres(summary.production_mtr)}
+              />
+            </View>
+            <View style={styles.metricsColumn}>
+              <CompactMetric
+                label="COST / MC-DAY"
+                value={formatDashboardAmount(summary.cost_per_machine_day, amountMode, undefined, 2)}
+              />
+            </View>
+          </View>
+        ) : (
         <View style={styles.metricsArea}>
           <View style={styles.metricsColumn}>
             <CompactMetric
@@ -569,6 +609,8 @@ const ExpenseDashboardCard: React.FC<Props> = ({
             />
           </View>
         </View>
+        )}
+      </View>
       </View>
 
       {!!error && <Text style={styles.inlineError}>{error}</Text>}
@@ -772,6 +814,28 @@ const styles = StyleSheet.create({
   },
   metricsColumn: {
     flex: 1,
+    minWidth: 0,
+  },
+  metricsAreaWide: {
+    marginLeft: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  // Desktop: [ring + metrics | coverage] in one row.
+  wideBody: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 20,
+  },
+  wideContent: {
+    flex: 1.7,
+    minWidth: 0,
+  },
+  wideCoverage: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    marginTop: 12,
   },
   metric: {
     minHeight: 53,

@@ -31,8 +31,9 @@ export const T = {
   fontMono: 'Courier',
 } as const
 
+// NEW ERP UI font = Inter (bundled, applied automatically — src/core/fonts/erpFont.tsx).
 export const FONTS = {
-  sans: 'DMSans',
+  sans: 'Inter-Regular',
   mono: 'DMMono',
 } as const
 

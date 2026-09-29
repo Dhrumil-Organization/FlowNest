@@ -697,17 +697,17 @@ export const DyeingAPI = {
 
   // Outward (challan) help for one chart + the lot nos already saved on it.
   // GET /dyeing/outward_details?prptype=S&chartno=CH-2-01&yearno=27
-  outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number }) =>
+  outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number; shdcode?: string; shdname?: string }) =>
     client.get('/dyeing/outward_details', { params }),
 
   // Every outward line of ONE SO line (shade) with its saved lot no.
   // GET /dyeing/outward_details_all?prptype=S&yearno=27&orderuid=370000635&ordersrno=1
-  outwardDetailsAll: (params: { prptype: string; yearno: string | number; orderuid: string | number; ordersrno: string | number }) =>
+  outwardDetailsAll: (params: { prptype: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string }) =>
     client.get('/dyeing/outward_details_all', { params }),
 
   // Saved lot nos of one chart + SO line (the table under the status sheet).
   // GET /dyeing/lotnos?prptype=S&chartno=CH-2-01&yearno=27&orderuid=370000635&ordersrno=2
-  lotNos: (params: { prptype: string; chartno: string; yearno: string | number; orderuid: string | number; ordersrno: string | number }) =>
+  lotNos: (params: { prptype: string; chartno: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string }) =>
     client.get('/dyeing/lotnos', { params }),
 
   // Add / edit the lot no. of ONE outward line (uid + srno of the challan).

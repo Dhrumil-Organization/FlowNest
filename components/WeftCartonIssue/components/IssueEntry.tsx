@@ -78,8 +78,9 @@ const IssueEntry = ({
 
         try {
             const exp = await api.fetchExpProdQty(token, {
-                prpcode, yearno, wt: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
-                dsnrcpsrno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+                srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                IssUId: undefined,
             });
 
             const r = await api.saveLine(token, {

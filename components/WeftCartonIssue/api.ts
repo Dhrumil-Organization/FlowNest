@@ -102,23 +102,33 @@ export const fetchRecipe = (t: string, prpcode: string, yearno: any, dsncode: an
         prpcode, yearno, txntype: 'weft_selvedge_issue', dsncode, stktype,
     });
 
-/** Same call as WeftIssueItemDrawer.ExpectedProdQty. Returns 0 when not available. */
+/** Fetch expected production quantity from the issue-qty history API. */
 export async function fetchExpProdQty(t: string, p: {
-    prpcode: string; yearno: any; wt: any; itmcode: any; shdcode: any; dsnrcpsrno: any; beamuid: any; dsncode: any;
+    prpcode: string; yearno: any; reqqty: any; itmcode: any; shdcode: any;
+    srno: any; beamuid: any; dsncode: any; IssUId?: any;
 }): Promise<number> {
     try {
-        const res = await axios.get(`${API}/api/get_expprodqty_from_issueqty`, {
+        const res = await axios.get(`${API}/api/getExpectedWeftIssue`, {
             headers: headers(t),
             params: {
-                PrpCode: p.prpcode, YearNo: p.yearno, txntype: 'beam_weft_issue', WfIssQty: p.wt,
-                MRUId: '0', MRSrNo: '0', ItmCode: p.itmcode, ShdCode: p.shdcode,
-                PlnWfSrNo: p.dsnrcpsrno, beamuid: p.beamuid, dsncode: p.dsncode,
+                prpcode: p.prpcode,
+                yearno: p.yearno,
+                txntype: 'beam_weft_issue',
+                reqqty: p.reqqty,
+                itmcode: p.itmcode,
+                shdcode: p.shdcode,
+                srno: p.srno || '',
+                beamuid: p.beamuid,
+                dsncode: p.dsncode,
+                IssUId: p.IssUId ?? '',
             },
             timeout: 20000,
         });
+
         const arr = listOf(res.data);
         return Number(arr?.[0]?.ExpProdQty) || 0;
     } catch (e) {
+        console.log('getExpectedWeftIssue error', e);
         return 0;
     }
 }

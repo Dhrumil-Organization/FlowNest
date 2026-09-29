@@ -100,8 +100,9 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
 
         setSaving(true);
         const exp = await fetchExpProdQty(token, {
-            prpcode, yearno, wt: w, itmcode: info?.itm ?? line.ItmCode, shdcode: info?.shd ?? line.ShdCode,
-            dsnrcpsrno: val.rsr, beamuid: val.beam.UId, dsncode: val.dsn.DsnCode,
+            prpcode, yearno, reqqty: w, itmcode: info?.itm ?? line.ItmCode, shdcode: info?.shd ?? line.ShdCode,
+            srno: val.rsr, beamuid: val.beam.UId, dsncode: val.dsn.DsnCode,
+            IssUId: line.UId,
         });
         const r = await modifyLine(token, {
             prpcode, yearno, uid: line.UId, srno: line.SrNo, subsr: line.SubSr,

@@ -288,7 +288,8 @@ export function MillHubTab() {
       </HScroll>
 
       <Text style={st.footer}>
-        Outward and inward are counted independently by their own dates, over the full history. Pending = period outwards
+        Metres = each outward lot's LOT QTY (one challan row per lot, with its own mill); a shade with no lot qty
+        yet uses its order qty (≈ on the challan page). Outward and inward are counted independently by their own dates, over the full history. Pending = period outwards
         not yet settled by receipts. Shortage = sent-lot minus received on the period’s receipts — never pending material,
         and never blocked by it. Re-dye trips (after lorry cuts) are shown separately and never inflate Outward or Inward.
         Tap a design for the challan-wise breakdown.
@@ -395,7 +396,7 @@ function ChallanLine({ r }: { r: ChallanRow }) {
         <Text style={[st.stateBadge, { backgroundColor: stateColor(r) }]}>{r.state}</Text>
         <Text style={st.infoMain}>{infoOf(t)}</Text>
         <Text style={st.infoText}>
-          {t.mill}{t.chartNo ? ` · chart ${t.chartNo}` : ''}{t.party ? ` · ${t.party}` : ''} · outwarded {fmt(t.metres)} m ·
+          {t.mill}{t.chartNo ? ` · chart ${t.chartNo}` : ''}{t.party ? ` · ${t.party}` : ''} · outwarded {t.estimate ? '≈ ' : ''}{fmt(t.metres)} m{t.estimate ? ' (order qty — lot qty not entered)' : ''} ·
           settled {fmt(r.settled)} m, received {fmt(r.received)} m
           {t.ins.length ? ` (${t.ins.map((i) => fmtD(i.date)).join(', ')})` : ''}
           {r.shAll > 0 ? ` · shortage so far ${fmt(r.shAll)} m` : ''}

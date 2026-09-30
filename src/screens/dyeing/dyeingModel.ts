@@ -12,6 +12,10 @@
 // The backend (SalesOrderPartyPriorityRepository::save_dyeing_status) uses
 // the SAME rank + re-work rule, so the mock and the real API behave alike.
 //
+// Outward lots (backend FAMSOAllocationPriorityOutwardLot): every shade keeps
+// its own lots — lot no + LOT QTY (= outward qty of that lot) + the outward
+// line, challan and mill. Daily Update / Mill Hub count metres from lot qty.
+//
 // Storage (backend): the EXISTING FAMSOAllocationPriorityStatus table —
 //   IsLot = 0 colour row (old status), IsLot = 1 one row per dyeing lot —
 // plus the append-only FAMSOAllocationPriorityStatusHistory. `LotId` below is
@@ -156,6 +160,54 @@ export type DyeLot = {
   virtual?: boolean; // the un-split remainder of the colour
 };
 
+/**
+ * One OUTWARD LOT of a shade (backend FAMSOAllocationPriorityOutwardLot):
+ * lot no. + lot qty (= the outward qty of that lot) + the outward line /
+ * challan / mill it went on. `Legacy` = old GRYOutD1.ChartLotNo (no qty).
+ */
+export type OutwardLotBrief = {
+  LotId: number | null;
+  LotNo: string;
+  LotQty: number | null;
+  OutwardUId: string;
+  OutwardSrNo: number;
+  ChalNo: string | null;
+  ChalDate: string | null;
+  MillName: string | null;
+  Legacy?: boolean;
+};
+
+export const toOutwardLotBrief = (raw: any): OutwardLotBrief | null => {
+  const lotNo = String(raw?.LotNo ?? raw?.ChartLotNo ?? '').trim();
+  if (!lotNo) return null;
+  const q = raw?.LotQty;
+  return {
+    LotId: raw?.LotId != null && raw?.LotId !== '' ? Number(raw.LotId) : null,
+    LotNo: lotNo,
+    LotQty: q !== null && q !== undefined && q !== '' && Number(q) > 0 ? Number(q) : null,
+    OutwardUId: String(raw?.OutwardUId ?? raw?.uuid ?? ''),
+    OutwardSrNo: Number(raw?.OutwardSrNo ?? raw?.usrno ?? 0) || 0,
+    ChalNo: raw?.ChalNo ? String(raw.ChalNo).trim() : null,
+    ChalDate: raw?.ChalDate ? parseAnyDate(raw.ChalDate) || null : null,
+    MillName: raw?.MillName ? String(raw.MillName).trim() : null,
+    Legacy: !!Number(raw?.Legacy ?? 0),
+  };
+};
+
+export const toOutwardLotBriefs = (list: any): OutwardLotBrief[] =>
+  (Array.isArray(list) ? list : []).map(toOutwardLotBrief).filter(Boolean) as OutwardLotBrief[];
+
+/** Total lot qty — null when there is no lot or any lot has no qty yet (same rule as the backend). */
+export const lotsTotalQty = (lots: { LotQty: number | null }[]): number | null => {
+  if (!lots.length) return null;
+  let total = 0;
+  for (const l of lots) {
+    if (!(l.LotQty != null && l.LotQty > 0)) return null;
+    total += l.LotQty;
+  }
+  return Math.round(total * 1000) / 1000;
+};
+
 export type PriorityShade = {
   ShdCode: string;
   ShdName: string;
@@ -167,6 +219,9 @@ export type PriorityShade = {
   Status: ShadeStatus | null; // derived colour status (lowest lot)
   colourHistory: DyeEvent[]; // colour-level events (saved without lots / old API)
   lots: DyeLot[];
+  outwardLots: OutwardLotBrief[]; // shade's outward lots (lot no + lot qty + challan + mill)
+  LotNos: string; // "3365/3378"
+  LotQty: number | null; // total lot qty (null = no lot / some lot without qty)
 };
 
 export type PriorityChart = {
@@ -268,8 +323,11 @@ export type DyeEventRow = DyeEvent & {
   DsnName: string;
   RootLotId: number | string; // lot the material was first sent under (split lots share it)
   ChainLotCount: number; // active lots sharing RootLotId
-  LotNos: string; // mill lot nos. saved on this shade's outwards (GRYOutD1.ChartLotNo), "3365/3378"
+  LotNos: string; // lot nos. of this shade's outward lots, "3365/3378"
   OutwardNos: string; // outward challan nos. of this shade (FAMSAL.ChalNo), "00035/00038"
+  OutwardLots: OutwardLotBrief[]; // per-lot qty / challan / mill (reports split the shade per lot)
+  LotQty: number | null; // total lot qty of the shade
+  QtySource: 'LOT' | 'EVENT' | 'ORDER' | ''; // where Qty came from (backend)
 };
 
 /* -------------------------------------------------------------------------- */
@@ -502,6 +560,9 @@ export const toEventRow = (raw: any): DyeEventRow | null => {
     ChainLotCount: Math.max(1, num(raw?.ChainLotCount) || 1),
     LotNos: String(raw?.LotNos ?? '').trim(),
     OutwardNos: String(raw?.OutwardNos ?? '').trim(),
+    OutwardLots: toOutwardLotBriefs(raw?.OutwardLots),
+    LotQty: raw?.LotQty != null && raw?.LotQty !== '' && Number(raw.LotQty) > 0 ? Number(raw.LotQty) : null,
+    QtySource: (['LOT', 'EVENT', 'ORDER'].includes(String(raw?.QtySource)) ? raw.QtySource : '') as DyeEventRow['QtySource'],
     Source: raw?.Source ?? null,
   };
 };

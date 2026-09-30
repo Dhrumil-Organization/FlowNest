@@ -20,6 +20,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PriorityScreen, PriorityPerms } from '../priority/PriorityScreen';
 import { DailyUpdateTab } from './DailyUpdateTab';
+import { DyeingGuide, GuideSection, useFirstVisitGuide } from './DyeingGuide';
 import { MillHubTab } from './MillHubTab';
 
 export const DYEING_ROOT = 'priority';
@@ -70,6 +71,13 @@ export function DyeingScreen() {
   const [activeTab, setActiveTab] = useState<TabId>(visibleTabs[0]?.id ?? 'priority');
   const current = visibleTabs.some((t) => t.id === activeTab) ? activeTab : visibleTabs[0]?.id;
 
+  // Guide: "Guide" button on the tab bar (opens on the current tab) + opens
+  // by itself the first time Dyeing is visited on this device.
+  const firstVisit = useFirstVisitGuide();
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideSection: GuideSection = current === 'daily' ? 'daily' : current === 'millHub' ? 'millHub' : 'priority';
+  const closeGuide = () => { setGuideOpen(false); if (firstVisit.show) firstVisit.dismiss(); };
+
   if (!current) {
     return (
       <View style={s.center}>
@@ -82,32 +90,47 @@ export function DyeingScreen() {
 
   return (
     <View style={s.flex}>
-      {visibleTabs.length > 1 && (
-        <View style={s.tabBar}>
-          {visibleTabs.map((t) => {
-            const on = current === t.id;
-            return (
-              <TouchableOpacity key={t.id} onPress={() => setActiveTab(t.id)} style={[s.tabBtn, on && s.tabBtnOn]} activeOpacity={0.7}>
-                <Icon name={t.icon} size={14} color={on ? '#fff' : 'rgba(255,255,255,0.6)'} />
-                <Text style={[s.tabBtnText, on && s.tabBtnTextOn]}>{t.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      <View style={s.tabBar}>
+        {visibleTabs.map((t) => {
+          const on = current === t.id;
+          return (
+            <TouchableOpacity key={t.id} onPress={() => setActiveTab(t.id)} style={[s.tabBtn, on && s.tabBtnOn]} activeOpacity={0.7}>
+              <Icon name={t.icon} size={14} color={on ? '#fff' : 'rgba(255,255,255,0.6)'} />
+              <Text style={[s.tabBtnText, on && s.tabBtnTextOn]} numberOfLines={1}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        <TouchableOpacity
+          onPress={() => setGuideOpen(true)}
+          style={s.guideBtn}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Open the Dyeing guide"
+        >
+          <Icon name="help-outline" size={15} color="#fff" />
+          <Text style={s.guideText}>Guide</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={s.flex}>
         {current === 'priority' && <PriorityScreen perms={priorityPerms} />}
         {current === 'daily' && <DailyUpdateTab />}
         {current === 'millHub' && <MillHubTab />}
       </View>
+
+      <DyeingGuide visible={guideOpen || firstVisit.show} section={guideSection} onClose={closeGuide} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
   flex: { flex: 1, backgroundColor: T.bg },
-  tabBar: { flexDirection: 'row', backgroundColor: T.nav, paddingHorizontal: 6 },
+  tabBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.nav, paddingHorizontal: 6 },
+  guideBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4, paddingHorizontal: 10, height: 28,
+    borderRadius: 14, backgroundColor: 'rgba(200,117,51,0.35)', borderWidth: 1, borderColor: 'rgba(200,117,51,0.7)',
+  },
+  guideText: { color: '#fff', fontSize: 11.5, fontWeight: '700' },
   tabBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
     paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: 'transparent',

@@ -44,8 +44,14 @@ export type OutwardRow = {
   hasChallan: boolean; // challanNo came from the API (not the UId/SrNo fallback)
   chartNo: string; // GRYOutD1.ChartNo of this outward line (save_outward_details needs it)
   date: string; // YYYY-MM-DD or ''
-  qty: number | null;
+  qty: number | null; // OUTWARD line qty (m)
   lotNo: string; // '' = no lot saved yet
+  lotQty: number | null; // saved LOT qty of this shade (m) — null = not set (old lot)
+  lotId: number | null; // lot row id (lot table) — null for old lots
+  balance: number | null; // outward qty not yet given to any shade (help rows)
+  takenBy: string; // "Lot 3365 · Shd 5" — other shades that took this outward (help rows)
+  outwardShdCode: string; // GRYOutD1.SoShdCode of the outward line
+  legacy: boolean; // old lot (GRYOutD1.ChartLotNo) — no qty yet
   shdCode: string;
   shdName: string;
   mill: string;
@@ -76,13 +82,20 @@ const CHALLAN_KEYS = [
   'ChalNo', 'chalno', 'OutwardNo', 'outwardno', 'ChallanNo', 'challanno', 'ChalanNo', 'chalanno', 'VouNo', 'vouno',
   'VoucherNo', 'DocNo', 'docno', 'BillNo', 'billno', 'OutNo', 'outno',
 ];
-const DATE_KEYS = ['Date', 'date', 'OutwardDate', 'ChallanDate', 'VouDate', 'voudate', 'DocDate', 'BillDate'];
-const QTY_KEYS = ['Qty', 'qty', 'Mtrs', 'mtrs', 'Meter', 'Meters', 'Quantity', 'NetQty', 'Pcs'];
+const DATE_KEYS = ['Date', 'date', 'ChalDate', 'OutwardDate', 'ChallanDate', 'VouDate', 'voudate', 'DocDate', 'BillDate'];
+const QTY_KEYS = ['Qty', 'qty', 'OutwardQty', 'Mtrs', 'mtrs', 'Meter', 'Meters', 'Quantity', 'NetQty', 'Pcs'];
+const LOT_QTY_KEYS = ['LotQty', 'lotqty', 'LOTQTY'];
 const LOT_KEYS = ['ChartLotNo', 'chartlotno', 'LotNo', 'lotno', 'Lotno', 'LOTNO', 'DyeLotNo', 'MillLotNo'];
 const CHART_KEYS = ['ChartNo', 'chartno', 'CHARTNO'];
 const SHD_CODE_KEYS = ['soshdcode', 'SOShdCode', 'SoShdCode', 'ShdCode', 'shdcode', 'ShadeCode', 'shadecode'];
 const SHD_NAME_KEYS = ['ShdName', 'shdname', 'ShadeName', 'shadename', 'Shade', 'shade'];
-const MILL_KEYS = ['MillName', 'millname', 'Mill', 'PartyName', 'partyname', 'AccName', 'accname', 'ProcessHouse'];
+const MILL_KEYS = ['MillName', 'millname', 'Mill', 'OutwardParty', 'PartyName', 'partyname', 'AccName', 'accname', 'ProcessHouse'];
+
+const numOrNull = (v: any): number | null => {
+  if (v === undefined || v === null || String(v).trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 /** Outward line identity: outward uid|srno. */
 export const lineKeyOf = (r: { uid: string; srno: string }) => `${r.uid}|${r.srno}`;
@@ -121,6 +134,12 @@ const toRow = (raw: any): OutwardRow | null => {
     date: parseAnyDate(pick(raw, DATE_KEYS)),
     qty: qtyRaw !== undefined ? num(qtyRaw) : null,
     lotNo: str(pick(raw, LOT_KEYS)),
+    lotQty: (() => { const q = numOrNull(pick(raw, LOT_QTY_KEYS)); return q != null && q > 0 ? q : null; })(),
+    lotId: numOrNull(pick(raw, ['LotId', 'lotid'])),
+    balance: numOrNull(pick(raw, ['Balance', 'balance'])),
+    takenBy: str(pick(raw, ['TakenBy', 'takenby'])),
+    outwardShdCode: str(pick(raw, ['OutwardShdCode', 'outwardshdcode'])),
+    legacy: !!Number(pick(raw, ['Legacy', 'legacy']) ?? 0),
     shdCode,
     shdName: str(pick(raw, SHD_NAME_KEYS)),
     mill: str(pick(raw, MILL_KEYS)),
@@ -172,6 +191,12 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
         date: prev.date || row.date,
         qty: prev.qty ?? row.qty,
         lotNo: row.lotNo || prev.lotNo,
+        lotQty: row.lotNo ? (row.lotQty ?? prev.lotQty) : (prev.lotQty ?? row.lotQty),
+        lotId: row.lotId ?? prev.lotId,
+        balance: prev.balance ?? row.balance,
+        takenBy: prev.takenBy || row.takenBy,
+        outwardShdCode: prev.outwardShdCode || row.outwardShdCode,
+        legacy: row.lotNo ? row.legacy : prev.legacy,
         shdCode: prev.shdCode || row.shdCode,
         shdName: prev.shdName || row.shdName,
         mill: prev.mill || row.mill,
@@ -181,11 +206,14 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
   return Array.from(merged.values());
 };
 
-/** Same outward line? outward uid (uuid) + srno (usrno), + chart when both know it. */
+/**
+ * Same outward line? = outward uid (uuid) + srno (usrno). That pair is the
+ * GRYOutD1 line itself, so the chart is NOT compared: the same outward
+ * reached from the chart help or from Advance (another chart) is one line.
+ */
 export const sameOutward = (a: OutwardRow, b: OutwardRow) => {
   if (!a.uid || !b.uid) return false;
-  if (a.uid !== b.uid || a.srno !== b.srno) return false;
-  return !a.chartNo || !b.chartNo || a.chartNo === b.chartNo;
+  return a.uid === b.uid && a.srno === b.srno;
 };
 
 /** Does this row belong to the given shade? (no shade info on the row = undecided -> null) */

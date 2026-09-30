@@ -4,27 +4,13 @@
 // Existing Web Grey Packing remains untouched.
 
 import AppAlert from '@/common/utils/appAlert';
-import { GreyPackingAPI } from '../../api/legacyClient';
-import SearchablePickerModal, {
-  SearchablePickerOption,
-} from '../../components/SearchablePickerModal';
-import SearchableMultiSelectModal, {
-  SearchableMultiSelectOption,
-} from '../../components/SearchableMultiSelectModal';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import { fetchPropertyData } from '../../api/legacyFunctions';
-import { useBusinessContext } from '../../core/business';
-import { usePermission } from '../../core/permissions';
-import { useAppSessionStore } from '../../stores/AppSessionStore';
-import { T,S } from '../../theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   AppState,
   BackHandler,
   FlatList,
@@ -37,8 +23,20 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
+  useWindowDimensions
 } from 'react-native';
+import { GreyPackingAPI } from '../../api/legacyClient';
+import { fetchPropertyData } from '../../api/legacyFunctions';
+import SearchableMultiSelectModal, {
+  SearchableMultiSelectOption,
+} from '../../components/SearchableMultiSelectModal';
+import SearchablePickerModal, {
+  SearchablePickerOption,
+} from '../../components/SearchablePickerModal';
+import { useBusinessContext } from '../../core/business';
+import { usePermission } from '../../core/permissions';
+import { useAppSessionStore } from '../../stores/AppSessionStore';
+import { S, T } from '../../theme';
 
 type MainRow = {
   UId?: number | string;
@@ -1123,33 +1121,100 @@ export default function GreyPackingScannerScreen() {
           text: 'Finish Packing',
           onPress: async () => {
             setBusy(true);
+            scanLock.current = true;
+            setCameraScreenVisible(false);
+
             try {
+              /*
+               * New mobile Add keeps VouNo blank while scanning. Reserve the
+               * permanent Grey Packing voucher only when the user finishes.
+               * The backend applies the legacy 5-digit Grey Packing voucher
+               * body before format_voucher_no_for_save_call().
+               */
               let finalVoucher: Record<string, any> = {};
+
               if (!String(main?.VouNo ?? '').trim()) {
+                const finalDate = displayDate(todayRef.current);
                 const voucherResponse = await GreyPackingAPI.voucherNo({
-                  prpcode: selectedPrpCode, yearno: selectedYearNo, strcode: '', acccode: '',
-                  vouno: 0, suffix: '', month: monthCode(todayRef.current), uid: 0,
-                  date: displayDate(todayRef.current), module: 'GRYPacking',
-                  module_no_key: 'VouNo', txntype: TXN_TYPE, outtype: 'I',
+                  prpcode: selectedPrpCode,
+                  yearno: selectedYearNo,
+                  strcode: '',
+                  acccode: '',
+                  vouno: 0,
+                  suffix: '',
+                  month: monthCode(todayRef.current),
+                  uid: 0,
+                  date: finalDate,
+                  module: 'GRYPacking',
+                  module_no_key: 'VouNo',
+                  txntype: TXN_TYPE,
+                  outtype: 'I',
                 });
+
                 const vb = voucherResponse?.data?.response ?? {};
-                if (String(vb?.validate) !== 'true') throw new Error(vb?.message || 'Unable to generate final voucher number.');
-                finalVoucher = { vouno: String(vb?.VouNo ?? ''), month: String(vb?.month ?? monthCode(todayRef.current)), suffix: String(vb?.suffix ?? ''), voudate: displayDate(todayRef.current) };
+                if (String(vb?.validate) !== 'true') {
+                  throw new Error(vb?.message || 'Unable to generate final voucher number.');
+                }
+
+                const nextVouNo = String(vb?.VouNo ?? '').trim();
+                const nextMonth = String(vb?.month ?? monthCode(todayRef.current)).trim();
+                const nextSuffix = String(vb?.suffix ?? '').trim();
+
+                if (!nextVouNo || !nextMonth) {
+                  throw new Error('Final voucher number could not be generated.');
+                }
+
+                finalVoucher = {
+                  vouno: nextVouNo,
+                  month: nextMonth,
+                  suffix: nextSuffix,
+                  voudate: finalDate,
+                };
               }
+
               const response = await GreyPackingAPI.completeSession({
-                prpcode: selectedPrpCode, yearno: selectedYearNo, uid, ...finalVoucher,
+                prpcode: selectedPrpCode,
+                yearno: selectedYearNo,
+                uid,
+                ...finalVoucher,
               });
+
               const result = unwrap(response);
               if (!result.success) throw new Error(result.message);
-              applySession(result.data as SessionData);
-              setMode('list');
+
+              // Finish Packing means this user's live mobile session is over.
+              // Do not keep the completed packing loaded as the active session.
+              try {
+                await AsyncStorage.removeItem(transactionFilterKey(uid));
+              } catch {
+                // Server Finish already succeeded. Local cleanup must not turn
+                // a completed packing into a user-visible failure.
+              }
+
+              setSession(null);
+              setLastScan(null);
+              setSelectedTransactionTypes(['64']);
+              setTransactionFilterRestored(true);
               setConnectionBlocked(false);
-              setNotice({ type: 'ok', text: 'Packing completed successfully.' });
+              setAccessMode('add');
+              setModifyMode(false);
+              setVoucherNo('');
+              setVoucherSuffix('');
+              setVoucherMonth(monthCode(todayRef.current));
+              setNotice(null);
+              setCameraScreenVisible(false);
+
+              // Move out of the finished live session immediately, then refresh
+              // Browse so the just-completed voucher is visible there.
+              setMode('browseList');
+              await loadPackingbrowselist();
             } catch (error) {
               if (isNetworkLikeError(error)) setConnectionBlocked(true);
               AppAlert.alert('Unable to Finish Packing', apiError(error));
             } finally {
               setBusy(false);
+              scanLock.current = false;
+              setCameraScreenVisible(false);
             }
           },
         },

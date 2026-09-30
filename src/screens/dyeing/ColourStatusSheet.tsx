@@ -10,6 +10,10 @@
 //   [Sent for job] [Dying] [Finish] [Job inward] [✂ Lorry Cut]   <- shade status
 //   (29/09/26 Sent for job) → (30/09/26 Dying)                    <- status with date
 //
+// LOT QTY: every outward lot now carries its lot qty (= outward qty of the
+// lot). The shade's status is saved with Qty = total lot qty (when every lot
+// has a qty), else the shade qty — the backend does the same.
+//
 // - Outward · Lot No. block (OutwardLotSection):
 //     help            GET /dyeing/outward_details?prptype&chartno&yearno
 //     [Advance] ->    GET /dyeing/outward_details_all?prptype&yearno&orderuid&ordersrno (nested help)
@@ -74,6 +78,7 @@ import {
   todayISO,
 } from './dyeingModel';
 import { chipDate, lineKeyOf, OutwardRow, outwardSaveOk, rowShadeMatch, toOutwardRows } from './dyeingOutward';
+import { DyeingGuide } from './DyeingGuide';
 import { OutwardLotSection, OutwardState } from './OutwardLotSection';
 
 export type SheetPerms = {
@@ -158,6 +163,7 @@ export function ColourStatusSheet({
   const { width } = useWindowDimensions();
   const wide = width >= 700;
   const [toast, setToast] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   // SHADE-WISE outward / lot data — every call is made per shade and sends
   // that shade's code + name (shdcode / shdname):
@@ -318,6 +324,14 @@ export function ColourStatusSheet({
                 <Text style={st.prioHint}>{qtyLabel(chart.qty)} m · {chart.shades.length} shades</Text>
               </View>
             </View>
+            <TouchableOpacity
+              onPress={() => setGuideOpen(true)}
+              style={st.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="How the status sheet works"
+            >
+              <Icon name="help-outline" size={20} color={T.copper} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={onClose} style={st.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Icon name="close" size={20} color={T.muted} />
             </TouchableOpacity>
@@ -340,6 +354,10 @@ export function ColourStatusSheet({
               // this shade's own help list (NOT filtered — the same outward can be taken by every shade, once per shade)
               const shadeHelp: OutwardState = helpByShade[k] ?? { rows: [], loading: true, error: null };
               const outwardLots = table.rows.map((r) => r.lotNo).filter(Boolean);
+              const withLot = table.rows.filter((r) => r.lotNo);
+              const lotQtyTotal = withLot.length && withLot.every((r) => r.lotQty != null && r.lotQty > 0)
+                ? withLot.reduce((sum, r) => sum + (r.lotQty ?? 0), 0)
+                : (table.loading ? shade.LotQty : null);
               const others = group.filter((g) => g !== shade).map((g) => g.ShdName).filter(Boolean);
               return (
                 <ShadeCard
@@ -350,6 +368,7 @@ export function ColourStatusSheet({
                   prpGroup={prpGroup}
                   yearNo={yearNo}
                   outwardLotNos={outwardLots}
+                  lotQtyTotal={lotQtyTotal ?? null}
                   outward={(
                     <OutwardLotSection
                       title={`Outward · Lot No. — ${shade.ShdName || shade.ShdCode || `Sr ${shade.OrderSrNo}`}`}
@@ -358,6 +377,9 @@ export function ColourStatusSheet({
                       ownsUntagged={group.length === 1}
                       note={others.length ? `Sr ${shade.OrderSrNo} is shared with ${others.join(' · ')} — lot nos. here are for ${shade.ShdName} only` : null}
                       chartNo={chart.ChartNo}
+                      orderUId={chart.OrderUId}
+                      parCode={chart.ParCode}
+                      shadeQty={shade.AllocationQty}
                       orderSrNo={shade.OrderSrNo}
                       prpGroup={prpGroup}
                       yearNo={yearNo}
@@ -381,6 +403,7 @@ export function ColourStatusSheet({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+      <DyeingGuide visible={guideOpen} section="status" onClose={() => setGuideOpen(false)} />
     </Modal>
   );
 }
@@ -390,7 +413,7 @@ export function ColourStatusSheet({
 /* -------------------------------------------------------------------------- */
 
 function ShadeCard({
-  chart, shade, perms, prpGroup, yearNo, outwardLotNos, outward, onSaved,
+  chart, shade, perms, prpGroup, yearNo, outwardLotNos, lotQtyTotal, outward, onSaved,
 }: {
   chart: PriorityChart;
   shade: PriorityShade;
@@ -398,6 +421,7 @@ function ShadeCard({
   prpGroup: string;
   yearNo: string | number;
   outwardLotNos: string[]; // lot nos. saved on this shade's outwards
+  lotQtyTotal: number | null; // total lot qty of this shade (null = no lot / a lot without qty)
   outward: React.ReactNode;
   onSaved: (message: string) => Promise<void>;
 }) {
@@ -452,8 +476,9 @@ function ShadeCard({
     if (picked === 'Lorry Cut' && !reason) { setError('Select the Lorry Cut reason.'); return; }
     setError(null);
     // /dyeing/save_status — ONLY this shade (its own OrderUId / OrderSrNo /
-    // ShdCode / ChartNo), dated today, the shade's full qty.
-    const qty = num(shade.AllocationQty);
+    // ShdCode / ChartNo), dated today. Qty = the shade's total LOT qty
+    // (outward qty of its lots), else the shade's full qty.
+    const qty = lotQtyTotal != null && lotQtyTotal > 0 ? lotQtyTotal : num(shade.AllocationQty);
     const lotNo = outwardLotNos.join('/');
     const payload: SaveStatusPayload = {
       prptype: prpGroup,
@@ -535,6 +560,7 @@ function ShadeCard({
           <Text style={st.shadeMeta} numberOfLines={1}>
             {shade.ShdCode ? `Code ${shade.ShdCode} · ` : ''}Sr {shade.OrderSrNo} · {qtyLabel(shade.AllocationQty)} m
             {outwardLotNos.length ? ` · Lot ${outwardLotNos.join('/')}` : ''}
+            {lotQtyTotal != null ? ` · Lot qty ${qtyLabel(lotQtyTotal)} m` : ''}
           </Text>
         </View>
         <View style={[st.curChip, { borderColor: current ? STATUS_COLORS[current] : T.border }]}>
@@ -616,7 +642,7 @@ function ShadeCard({
         <View style={st.confirmRow}>
           <Text style={st.confirmText} numberOfLines={2}>
             Set <Text style={{ color: STATUS_COLORS[picked], fontWeight: '900' }}>{picked}</Text> for {shade.ShdName}
-            {' '}· today?
+            {' '}· {qtyLabel(lotQtyTotal != null && lotQtyTotal > 0 ? lotQtyTotal : shade.AllocationQty)} m · today?
           </Text>
           <TouchableOpacity onPress={() => { setPicked(null); setReason(null); }} style={st.cancelBtn} disabled={saving}>
             <Text style={st.cancelText}>Cancel</Text>

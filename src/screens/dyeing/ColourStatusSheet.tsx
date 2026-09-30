@@ -5,7 +5,7 @@
 //   ┌ OUTWARD · LOT NO. ─────────────────────────── 2 lots ⟳ ┐
 //   │ [Select Outward 🔍] [Lot No.     ] [+ Add]               │
 //   │ Outward No.            | Lot No.                     │
-//   │ DC-4101  UId…·Sr 1     | SR-4310                   ✎ │  <- GET /dyeing/lotnos
+//   │ OutNo · OutDate · acc  | SR-4310                   ✎ │  <- GET /dyeing/lotnos
 //   └──────────────────────────────────────────────────────┘
 //   [Sent for job] [Dying] [Finish] [Job inward] [✂ Lorry Cut]   <- shade status
 //   (29/09/26 Sent for job) → (30/09/26 Dying)                    <- status with date
@@ -167,9 +167,10 @@ export function ColourStatusSheet({
 
   // SHADE-WISE outward / lot data — every call is made per shade and sends
   // that shade's code + name (shdcode / shdname):
-  //   help     GET /dyeing/outward_details      ?prptype&chartno&yearno&shdcode&shdname
-  //   advance  GET /dyeing/outward_details_all  ?prptype&yearno&orderuid&ordersrno&shdcode&shdname
-  //   table    GET /dyeing/lotnos               ?prptype&chartno&yearno&orderuid&ordersrno&shdcode&shdname
+  //   help     GET /dyeing/outward_details      ?prptype&chartno&yearno&shdcode&shdname&dsncode&dsnname
+  //   advance  GET /dyeing/outward_details_all  ?prptype&yearno&orderuid&ordersrno&shdcode&shdname&dsncode&dsnname
+  //   table    GET /dyeing/lotnos               ?prptype&chartno&yearno&orderuid&ordersrno&shdcode&shdname&dsncode&dsnname
+  //   (dsncode / dsnname = the card's design — chart.DesignCode / chart.DesignName)
   // key = shadeKeyOf(shade)
   const [helpByShade, setHelpByShade] = useState<Record<string, OutwardState>>({});
   const [lotsByShade, setLotsByShade] = useState<Record<string, OutwardState>>({});
@@ -193,11 +194,19 @@ export function ColourStatusSheet({
     return !!body && typeof body === 'object' && (body.success === false || body.status === false);
   };
 
-  /** shdcode + shdname of a shade, as sent on every outward / lot call. */
-  const shadeParams = (shade: PriorityShade) => ({
+  /**
+   * shdcode + shdname of a shade + dsncode + dsnname of the card's design
+   * (the design shown outside, on the Priority card), as sent on the
+   * outward_details / outward_details_all / lotnos calls.
+   */
+  const dsnCode = String(chart?.DesignCode ?? '').trim();
+  const dsnName = String(chart?.DesignName ?? '').trim();
+  const shadeParams = useCallback((shade: PriorityShade) => ({
     shdcode: String(shade.ShdCode ?? '').trim(),
     shdname: String(shade.ShdName ?? '').trim(),
-  });
+    dsncode: dsnCode,
+    dsnname: dsnName,
+  }), [dsnCode, dsnName]);
 
   /** Help — outward lines of the chart for ONE shade (GET /dyeing/outward_details). */
   const loadHelp = useCallback(async (shade: PriorityShade) => {
@@ -216,7 +225,7 @@ export function ColourStatusSheet({
         [k]: { rows: [], loading: false, error: err?.response?.data?.message || err?.message || 'Unable to load outward list' },
       }));
     }
-  }, [chartNo, prpGroup, yearNo]);
+  }, [chartNo, prpGroup, yearNo, shadeParams]);
 
   /** Table — saved lot nos of ONE shade (GET /dyeing/lotnos). */
   const loadLots = useCallback(async (shade: PriorityShade) => {
@@ -238,7 +247,7 @@ export function ColourStatusSheet({
         [k]: { rows: [], loading: false, error: err?.response?.data?.message || err?.message || 'Unable to load lot nos.' },
       }));
     }
-  }, [chartNo, orderUId, prpGroup, yearNo]);
+  }, [chartNo, orderUId, prpGroup, yearNo, shadeParams]);
 
   /** Nested "Advance" help — every outward of the SO line, for ONE shade (GET /dyeing/outward_details_all). */
   const loadAdvance = useCallback(async (shade: PriorityShade) => {
@@ -247,7 +256,7 @@ export function ColourStatusSheet({
     const response: any = await DyeingService.outwardDetailsAll(params);
     if (failed(response)) throw new Error(messageOf(response, 'Unable to load outwards'));
     return toOutwardRows(response);
-  }, [orderUId, prpGroup, yearNo]);
+  }, [orderUId, prpGroup, yearNo, shadeParams]);
 
   const shadesSig = useMemo(
     () => (chart?.shades ?? []).map((sh) => shadeKeyOf(sh)).join(','),

@@ -1,4 +1,3 @@
-import { showSuccess } from '@/common/utils/snackbar';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -17,7 +16,7 @@ type Props = {
     carton: Carton;
     beams: Beam[]; beamsLoading?: boolean; isMobile?: boolean;
     bus: EntryBus;                                // carries typed chees to the progress bar
-    onSaved: (e: SavedEntry) => void;             // screen updates balance + "issued now" list locally
+    onSaved: (e: SavedEntry, message: string) => void;             // screen updates balance + "issued now" list locally
     onStale: () => void;                          // server says balance changed: reload it
 };
 
@@ -101,13 +100,12 @@ const IssueEntry = ({
                 return;
             }
 
-            showSuccess?.(`${line.beam.BeamNo}: ${r.message}`);
             const saved: SavedEntry = { chees: ch, wt: w, beam: line.beam.BeamNo || '', dsn: `${line.dsn.DsnCode ?? ''}` };
             // reset the form, then let the screen update balance + list locally (no extra API call)
             setLine(emptyLine); setChees(''); setWt(''); setWtTouched(false); setFormErr('');
             clientRef.current = null;
             bus.set(0);
-            onSaved(saved);
+            onSaved(saved, r.message || 'Issue saved successfully.');
         } finally {
             savingRef.current = false;
             setSaving(false);

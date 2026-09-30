@@ -59,6 +59,7 @@ export type OutwardRow = {
   outNo: string; // API `OutNo` — shown as the outward no. (NO uid on screen)
   OutDate: string; // API `OutDate` (YYYY-MM-DD or '')
   accName: string; // API `accname` — outward party
+  accname: string; // API `accname` — outward party
 };
 
 const pick = (row: any, keys: string[]): any => {

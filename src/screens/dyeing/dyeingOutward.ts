@@ -56,6 +56,9 @@ export type OutwardRow = {
   shdName: string;
   mill: string;
   raw: any;
+  outNo: string; // API `OutNo` — shown as the outward no. (NO uid on screen)
+  OutDate: string; // API `OutDate` (YYYY-MM-DD or '')
+  accName: string; // API `accname` — outward party
 };
 
 const pick = (row: any, keys: string[]): any => {
@@ -89,6 +92,9 @@ const LOT_KEYS = ['ChartLotNo', 'chartlotno', 'LotNo', 'lotno', 'Lotno', 'LOTNO'
 const CHART_KEYS = ['ChartNo', 'chartno', 'CHARTNO'];
 const SHD_CODE_KEYS = ['soshdcode', 'SOShdCode', 'SoShdCode', 'ShdCode', 'shdcode', 'ShadeCode', 'shadecode'];
 const SHD_NAME_KEYS = ['ShdName', 'shdname', 'ShadeName', 'shadename', 'Shade', 'shade'];
+const OUT_NO_KEYS = ['OutNo', 'outno', 'OUTNO', 'OutwardNo', 'outwardno'];
+const OUT_DATE_KEYS = ['OutDate', 'outdate', 'OUTDATE'];
+const ACC_NAME_KEYS = ['accname', 'AccName', 'ACCNAME', 'Accname'];
 const MILL_KEYS = ['MillName', 'millname', 'Mill', 'OutwardParty', 'PartyName', 'partyname', 'AccName', 'accname', 'ProcessHouse'];
 
 const numOrNull = (v: any): number | null => {
@@ -144,6 +150,9 @@ const toRow = (raw: any): OutwardRow | null => {
     shdName: str(pick(raw, SHD_NAME_KEYS)),
     mill: str(pick(raw, MILL_KEYS)),
     raw,
+    outNo: str(pick(raw, OUT_NO_KEYS)),
+    OutDate: parseAnyDate(pick(raw, OUT_DATE_KEYS)),
+    accName: str(pick(raw, ACC_NAME_KEYS)),
   };
 };
 
@@ -200,6 +209,9 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
         shdCode: prev.shdCode || row.shdCode,
         shdName: prev.shdName || row.shdName,
         mill: prev.mill || row.mill,
+        outNo: prev.outNo || row.outNo,
+        OutDate: prev.OutDate || row.OutDate,
+        accName: prev.accName || row.accName,
       });
     });
   });

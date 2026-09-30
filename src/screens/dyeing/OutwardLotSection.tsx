@@ -4,7 +4,7 @@
 //   [ Select Outward 🔍 ] [ Lot No. ] [ + Add ]
 //   ┌──────────────────────┬──────────┬───┐
 //   │ Outward No.          │ Lot No.  │   │   <- GET /dyeing/lotnos
-//   │ DC-4101 · UId/Sr     │ SR-4310  │ ✎ │      ?prptype&chartno&yearno&orderuid&ordersrno
+//   │ OutNo · OutDate      │ SR-4310  │ ✎ │      ?prptype&chartno&yearno&orderuid&ordersrno
 //   └──────────────────────┴──────────┴───┘
 //
 // Flow
@@ -94,6 +94,21 @@ const defaultQtyOf = (r: OutwardRow) => {
   const q = r.balance != null && r.balance > 0 ? r.balance : r.qty;
   return q != null && q > 0 ? String(Math.round(q * 1000) / 1000) : '';
 };
+/**
+ * Outward no. shown on screen = API `OutNo`; else the challan no. when the
+ * API sent one. The internal UId / SrNo fallback is NEVER shown.
+ */
+const isIdFallback = (text: string, r: OutwardRow) =>
+  !text || text === r.uid || text === `${r.uid}/${r.srno}`;
+export const outNoOf = (r: OutwardRow, challanOf: (row: OutwardRow) => string) => {
+  if (r.outNo) return r.outNo;
+  const c = challanOf(r);
+  return isIdFallback(c, r) ? '—' : c;
+};
+/** "OutDate · accname" line of an outward (no uid). */
+const outDateOf = (r: OutwardRow) => (r.OutDate ? showDate(r.OutDate) : r.date ? showDate(r.date) : '');
+const accOf = (r: OutwardRow) => r.accName || r.mill || '';
+
 /** '' / invalid -> null, else the positive number. */
 const parseQty = (text: string): number | null | 'BAD' => {
   const t = String(text ?? '').trim();
@@ -118,6 +133,7 @@ export function OutwardLotSection({
   const [error, setError] = useState<string | null>(null);
 
   const saved = useMemo(() => table.rows.filter((r) => r.lotNo), [table.rows]);
+  const labelOf = useCallback((r: OutwardRow) => outNoOf(r, challanOf), [challanOf]);
   const lotTotal = useMemo(() => saved.reduce((sum, r) => sum + (r.lotQty ?? 0), 0), [saved]);
   const missingQty = useMemo(() => saved.filter((r) => !(r.lotQty != null && r.lotQty > 0)).length, [saved]);
   /**
@@ -176,7 +192,7 @@ export function OutwardLotSection({
       const response: any = await DyeingService.saveOutwardDetails(params);
       console.log('[Dyeing] save_outward_details response ->', response?.data ?? response);
       if (!outwardSaveOk(response)) throw new Error(messageOf(response, 'Unable to save lot no.'));
-      await onSaved(`${challanOf(row)} → Lot ${clean} · ${qtyLabel(qty)} m ${mode === 'ADD' ? 'added' : 'updated'}`);
+      await onSaved(`${labelOf(row)} → Lot ${clean} · ${qtyLabel(qty)} m ${mode === 'ADD' ? 'added' : 'updated'}`);
       return true;
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Unable to save lot no.');
@@ -191,7 +207,7 @@ export function OutwardLotSection({
     if (!selected) { setError('Select outward first.'); return; }
     const existing = lotOf(selected);
     if (existing) {
-      setError(`${challanOf(selected)} is already added in ${shdName || 'this shade'} (Lot ${existing}) — the same outward can't be added twice in one shade. Edit it in the table.`);
+      setError(`${labelOf(selected)} is already added in ${shdName || 'this shade'} (Lot ${existing}) — the same outward can't be added twice in one shade. Edit it in the table.`);
       setSelected(null);
       return;
     }
@@ -230,7 +246,7 @@ export function OutwardLotSection({
       if (!outwardSaveOk(response)) throw new Error(messageOf(response, 'Unable to remove lot no.'));
       setConfirmKey(null);
       if (editKey === row.key) setEditKey(null);
-      await onSaved(`${challanOf(row)} → Lot ${row.lotNo} removed`);
+      await onSaved(`${labelOf(row)} → Lot ${row.lotNo} removed`);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Unable to remove lot no.');
     } finally {
@@ -275,11 +291,12 @@ export function OutwardLotSection({
           >
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[st.pickerText, !selected && { color: T.muted }]} numberOfLines={1}>
-                {selected ? challanOf(selected) : 'Select Outward'}
+                {selected ? labelOf(selected) : 'Select Outward'}
               </Text>
               {!!selected && (
                 <Text style={st.pickerSub} numberOfLines={1}>
-                  {[`UId ${selected.uid} · Sr ${selected.srno}`,
+                  {[outDateOf(selected),
+                    accOf(selected),
                     selected.qty != null ? `Out ${qtyLabel(selected.qty)} m` : '',
                     selected.balance != null && selected.qty != null && selected.balance !== selected.qty ? `Bal ${qtyLabel(selected.balance)} m` : '',
                   ].filter(Boolean).join(' · ')}
@@ -347,12 +364,12 @@ export function OutwardLotSection({
             return (
               <View key={row.key} style={[st.tr, i < saved.length - 1 && st.trLine, editing && st.trEdit, confirming && st.trRemove]}>
                 <View style={{ flex: 1.3, minWidth: 0 }}>
-                  <Text style={st.tdText} numberOfLines={1}>{challanOf(row)}</Text>
+                  <Text style={st.tdText} numberOfLines={1}>{labelOf(row)}</Text>
                   <Text style={st.tdSub} numberOfLines={1}>
-                    {[`UId ${row.uid} · Sr ${row.srno}`, row.date ? showDate(row.date) : '', row.qty != null ? `Out ${qtyLabel(row.qty)} m` : '']
+                    {[outDateOf(row), row.qty != null ? `Out ${qtyLabel(row.qty)} m` : '']
                       .filter(Boolean).join(' · ')}
                   </Text>
-                  {!!row.mill && <Text style={st.tdSub} numberOfLines={1}>{row.mill}</Text>}
+                  {!!accOf(row) && <Text style={st.tdSub} numberOfLines={1}>{accOf(row)}</Text>}
                 </View>
                 <View style={[st.lotCell, { flex: 1 }]}>
                   {editing ? (
@@ -511,7 +528,7 @@ function OutwardHelp({
   const list = useMemo(() => {
     const query = q.trim().toLowerCase();
     const base = query
-      ? state.rows.filter((r) => [challanOf(r), r.uuid, r.uid, r.srno, r.chartNo, r.lotNo, r.shdName, r.mill, showDate(r.date)]
+      ? state.rows.filter((r) => [outNoOf(r, challanOf), outDateOf(r), r.OutDate, accOf(r), r.chartNo, r.lotNo, r.shdName]
         .join(' ').toLowerCase().includes(query))
       : state.rows;
     // open outwards first, outwards that already have a lot last
@@ -552,7 +569,7 @@ function OutwardHelp({
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="Search outward no, UId, chart, lot…"
+              placeholder="Search out no, date, party, chart, lot…"
               placeholderTextColor={T.muted}
               style={st.helpSearchInput}
               autoCapitalize="none"
@@ -591,16 +608,15 @@ function OutwardHelp({
                     activeOpacity={0.6}
                   >
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={st.tdText} numberOfLines={1}>{challanOf(item)}</Text>
+                      <Text style={st.tdText} numberOfLines={1}>{outNoOf(item, challanOf)}</Text>
                       <Text style={st.tdSub} numberOfLines={1}>
-                        {[`UId ${item.uid} · Sr ${item.srno}`,
+                        {[outDateOf(item),
+                          accOf(item),
                           item.chartNo && item.chartNo !== chartNo ? `Chart ${item.chartNo}` : '',
                           item.shdName ? item.shdName : '',
-                          item.soUid ? `SO ${item.soUid}/${item.soSrNo}` : '',
-                          item.date ? showDate(item.date) : '',
                           item.qty != null ? `Out ${qtyLabel(item.qty)} m` : '',
                           item.balance != null && item.qty != null && item.balance !== item.qty ? `Bal ${qtyLabel(item.balance)} m` : '',
-                          item.mill || ''].filter(Boolean).join(' · ')}
+                        ].filter(Boolean).join(' · ')}
                       </Text>
                       {!!item.takenBy && <Text style={st.takenBy} numberOfLines={1}>Taken: {item.takenBy}</Text>}
                     </View>

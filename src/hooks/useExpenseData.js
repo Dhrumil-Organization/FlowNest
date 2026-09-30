@@ -445,6 +445,11 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
         const utilityDaily = payload.trends?.utility_daily || [];
         const electricityDaily = payload.trends?.electricity_daily || [];
         const prodDaily = payload.production?.daily_trend || [];
+        const sectionAB = payload.section_ab || {};
+        const sectionABProduction = sectionAB.production || {};
+        const sectionABPicks = sectionAB.picks || {};
+        const sectionABElectricity = sectionAB.electricity || {};
+        const isSectionAB = payload.meta?.calculation_mode === 'section_ab' && sectionAB.active === true;
         const byDate = Object.fromEntries(expenseDaily.map(x => [Number(x.date_ymd), x]));
 
         const daily = prodDaily.map(row => {
@@ -463,6 +468,10 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
             prod_sud: Number(row.sip_rapier_mtr || 0),
             prod_wj: Number(row.waterjet_mtr || 0),
             prod_tot: Number(row.combined_mtr || 0),
+            section_a_mtr: Number(row.section_a_mtr || 0),
+            section_b_mtr: Number(row.section_b_mtr || 0),
+            section_a_weighted_picks: Number(row.section_a_weighted_picks || 0),
+            section_b_weighted_picks: Number(row.section_b_weighted_picks || 0),
           };
         });
 
@@ -527,6 +536,29 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           expense_daily_trend: expenseDaily,
           utility_daily_trend: utilityDaily,
           electricity_daily: electricityDaily,
+
+          // Effective-dated Section A/B reporting contract. Legacy fields above
+          // intentionally remain populated for <= 30/09/2026 and for the
+          // later salary/stores migration steps.
+          calculation_mode: payload.meta?.calculation_mode || 'legacy_rapier_waterjet',
+          is_section_ab: isSectionAB,
+          section_ab_effective_from_ymd: Number(payload.meta?.section_ab_effective_from_ymd || sectionAB.effective_from_ymd || 20261001),
+          section_a_mtr: Number(sectionABProduction.section_a_mtr || 0),
+          section_b_mtr: Number(sectionABProduction.section_b_mtr || 0),
+          section_a_avg_picks: Number(sectionABPicks.section_a_avg || 0),
+          section_b_avg_picks: Number(sectionABPicks.section_b_avg || 0),
+          section_a_electricity_kwh: Number(sectionABElectricity.section_a_kwh || 0),
+          section_b_electricity_kwh: Number(sectionABElectricity.section_b_kwh || 0),
+          section_a_electricity_amount: Number(sectionABElectricity.section_a_amount || 0),
+          section_b_electricity_amount: Number(sectionABElectricity.section_b_amount || 0),
+          section_ab_electricity_total_kwh: Number(sectionABElectricity.total_kwh || 0),
+          section_ab_electricity_total_amount: Number(sectionABElectricity.total_amount || 0),
+          section_ab_electricity_reconciled: sectionABElectricity.is_reconciled === true,
+          section_ab_electricity_difference_kwh: Number(sectionABElectricity.difference_kwh || 0),
+          section_ab_electricity_status: sectionABElectricity.status || null,
+          section_ab_readiness: sectionAB.readiness || {},
+          section_ab_groups: sectionABProduction.groups || {},
+
           trend_meta: payload.trends || {},
           conversion_rates: payload.conversion_rates || null,
           coverage: payload.period,

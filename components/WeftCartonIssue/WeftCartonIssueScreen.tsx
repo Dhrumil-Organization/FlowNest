@@ -1,29 +1,37 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-    View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Modal,
-    KeyboardAvoidingView, Platform, RefreshControl, SafeAreaView, useWindowDimensions,
-} from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { showSuccess, showError } from '@/common/utils/snackbar';
 import AppAlert from '@/common/utils/appAlert';
+import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import SearchableDropdown from '@/Shared/SearchableDropdown';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform, RefreshControl,
+    ScrollView,
+    Text, TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 
-import { s, C } from './styles';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as api from './api';
-import { f2, r3, toYmd, toDmy, ymdShow, parseCartonQr } from './helpers';
+import CartonProgress from './components/CartonProgress';
+import CartonSearch from './components/CartonSearch';
+import EditLineSheet, { EditableLine } from './components/EditLineSheet';
+import { createEntryBus } from './components/entryBus';
+import IssueCard from './components/IssueCard';
+import IssueEntry, { SavedEntry } from './components/IssueEntry';
 import type { Beam } from './components/LineFields';
 import LineRow from './components/LineRow';
-import IssueCard from './components/IssueCard';
-import CartonSearch from './components/CartonSearch';
-import CartonProgress from './components/CartonProgress';
-import IssueEntry, { SavedEntry } from './components/IssueEntry';
-import { createEntryBus } from './components/entryBus';
-import type { Carton } from './types';
 import ScannerModal from './components/ScannerModal';
-import EditLineSheet, { EditableLine } from './components/EditLineSheet';
+import { f2, parseCartonQr, r3, toDmy, toYmd, ymdShow } from './helpers';
+import { C, s } from './styles';
+import type { Carton } from './types';
 
 
 const MemoSearchableDropdown = React.memo((props: any) => <SearchableDropdown {...props} />);
@@ -186,6 +194,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
        Carton load (scan / manual pick)
        ====================================================================== */
     const setCartonFrom = useCallback((c: Carton) => {
+        setScanErr('');
         setCarton(c);
         setStartBal(c.BalUnknown ? null : { chees: Number(c.Chees) || 0, wt: Number(c.Wt) || 0 });
         setCartonLines([]);
@@ -201,7 +210,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             setScanErr('Invalid QR. Scan the carton label again.');
             return;
         }
-        setScanErr('');
         setLoadingCarton(true);
 
         // Plain carton number (handheld scanner): nothing else to read from it, use the search API once.
@@ -241,7 +249,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
 
     /** MANUAL: the search row already has everything, so selecting it needs no further call. */
     const onPickCarton = useCallback((c: Carton) => {
-        setScanErr('');
         setCartonFrom({
             ...c,
             Chees: parseInt(String(c.Chees ?? 0), 10) || 0,
@@ -281,7 +288,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         if (m === mode) return;
         setMode(m);
         clearCarton();
-        setScanErr('');
     };
 
     /* Property / year changed: the carton, search results and beams belonged to the old selection. */
@@ -289,7 +295,6 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     useEffect(() => {
         if (selectionInit.current) { selectionInit.current = false; return; }
         clearCarton();
-        setScanErr('');
     }, [activePrpCode, activeYearNo, clearCarton]);
 
     // After a successful save: update the balance and the "issued now" list locally (no extra API call).
@@ -316,22 +321,22 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                         if (deleteBusyRef.current) return;
                         deleteBusyRef.current = true;
                         try {
-                        const uid = l.UId ?? l.uid ?? l.UID;
-                        const srno = l.SrNo ?? l.srno;
-                        const subsr = l.SubSr ?? l.subsr ?? l.SubSR;
-                        if (uid == null) {
-                            showError?.('Delete failed: line UID is missing in browse data.');
-                            return;
-                        }
-                        const r = await api.deleteLine(token, {
-                            prpcode: activePrpCode, yearno: activeYearNo,
-                            uid, srno, subsr,
-                            StkType: l.StkType ?? l.stktype ?? stkType,
-                        });
-                        if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
-                        const hd = r.payload?.data?.header_deleted ? ` IssNo ${l.IssNo} had no lines left and was removed.` : '';
-                        showSuccess?.(`Line deleted.${hd}`);
-                        afterChangeRef.current();
+                            const uid = l.UId ?? l.uid ?? l.UID;
+                            const srno = l.SrNo ?? l.srno;
+                            const subsr = l.SubSr ?? l.subsr ?? l.SubSR;
+                            if (uid == null) {
+                                showError?.('Delete failed: line UID is missing in browse data.');
+                                return;
+                            }
+                            const r = await api.deleteLine(token, {
+                                prpcode: activePrpCode, yearno: activeYearNo,
+                                uid, srno, subsr,
+                                StkType: l.StkType ?? l.stktype ?? stkType,
+                            });
+                            if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
+                            const hd = r.payload?.data?.header_deleted ? ` IssNo ${l.IssNo} had no lines left and was removed.` : '';
+                            showSuccess?.(`Line deleted.${hd}`);
+                            afterChangeRef.current();
                         } finally {
                             deleteBusyRef.current = false;
                         }
@@ -352,21 +357,21 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                         if (deleteBusyRef.current) return;
                         deleteBusyRef.current = true;
                         try {
-                        const uid = iss.UId ?? iss.uid ?? iss.UID;
-                        if (uid == null) {
-                            showError?.('Delete failed: issue UID is missing in browse data.');
-                            return;
-                        }
-                        const r = await api.deleteIssue(token, {
-                            prpcode: activePrpCode, yearno: activeYearNo,
-                            uid,
-                            IssNo: iss.IssNo ?? iss.issno,
-                            IssDate: iss.IssDate ?? iss.issdate,
-                            StkType: iss.StkType ?? iss.stktype ?? stkType,
-                        });
-                        if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
-                        showSuccess?.(`IssNo ${iss.IssNo} deleted.`);
-                        afterChangeRef.current();
+                            const uid = iss.UId ?? iss.uid ?? iss.UID;
+                            if (uid == null) {
+                                showError?.('Delete failed: issue UID is missing in browse data.');
+                                return;
+                            }
+                            const r = await api.deleteIssue(token, {
+                                prpcode: activePrpCode, yearno: activeYearNo,
+                                uid,
+                                IssNo: iss.IssNo ?? iss.issno,
+                                IssDate: iss.IssDate ?? iss.issdate,
+                                StkType: iss.StkType ?? iss.stktype ?? stkType,
+                            });
+                            if (!r.ok) { showError?.(r.message || 'Could not delete.'); return; }
+                            showSuccess?.(`IssNo ${iss.IssNo} deleted.`);
+                            afterChangeRef.current();
                         } finally {
                             deleteBusyRef.current = false;
                         }
@@ -459,7 +464,19 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 <CartonSearch token={token} prpcode={activePrpCode} yearno={activeYearNo} onPick={onPickCarton} />
             )}
 
-            {!!scanErr && <View style={[s.msg, { backgroundColor: C.badSoft, marginTop: 10 }]}><Text style={[s.msgText, { color: C.bad }]}>{scanErr}</Text></View>}
+            {!!scanErr && (
+                <View style={[s.msg, { backgroundColor: C.bad, marginTop: 10, flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingLeft: 12, paddingRight: 6 }]}>
+                    <Text style={[s.msgText, { color: '#fff', flex: 1, fontWeight: '600' }]}>{scanErr}</Text>
+                    <TouchableOpacity
+                        onPress={() => setScanErr('')}
+                        accessibilityLabel="Close validation"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
+                    >
+                        <Icon name="close" size={17} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            )}
             {loadingCarton && <ActivityIndicator style={{ marginTop: 16 }} color={C.primary} />}
 
             {!!carton && (
@@ -691,25 +708,25 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                             </View>
 
                             {tab === 'beams' && (
-                            <View style={[s.filterFieldRow, isMobile && s.filterFieldRowMobile, { marginTop: 12 }]}>
-                                <View style={s.filterField}>
-                                    <Text style={s.filterLabel}>From Date</Text>
-                                    <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('from')} activeOpacity={0.8}>
-                                        <Icon name="calendar-today" size={17} color={C.primary} />
-                                        <Text style={s.filterDateText}>{toDmy(fromDate)}</Text>
-                                        <Icon name="chevron-right" size={18} color={C.ink2} />
-                                    </TouchableOpacity>
-                                </View>
+                                <View style={[s.filterFieldRow, isMobile && s.filterFieldRowMobile, { marginTop: 12 }]}>
+                                    <View style={s.filterField}>
+                                        <Text style={s.filterLabel}>From Date</Text>
+                                        <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('from')} activeOpacity={0.8}>
+                                            <Icon name="calendar-today" size={17} color={C.primary} />
+                                            <Text style={s.filterDateText}>{toDmy(fromDate)}</Text>
+                                            <Icon name="chevron-right" size={18} color={C.ink2} />
+                                        </TouchableOpacity>
+                                    </View>
 
-                                <View style={s.filterField}>
-                                    <Text style={s.filterLabel}>To Date</Text>
-                                    <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('to')} activeOpacity={0.8}>
-                                        <Icon name="calendar-today" size={17} color={C.primary} />
-                                        <Text style={s.filterDateText}>{toDmy(toDate)}</Text>
-                                        <Icon name="chevron-right" size={18} color={C.ink2} />
-                                    </TouchableOpacity>
+                                    <View style={s.filterField}>
+                                        <Text style={s.filterLabel}>To Date</Text>
+                                        <TouchableOpacity style={s.filterDateBtn} onPress={() => setFilterDateType('to')} activeOpacity={0.8}>
+                                            <Icon name="calendar-today" size={17} color={C.primary} />
+                                            <Text style={s.filterDateText}>{toDmy(toDate)}</Text>
+                                            <Icon name="chevron-right" size={18} color={C.ink2} />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
-                            </View>
                             )}
                         </ScrollView>
 

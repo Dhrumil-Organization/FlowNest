@@ -66,6 +66,7 @@ import {
   deriveColourStatus,
   DyeEvent,
   DyeLot,
+  lotsTotalQty,
   normalizeStatus,
   num,
   parseAnyDate,
@@ -76,6 +77,7 @@ import {
   STATUS_COLORS,
   STATUS_LETTER,
   STATUS_OPTIONS,
+  toOutwardLotBriefs,
   withVirtualRemainder,
 } from '../dyeing/dyeingModel';
 
@@ -239,6 +241,8 @@ export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
       const legacy = normalizeStatus(sd?.Status ?? sd?.status);
       const savedLots = (Array.isArray(sd?.lots) ? sd.lots : []).map(toLot);
       const colourHistory = toEvents(sd?.colourHistory);
+      const outwardLots = toOutwardLotBriefs(sd?.outwardLots);
+      const lotNos = String(sd?.LotNos ?? '').trim() || outwardLots.map((l) => l.LotNo).join('/');
 
       // identity of a shade row inside a chart = ShdCode + OrderSrNo
       const existing = current.shades.find(
@@ -253,6 +257,9 @@ export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
           existing.Status,
         );
         existing.Status = deriveColourStatus(existing.lots) ?? existing.Status;
+        existing.outwardLots = [...existing.outwardLots, ...outwardLots];
+        existing.LotNos = Array.from(new Set(existing.outwardLots.map((l) => l.LotNo))).join('/') || existing.LotNos;
+        existing.LotQty = lotsTotalQty(existing.outwardLots);
         return;
       }
 
@@ -268,6 +275,9 @@ export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
         Status: savedLots.length ? deriveColourStatus(lots) : legacy,
         colourHistory,
         lots,
+        outwardLots,
+        LotNos: lotNos,
+        LotQty: sd?.LotQty != null && sd?.LotQty !== '' && Number(sd.LotQty) > 0 ? Number(sd.LotQty) : lotsTotalQty(outwardLots),
       });
     });
 
@@ -564,6 +574,7 @@ export function PriorityScreen({ perms }: { perms: PriorityPerms }) {
           ...chart.shades.map((shade) => shade.ShdName),
           ...chart.shades.map((shade) => shade.ShdCode),
           ...chart.shades.flatMap((shade) => shade.lots.map((lot) => lot.LotNo)),
+          ...chart.shades.map((shade) => shade.LotNos),
         ]
           .join(' ')
           .toLowerCase();
@@ -766,13 +777,32 @@ function StatusLegend({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Colour chip on the card: NAME + per-lot [letter | lot no] + ✂ count        */
+/*  Colour chip on the card:                                                   */
+/*    NAME  [S][D][F][J][✂]  L·3365/3378 · 1,200 m                            */
+/*  Every status is shown by its first letter in the fixed sequence. A status  */
+/*  that HAS happened on the shade (in its history) is filled in its colour;   */
+/*  the CURRENT (latest) one also gets a ring; the rest stay grey = disabled.  */
 /* -------------------------------------------------------------------------- */
 
+const CHIP_STATUSES: ShadeStatus[] = ['Sent for job', 'Dying', 'Finish', 'Job inward', 'Lorry Cut'];
+
+const shadeReached = (shade: PriorityShade): Set<ShadeStatus> => {
+  const set = new Set<ShadeStatus>();
+  (shade.colourHistory || []).forEach((e) => set.add(e.Status));
+  shade.lots.forEach((lot) => {
+    (lot.history || []).forEach((e) => set.add(e.Status));
+    if (lot.Status && !lot.virtual) set.add(lot.Status);
+  });
+  if (shade.Status) set.add(shade.Status);
+  return set;
+};
+
 const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShade }) {
-  const colourColor = shade.Status ? STATUS_COLORS[shade.Status] : null;
-  const lotsToShow = shade.lots.filter((lot) => lot.Status || !lot.virtual);
+  const current = shade.Status;
+  const colourColor = current ? STATUS_COLORS[current] : null;
+  const reached = useMemo(() => shadeReached(shade), [shade]);
   const cuts = shade.lots.reduce((sum, lot) => sum + lot.LorryCutCount, 0);
+  const lotNos = shade.LotNos || Array.from(new Set(shade.lots.map((l) => l.LotNo).filter(Boolean))).join('/');
   return (
     <View
       style={[
@@ -781,20 +811,32 @@ const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShad
       ]}
     >
       <Text style={s.chipText} numberOfLines={1}>{shade.ShdName}</Text>
-      {lotsToShow.map((lot, idx) => {
-        const color = lot.Status ? STATUS_COLORS[lot.Status] : T.muted;
-        return (
-          <View key={`${lot.LotId ?? 'v'}-${idx}`} style={[s.lotPill, { borderColor: `${color}66` }]}>
-            <View style={[s.lotLetter, { backgroundColor: lot.Status ? color : T.alt }]}>
-              <Text style={[s.lotLetterText, !lot.Status && { color: T.muted }]}>
-                {lot.Status ? STATUS_LETTER[lot.Status] : '–'}
-              </Text>
+      <View style={s.letterRow}>
+        {CHIP_STATUSES.map((option) => {
+          const done = reached.has(option);
+          const isCurrent = current === option;
+          const color = STATUS_COLORS[option];
+          return (
+            <View
+              key={option}
+              style={[
+                s.lotLetter,
+                done ? { backgroundColor: color } : s.letterOff,
+                isCurrent && { borderWidth: 1.5, borderColor: T.ink },
+              ]}
+            >
+              {/* <Text style={[s.lotLetterText, !done && s.letterOffText]}>{STATUS_LETTER[option]}</Text> */}
+              <Text style={[s.lotLetterText, !done && s.letterOffText]}>{STATUS_LETTER[option]}</Text>
             </View>
-            {!!lot.LotNo && <Text style={[s.lotNoText, { color }]} numberOfLines={1}>{lot.LotNo}</Text>}
-          </View>
-        );
-      })}
-      {cuts > 0 && <Text style={s.cutText}>✂{cuts}</Text>}
+          );
+        })}
+      </View>
+      {/* {!!lotNos && (
+        <Text style={[s.lotNoText, { color: colourColor || T.muted }]} numberOfLines={1}>
+          L·{lotNos}{shade.LotQty != null ? ` · ${qtyLabel(shade.LotQty)} m` : ''}
+        </Text>
+      )} */}
+      {cuts > 1 && <Text style={s.cutText}>✂{cuts}</Text>}
     </View>
   );
 });
@@ -1543,7 +1585,10 @@ const s = StyleSheet.create({
     width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
   },
   lotLetterText: { color: '#fff', fontSize: 8.5, fontWeight: '900' },
-  lotNoText: { fontSize: 9, fontWeight: '800', maxWidth: 80 },
+  lotNoText: { fontSize: 9, fontWeight: '800', maxWidth: 150 },
+  letterRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  letterOff: { backgroundColor: T.alt, borderWidth: 1, borderColor: T.border },
+  letterOffText: { color: '#BDB6AE' },
   cutText: { fontSize: 9.5, fontWeight: '900', color: T.purple },
 
   draggingCard: {

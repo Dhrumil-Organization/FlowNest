@@ -28,6 +28,16 @@
 // dates; pending = period outwards not yet received; shortage = sent minus
 // received on the period's receipts (pending never counts, never blocks);
 // re-dye shown separately.
+//
+// ── LOT QTY (outward lots) ──────────────────────────────────────────────────
+// The status is saved per SHADE, but a shade goes to the mill as one or more
+// OUTWARD LOTS (lot no + lot qty + challan + mill — backend lot table). When
+// every lot of the shade has a qty, each status event of the shade is split
+// into one event per lot (expandByLots): metres = that lot's qty, challan /
+// mill / lot no = that lot's. So Daily Update rows and Mill Hub trips are
+// per lot, per challan, per mill — and the totals are the real lot metres.
+// Shades without lots (or with a lot that has no qty yet) stay as one row
+// with the qty the backend sent (lot total / saved qty / order qty).
 
 import { DyeEventRow, num } from './dyeingModel';
 
@@ -52,7 +62,40 @@ export const designOf = (e: Pick<DyeEventRow, 'DsnName' | 'DsnCode'>) =>
 
 const lotNoOf = (e: DyeEventRow) => e.LotNos || e.LotNo || '';
 
-const groupByLot = (events: DyeEventRow[]) => {
+/**
+ * One event per OUTWARD LOT of the shade (see LOT QTY above). The lot key
+ * becomes `<status row>-L<lot>` so every lot is counted on its own.
+ */
+export function expandByLots(events: DyeEventRow[]): DyeEventRow[] {
+  const out: DyeEventRow[] = [];
+  events.forEach((e) => {
+    const lots = e.OutwardLots || [];
+    const allHaveQty = lots.length > 0 && lots.every((l) => l.LotQty != null && l.LotQty > 0);
+    if (!allHaveQty) {
+      out.push(e);
+      return;
+    }
+    lots.forEach((l, i) => {
+      out.push({
+        ...e,
+        LotId: `${e.LotId}-L${l.LotId ?? `${l.OutwardUId}/${l.OutwardSrNo}/${i}`}`,
+        RootLotId: e.RootLotId ?? e.LotId,
+        Qty: l.LotQty as number,
+        LotNo: l.LotNo,
+        LotNos: l.LotNo,
+        OutwardNos: l.ChalNo || '',
+        ChallanNo: e.ChallanNo || l.ChalNo || null,
+        MillName: l.MillName || e.MillName,
+        OutwardLots: [l],
+        LotQty: l.LotQty,
+      });
+    });
+  });
+  return out;
+}
+
+const groupByLot = (input: DyeEventRow[]) => {
+  const events = expandByLots(input);
   const map = new Map<string, DyeEventRow[]>();
   events.forEach((e) => {
     const k = lotKeyOf(e);
@@ -88,6 +131,7 @@ export type StreamRow = {
   reason: string | null;
   afterFinish: boolean | null;
   cycle: number | null;
+  estimate: boolean; // metres = order qty (no lot qty entered yet)
 };
 
 /** Every classified daily row (all dates) — ERP `stream`. */
@@ -115,6 +159,7 @@ export function buildStream(events: DyeEventRow[]): StreamRow[] {
         reason: null as string | null,
         afterFinish: null as boolean | null,
         cycle: null as number | null,
+        estimate: e.QtySource === 'ORDER',
       };
       switch (e.Status) {
         case 'Lorry Cut': {
@@ -201,6 +246,7 @@ export type DayLotRow = {
   reasons: string[];
   afterFinish: boolean | null;
   cycle: number | null;
+  estimate: boolean;
 };
 
 export const mergeDayRows = (list: StreamRow[]): DayLotRow[] => {
@@ -211,12 +257,13 @@ export const mergeDayRows = (list: StreamRow[]): DayLotRow[] => {
       x = {
         lot: r.lot, design: r.design, chartNo: r.chartNo, colour: r.colour, party: r.party,
         lotNo: r.lotNo, challan: r.challan, mill: r.mill, metres: 0, kinds: {}, reasons: [],
-        afterFinish: null, cycle: null,
+        afterFinish: null, cycle: null, estimate: false,
       };
       map.set(r.lot, x);
     }
     x.kinds[r.kind] = true;
     x.metres = Math.max(x.metres, r.metres);
+    if (r.estimate) x.estimate = true;
     if (r.mill) x.mill = r.mill;
     if (r.lotNo) x.lotNo = r.lotNo;
     if (r.challan) x.challan = r.challan;
@@ -329,6 +376,7 @@ export type MillTrip = {
   dyed: boolean;
   finished: boolean;
   cuts: number;
+  estimate: boolean; // metres = order qty (no lot qty entered yet)
 };
 
 /** Every outward trip (with its receipts) of every lot — the app's "mill moves". */
@@ -366,6 +414,7 @@ export function buildTrips(events: DyeEventRow[]): MillTrip[] {
         dyed: false,
         finished: false,
         cuts: 0,
+        estimate: e.QtySource === 'ORDER',
       };
       trips.push(t);
       mine.push(t);

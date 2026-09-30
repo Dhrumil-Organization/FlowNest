@@ -267,7 +267,7 @@ export function DailyUpdateTab() {
                                 </Text>
                                 {r.reasons.length ? <Text style={{ color: PC.lorrycut }}> · {r.reasons.join(', ')}</Text> : null}
                               </Text>
-                              <Text style={[st.mono, { fontSize: 10.5, fontWeight: '700', color: T.ink }]}>{fmt(r.metres)} m</Text>
+                              <Text style={[st.mono, { fontSize: 10.5, fontWeight: '700', color: T.ink }]}>{r.estimate ? '≈ ' : ''}{fmt(r.metres)} m</Text>
                               <Badge r={r} />
                             </View>
                           ))}
@@ -288,7 +288,8 @@ export function DailyUpdateTab() {
             Dyed / Finished / Received are first-time work on physical material. A lorry cut sends a lot back for
             re-processing — before finishing (re-dye only) or after finishing (re-dye + re-finish); all of that, plus
             re-processing outwards and returns, is counted separately per lot per day and never added to the dyeing totals.
-            Month lorry cuts: {grand.cuts} · {qtyLabel(grand.cut)} m.
+            Month lorry cuts: {grand.cuts} · {qtyLabel(grand.cut)} m. Metres come from each shade's outward LOT QTY
+            (one row per lot); ≈ = no lot qty entered yet, the shade's order qty is used.
           </Text>
         </>
       )}
@@ -346,7 +347,7 @@ function ActivityRow({ r }: { r: DayLotRow }) {
         </Text>
       </View>
       <View style={st.aRight}>
-        <Text style={[st.mono, st.aMetres]}>{fmt(r.metres)} m</Text>
+        <Text style={[st.mono, st.aMetres]}>{r.estimate ? '≈ ' : ''}{fmt(r.metres)} m</Text>
         <Badge r={r} />
       </View>
     </View>

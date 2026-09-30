@@ -86,10 +86,34 @@ type GryLine = {
   SOUID: number;
   SOSrNo: number;
   ChalNo: string;
+  Qty: number; // outward qty (FAMSALD2.Qty)
+  MillName: string; // outward party
+  SoShdCode: string;
+};
+
+/** FAMSOAllocationPriorityOutwardLot — one lot of one shade on one outward line. */
+type MockLot = {
+  Id: number;
+  OrderUId: number;
+  OrderSrNo: number;
+  ChartNo: string;
+  ShdCode: string;
+  ShdName: string;
+  OutwardUId: number;
+  OutwardSrNo: number;
+  OutwardShdCode: string;
+  ChalNo: string;
+  MillName: string;
+  OutwardQty: number;
+  LotNo: string;
+  LotQty: number | null;
+  IsActive: boolean;
 };
 
 let CHARTS: MockChart[] = [];
 let GRY: GryLine[] = [];
+let LOTS: MockLot[] = [];
+let lotSeq = 0;
 let eventSeq = 0;
 let rowSeq = 0;
 
@@ -162,12 +186,25 @@ const chart = (
     const sends = s.history.filter((h) => h.Status === 'Sent for job');
     (sends.length ? sends : []).forEach((h, i) => {
       gryUid += 1;
-      GRY.push({
+      const line: GryLine = {
         UId: gryUid, SrNo: i + 1, ChartNo, SOUID: OrderUId, SOSrNo: OrderSrNo,
         ChalNo: h.ChallanNo || `DC-${String(gryUid).slice(-4)}`,
         ChartLotNo: (s.lots && s.lots[i]) || '',
-      });
-      if (!h.ChallanNo) h.ChallanNo = GRY[GRY.length - 1].ChalNo;
+        Qty: num(h.Qty) || s.qty,
+        MillName: h.MillName || '',
+        SoShdCode: String(shdSeq),
+      };
+      GRY.push(line);
+      if (!h.ChallanNo) h.ChallanNo = line.ChalNo;
+      if (line.ChartLotNo) {
+        lotSeq += 1;
+        LOTS.push({
+          Id: lotSeq, OrderUId, OrderSrNo, ChartNo, ShdCode: String(shdSeq), ShdName: s.name,
+          OutwardUId: line.UId, OutwardSrNo: line.SrNo, OutwardShdCode: line.SoShdCode,
+          ChalNo: line.ChalNo, MillName: line.MillName, OutwardQty: line.Qty,
+          LotNo: line.ChartLotNo, LotQty: line.Qty, IsActive: true,
+        });
+      }
     });
   });
   CHARTS.push(c);
@@ -177,12 +214,18 @@ const chart = (
 /** Extra outward line on an SO line (a second challan not yet given a lot no.). */
 const extraOutward = (c: MockChart, srNo: number, chalNo: string, lot = '') => {
   gryUid += 1;
-  GRY.push({ UId: gryUid, SrNo: 1, ChartNo: c.ChartNo, SOUID: c.OrderUId, SOSrNo: srNo, ChalNo: chalNo, ChartLotNo: lot });
+  const shd = c.shades.find((x) => x.OrderSrNo === srNo);
+  GRY.push({
+    UId: gryUid, SrNo: 1, ChartNo: c.ChartNo, SOUID: c.OrderUId, SOSrNo: srNo, ChalNo: chalNo, ChartLotNo: lot,
+    Qty: 600, MillName: SR, SoShdCode: shd?.ShdCode || '',
+  });
 };
 
 function seed() {
   CHARTS = [];
   GRY = [];
+  LOTS = [];
+  lotSeq = 0;
   eventSeq = 0;
   rowSeq = 0;
   uidSeq = 370000600;
@@ -196,7 +239,7 @@ function seed() {
       history: flow(1200, SR, 46, { sent: 11, dyed: 9, fin: 7, inward: 5, inQty: name === 'Sand' ? 1176 : 1200 }),
     })),
     {
-      name: 'Olive', qty: 1200, lots: ['SR-4315', 'SR-4315R'],
+      name: 'Olive', qty: 1200, lots: ['SR-4315'],
       history: [
         ...flow(1200, SR, 46, { sent: 11, dyed: 9, fin: 7, inward: 5 }),
         ev('Lorry Cut', 5, 1200, { LorryCutReason: 'Shade variation — lot to lot', Remarks: 'cut after receipt, sent back', MillName: SR }),
@@ -306,15 +349,57 @@ const gryOf = (c: MockChart, s: MockShade) =>
 
 const join = (xs: string[]) => Array.from(new Set(xs.map((x) => x.trim()).filter(Boolean))).join('/');
 
+const lotsOfShade = (c: MockChart, s: MockShade) =>
+  LOTS.filter((l) => l.IsActive && l.OrderUId === c.OrderUId && l.OrderSrNo === s.OrderSrNo
+    && l.ChartNo === c.ChartNo && l.ShdCode === s.ShdCode);
+
+const lotBrief = (l: MockLot) => ({
+  LotId: l.Id, LotNo: l.LotNo, LotQty: l.LotQty, OutwardUId: String(l.OutwardUId), OutwardSrNo: l.OutwardSrNo,
+  ChalNo: l.ChalNo, ChalDate: null, MillName: l.MillName || null, OutwardShdCode: l.OutwardShdCode,
+});
+
+/** backend dyeing_lots_total — null when no lot or any lot without qty. */
+const lotsTotal = (lots: MockLot[]) =>
+  lots.length && lots.every((l) => (l.LotQty ?? 0) > 0) ? lots.reduce((t, l) => t + (l.LotQty ?? 0), 0) : null;
+
+const lotApiRow = (l: MockLot) => ({
+  Id: l.Id, LotId: l.Id, uuid: String(l.OutwardUId), usrno: String(l.OutwardSrNo), uid: String(l.OrderUId), srno: String(l.OrderSrNo),
+  ChartNo: l.ChartNo, ChartLotNo: l.LotNo, LotNo: l.LotNo, LotQty: l.LotQty, soshdcode: l.ShdCode, ShdCode: l.ShdCode,
+  ShdName: l.ShdName, OutwardShdCode: l.OutwardShdCode, ChalNo: l.ChalNo, MillName: l.MillName, Qty: l.OutwardQty, Legacy: 0,
+});
+
+/** outward_details row + what the lot table knows about that line (backend dyeing_outward_with_lots). */
+const outwardRow = (g: GryLine, shdcode: string, withChallan: boolean) => {
+  const lots = LOTS.filter((l) => l.IsActive && l.OutwardUId === g.UId && l.OutwardSrNo === g.SrNo);
+  const used = lots.reduce((t, l) => t + (l.LotQty ?? 0), 0);
+  const mine = shdcode ? lots.find((l) => l.ShdCode === shdcode) : undefined;
+  return {
+    uuid: String(g.UId), usrno: String(g.SrNo), uid: String(g.SOUID), srno: String(g.SOSrNo), ChartNo: g.ChartNo,
+    ChartLotNo: shdcode ? (mine?.LotNo ?? '') : g.ChartLotNo, soshdcode: g.SoShdCode,
+    ...(withChallan ? { ChalNo: g.ChalNo } : {}),
+    MillName: g.MillName, Qty: g.Qty,
+    ShadeLots: lots.map((l) => ({ LotId: l.Id, ShdCode: l.ShdCode, ChartNo: l.ChartNo, LotNo: l.LotNo, LotQty: l.LotQty })),
+    LotQtyUsed: used, Balance: Math.max(0, g.Qty - used),
+    TakenBy: lots.filter((l) => l !== mine).map((l) => `Lot ${l.LotNo} · Shd ${l.ShdCode}`).join(', '),
+    LotQty: mine?.LotQty ?? null, LotId: mine?.Id ?? null,
+  };
+};
+
 /** Flat report rows (backend dyeing_event_query + GRY enrichment). */
 const flatEvents = () => {
   const rows: any[] = [];
   CHARTS.forEach((c) => c.shades.forEach((s) => {
     const g = gryOf(c, s);
-    const LotNos = join(g.map((x) => x.ChartLotNo));
-    const OutwardNos = join(g.map((x) => x.ChalNo));
+    const lots = lotsOfShade(c, s);
+    const LotNos = lots.length ? join(lots.map((l) => l.LotNo)) : join(g.map((x) => x.ChartLotNo));
+    const OutwardNos = lots.length ? join(lots.map((l) => l.ChalNo)) : join(g.map((x) => x.ChalNo));
+    const LotQty = lotsTotal(lots);
     s.history.forEach((h) => rows.push({
       ...h,
+      Qty: LotQty ?? h.Qty,
+      QtySource: LotQty != null ? 'LOT' : 'EVENT',
+      LotQty,
+      OutwardLots: lots.map(lotBrief),
       LotId: s.rowId,
       LotNo: h.LotNo || LotNos,
       LotStatus: s.Status,
@@ -369,6 +454,9 @@ export async function mockDyeingBrowse() {
       ClientPriority: c.ClientPriority,
       SelfPriority: c.SelfPriority,
       Status: s.Status,
+      LotNos: join(lotsOfShade(c, s).map((l) => l.LotNo)),
+      LotQty: lotsTotal(lotsOfShade(c, s)),
+      outwardLots: lotsOfShade(c, s).map(lotBrief),
       colourHistory: s.history.map((h) => ({ ...h })),
       lots: [],
     })),
@@ -430,62 +518,114 @@ export async function mockSaveDyeingLot(_p: SaveLotPayload) {
   return { data: { status: true, success: true, message: 'Lot updated.', data: { Lot: null, Lots: [] } } };
 }
 
-export async function mockOutwardDetails(params: { chartno: string }) {
+export async function mockOutwardDetails(params: { chartno: string; shdcode?: string }) {
   await mockDelay(150);
   const chartNo = String(params.chartno || '').trim();
   if (!chartNo) return fail('Chart No is required.');
+  const shd = String(params.shdcode || '').trim();
   const outward_details = GRY
     .filter((g) => g.ChartNo === chartNo)
     .sort((a, b) => a.UId - b.UId || a.SrNo - b.SrNo)
-    .map((g) => ({ uuid: String(g.UId), usrno: String(g.SrNo), uid: String(g.SOUID), srno: String(g.SOSrNo), ChartNo: g.ChartNo, ChartLotNo: g.ChartLotNo, ChalNo: g.ChalNo }));
+    .map((g) => outwardRow(g, shd, true));
   return ok({ outward_details });
 }
 
-export async function mockOutwardDetailsAll(params: { orderuid: string | number; ordersrno: string | number }) {
+export async function mockOutwardDetailsAll(params: { orderuid: string | number; ordersrno: string | number; shdcode?: string }) {
   await mockDelay(150);
+  const shd = String(params.shdcode || '').trim();
   const outward_details = GRY
     .filter((g) => String(g.SOUID) === String(params.orderuid) && String(g.SOSrNo) === String(params.ordersrno))
     .sort((a, b) => a.UId - b.UId || a.SrNo - b.SrNo)
-    .map((g) => ({ uuid: String(g.UId), usrno: String(g.SrNo), uid: String(g.SOUID), srno: String(g.SOSrNo), ChartNo: g.ChartNo, ChartLotNo: g.ChartLotNo }));
+    .map((g) => outwardRow(g, shd, true));
   return ok({ outward_details });
 }
 
-/** GET /dyeing/lotnos — backend get_lot_data: chart + SO line, rows WITH a lot no. only. */
-export async function mockLotNos(params: { chartno: string; orderuid: string | number; ordersrno: string | number }) {
+/** GET /dyeing/lotnos — backend get_lot_data: lots of ONE shade (chart + SO line + shade). */
+export async function mockLotNos(params: { chartno: string; orderuid: string | number; ordersrno: string | number; shdcode?: string }) {
   await mockDelay(150);
   const chartNo = String(params.chartno || '').trim();
   if (!chartNo) return fail('Chart No is required.');
-  const lot_details = GRY
-    .filter((g) => g.ChartNo === chartNo && String(g.SOUID) === String(params.orderuid)
-      && String(g.SOSrNo) === String(params.ordersrno) && g.ChartLotNo.trim() !== '')
-    .sort((a, b) => a.UId - b.UId || a.SrNo - b.SrNo)
-    .map((g) => ({ uuid: String(g.UId), usrno: String(g.SrNo), uid: String(g.SOUID), srno: String(g.SOSrNo), ChartNo: g.ChartNo, ChartLotNo: g.ChartLotNo }));
-  return ok({ lot_details });
+  const shd = String(params.shdcode || '').trim();
+  const lot_details = LOTS
+    .filter((l) => l.IsActive && l.ChartNo === chartNo && String(l.OrderUId) === String(params.orderuid)
+      && String(l.OrderSrNo) === String(params.ordersrno) && (!shd || l.ShdCode === shd))
+    .map(lotApiRow);
+  return ok({ lot_details, LotQtyTotal: lotsTotal(LOTS.filter((l) => lot_details.some((r) => r.Id === l.Id))) });
 }
 
-export async function mockSaveOutwardDetails(params: { uid: any; srno: any; chartno: string; lotno: string }) {
+/** POST /dyeing/save_outward_details — add / update the lot (no + qty) of one shade on one outward line. */
+export async function mockSaveOutwardDetails(params: {
+  uid: any; srno: any; uuid?: any; usrno?: any; chartno: string; lotno: string; lotqty?: number | null;
+  shdcode: string; shdname?: string; lotchartno?: string; orderuid?: any; ordersrno?: any; mode?: 'add' | 'edit';
+}) {
   await mockDelay(200);
-  const lot = String(params.lotno || '').trim();
+  const lot = String(params.lotno || '').trim().toUpperCase();
   if (!params.uid) return fail('UId is required.');
   if (!params.srno) return fail('SrNo is required.');
   if (!params.chartno) return fail('Chart No is required.');
   if (!lot) return fail('Lot No is required.');
-  const g = GRY.find((x) => String(x.SOUID) === String(params.uid) && String(x.SOSrNo) === String(params.srno) && x.ChartNo === String(params.chartno).trim());
+  const g = GRY.find((x) => String(x.SOUID) === String(params.uid) && String(x.SOSrNo) === String(params.srno)
+    && x.ChartNo === String(params.chartno).trim()
+    && (params.uuid == null || params.uuid === '' || String(x.UId) === String(params.uuid))
+    && (params.usrno == null || params.usrno === '' || String(x.SrNo) === String(params.usrno)));
   if (!g) return fail(`Outward entry not found for UId: ${params.uid}, SrNo: ${params.srno}, ChartNo: ${params.chartno}`);
+  const shd = String(params.shdcode || '').trim();
+  if (!shd) return fail('ShdCode is required.');
+  const qty = num(params.lotqty) > 0 ? num(params.lotqty) : g.Qty;
+  if (!(qty > 0)) return fail('Enter Lot Qty (m).');
+  const OrderUId = num(params.orderuid) || g.SOUID;
+  const OrderSrNo = num(params.ordersrno) || g.SOSrNo;
+  const ChartNo = String(params.lotchartno || params.chartno).trim();
+  const others = LOTS.filter((l) => l.IsActive && l.OutwardUId === g.UId && l.OutwardSrNo === g.SrNo
+    && !(l.OrderUId === OrderUId && l.OrderSrNo === OrderSrNo && l.ChartNo === ChartNo && l.ShdCode === shd))
+    .reduce((t, l) => t + (l.LotQty ?? 0), 0);
+  if (qty + others > g.Qty + 0.001) {
+    return fail(`Lot qty ${qty} m is more than the balance of this outward (${Math.max(0, g.Qty - others)} m of ${g.Qty} m).`);
+  }
+  let row = LOTS.find((l) => l.IsActive && l.OrderUId === OrderUId && l.OrderSrNo === OrderSrNo && l.ChartNo === ChartNo
+    && l.ShdCode === shd && l.OutwardUId === g.UId && l.OutwardSrNo === g.SrNo);
+  if (row && params.mode === 'add') {
+    return fail(`This outward is already added in this shade (Lot ${row.LotNo}) — the same outward can't be added twice in one shade. Edit it in the table.`);
+  }
+  const mode = row ? 'updated' : 'added';
+  if (row) {
+    row.LotNo = lot;
+    row.LotQty = qty;
+  } else {
+    lotSeq += 1;
+    row = {
+      Id: lotSeq, OrderUId, OrderSrNo, ChartNo, ShdCode: shd, ShdName: String(params.shdname || ''),
+      OutwardUId: g.UId, OutwardSrNo: g.SrNo, OutwardShdCode: g.SoShdCode, ChalNo: g.ChalNo, MillName: g.MillName,
+      OutwardQty: g.Qty, LotNo: lot, LotQty: qty, IsActive: true,
+    };
+    LOTS.push(row);
+  }
   g.ChartLotNo = lot;
-  return ok({ UId: g.UId, SrNo: g.SrNo, ChartNo: g.ChartNo, ChartLotNo: lot }, 'Lot No saved successfully.');
+  return ok({ UId: g.UId, SrNo: g.SrNo, ChartNo: g.ChartNo, ChartLotNo: lot, Lot: lotApiRow(row) }, `Lot No ${mode} successfully.`);
 }
 
-/** POST /dyeing/remove_lotno — clears the lot no. of one outward line. */
-export async function mockRemoveLotNo(p: { uid: any; srno: any; chartno: string; shdcode: string }) {
+/** POST /dyeing/remove_lotno — removes the lot of ONE shade on one outward line. */
+export async function mockRemoveLotNo(p: {
+  uid: any; srno: any; uuid?: any; usrno?: any; chartno: string; shdcode: string; lotid?: number;
+  lotchartno?: string; orderuid?: any; ordersrno?: any;
+}) {
   await mockDelay(200);
   if (!p.uid) return fail('UId is required.');
   if (!p.srno) return fail('SrNo is required.');
   if (!p.chartno) return fail('Chart No is required.');
-  const g = GRY.find((x) => String(x.SOUID) === String(p.uid) && String(x.SOSrNo) === String(p.srno) && x.ChartNo === String(p.chartno).trim());
-  if (!g) return fail(`Outward entry not found for UId: ${p.uid}, SrNo: ${p.srno}, ChartNo: ${p.chartno}`);
-  g.ChartLotNo = '';
-  return ok({ UId: g.UId, SrNo: g.SrNo, ChartNo: g.ChartNo }, 'Lot No removed successfully.');
+  const shd = String(p.shdcode || '').trim();
+  const ChartNo = String(p.lotchartno || p.chartno).trim();
+  const hits = LOTS.filter((l) => l.IsActive && (p.lotid ? l.Id === p.lotid
+    : l.OrderUId === (num(p.orderuid) || num(p.uid)) && l.OrderSrNo === (num(p.ordersrno) || num(p.srno))
+      && l.ChartNo === ChartNo && l.ShdCode === shd && String(l.OutwardUId) === String(p.uuid) && String(l.OutwardSrNo) === String(p.usrno)));
+  if (!hits.length) return fail('Lot not found.');
+  hits.forEach((l) => { l.IsActive = false; });
+  hits.forEach((l) => {
+    const g = GRY.find((x) => x.UId === l.OutwardUId && x.SrNo === l.OutwardSrNo);
+    const rest = LOTS.filter((x) => x.IsActive && x.OutwardUId === l.OutwardUId && x.OutwardSrNo === l.OutwardSrNo);
+    if (g) g.ChartLotNo = rest.length ? rest[rest.length - 1].LotNo : '';
+  });
+  return ok({ UId: hits[0].OutwardUId, SrNo: hits[0].OutwardSrNo, ChartNo: hits[0].ChartNo, ChartLotNo: '' }, 'Lot No removed successfully.');
 }
 
 /** POST /dyeing/remove_status — removes the shade's LATEST status only. */

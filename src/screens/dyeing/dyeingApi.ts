@@ -85,6 +85,9 @@ export const DyeingService = {
   saveOutwardDetails: async (params: {
     prptype: string; chartno: string; yearno: string | number; uid: string | number; srno: string | number; lotno: string;
     shdcode: string; shdname?: string; uuid?: any; usrno?: any;
+    lotqty?: number | null; // lot qty (m) = outward qty of the lot
+    mode?: 'add' | 'edit'; // add = refuse when this shade already has this outward line
+    lotchartno?: string; orderuid?: string | number; ordersrno?: string | number; parcode?: string; // shade identity
   }) => {
     if (USE_MOCK) return mockSaveOutwardDetails(params);
     try {
@@ -120,6 +123,10 @@ export type RemoveLotNoPayload = {
   usrno?: any; // outward usrno as received
   shdname?: string; // shade name of the shade the lot belongs to
   chartno: string;
+  lotchartno?: string; // chart of the shade (lot table key)
+  orderuid?: number | string; // SO line of the shade
+  ordersrno?: number | string;
+  lotid?: number; // lot row id (lot table)
   shdcode: string;
   prptype: string;
   yearno: number | string;

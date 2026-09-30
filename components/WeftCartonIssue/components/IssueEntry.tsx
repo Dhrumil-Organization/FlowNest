@@ -1,13 +1,13 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
 import { showSuccess } from '@/common/utils/snackbar';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as api from '../api';
+import { f2, makeClientRef, r3 } from '../helpers';
+import { C, s } from '../styles';
+import type { Carton } from '../types';
 import LineFields, { Beam, LineValue } from './LineFields';
 import { EntryBus } from './entryBus';
-import { s, C } from '../styles';
-import * as api from '../api';
-import { f2, r3, makeClientRef } from '../helpers';
-import type { Carton } from '../types';
 
 export type SavedEntry = { chees: number; wt: number; beam: string; dsn: string };
 
@@ -29,7 +29,7 @@ const emptyLine: LineValue = { beam: null, stkType: undefined, dsn: null, rsr: n
  * The screen mounts it with key=carton, so it resets by itself when the carton changes.
  */
 const IssueEntry = ({
-    token, prpcode, yearno, stkType, dmy, ymd, shift, expProdQtyType,
+    token, prpcode, yearno, stkType = 'I', dmy, ymd, shift, expProdQtyType,
     carton, beams, beamsLoading, isMobile = false, bus, onSaved, onStale,
 }: Props) => {
     const [line, setLine] = useState<LineValue>(emptyLine);
@@ -44,12 +44,13 @@ const IssueEntry = ({
     useEffect(() => () => bus.set(0), [bus]);      // leaving / changing carton clears the bar's "this entry"
 
     // any change to the entry means a new request id
-    const touchEntry = useCallback(() => { clientRef.current = null; setFormErr(''); }, []);
-    const handleLine = useCallback((v: LineValue) => { touchEntry(); setLine(v); }, [touchEntry]);
+    const touchEntry = useCallback(() => { clientRef.current = null; }, []);
+    const handleLine = useCallback((v: LineValue) => { touchEntry(); setLine(v); setFormErr(''); }, [touchEntry]);
 
     const onChees = (v: string) => {
         touchEntry();
         setChees(v);
+        setFormErr('');
         bus.set(Math.max(0, parseInt(v, 10) || 0));
         if (wtTouched) return;
         const n = parseInt(v, 10);
@@ -57,7 +58,7 @@ const IssueEntry = ({
         setWt(n >= carton.Chees ? f2(carton.Wt) : f2((carton.Wt / carton.Chees) * n)); // last chees takes exact balance
     };
 
-    const onWt = (v: string) => { touchEntry(); setWt(v); setWtTouched(v !== ''); };
+    const onWt = (v: string) => { touchEntry(); setWt(v); setWtTouched(v !== ''); setFormErr(''); };
 
     const addBeam = async () => {
         if (savingRef.current) return;
@@ -84,8 +85,9 @@ const IssueEntry = ({
             });
 
             const r = await api.saveLine(token, {
-                prpcode, yearno, IssDate: ymd, Shift: shift, StkType: line.stkType || stkType,
-                BeamUId: line.beam.UId, DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
+                prpcode, yearno, IssDate: ymd, Shift: shift, StkType: line.stkType || stkType || 'I',
+                IssTo: '', Remark: '',
+                BeamUId: line.beam.UId, BeamNo: line.beam.BeamNo || '', DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
                 ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
                 Chees: ch, Wt: w, ClientRefId: clientRef.current,
                 CartNo: carton.CartNo, TranType: carton.TranType, PUId: carton.PUId, PSrNo: carton.PSrNo, PSubSr: carton.PSubSr,
@@ -140,7 +142,19 @@ const IssueEntry = ({
             </View>
 
             {!!chees && !wtTouched && <Text style={[s.hint, { marginTop: 0, marginBottom: 8 }]}>Weight filled from average chees weight. Edit it if the scale says otherwise.</Text>}
-            {!!formErr && <View style={[s.msg, { backgroundColor: C.badSoft }]}><Text style={[s.msgText, { color: C.bad }]}>{formErr}</Text></View>}
+            {!!formErr && (
+                <View style={[s.msg, { backgroundColor: C.bad, flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingLeft: 12, paddingRight: 6 }]}>
+                    <Text style={[s.msgText, { color: '#fff', flex: 1, fontWeight: '600' }]}>{formErr}</Text>
+                    <TouchableOpacity
+                        onPress={() => setFormErr('')}
+                        accessibilityLabel="Close validation"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
+                    >
+                        <Icon name="close" size={17} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <TouchableOpacity style={[s.btn, s.btnPrimary, { height: 48 }]} onPress={addBeam} disabled={saving} activeOpacity={0.85}>
                 {saving ? <ActivityIndicator color="#fff" /> : (<><Icon name="add-circle-outline" size={20} color="#fff" /><Text style={s.btnPrimaryText}>Add beam</Text></>)}

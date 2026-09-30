@@ -31,6 +31,7 @@
 // const f2 = (v) => Number(v || 0).toFixed(2);
 // const f3 = (v) => Number(v || 0).toFixed(3);
 // const fN = (v) => Math.round(v || 0).toLocaleString("en-IN");
+
 // const arrow = (c, p) => {
 //   if (!p) return "—";
 //   const d = ((c - p) / p) * 100;
@@ -2434,9 +2435,26 @@ const f2 = (v) => Number(v || 0).toFixed(2);
 const f3 = (v) => Number(v || 0).toFixed(3);
 const f4 = (v) => Number(v || 0).toFixed(4);
 const fN = (v) => Math.round(v || 0).toLocaleString("en-IN");
+const fINR = (v, decimals = 2) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 
 const buildUtilityRateRows = (d) => {
   if (!d) return [];
+
+  if (d.is_section_ab) {
+    const sectionRow = (key, label, kwh, amount, production, picks) => ({
+      key, label, kwh: Number(kwh || 0), amount: Number(amount || 0),
+      shared: false,
+      rate_available: Number(production || 0) > 0,
+      pick_rate_available: Number(production || 0) > 0 && Number(picks || 0) > 0,
+      cost_per_mtr: Number(production || 0) > 0 ? Number(amount || 0) / Number(production || 0) : 0,
+      cost_per_pick: Number(production || 0) > 0 && Number(picks || 0) > 0 ? Number(amount || 0) / Number(production || 0) / Number(picks || 0) : 0,
+    });
+    return [
+      sectionRow('section_a', 'Section A · 40 machines', d.section_a_electricity_kwh, d.section_a_electricity_amount, d.section_a_mtr, d.section_a_avg_picks),
+      sectionRow('section_b', 'Section B · 86 machines', d.section_b_electricity_kwh, d.section_b_electricity_amount, d.section_b_mtr, d.section_b_avg_picks),
+    ];
+  }
+
   if (Array.isArray(d.utility_rates) && d.utility_rates.length > 0) {
     return d.utility_rates;
   }
@@ -3268,8 +3286,9 @@ function DayInputTable({ days, cols, rows, setRows, onAddDay }) {
 function DailyUnitsView({ d, onBack }) {
   const rows = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
   const [openDay, setOpenDay] = useState(rows.length ? rows.length - 1 : -1);
-  const totalKwh = rows.reduce((sum, r) => sum + Number(r.total_kwh || 0), 0);
-  const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const sectionMode = d.is_section_ab === true;
+  const totalKwh = sectionMode ? Number(d.section_ab_electricity_total_kwh || 0) : rows.reduce((sum, r) => sum + Number(r.total_kwh || 0), 0);
+  const totalAmount = sectionMode ? Number(d.section_ab_electricity_total_amount || 0) : rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const monthLabel = d.label || '';
   const fmtDate = (ymd) => {
     const x = String(ymd || '');
@@ -3294,29 +3313,49 @@ function DailyUnitsView({ d, onBack }) {
       <TouchableOpacity onPress={onBack} style={{ marginBottom: 12 }}>
         <Text style={S.subBack}>‹ Back to report</Text>
       </TouchableOpacity>
-      <Text style={S.subTitle}>Electricity units</Text>
+      <Text style={S.subTitle}>{sectionMode ? 'Daily units · Section A / Section B' : 'Electricity units'}</Text>
       <Text style={S.subDesc}>
-        Read-only daily sub-meter readings from Expense Costing. Tap a day to audit the meter split. No value is entered or saved from this screen.
+        {sectionMode ? 'Read-only electricity from Expense Costing. Section A = Waterjet + SUD 230; Section B = MW + SUD 190. Shared electricity uses the approved machine ratios.' : 'Read-only daily sub-meter readings from Expense Costing. Tap a day to audit the meter split. No value is entered or saved from this screen.'}
       </Text>
 
       <View style={{borderWidth:1,borderColor:'#e5e7eb',borderRadius:12,padding:12,marginBottom:10,flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10}}>
         <View style={{flexShrink:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>MONTH TO DATE {monthLabel ? `· ${monthLabel}` : ''}</Text><Text style={{fontSize:20,fontWeight:'700',marginTop:3}}>{fN(totalKwh)} <Text style={{fontSize:12,color:'#6b7280'}}>kWh</Text></Text></View>
-        <View style={{alignItems:'flex-end'}}><Text style={{fontSize:9,color:'#6b7280'}}>ELECTRICITY @ ₹{f2(d.unit_rate || 0)}</Text><Text style={{fontSize:17,fontWeight:'700',color:'#185FA5',marginTop:3}}>{fL(totalAmount)}</Text></View>
+        <View style={{alignItems:'flex-end'}}><Text style={{fontSize:9,color:'#6b7280'}}>ELECTRICITY COST</Text><Text style={{fontSize:17,fontWeight:'700',color:'#185FA5',marginTop:3}}>{fINR(totalAmount)}</Text></View>
       </View>
+
+      {sectionMode && <View style={{flexDirection:'row',gap:8,marginBottom:10}}>
+        {[
+          ['SECTION A · 40 MC', d.section_a_electricity_kwh, d.section_a_electricity_amount],
+          ['SECTION B · 86 MC', d.section_b_electricity_kwh, d.section_b_electricity_amount],
+        ].map(([label,kwh,amount]) => <View key={label} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10,padding:10,backgroundColor:'#fff'}}><Text style={{fontSize:9,fontWeight:'800',color:'#6b7280'}}>{label}</Text><Text style={{fontSize:15,fontWeight:'800',marginTop:4}}>{fN(kwh)} kWh</Text><Text style={{fontSize:11,color:'#185FA5',fontWeight:'700',marginTop:3}}>{fINR(amount)}</Text></View>)}
+      </View>}
 
       {rows.length === 0 ? <View style={{padding:18,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10}}><Text style={{fontSize:12,color:'#6b7280'}}>No daily electricity readings are available for this month.</Text></View> : rows.map((r, i) => {
         const open = openDay === i;
         return <View key={`${r.date_ymd}-${i}`} style={{borderWidth:1,borderColor:open?'#cbd5e1':'#e5e7eb',borderRadius:10,marginBottom:7,overflow:'hidden',backgroundColor:'#fff'}}>
           <TouchableOpacity onPress={()=>setOpenDay(open?-1:i)} style={{padding:11,flexDirection:'row',alignItems:'center'}} activeOpacity={0.75}>
             <View style={{width:25,height:25,borderRadius:6,backgroundColor:open?'#185FA5':'#f3f4f6',alignItems:'center',justifyContent:'center',marginRight:9}}><Text style={{fontSize:11,fontWeight:'700',color:open?'#fff':'#6b7280'}}>{Number(r.day || i+1)}</Text></View>
-            <View style={{flex:1}}><Text style={{fontSize:12,fontWeight:'700'}}>{fmtDate(r.date_ymd)}</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{fN(r.total_kwh)} kWh</Text></View>
-            <Text style={{fontSize:11,fontWeight:'700',color:'#185FA5',marginRight:8}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:11,color:'#6b7280'}}>{open?'⌃':'⌄'}</Text>
+            <View style={{flex:1}}><Text style={{fontSize:12,fontWeight:'700'}}>{fmtDate(r.date_ymd)}</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{sectionMode ? `A ${fN(r.section_ab?.section_a_kwh)} · B ${fN(r.section_ab?.section_b_kwh)} kWh` : `${fN(r.total_kwh)} kWh`}</Text></View>
+            <View style={{alignItems:'flex-end',marginRight:8}}><Text style={{fontSize:11,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{fINR(r.amount || 0)}</Text></View><Text style={{fontSize:11,color:'#6b7280'}}>{open?'⌃':'⌄'}</Text>
           </TouchableOpacity>
           {open && <View style={{borderTopWidth:1,borderTopColor:'#f1f5f9',paddingHorizontal:11,paddingBottom:10}}>
-            {meterRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:7,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:11,color:'#374151'}}>{label}</Text><Text style={{fontSize:11,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            <Text style={{fontSize:9,fontWeight:'700',color:'#6b7280',marginTop:9,marginBottom:2}}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
-            {moreRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6}}><Text style={{fontSize:10.5,color:'#4b5563'}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            <View style={{marginTop:6,paddingTop:8,borderTopWidth:1,borderTopColor:'#e5e7eb',flexDirection:'row',justifyContent:'space-between'}}><View><Text style={{fontSize:10,fontWeight:'700'}}>DAY TOTAL</Text><Text style={{fontSize:9,color:'#6b7280',marginTop:2}}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {r.is_reconciled === false ? `difference ${fN(r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{alignItems:'flex-end'}}><Text style={{fontSize:13,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:10,color:'#6b7280',marginTop:2}}>{fL(r.amount || 0)}</Text></View></View>
+            {sectionMode ? <>
+              <View style={{flexDirection:'row',gap:8,paddingVertical:9}}>
+                <View style={{flex:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>SECTION A</Text><Text style={{fontSize:12,fontWeight:'800'}}>{fN(r.section_ab?.section_a_kwh)} kWh</Text><Text style={{fontSize:10,color:'#185FA5'}}>{fINR(r.section_ab?.section_a_amount)}</Text></View>
+                <View style={{flex:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>SECTION B</Text><Text style={{fontSize:12,fontWeight:'800'}}>{fN(r.section_ab?.section_b_kwh)} kWh</Text><Text style={{fontSize:10,color:'#185FA5'}}>{fINR(r.section_ab?.section_b_amount)}</Text></View>
+              </View>
+              {[
+                ['Waterjet → A', r.section_ab?.allocation?.waterjet_to_a_kwh], ['SUD 230 → A', r.section_ab?.allocation?.sud_230_to_a_kwh],
+                ['SUD Luwa → A (10/48)', r.section_ab?.allocation?.sud_luwa_a_kwh], ['Warping + Misc → A (40/126)', r.section_ab?.allocation?.shared_a_kwh],
+                ['MW + MW Luwa → B', r.section_ab?.allocation?.mw_to_b_kwh], ['SUD 190 → B', r.section_ab?.allocation?.sud_190_to_b_kwh],
+                ['SUD Luwa → B (38/48)', r.section_ab?.allocation?.sud_luwa_b_kwh], ['Warping + Misc → B (86/126)', r.section_ab?.allocation?.shared_b_kwh],
+              ].map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:10.5,color:'#4b5563',flex:1,paddingRight:8}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
+            </> : <>
+              {meterRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:7,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:11,color:'#374151'}}>{label}</Text><Text style={{fontSize:11,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
+              <Text style={{fontSize:9,fontWeight:'700',color:'#6b7280',marginTop:9,marginBottom:2}}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
+              {moreRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6}}><Text style={{fontSize:10.5,color:'#4b5563'}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
+            </>}
+            <View style={{marginTop:6,paddingTop:8,borderTopWidth:1,borderTopColor:'#e5e7eb',flexDirection:'row',justifyContent:'space-between'}}><View><Text style={{fontSize:10,fontWeight:'700'}}>DAY TOTAL</Text><Text style={{fontSize:9,color:'#6b7280',marginTop:2}}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {(sectionMode ? r.section_ab?.is_reconciled : r.is_reconciled) === false ? `difference ${fN(sectionMode ? r.section_ab?.difference_kwh : r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{alignItems:'flex-end'}}><Text style={{fontSize:13,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:10,color:'#6b7280',marginTop:2}}>{fINR(r.amount || 0)}</Text></View></View>
           </View>}
         </View>;
       })}
@@ -3951,6 +3990,7 @@ function ExpenseCoverageNotice({ d, month }) {
 
 // ── Production block ──────────────────────────────────────────────
 function ProductionBlock({ d }) {
+  const sectionMode = d?.is_section_ab === true;
   const [series, setSeries] = useState('combined');
   // UI only: measured chart width so the day-wise chart fills wide cards.
   const [chartW, setChartW] = useState(0);
@@ -3960,11 +4000,9 @@ function ProductionBlock({ d }) {
     const rapier = Number(row?.prod_mw || 0) + Number(row?.prod_sud || 0);
     const waterjet = Number(row?.prod_wj || 0);
     const combined = Number(row?.prod_tot || 0) || (rapier + waterjet);
-    const value = series === 'rapier'
-      ? rapier
-      : series === 'waterjet'
-        ? waterjet
-        : combined;
+    const value = sectionMode
+      ? (series === 'section_a' ? Number(row?.section_a_mtr || 0) : series === 'section_b' ? Number(row?.section_b_mtr || 0) : combined)
+      : (series === 'rapier' ? rapier : series === 'waterjet' ? waterjet : combined);
 
     return {
       day: String(Number(String(row?.date || index + 1).slice(0, 2)) || index + 1),
@@ -3972,23 +4010,17 @@ function ProductionBlock({ d }) {
     };
   });
 
-  const total = series === 'rapier'
-    ? Number(d?.prod_rapier || 0)
-    : series === 'waterjet'
-      ? Number(d?.prod_wjet || 0)
-      : Number(d?.prod_total || 0);
+  const total = sectionMode
+    ? (series === 'section_a' ? Number(d?.section_a_mtr || 0) : series === 'section_b' ? Number(d?.section_b_mtr || 0) : Number(d?.prod_total || 0))
+    : (series === 'rapier' ? Number(d?.prod_rapier || 0) : series === 'waterjet' ? Number(d?.prod_wjet || 0) : Number(d?.prod_total || 0));
 
-  const picks = series === 'rapier'
-    ? Number(d?.avg_pick_mw || 0)
-    : series === 'waterjet'
-      ? Number(d?.avg_pick_wjet || 0)
-      : Number(d?.avg_pick_tot || 0);
+  const picks = sectionMode
+    ? (series === 'section_a' ? Number(d?.section_a_avg_picks || 0) : series === 'section_b' ? Number(d?.section_b_avg_picks || 0) : Number(d?.avg_pick_tot || 0))
+    : (series === 'rapier' ? Number(d?.avg_pick_mw || 0) : series === 'waterjet' ? Number(d?.avg_pick_wjet || 0) : Number(d?.avg_pick_tot || 0));
 
-  const label = series === 'rapier'
-    ? 'Rapier'
-    : series === 'waterjet'
-      ? 'Waterjet'
-      : 'Combined';
+  const label = sectionMode
+    ? (series === 'section_a' ? 'Section A' : series === 'section_b' ? 'Section B' : 'Combined')
+    : (series === 'rapier' ? 'Rapier' : series === 'waterjet' ? 'Waterjet' : 'Combined');
 
   return (
     <View style={S.prodBlock}>
@@ -4003,11 +4035,10 @@ function ProductionBlock({ d }) {
       </View>
 
       <View style={S.prodSelector}>
-        {[
-          ['combined', 'Combined'],
-          ['rapier', 'Rapier'],
-          ['waterjet', 'Waterjet'],
-        ].map(([key, text]) => {
+        {(sectionMode
+          ? [['combined', 'Combined'], ['section_a', 'Section A'], ['section_b', 'Section B']]
+          : [['combined', 'Combined'], ['rapier', 'Rapier'], ['waterjet', 'Waterjet']]
+        ).map(([key, text]) => {
           const active = series === key;
           return (
             <TouchableOpacity
@@ -4043,8 +4074,8 @@ function ProductionBlock({ d }) {
         data={trend}
         valueKey="meters"
         labelKey="day"
-        color={series === 'waterjet' ? '#185FA5' : series === 'rapier' ? '#B77932' : '#0D1B2A'}
-        fillColor={series === 'waterjet' ? '#185FA5' : series === 'rapier' ? '#B77932' : '#0D1B2A'}
+        color={(series === 'waterjet' || series === 'section_b') ? '#185FA5' : (series === 'rapier' || series === 'section_a') ? '#B77932' : '#0D1B2A'}
+        fillColor={(series === 'waterjet' || series === 'section_b') ? '#185FA5' : (series === 'rapier' || series === 'section_a') ? '#B77932' : '#0D1B2A'}
         height={116}
         pointGap={trend.length > 1 ? Math.max(48, (chartW - 44) / (trend.length - 1)) : 48}
         minWidth={Math.max(320, trend.length * 48, chartW)}
@@ -4059,7 +4090,7 @@ function ProductionBlock({ d }) {
       </View>
 
       <Text style={S.prodFootnote}>
-        Select Combined, Rapier or Waterjet. The chart always uses the selected month’s day-wise production feed.
+        {sectionMode ? 'Select Combined, Section A or Section B. The chart uses the verified machine-group production feed.' : 'Select Combined, Rapier or Waterjet. The chart always uses the selected month’s day-wise production feed.'}
       </Text>
     </View>
   );
@@ -4376,10 +4407,9 @@ export default function ExpenseScreen({ token, apiBase }) {
                 />
               ))}
               <Text style={{ fontSize: 11, color: "#000", marginTop: 4 }}>
-                ₹/mtr and ₹/pick are utility contribution KPIs only. Warping +
-                Misc remain shared exactly as before — existing ⅔ Rapier, ⅓
-                Waterjet costing allocation is unchanged. Shared display rates
-                use combined production and weighted picks.
+                {d.is_section_ab
+                  ? "Section A/B electricity is read from the verified ERP split. SUD 230 uses its actual sub-meter; SUD Luwa is allocated 10/48 : 38/48 and Warping + Misc 40/126 : 86/126. A + B is reconciled to the original daily units."
+                  : "₹/mtr and ₹/pick are utility contribution KPIs only. Warping + Misc remain on the legacy ⅔ Rapier, ⅓ Waterjet allocation for this historical period."}
               </Text>
             </ExpBlock>
 

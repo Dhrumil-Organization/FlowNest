@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import LineFields, { Beam, LineValue } from './LineFields';
-import { s, C, tagStyle } from '../styles';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { cartonBalance, fetchExpProdQty, findIssue, modifyLine } from '../api';
 import { f2, r3, ymdShow } from '../helpers';
+import { C, s, tagStyle } from '../styles';
+import LineFields, { Beam, LineValue } from './LineFields';
 
 export type EditableLine = {
     UId: number; SrNo: number; SubSr: number; CartNo: string; Chees: number; Qty: number;
@@ -89,7 +89,6 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
     const availWt = r3((info?.balWt ?? 0) + Number(line.Qty));
 
     const save = async () => {
-        setErr('');
         const ch = parseInt(chees, 10), w = r3(parseFloat(wt));
         if (!val.beam || !val.dsn) return setErr('Select beam and design.');
         if (!val.rsr) return setErr('Select the weft position (recipe SrNo).');
@@ -107,7 +106,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         const r = await modifyLine(token, {
             prpcode, yearno, uid: line.UId, srno: line.SrNo, subsr: line.SubSr,
             OldChees: line.Chees, OldQty: line.Qty,
-            BeamUId: val.beam.UId, DsnCode: val.dsn.DsnCode, DsnRcpSrNo: val.rsr, StkType: val.stkType || stkType,
+            BeamUId: val.beam.UId, BeamNo: val.beam.BeamNo || line.BeamNo || '', DsnCode: val.dsn.DsnCode, DsnRcpSrNo: val.rsr, StkType: val.stkType || stkType,
             Chees: ch, Wt: w, ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
         });
         setSaving(false);
@@ -133,7 +132,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
                         <LineFields
                             token={token} prpcode={prpcode} yearno={yearno} stkType={stkType} dmy={dmy}
                             beams={beams} beamsLoading={beamsLoading} mitmcode={info?.mitm ?? ''}
-                            value={val} onChange={setVal}
+                            value={val} onChange={(v) => { setVal(v); setErr(''); }}
                         />
 
                         <View style={s.row2}>
@@ -154,7 +153,19 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
                             </View>
                         )}
 
-                        {!!err && <View style={[s.msg, { backgroundColor: C.badSoft }]}><Text style={[s.msgText, { color: C.bad }]}>{err}</Text></View>}
+                        {!!err && (
+                            <View style={[s.msg, { backgroundColor: C.bad, flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingLeft: 12, paddingRight: 6 }]}>
+                                <Text style={[s.msgText, { color: '#fff', flex: 1, fontWeight: '600' }]}>{err}</Text>
+                                <TouchableOpacity
+                                    onPress={() => setErr('')}
+                                    accessibilityLabel="Close validation"
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
+                                >
+                                    <Icon name="close" size={17} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                             <TouchableOpacity style={[s.btn, { flex: 1 }]} onPress={onClose}><Text style={s.btnText}>Cancel</Text></TouchableOpacity>

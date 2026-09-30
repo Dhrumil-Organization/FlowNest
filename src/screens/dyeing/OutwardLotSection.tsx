@@ -366,7 +366,8 @@ export function OutwardLotSection({
                 <View style={{ flex: 1.3, minWidth: 0 }}>
                   <Text style={st.tdText} numberOfLines={1}>{labelOf(row)}</Text>
                   <Text style={st.tdSub} numberOfLines={1}>
-                    {[outDateOf(row), row.qty != null ? `Out ${qtyLabel(row.qty)} m` : '']
+                    {/* {[outDateOf(row), row.qty != null ? `Out ${qtyLabel(row.qty)} m` : ''] */}
+                    {[outDateOf(row), row.accname != null ? `${row.accname}` : '-']
                       .filter(Boolean).join(' · ')}
                   </Text>
                   {!!accOf(row) && <Text style={st.tdSub} numberOfLines={1}>{accOf(row)}</Text>}

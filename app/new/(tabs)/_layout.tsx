@@ -92,6 +92,12 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'checking-scanner-new': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
   'beam-gaiting-new': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Gaiting' },
   'beam-close-new': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Open/Close' },
+  'sales-order-inactive': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sales Order (Inactive)' },
+  'sales-order-price-list-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sales Order Price List Auth' },
+  'purchase-rate-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Purchase Rate Auth' },
+  'purchase-import-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Purchase Import Auth' },
+  'purchase-grade-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Purchase Grade Auth' },
+  'monthly-expense-report': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Expense Report' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
@@ -108,6 +114,12 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
 const MAX_PRIMARY_TABS = 3;
 
 type NavItem = { routeName: string; title: string; icon: string };
+
+function routeMatchesPath(pathname: string, routeName: string) {
+  const r = routeName.replace(/\/index$/, '');
+  if (!r) return false;
+  return pathname === `/${r}` || pathname.endsWith(`/${r}`) || pathname.includes(`/${r}/`);
+}
 
 export default function TabsLayout() {
   const { canAccess, canDo } = usePermission();
@@ -161,16 +173,16 @@ export default function TabsLayout() {
       : tabBarHeight + barBottomOffset + TAB_BAR_CONTENT_GAP;
   const onDashboard = pathname === '/new' || pathname === '/new/' || pathname.endsWith('/new/(tabs)') || pathname.endsWith('/new/(tabs)/');
 
-  const activeRouteName = onDashboard
-    ? 'index'
-    : APP_NAVIGATION.map((item) => item.routeName).find(
-      (routeName) => routeName !== 'index' && pathname.includes(routeName.replace(/\/index$/, '')),
-    );
+  // Match a route by whole path segment and prefer the LONGEST matching route.
+  // (A plain `pathname.includes(route)` made '/new/weft-issue-return' resolve to
+  // 'weft-issue', '/new/sales-order-inactive' to 'sales-order' and
+  // '/new/sales-order-price-list-auth' to 'price-list' — wrong header title.)
   const activeNavItem = !onDashboard
-    ? APP_NAVIGATION.find(
-      (item) => item.routeName !== 'index' && pathname.includes(item.routeName.replace(/\/index$/, '')),
-    )
+    ? APP_NAVIGATION
+      .filter((item) => item.routeName !== 'index' && routeMatchesPath(pathname, item.routeName))
+      .sort((a, b) => b.routeName.length - a.routeName.length)[0]
     : undefined;
+  const activeRouteName = onDashboard ? 'index' : activeNavItem?.routeName;
 
   // Falls back to the nav node's own `title` (from the ui-registry) when this
   // route has no explicit HEADER_CONTENT override — so adding a brand-new

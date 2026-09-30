@@ -118,33 +118,64 @@ export const itemDetailFromCarton = (
         shdcode: parsedData?.ShdCode ?? '',
     });
 
-/** Fetch expected production quantity from the issue-qty history API. */
-export async function fetchExpProdQty(t: string, p: {
-    prpcode: string; yearno: any; reqqty: any; itmcode: any; shdcode: any;
-    srno: any; beamuid: any; dsncode: any; IssUId?: any;
-}): Promise<number> {
-    try {
-        const res = await axios.get(`${API}/api/getExpectedWeftIssue`, {
-            headers: headers(t),
-            params: {
-                prpcode: p.prpcode,
-                yearno: p.yearno,
-                txntype: 'beam_weft_issue',
-                reqqty: p.reqqty,
-                itmcode: p.itmcode,
-                shdcode: p.shdcode,
-                srno: p.srno || '',
-                beamuid: p.beamuid,
-                dsncode: p.dsncode,
-                IssUId: p.IssUId ?? '',
-            },
-            timeout: 20000,
-        });
 
+export async function fetchExpProdQty(
+    t: string,
+    p: {
+        prpcode: string;
+        yearno: any;
+        reqqty: any;
+        itmcode: any;
+        shdcode: any;
+        srno: any;
+        beamuid: any;
+        dsncode: any;
+        IssUId?: any;
+        DsnRcpSrNo?: any; // ✅ added
+    }
+): Promise<number> {
+    try {
+        const res = await axios.get(
+            `${API}/api/get_expprodqty_from_issueqty`,
+            {
+                headers: headers(t),
+                params: {
+                    PrpCode: p.prpcode,
+                    YearNo: p.yearno,
+                    txntype: 'beam_weft_issue',
+                    WfIssQty: p.reqqty,
+                    MRUId: '0',
+                    MRSrNo: '0',
+                    ItmCode: p.itmcode,
+                    ShdCode: p.shdcode,
+                    PlnWfSrNo: p.srno || p.DsnRcpSrNo || '',
+                    beamuid: p.beamuid,
+                    dsncode: p.dsncode,
+                    StrCode: '002'
+
+
+                    // prpcode: p.prpcode,
+                    // yearno: p.yearno,
+                    // txntype: 'beam_weft_issue',
+                    // reqqty: p.reqqty,
+                    // itmcode: p.itmcode,
+                    // shdcode: p.shdcode,
+                    // srno: p.srno || p.DsnRcpSrNo || '',
+                    // beamuid: p.beamuid,
+                    // dsncode: p.dsncode,
+                    // IssUId: '',
+                    // StrCode: '002'
+                },
+                timeout: 20000,
+            }
+        );
         const arr = listOf(res.data);
         return Number(arr?.[0]?.ExpProdQty) || 0;
     } catch (e) {
-        console.log('getExpectedWeftIssue error', e);
+        console.log(
+            'getExpectedWeftIssue error',
+            e
+        );
         return 0;
     }
 }

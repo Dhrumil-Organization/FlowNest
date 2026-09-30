@@ -60,21 +60,21 @@ export const DyeingService = {
     (USE_MOCK ? mockDyeingMillHub(body) : DyeingAPI.millHub(body)),
 
   /** Status sheet — outward (challan) lines of a chart (the "Select Outward" help, with ChalNo). */
-  outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number; shdcode?: string; shdname?: string }) =>
+  outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number; shdcode?: string; shdname?: string; dsncode?: string; dsnname?: string }) =>
     (USE_MOCK ? mockOutwardDetails(params) : DyeingAPI.outwardDetails(params)),
 
   /**
    * Status sheet — EVERY outward line of one SO line (shade) with its saved lot no.
    * GET /dyeing/outward_details_all?prptype=S&yearno=27&orderuid=370000635&ordersrno=1
    */
-  outwardDetailsAll: (params: { prptype: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string }) =>
+  outwardDetailsAll: (params: { prptype: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string; dsncode?: string; dsnname?: string }) =>
     (USE_MOCK ? mockOutwardDetailsAll(params) : DyeingAPI.outwardDetailsAll(params)),
 
   /**
    * Status sheet — table of saved lot nos. (chart + SO line).
    * GET /dyeing/lotnos?prptype=S&chartno=CH-2-01&yearno=27&orderuid=370000635&ordersrno=2
    */
-  lotNos: (params: { prptype: string; chartno: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string }) =>
+  lotNos: (params: { prptype: string; chartno: string; yearno: string | number; orderuid: string | number; ordersrno: string | number; shdcode?: string; shdname?: string; dsncode?: string; dsnname?: string }) =>
     (USE_MOCK ? mockLotNos(params) : DyeingAPI.lotNos(params)),
 
   /**

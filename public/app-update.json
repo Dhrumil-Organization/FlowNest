@@ -1,13 +1,13 @@
 {
   "android": {
-    "latestVersion": "1.0.48",
-    "minVersion": "",
+    "latestVersion": "1.0.53",
+    "minVersion": "1.0.53",
     "storeUrl": "",
     "message": ""
   },
   "ios": {
-    "latestVersion": "1.0.48",
-    "minVersion": "",
+    "latestVersion": "1.0.53",
+    "minVersion": "1.0.53",
     "storeUrl": "",
     "message": ""
   }

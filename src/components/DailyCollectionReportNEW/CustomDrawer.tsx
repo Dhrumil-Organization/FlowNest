@@ -1,13 +1,8 @@
-import theme from '@/components/theme';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
+import { Btn, Segment, Sheet } from '@/src/components/erpUi';
+import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -17,8 +12,8 @@ import {
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { CustomListDrawerPropsNew, DesignData, ItemData, ItemStatus } from './Modal';
-
-const { height } = Dimensions.get('window');
+// NEW ERP UI: light re-skin of the shared dropdown (same props / behaviour).
+import SearchableDropdown from './SearchableDropdown';
 
 
 const formatDisplayDate = (d?: Date | string | null) => {
@@ -83,7 +78,6 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
 
     form
 }) => {
-    const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -142,14 +136,6 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
         setHasMoreItem(filtereditem.length > 10);
     }, [searchQuery, designData, searchQueryItem, itemData]);
 
-
-    React.useEffect(() => {
-        Animated.timing(slideAnim, {
-            toValue: isVisible ? 0 : height,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
-    }, [isVisible]);
 
     useEffect(() => {
         setLocalItemStatus(selectedItemStatus);
@@ -267,533 +253,262 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
         }
     }, [internal_dropdown, selectedInternal, onExeChangeInternal]);
 
+    // ---------- NEW ERP UI (presentation only) ----------
+    const webDateStyle: any = {
+        flex: 1,
+        border: 'none',
+        outline: 'none',
+        background: 'transparent',
+        fontSize: 14,
+        fontWeight: 700,
+        color: T.ink,
+        width: '100%',
+        minWidth: 0,
+        padding: 0,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+    };
+
     return (
-        <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
-            <View style={styles.modalOverlay}>
-                <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
-                    <LinearGradient
-                        colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                        style={styles.gradientBackground}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        {/* Close Button */}
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>
-
-                        {/* Scrollable Form Container */}
-                        <ScrollView
-                            style={styles.scrollableFormContainer}
-                            contentContainerStyle={styles.scrollableFormContent}
-                            nestedScrollEnabled={true}
-                        >
-                            {/* Property */}
-                            <View style={{ marginBottom: 10 }} >
-                                <Text style={styles.label}>Select Property Group <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <SearchableDropdown
-                                    data={getPropertyGroupData}
-                                    labelKey="PrpOfFull"
-                                    valueKey="PrpOf"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    initialValue={selectedPropertyGroup ?? null}
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, PrpOf: item?.PrpOf || '' }));
-                                        setSelectedPropertyGroup(item);
-                                    }}
-                                    multiple={false}
-                                    emptyMessage="No properties group available"
-                                />
-                            </View>
-                            <View style={{ marginBottom: 10 }} >
-                                <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <SearchableDropdown
-                                    data={getPropertyData}
-                                    // labelKey="PrpName"
-                                    labelKey={["PrpName", "PrpCode"]}
-                                    valueKey="PrpCode"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    initialValue={selectedProperty ?? null}
-                                    onSelect={(items) => {
-                                        // items will be an array of selected objects
-                                        setSelectedProperty(items);
-                                        // Extract PrpCode values and pass as array to parent
-                                        const selectedCodes = items.map(item => item.PrpCode);
-                                        setForm(prev => ({ ...prev, PrpCode: selectedCodes }));
-                                    }}
-                                    multiple={true} // Enable multi-select
-                                    emptyMessage="No properties available"
-                                />
-
-                            </View>
-                            <View style={{ marginBottom: 10 }}>
-                                <Text style={styles.label}>From Date</Text>
-
-                                {Platform.OS === 'web' ? (
-                                    // ---------- WEB ----------
-                                    <View style={styles.dateTrigger}>
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: form.fromdate || '',
-                                            max: toISODate(new Date()),
-                                            onChange: (e: any) => {
-                                                const v = e.target.value; // already YYYY-MM-DD
-                                                setForm(prev => ({ ...prev, fromdate: v }));
-                                            },
-                                            style: {
-                                                flex: 1,
-                                                border: 'none',
-                                                outline: 'none',
-                                                background: 'transparent',
-                                                fontSize: 14,
-                                                fontWeight: 600,
-                                                color: theme.TEXT_PRIMARY,
-                                                width: '100%',
-                                                padding: 0,
-                                                cursor: 'pointer',
-                                                fontFamily: 'inherit',
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    // ---------- NATIVE ----------
-                                    <>
-                                        <TouchableOpacity
-                                            activeOpacity={0.85}
-                                            style={styles.dateTrigger}
-                                            onPress={() => setCheckingDatePickerVisible(true)}
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.dateTriggerText, !form.fromdate && styles.placeholderText]}>
-                                                    {form.fromdate ? formatDisplayDate(form.fromdate) : 'Select from date'}
-                                                </Text>
-                                            </View>
-                                            <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                        </TouchableOpacity>
-
-                                        <DateTimePickerModal
-                                            isVisible={checkingDatePickerVisible}
-                                            mode="date"
-                                            onConfirm={(date) => {
-                                                const selectedDate = new Date(date);
-                                                selectedDate.setHours(0, 0, 0, 0);
-                                                setForm(prev => ({ ...prev, fromdate: toISODate(selectedDate) }));
-                                                setCheckingDatePickerVisible(false);
-                                            }}
-                                            onCancel={() => setCheckingDatePickerVisible(false)}
-                                            headerTextIOS="Pick From Date"
-                                            locale="en_GB"
-                                            maximumDate={new Date()}
-                                        />
-                                    </>
-                                )}
-                            </View>
-                            <View style={{ marginBottom: 10 }}>
-                                <Text style={styles.label}>TO Date</Text>
-
-                                {Platform.OS === 'web' ? (
-                                    // ---------- WEB ----------
-                                    <View style={styles.dateTrigger}>
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: form.todate || '',
-                                            max: toISODate(new Date()),
-                                            min: form.fromdate || undefined,
-                                            onChange: (e: any) => {
-                                                const v = e.target.value;
-                                                setForm(prev => ({ ...prev, todate: v }));
-                                            },
-                                            style: {
-                                                flex: 1,
-                                                border: 'none',
-                                                outline: 'none',
-                                                background: 'transparent',
-                                                fontSize: 14,
-                                                fontWeight: 600,
-                                                color: theme.TEXT_PRIMARY,
-                                                width: '100%',
-                                                padding: 0,
-                                                cursor: 'pointer',
-                                                fontFamily: 'inherit',
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    // ---------- NATIVE ----------
-                                    <>
-                                        <TouchableOpacity
-                                            activeOpacity={0.85}
-                                            style={styles.dateTrigger}
-                                            onPress={() => setCheckingDatePickerVisible1(true)}
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.dateTriggerText, !form.todate && styles.placeholderText]}>
-                                                    {form.todate ? formatDisplayDate(form.todate) : 'Select to date'}
-                                                </Text>
-                                            </View>
-                                            <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                        </TouchableOpacity>
-
-                                        <DateTimePickerModal
-                                            isVisible={checkingDatePickerVisible1}
-                                            mode="date"
-                                            onConfirm={(date) => {
-                                                const selectedDate = new Date(date);
-                                                selectedDate.setHours(0, 0, 0, 0);
-                                                setForm(prev => ({ ...prev, todate: toISODate(selectedDate) }));
-                                                setCheckingDatePickerVisible1(false);
-                                            }}
-                                            onCancel={() => setCheckingDatePickerVisible1(false)}
-                                            headerTextIOS="Pick To Date"
-                                            locale="en_GB"
-                                            maximumDate={new Date()}
-                                        />
-                                    </>
-                                )}
-                            </View>
-                            <View style={{ marginBottom: 10 }} >
-                                <Text style={styles.label}>Sales Executive <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <SearchableDropdown
-                                    data={exeDataCRT}
-                                    labelKey={["SalesExecutive", "Code"]}
-                                    valueKey="Code"
-                                    placeholder="Choose sales executive..."
-                                    pageSize={10}
-                                    initialValue={SelectedSexe ?? null}
-                                    onSelect={(items) => {
-                                        // items will be an array of selected objects
-                                        setSelectedSexe(items);
-                                        // Extract PrpCode values and pass as array to parent
-                                        const selectedCodes = items.map(item => item.Code);
-                                        setForm(prev => ({ ...prev, SexeCode: selectedCodes }));
-                                    }}
-                                    multiple={true} // Enable multi-select
-                                    emptyMessage="No sales executive available"
-                                />
-
-                            </View>
-                            <View style={styles.inputGroup}>
-                                {/* <Text style={styles.label}>Sales Property Group</Text> */}
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsIntDropdownOpen(!isIntDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedInternal}</Text>
-                                </TouchableOpacity>
-                                {isIntDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            {/* <TouchableOpacity
-                                                                            style={styles.dropdownOption}
-                                                                            onPress={() => {
-                                                                                onExeChangeInternal(null); // Send empty value
-                                                                                setIsExeDropdownOpen(false);
-                                                                            }}
-                                                                        >
-                                                                            <Text style={styles.dropdownOptionText}>Select</Text>
-                                                                        </TouchableOpacity> */}
-                                            {internal_dropdown.map((internal) => (
-                                                <TouchableOpacity
-                                                    key={internal.value}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedInternal === internal.lable && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onExeChangeInternal(internal);
-                                                        setIsIntDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{internal.lable}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                            </View>
-                        </ScrollView>
-
-                        {/* Load Button (Fixed at Bottom) */}
-                        <View style={styles.loadButtonContainer}>
-                            <TouchableOpacity style={styles.loadButton} onPress={handleLoadPress}>
-                                {isLoading ? (
-                                    <ActivityIndicator size={24} color={theme.BRAND_GRADIENT_START} />
-                                ) : (
-                                    <Icon name="refresh" size={24} color={theme.BRAND_GRADIENT_START} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-                </Animated.View>
+        <Sheet
+            open={isVisible}
+            onClose={onClose}
+            eyebrow="DAILY COLLECTION REPORT"
+            title="Filters"
+            side
+            wideMax={460}
+            footer={
+                <>
+                    <Btn label="Cancel" kind="ghost" onPress={onClose} style={{ flex: 1 }} />
+                    <Btn
+                        label={isLoading ? 'Loading…' : 'Load'}
+                        icon="refresh"
+                        onPress={handleLoadPress}
+                        loading={isLoading}
+                        style={{ flex: 2 }}
+                    />
+                </>
+            }
+        >
+            {/* Property group */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Property Group <Text style={styles.req}>*</Text></Text>
+                <SearchableDropdown
+                    data={getPropertyGroupData}
+                    labelKey="PrpOfFull"
+                    valueKey="PrpOf"
+                    placeholder="Choose property..."
+                    title="Property Group"
+                    icon="domain"
+                    pageSize={10}
+                    initialValue={selectedPropertyGroup ?? null}
+                    onSelect={(item) => {
+                        setForm(prev => ({ ...prev, PrpOf: item?.PrpOf || '' }));
+                        setSelectedPropertyGroup(item);
+                    }}
+                    multiple={false}
+                    emptyMessage="No properties group available"
+                />
             </View>
-        </Modal>
+
+            {/* Property (multi) */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Property <Text style={styles.req}>*</Text></Text>
+                <SearchableDropdown
+                    data={getPropertyData}
+                    // labelKey="PrpName"
+                    labelKey={["PrpName", "PrpCode"]}
+                    valueKey="PrpCode"
+                    placeholder="Choose property..."
+                    title="Property"
+                    icon="business"
+                    pageSize={10}
+                    initialValue={selectedProperty ?? null}
+                    onSelect={(items) => {
+                        // items will be an array of selected objects
+                        setSelectedProperty(items);
+                        // Extract PrpCode values and pass as array to parent
+                        const selectedCodes = items.map(item => item.PrpCode);
+                        setForm(prev => ({ ...prev, PrpCode: selectedCodes }));
+                    }}
+                    multiple={true} // Enable multi-select
+                    emptyMessage="No properties available"
+                />
+            </View>
+
+            {/* Date range */}
+            <View style={styles.dateRow}>
+                <View style={[styles.group, styles.dateCol]}>
+                    <Text style={styles.label}>From Date</Text>
+
+                    {Platform.OS === 'web' ? (
+                        // ---------- WEB ----------
+                        <View style={styles.dateTrigger}>
+                            <Icon name="event" size={17} color={T.copper} />
+                            {React.createElement('input', {
+                                type: 'date',
+                                value: form.fromdate || '',
+                                max: toISODate(new Date()),
+                                'aria-label': 'From date',
+                                onChange: (e: any) => {
+                                    const v = e.target.value; // already YYYY-MM-DD
+                                    setForm(prev => ({ ...prev, fromdate: v }));
+                                },
+                                style: webDateStyle,
+                            })}
+                        </View>
+                    ) : (
+                        // ---------- NATIVE ----------
+                        <>
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                style={styles.dateTrigger}
+                                onPress={() => setCheckingDatePickerVisible(true)}
+                                accessibilityRole="button"
+                                accessibilityLabel="From date"
+                            >
+                                <Icon name="event" size={17} color={T.copper} />
+                                <Text style={[styles.dateTriggerText, !form.fromdate && styles.placeholderText]} numberOfLines={1}>
+                                    {form.fromdate ? formatDisplayDate(form.fromdate) : 'Select from date'}
+                                </Text>
+                                <Icon name="expand-more" size={20} color={T.muted} />
+                            </TouchableOpacity>
+
+                            <DateTimePickerModal
+                                isVisible={checkingDatePickerVisible}
+                                mode="date"
+                                onConfirm={(date) => {
+                                    const selectedDate = new Date(date);
+                                    selectedDate.setHours(0, 0, 0, 0);
+                                    setForm(prev => ({ ...prev, fromdate: toISODate(selectedDate) }));
+                                    setCheckingDatePickerVisible(false);
+                                }}
+                                onCancel={() => setCheckingDatePickerVisible(false)}
+                                headerTextIOS="Pick From Date"
+                                locale="en_GB"
+                                maximumDate={new Date()}
+                            />
+                        </>
+                    )}
+                </View>
+                <View style={[styles.group, styles.dateCol]}>
+                    <Text style={styles.label}>To Date</Text>
+
+                    {Platform.OS === 'web' ? (
+                        // ---------- WEB ----------
+                        <View style={styles.dateTrigger}>
+                            <Icon name="event" size={17} color={T.copper} />
+                            {React.createElement('input', {
+                                type: 'date',
+                                value: form.todate || '',
+                                max: toISODate(new Date()),
+                                min: form.fromdate || undefined,
+                                'aria-label': 'To date',
+                                onChange: (e: any) => {
+                                    const v = e.target.value;
+                                    setForm(prev => ({ ...prev, todate: v }));
+                                },
+                                style: webDateStyle,
+                            })}
+                        </View>
+                    ) : (
+                        // ---------- NATIVE ----------
+                        <>
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                style={styles.dateTrigger}
+                                onPress={() => setCheckingDatePickerVisible1(true)}
+                                accessibilityRole="button"
+                                accessibilityLabel="To date"
+                            >
+                                <Icon name="event" size={17} color={T.copper} />
+                                <Text style={[styles.dateTriggerText, !form.todate && styles.placeholderText]} numberOfLines={1}>
+                                    {form.todate ? formatDisplayDate(form.todate) : 'Select to date'}
+                                </Text>
+                                <Icon name="expand-more" size={20} color={T.muted} />
+                            </TouchableOpacity>
+
+                            <DateTimePickerModal
+                                isVisible={checkingDatePickerVisible1}
+                                mode="date"
+                                onConfirm={(date) => {
+                                    const selectedDate = new Date(date);
+                                    selectedDate.setHours(0, 0, 0, 0);
+                                    setForm(prev => ({ ...prev, todate: toISODate(selectedDate) }));
+                                    setCheckingDatePickerVisible1(false);
+                                }}
+                                onCancel={() => setCheckingDatePickerVisible1(false)}
+                                headerTextIOS="Pick To Date"
+                                locale="en_GB"
+                                maximumDate={new Date()}
+                            />
+                        </>
+                    )}
+                </View>
+            </View>
+
+            {/* Sales executive (multi) */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Sales Executive <Text style={styles.req}>*</Text></Text>
+                <SearchableDropdown
+                    data={exeDataCRT}
+                    labelKey={["SalesExecutive", "Code"]}
+                    valueKey="Code"
+                    placeholder="Choose sales executive..."
+                    title="Sales Executive"
+                    icon="badge"
+                    pageSize={10}
+                    initialValue={SelectedSexe ?? null}
+                    onSelect={(items) => {
+                        // items will be an array of selected objects
+                        setSelectedSexe(items);
+                        // Extract PrpCode values and pass as array to parent
+                        const selectedCodes = items.map(item => item.Code);
+                        setForm(prev => ({ ...prev, SexeCode: selectedCodes }));
+                    }}
+                    multiple={true} // Enable multi-select
+                    emptyMessage="No sales executive available"
+                />
+            </View>
+
+            {/* Internal / External / Both — same options + handler as the old dropdown */}
+            <Segment
+                label="Account Type"
+                value={selectedInternal as any}
+                options={internal_dropdown.map((internal) => ({
+                    value: internal.lable as any,
+                    label: internal.lable,
+                }))}
+                onChange={(lable: any) => {
+                    const internal = internal_dropdown.find((i) => i.lable === lable);
+                    if (!internal) return;
+                    onExeChangeInternal(internal);
+                    setIsIntDropdownOpen(false);
+                }}
+            />
+        </Sheet>
     );
 };
 
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    drawerContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        overflow: 'hidden',
-    },
-    gradientBackground: {
-        flex: 1,
-        padding: 20,
-    },
-    closeButton: {
-        alignSelf: 'flex-end',
-        padding: 35,
-    },
-    stepIndicator: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    stepText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    formContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    inputGroup: {
-        marginBottom: 15,
-        zIndex: 10,
-    },
-    label: {
-        fontSize: 16,
-        marginBottom: 5,
-        color: '#fff',
-    },
-    dateInput: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dateText: {
-        color: '#fff',
-    },
-    dropdownButton: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dropdownText: {
-        color: '#fff',
-    },
-    dropdownOptionsContainer: {
-        position: 'relative',
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        zIndex: 100,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        maxHeight: 200,
-    },
-    dropdownOption: {
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    dropdownOptionText: {
-        color: '#333',
-    },
-    selectedOption: {
-        backgroundColor: '#e0e0e0',
-    },
-    navigationContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 10,
-        marginTop: 'auto',
-    },
-    navButton: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: 10,
-        borderRadius: 5,
-    },
-    loadButton: {
-        backgroundColor: 'rgb(255, 255, 255)',
-        borderRadius: 5,
-        alignItems: 'center',
-        // flex: 1,
-        padding: 10,
-    },
-    loadButtonText: {
-        color: 'rgb(103, 9, 210)',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    // 
-    searchContainer: {
+    group: { gap: 6 },
+    label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+    req: { color: T.red },
+    dateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    dateCol: { flex: 1, minWidth: 150 },
+    dateTrigger: {
+        height: 44,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        marginBottom: 10,
-    },
-    searchInput: {
-        flex: 1,
-        padding: 10,
-        color: '#fff',
-    },
-    searchIcon: {
-        marginLeft: 10,
-    },
-    selectedDesignsContainer: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    selectedDesignChip: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-        marginRight: 5,
-    },
-    selectedDesignText: {
-        color: '#fff',
-        fontSize: 12,
-    },
-
-    designListContainer: {
-        maxHeight: 300, // Fixed height for the design list
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    designListContent: {
-        paddingBottom: 20,
-    },
-    designItem: {
-        padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-    },
-    selectedDesignItem: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    designName: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    designCode: {
-        color: '#ccc',
-        fontSize: 12,
-    },
-    loadingIndicator: {
-        padding: 10,
-    },
-    accordionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 15,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    accordionHeaderText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    scrollableFormContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    scrollableFormContent: {
-        paddingBottom: 80, // Extra space for the Load button
-    },
-    loadButtonContainer: {
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        right: 20,
-        alignItems: 'center',
-    },
-    radioGroup: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    radioButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 20,
-    },
-    radioCircle: {
-        width: 20,
-        height: 20,
+        gap: 8,
+        paddingHorizontal: 12,
         borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 5,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
     },
-    radioInnerCircle: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#fff',
-    },
-    radioLabel: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    selectAllContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    selectAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 10,
-        borderRadius: 8,
-        marginRight: 10,
-        alignItems: 'center',
-    },
-    selectAllButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    removeAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-    },
-    dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
-    dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    dateTriggerText: { flex: 1, fontSize: 14, color: T.ink, fontWeight: '700' },
+    placeholderText: { color: T.muted, fontWeight: '600' },
 });
 
 export default CustomDrawer;

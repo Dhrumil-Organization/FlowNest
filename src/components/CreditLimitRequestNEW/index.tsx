@@ -4,7 +4,7 @@ import {
     ActivityIndicator,
     FlatList,
     Modal,
-    TextInput as RNTextInput,
+    StyleSheet,
     Text,
     TouchableOpacity,
     View,
@@ -12,13 +12,28 @@ import {
 } from 'react-native';
 
 // import { API } from '@/common/API/dynamicAPI';
-import { crlimtreq_styles } from '@/common/Style';
-import PartyHistoryModal from '@/components/CreditLimitRequest/PartyHistoryModal'; // 👈 path adjust
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { theme } from '@/components/theme';
+// NEW ERP UI: local re-skinned copy of the shared legacy modal
+// (was '@/components/CreditLimitRequest/PartyHistoryModal').
+import PartyHistoryModal from './PartyHistoryModal';
+import { T, S } from '@/src/theme';
+import {
+    Avatar,
+    Btn,
+    BusyOverlay,
+    CONTENT_MAX,
+    EmptyState,
+    Field,
+    Kpi,
+    KpiGrid,
+    SearchBox,
+    SectionHead,
+    Segment,
+    cellWidth,
+    useSotLayout,
+} from '@/src/components/erpUi';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import HeaderNew from '../../components/HeaderNew';
+import { Cell, HistoryCard, InfoLine, Pill, Tag } from './ui';
 
 interface Props {
     token: string;
@@ -625,310 +640,304 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
         const num = parseFloat(numericValue) || 0;
         return num.toLocaleString('en-IN');
     };
-    // 🔥 CARD UI (DITTO)
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => {
+    // =====================================================================
+    // NEW ERP UI (presentation only — every handler below is the original
+    // one, called with the original arguments).
+    // =====================================================================
+    const { isPhone, cols, gutter } = useSotLayout();
+
+    const toNum = (v: any) => {
+        const n = parseFloat(String(v ?? '').replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(n) ? n : 0;
+    };
+    const rupee = (v: any) => `₹ ${formatToIndianCurrency(v || '0')}`;
+    // compact ₹ for KPI tiles on phones (full value shown underneath)
+    const rupeeShort = (v: number) => {
+        if (!isPhone) return rupee(v);
+        const a = Math.abs(v);
+        if (a >= 10000000) return `₹ ${(v / 10000000).toFixed(2)} Cr`;
+        if (a >= 100000) return `₹ ${(v / 100000).toFixed(2)} L`;
+        return rupee(v);
+    };
+    const rupeeSub = (v: number) => (isPhone && Math.abs(v) >= 100000 ? rupee(v) : undefined);
+
+    const reqSummary = useMemo(() => {
+        let outstanding = 0, overdue = 0, requested = 0, processed = 0;
+        filteredData.forEach((i: any) => {
+            outstanding += toNum(i.outstanding);
+            overdue += toNum(i.overdue);
+            requested += toNum(i.limit2);
+            if (i.isProcessed) processed += 1;
+        });
+        return { outstanding, overdue, requested, processed, pending: filteredData.length - processed };
+    }, [filteredData]);
+
+    const histSummary = useMemo(() => {
+        let ok = 0, bad = 0, pend = 0;
+        filteredhistoryData.forEach((i: any) => {
+            if (i.isauth === '1') ok += 1;
+            else if (i.isauth === '2') bad += 1;
+            else pend += 1;
+        });
+        return { ok, bad, pend };
+    }, [filteredhistoryData]);
+
+    // 🔥 CARD UI
+    const renderCard = ({ item }: { item: any & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => {
 
         const editedLimit2 = editableValues[item.uid]?.limit2 || item.limit2;
         const rawValue = editedLimit2 ? editedLimit2.replace(/[₹,]/g, '') : item.limit2;
         const numericValue = parseFloat(rawValue);
         const itemLimitInWords = !isNaN(numericValue) ? numberToWordsIndian(numericValue) : '';
+        const overdueAmt = toNum(item.overdue);
 
         return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
-                <View style={[
-                    crlimtreq_styles.card,
-                    item.actionType === 'accept'
-                        ? crlimtreq_styles.acceptedCard
-                        : item.actionType === 'reject'
-                            ? crlimtreq_styles.rejectedCard
-                            : null
-                ]}>
-                    {item.isProcessed && (
-                        <View style={[
-                            crlimtreq_styles.stampContainer,
-                        ]}>
-                            <View style={[
-                                crlimtreq_styles.stamp,
-                                item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
-                            ]}>
-                                <Text style={crlimtreq_styles.stampText}>
-                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                                </Text>
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <View
+                    accessibilityLabel="Credit limit request"
+                    style={[
+                        styles.card,
+                        item.actionType === 'accept'
+                            ? styles.cardAccepted
+                            : item.actionType === 'reject'
+                                ? styles.cardRejected
+                                : null
+                    ]}
+                >
+                    {/* header: party + division + date + status */}
+                    <View style={styles.cardHead}>
+                        <Avatar name={item.parname} size={40} />
+                        <View style={styles.cardHeadInfo}>
+                            <Text style={styles.partyName} numberOfLines={2}>{item.parname}</Text>
+                            <View style={styles.metaRow}>
+                                <Tag icon="business" text={item.prptypename} tone="blue" />
+                                <Tag icon="event" text={item.date} />
                             </View>
                         </View>
-                    )}
-                    <View style={crlimtreq_styles.dateContainer}>
-                        <Text style={crlimtreq_styles.dateText}>{item.date}</Text>
+                        {item.isProcessed ? (
+                            item.actionType === 'accept'
+                                ? <Pill text="APPROVED" tone="green" icon="check-circle" />
+                                : <Pill text="REJECTED" tone="red" icon="cancel" />
+                        ) : (
+                            <Pill text="PENDING" tone="copper" />
+                        )}
                     </View>
-                    <View style={crlimtreq_styles.cardHeaderContainer}>
-                        <View style={crlimtreq_styles.cardHeader}>
-                            <Text style={crlimtreq_styles.cardHeaderText}>{item.prptypename}</Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.cardSubHeader}>
-                        <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.cardContent}>
-                        <View style={crlimtreq_styles.twoColumnRow}>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Outstanding:</Text>
-                                <Text style={crlimtreq_styles.value}>
-                                    {formatToIndianCurrency(item.outstanding || '0')}
-                                </Text>
-                            </View>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Old Limit:</Text>
-                                <Text style={crlimtreq_styles.valuegreen}>
-                                    {formatToIndianCurrency(item.limit1 || '0')}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.twoColumnRow}>
 
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Overdue:</Text>
-                                <Text style={crlimtreq_styles.value}>
-                                    {formatToIndianCurrency(item.overdue || '0')}
-                                </Text>
-                            </View>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Req. Limit:</Text>
-                                <RNTextInput
-                                    style={crlimtreq_styles.editableValue}
-                                    value={
-                                        editableValues[item.uid]?.limit2 !== undefined
-                                            ? editableValues[item.uid].limit2
-                                            : formatToIndianCurrency(item.limit2 || '0')
-                                    }
-                                    onChangeText={(text) => handleEdit(item.uid, 'limit2', text)}
-                                    keyboardType="numeric"
-                                />
-                            </View>
+                    {/* current position */}
+                    <View style={styles.metricBox}>
+                        <View style={styles.metricRow}>
+                            <Cell label="Outstanding" value={rupee(item.outstanding)} color={T.pd} />
+                            <Cell label="Overdue" value={rupee(item.overdue)} color={overdueAmt > 0 ? T.red : T.ink} />
                         </View>
-                        <View style={crlimtreq_styles.fullWidthRow}>
-                            {/* <Text style={crlimtreq_styles.key}>Remark:</Text> */}
-                            <Text style={crlimtreq_styles.valueWord}>{itemLimitInWords}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.twoColumnRow}>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Cr. Days:</Text>
-                                <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
-                            </View>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
-                                <RNTextInput
-                                    style={crlimtreq_styles.editableValue}
-                                    value={editableValues[item.uid]?.crday2 !== undefined ? editableValues[item.uid].crday2 : item.crday2}
-                                    onChangeText={(text) => handleEdit(item.uid, 'crday2', text)}
-                                    keyboardType="numeric"
-                                    placeholder={String(item.crday2)}
-                                />
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.fullWidthRow}>
-                            <Text style={crlimtreq_styles.key}>Remark:</Text>
-                            <Text style={crlimtreq_styles.value}>{item.remark}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.fullWidthRow}>
-                            <Text style={crlimtreq_styles.key}>Broker:</Text>
-                            <Text style={crlimtreq_styles.valueBold}>{item.BrkAccName}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.fullWidthRow}>
-                            <Text style={crlimtreq_styles.key}>SExe:</Text>
-                            <Text style={crlimtreq_styles.valueBold}>{item.sexename}</Text>
+                        <View style={styles.metricRow}>
+                            <Cell label="Old Limit" value={rupee(item.limit1)} color={T.green} />
+                            <Cell label="Cr. Days" value={item.crday1} color={T.green} />
                         </View>
                     </View>
-                    <View style={crlimtreq_styles.cardActions}>
-                        <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={item.isProcessed}>
-                            <Icon name="check-circle" size={40} color={item.isProcessed ? "#ccc" : "#4CAF50"} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={item.isProcessed}>
-                            <Icon name="cancel" size={40} color={item.isProcessed ? "#ccc" : "#F44336"} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleIconPress(item, 'list')} disabled={item.isProcessed}>
-                            <Icon name="list" size={40} color={item.isProcessed ? "#ccc" : "#2196F3"} />
-                        </TouchableOpacity>
+
+                    {/* requested (editable) */}
+                    <View style={styles.reqBox}>
+                        <Text style={styles.eyebrow}>REQUESTED</Text>
+                        <View style={styles.reqRow}>
+                            <Field
+                                label="Req. Limit (₹)"
+                                style={styles.reqLimitField}
+                                value={
+                                    editableValues[item.uid]?.limit2 !== undefined
+                                        ? editableValues[item.uid].limit2
+                                        : formatToIndianCurrency(item.limit2 || '0')
+                                }
+                                onChangeText={(text: string) => handleEdit(item.uid, 'limit2', text)}
+                                keyboardType="numeric"
+                                inputStyle={styles.reqInput}
+                            />
+                            <Field
+                                label="Req. Cr. Days"
+                                style={styles.reqDaysField}
+                                value={editableValues[item.uid]?.crday2 !== undefined ? editableValues[item.uid].crday2 : item.crday2}
+                                onChangeText={(text: string) => handleEdit(item.uid, 'crday2', text)}
+                                keyboardType="numeric"
+                                placeholder={String(item.crday2)}
+                                inputStyle={styles.reqInput}
+                            />
+                        </View>
+                        {itemLimitInWords ? (
+                            <Text style={styles.words} numberOfLines={2}>{itemLimitInWords}</Text>
+                        ) : null}
+                    </View>
+
+                    {/* remark / broker / sales exe */}
+                    <View style={styles.lines}>
+                        <InfoLine icon="notes" label="Remark" value={item.remark} lines={3} />
+                        <InfoLine icon="handshake" label="Broker" value={item.BrkAccName} bold />
+                        <InfoLine icon="badge" label="SExe" value={item.sexename} bold />
+                    </View>
+
+                    {/* actions */}
+                    <View style={styles.actions}>
+                        <Btn
+                            label="Approve"
+                            icon="check-circle"
+                            compact
+                            onPress={() => handleIconPress(item, 'accept')}
+                            disabled={item.isProcessed}
+                            style={[styles.actionBtn, { backgroundColor: T.green }]}
+                        />
+                        <Btn
+                            label="Reject"
+                            icon="cancel"
+                            kind="danger"
+                            compact
+                            onPress={() => handleIconPress(item, 'reject')}
+                            disabled={item.isProcessed}
+                            style={styles.actionBtn}
+                        />
+                        <Btn
+                            label="History"
+                            icon="history"
+                            kind="ghost"
+                            compact
+                            onPress={() => handleIconPress(item, 'list')}
+                            disabled={item.isProcessed}
+                            style={styles.actionBtn}
+                        />
                     </View>
                 </View>
             </View>
         );
     };
 
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <View style={[
-                crlimtreq_styles.card,
-                item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-            ]}>
-                {item.isauth && (
-                    <View style={crlimtreq_styles.stampContainer}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' ? 'REJECTED' : 'PENDING'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-                <View style={crlimtreq_styles.dateContainer}>
-                    <Text style={crlimtreq_styles.dateText}>{item.date}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardHeaderContainer}>
-                    <View style={crlimtreq_styles.cardHeader}>
-                        <Text style={crlimtreq_styles.cardHeaderText}>{item.prptypename}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText}>{item.parname}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardContent}>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Old Limit:</Text>
-                            <Text style={crlimtreq_styles.valuegreen}>{item.limit1}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Req. Limit:</Text>
-                            <Text style={crlimtreq_styles.editableValue1}>{item.limit2}</Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth. Limit:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>{item.limit3}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth. Days:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>{item.crday3}</Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Old Cr. Days:</Text>
-                            <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
-                            <Text style={crlimtreq_styles.editableValue1}>{item.crday2}</Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>{item.adate || 'N/A'}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised By:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>{item.ausrname || 'N/A'}</Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Status:</Text>
-                            {item.status === 'Authorised' ? <Text style={crlimtreq_styles.valueAuthorised}>{item.status}</Text>
-                                : item.status === 'Rejected' ? <Text style={crlimtreq_styles.valueRejected}>{item.status}</Text>
-                                    : item.status === 'Pending' ? <Text style={crlimtreq_styles.value}>{item.status}</Text>
-                                        : <Text style={crlimtreq_styles.value}>{item.status}</Text>}
-                            {/* <Text style={crlimtreq_styles.value}>{item.status}</Text> */}
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Revert Date:</Text>
-                            <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
-                        </View>
-                    </View>
-
-
-                    <View style={crlimtreq_styles.fullWidthRow}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.remark}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.fullWidthRow}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.BrkAccName}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.fullWidthRow}>
-                        <Text style={crlimtreq_styles.key}>SExe:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                    </View>
-                </View>
-            </View>
+    const renderAllCardHistory = ({ item }: { item: any }) => (
+        <View style={[cellWidth(cols), styles.gridCell]}>
+            <HistoryCard item={item} showParty />
         </View>
     );
 
-     
-    const TabBar = ({ activeTab, setActiveTab }) => (
-        <View style={crlimtreq_styles.tabContainer1}>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTab === 'requests' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTab('requests')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Request</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTab === 'history' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTab('history')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>History</Text>
-            </TouchableOpacity>
+    const listContentStyle = [styles.listContent, { paddingHorizontal: gutter - 5 }];
+
+    const requestsHeader = (
+        <View style={styles.listHeader}>
+            <KpiGrid isPhone={isPhone}>
+                <Kpi
+                    label="Pending"
+                    icon="pending-actions"
+                    accent={T.copper}
+                    valueColor={T.copper}
+                    value={String(reqSummary.pending)}
+                    sub={`${reqSummary.processed} actioned of ${filteredData.length}`}
+                />
+                <Kpi
+                    label="Outstanding"
+                    icon="account-balance-wallet"
+                    accent={T.pd}
+                    valueColor={T.pd}
+                    value={rupeeShort(reqSummary.outstanding)}
+                    sub={rupeeSub(reqSummary.outstanding)}
+                />
+                <Kpi
+                    label="Overdue"
+                    icon="warning-amber"
+                    accent={T.red}
+                    valueColor={reqSummary.overdue > 0 ? T.red : T.ink}
+                    value={rupeeShort(reqSummary.overdue)}
+                    sub={rupeeSub(reqSummary.overdue)}
+                />
+                <Kpi
+                    label="Req. Limit"
+                    icon="trending-up"
+                    accent={T.blue}
+                    value={rupeeShort(reqSummary.requested)}
+                    sub={rupeeSub(reqSummary.requested)}
+                />
+            </KpiGrid>
+            <SectionHead
+                title="Credit limit requests"
+                meta={`${filteredData.length} shown${searchQuery ? ` · ${data.length} total` : ''}`}
+            />
         </View>
     );
+
+    const historyHeader = (
+        <View style={styles.listHeader}>
+            <KpiGrid isPhone={isPhone}>
+                <Kpi label="Total" icon="history" accent={T.nav} value={String(filteredhistoryData.length)} />
+                <Kpi label="Authorised" icon="verified" accent={T.green} valueColor={T.green} value={String(histSummary.ok)} />
+                <Kpi label="Rejected" icon="block" accent={T.red} valueColor={T.red} value={String(histSummary.bad)} />
+                <Kpi label="Pending" icon="schedule" accent={T.copper} valueColor={T.copper} value={String(histSummary.pend)} />
+            </KpiGrid>
+            <SectionHead
+                title="Credit limit history"
+                meta={`${filteredhistoryData.length} shown${searchhistoryQuery ? ` · ${allhistoryData.length} total` : ''}`}
+            />
+        </View>
+    );
+
+    const pendingLimit = selectedItem
+        ? (editableValues[selectedItem.uid]?.limit2 || formatToIndianCurrency(selectedItem.limit2 || '0'))
+        : '';
+    const pendingDays = selectedItem
+        ? (editableValues[selectedItem.uid]?.crday2 || (selectedItem.crday2 || '0'))
+        : '';
+    const isAccept = selectedAction === 'accept';
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={styles.root}>
 
-            {/* HEADER */}
-            {/* <Header
-                userName={username}
-                onSearch={activeTab1 === 'requests' ? setSearchQuery : setSearchhistoryQuery}
-            /> */}
-            {activeTab1 === 'requests' ? (
-                <HeaderNew
-                    userName={username}
-                    onSearch={setSearchQuery}
-                    placeholder="Search request..."
-                />
-            ) : activeTab1 === 'history' ? (
-                <HeaderNew
-                    userName={username}
-                    onSearch={setSearchhistoryQuery}
-                    placeholder="Search history..."
-                />
-            ) : null}
-
-            {isLoading && <FullScreenLoader message="Loading..." />}
-
-            {/* TAB SWITCH */}
-            {/* <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                <TouchableOpacity onPress={() => setActiveTab1('requests')}>
-                    <Text>Request</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setActiveTab1('history')}>
-                    <Text>History</Text>
-                </TouchableOpacity>
-            </View> */}
-            <TabBar activeTab={activeTab1} setActiveTab={setActiveTab1} />
+            {/* ───────────── Toolbar: Request/History switch + search ───────────── */}
+            <View style={styles.toolbar}>
+                <View style={[styles.toolbarInner, { paddingHorizontal: gutter }, isPhone && styles.toolbarPhone]}>
+                    <View style={isPhone ? null : styles.segWrap}>
+                        <Segment
+                            value={activeTab1}
+                            onChange={(v) => setActiveTab1(v)}
+                            options={[
+                                { value: 'requests', label: 'Request', icon: 'assignment' },
+                                { value: 'history', label: 'History', icon: 'history' },
+                            ]}
+                        />
+                    </View>
+                    {activeTab1 === 'requests' ? (
+                        <SearchBox
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholder="Search request..."
+                            style={isPhone ? null : { flex: 1 }}
+                        />
+                    ) : activeTab1 === 'history' ? (
+                        <SearchBox
+                            value={searchhistoryQuery}
+                            onChangeText={setSearchhistoryQuery}
+                            placeholder="Search history..."
+                            style={isPhone ? null : { flex: 1 }}
+                        />
+                    ) : null}
+                </View>
+            </View>
 
             {/* LIST */}
             {activeTab1 === 'requests' ? (
                 <FlatList
                     ref={flatListRef}
+                    style={styles.list}
                     data={filteredData}
                     renderItem={renderCard}
                     keyExtractor={(item) => item.uid}
-                    numColumns={numColumns}
-                    key={numColumns} // 🔥 VERY IMPORTANT (re-render fix)
-                    contentContainerStyle={crlimtreq_styles.list}
+                    numColumns={cols}
+                    key={`clr-req-${cols}`} // 🔥 VERY IMPORTANT (re-render fix)
+                    contentContainerStyle={listContentStyle}
+                    keyboardShouldPersistTaps="handled"
+                    ListHeaderComponent={data.length > 0 ? requestsHeader : null}
                     onScroll={({ nativeEvent }) => {
                         setShowTopButton(nativeEvent.contentOffset.y > 100);
                     }}
                     ListEmptyComponent={
                         !isLoading ? (
-                            <View style={crlimtreq_styles.emptyContainer}>
-                                <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                            <View style={styles.emptyCard}>
+                                <EmptyState
+                                    icon={searchQuery ? 'search-off' : 'inbox'}
+                                    title="No request data found!"
+                                    text={searchQuery ? 'No request matches your search. Try another party, broker or sales executive.' : 'There are no credit limit requests waiting for approval.'}
+                                />
                             </View>
                         ) : null
                     }
@@ -936,32 +945,42 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
             ) : activeTab1 === 'history' ? (
                 <FlatList
                     ref={flatHistoryListRef}
+                    style={styles.list}
                     data={filteredhistoryData}
                     renderItem={renderAllCardHistory}
                     keyExtractor={(item) => item.uid}
-                    numColumns={numColumns}
-                    key={numColumns}
-                    contentContainerStyle={crlimtreq_styles.list}
+                    numColumns={cols}
+                    key={`clr-hist-${cols}`}
+                    contentContainerStyle={listContentStyle}
+                    keyboardShouldPersistTaps="handled"
+                    ListHeaderComponent={allhistoryData.length > 0 ? historyHeader : null}
                     onScroll={({ nativeEvent }) => {
                         setShowTopButton(nativeEvent.contentOffset.y > 100);
                     }}
                     ListEmptyComponent={
                         !isLoading ? (
-                            <View style={crlimtreq_styles.emptyContainer}>
-                                <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
+                            <View style={styles.emptyCard}>
+                                <EmptyState
+                                    icon={searchhistoryQuery ? 'search-off' : 'history'}
+                                    title="No history data found!"
+                                    text={searchhistoryQuery ? 'Nothing in the history matches your search.' : 'Approved and rejected credit limit requests will appear here.'}
+                                />
                             </View>
                         ) : null
                     }
                 />
             ) : null}
+
             {activeTab1 === 'requests' ? (
                 <>
                     {showTopButton && (
                         <TouchableOpacity
-                            style={crlimtreq_styles.topButton}
+                            style={styles.topButton}
                             onPress={scrollToTop}
+                            accessibilityRole="button"
+                            accessibilityLabel="Scroll to top"
                         >
-                            <Icon name="arrow-upward" size={24} color="black" />
+                            <Icon name="arrow-upward" size={22} color="#fff" />
                         </TouchableOpacity>
                     )}
                 </>
@@ -969,27 +988,16 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
             ) : activeTab1 === 'history' ? (<>
                 {showTopButton && (
                     <TouchableOpacity
-                        style={crlimtreq_styles.topButton}
+                        style={styles.topButton}
                         onPress={scrollHistoryToTop}
+                        accessibilityRole="button"
+                        accessibilityLabel="Scroll to top"
                     >
-                        <Icon name="arrow-upward" size={24} color="black" />
+                        <Icon name="arrow-upward" size={22} color="#fff" />
                     </TouchableOpacity>
                 )}</>) : null}
 
-            {/* MODAL */}
-            {/* <Modal visible={showOverlay} transparent>
-                <View style={crlimtreq_styles.overlay}>
-                    <Text>Confirm {selectedAction}</Text>
-
-                    <TouchableOpacity onPress={handleConfirmAction}>
-                        <Text>YES</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => setShowOverlay(false)}>
-                        <Text>NO</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal> */}
+            {/* ───────────── Confirm / result dialog ───────────── */}
             {getSuccess === true ? (
                 <Modal
                     visible={showOverlay}
@@ -997,26 +1005,38 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
                     animationType="fade"
                     onRequestClose={() => setShowOverlay(false)}
                 >
-                    <View style={crlimtreq_styles.overlayContainer}>
-                        <View style={crlimtreq_styles.overlay}>
-                            <Text style={crlimtreq_styles.overlayTitle}>
-                                {selectedAction === 'accept' ? 'Confirm Accept' : 'Confirm Reject'}
-                            </Text>
-                            <Text style={crlimtreq_styles.overlayPartyName}>
+                    <View style={styles.overlayContainer}>
+                        <View style={styles.dialog}>
+                            <View style={styles.dialogHead}>
+                                <View style={[styles.dialogIcon, { backgroundColor: `${isAccept ? T.green : T.red}16` }]}>
+                                    <Icon name={isAccept ? 'check-circle' : 'cancel'} size={24} color={isAccept ? T.green : T.red} />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={styles.eyebrow}>CREDIT LIMIT REQUEST</Text>
+                                    <Text style={styles.dialogTitle}>
+                                        {selectedAction === 'accept' ? 'Confirm Accept' : 'Confirm Reject'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Text style={styles.dialogParty} numberOfLines={2}>
                                 Party: {selectedItem?.parname}
                             </Text>
                             {responsemessage === 'Loading...' ? (
-                                <>
-                                    <Text style={crlimtreq_styles.loadingText}>
-                                        <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} /> {responsemessage}
-                                    </Text>
-                                </>
+                                <View style={styles.dialogStatus}>
+                                    <ActivityIndicator size="small" color={T.copper} />
+                                    <Text style={styles.loadingText}>{responsemessage}</Text>
+                                </View>
                             ) : (
-                                <>
-                                    <Text style={crlimtreq_styles.responseText}>
+                                <View style={[styles.dialogStatus, styles.dialogResult]}>
+                                    <Icon
+                                        name={responsemessage === 'Server Error' ? 'error-outline' : 'info-outline'}
+                                        size={18}
+                                        color={responsemessage === 'Server Error' ? T.red : T.nav}
+                                    />
+                                    <Text style={[styles.responseText, responsemessage === 'Server Error' && { color: T.red }]}>
                                         {responsemessage}
                                     </Text>
-                                </>
+                                </View>
                             )}
                         </View>
                     </View>
@@ -1028,27 +1048,43 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
                     animationType="fade"
                     onRequestClose={() => setShowOverlay(false)}
                 >
-                    <View style={crlimtreq_styles.overlayContainer}>
-                        <View style={crlimtreq_styles.overlay}>
-                            <Text style={crlimtreq_styles.overlayTitle}>
-                                {selectedAction === 'accept' ? 'Confirm Accept' : 'Confirm Reject'}
-                            </Text>
-                            <Text style={crlimtreq_styles.overlayPartyName}>
+                    <View style={styles.overlayContainer}>
+                        <View style={styles.dialog}>
+                            <View style={styles.dialogHead}>
+                                <View style={[styles.dialogIcon, { backgroundColor: `${isAccept ? T.green : T.red}16` }]}>
+                                    <Icon name={isAccept ? 'check-circle' : 'cancel'} size={24} color={isAccept ? T.green : T.red} />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={styles.eyebrow}>CREDIT LIMIT REQUEST</Text>
+                                    <Text style={styles.dialogTitle}>
+                                        {selectedAction === 'accept' ? 'Confirm Accept' : 'Confirm Reject'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Text style={styles.dialogParty} numberOfLines={2}>
                                 Party: {selectedItem?.parname}
                             </Text>
-                            <View style={crlimtreq_styles.overlayButtons}>
-                                <TouchableOpacity
-                                    style={[crlimtreq_styles.overlayButton, { backgroundColor: '#4CAF50' }]}
-                                    onPress={handleConfirmAction}
-                                >
-                                    <Icon name="check" size={20} color="white" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[crlimtreq_styles.overlayButton, { backgroundColor: '#F44336' }]}
+                            {selectedItem ? (
+                                <View style={styles.dialogBox}>
+                                    <Cell label="Old Limit" value={rupee(selectedItem.limit1)} color={T.green} />
+                                    <Cell label="Req. Limit" value={`₹ ${pendingLimit}`} color={T.copper} />
+                                    <Cell label="Req. Cr. Days" value={pendingDays} color={T.copper} />
+                                </View>
+                            ) : null}
+                            <View style={styles.dialogButtons}>
+                                <Btn
+                                    label="Cancel"
+                                    kind="ghost"
                                     onPress={() => setShowOverlay(false)}
-                                >
-                                    <Icon name="close" size={20} color="white" />
-                                </TouchableOpacity>
+                                    style={styles.dialogBtn}
+                                />
+                                <Btn
+                                    label={isAccept ? 'Confirm accept' : 'Confirm reject'}
+                                    icon={isAccept ? 'check' : 'close'}
+                                    kind={isAccept ? 'primary' : 'danger'}
+                                    onPress={handleConfirmAction}
+                                    style={[styles.dialogBtn, isAccept && { backgroundColor: T.green }]}
+                                />
                             </View>
                         </View>
                     </View>
@@ -1075,8 +1111,162 @@ const CreditLimitRequestNEW: React.FC<Props> = ({ token, username, API }) => {
                 getParname={getParname}
             />
 
+            <BusyOverlay visible={isLoading} text="Loading..." />
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    root: { flex: 1, backgroundColor: T.bg },
+    list: { flex: 1, backgroundColor: T.bg },
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 96,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+    gridCell: { padding: 5 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+
+    // toolbar
+    toolbar: {
+        backgroundColor: T.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingVertical: 10,
+    },
+    toolbarInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+    },
+    toolbarPhone: { flexDirection: 'column', alignItems: 'stretch', gap: 8 },
+    segWrap: { width: 280 },
+
+    // request card
+    card: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    cardAccepted: { borderColor: `${T.green}66`, backgroundColor: '#FBFDFB' },
+    cardRejected: { borderColor: `${T.red}66`, backgroundColor: '#FFFBFA' },
+    cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    cardHeadInfo: { flex: 1, minWidth: 0 },
+    partyName: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 },
+    metricBox: {
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    metricRow: { flexDirection: 'row', gap: 10 },
+    reqBox: {
+        gap: 8,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: `${T.copper}40`,
+        backgroundColor: `${T.copper}08`,
+    },
+    reqRow: { flexDirection: 'row', gap: 8 },
+    reqLimitField: { flex: 1.6, minWidth: 0 },
+    reqDaysField: { flex: 1, minWidth: 0 },
+    reqInput: { fontWeight: '800', color: T.pd },
+    words: { fontSize: 11.5, fontWeight: '700', fontStyle: 'italic', color: T.copper, lineHeight: 16 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    lines: { gap: 6 },
+    actions: {
+        flexDirection: 'row',
+        gap: 8,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        paddingTop: 11,
+        marginTop: 'auto',
+    },
+    actionBtn: { flex: 1, paddingHorizontal: 8 },
+
+    topButton: {
+        position: 'absolute',
+        right: 18,
+        bottom: 24,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: T.nav,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...S.sheet,
+    },
+
+    // dialog
+    overlayContainer: {
+        flex: 1,
+        backgroundColor: 'rgba(13,27,42,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+    },
+    dialog: {
+        width: '100%',
+        maxWidth: 420,
+        backgroundColor: T.surface,
+        borderRadius: 16,
+        padding: 18,
+        gap: 12,
+        ...S.sheet,
+    },
+    dialogHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    dialogIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    dialogTitle: { fontSize: 17, fontWeight: '900', color: T.nav, marginTop: 2 },
+    dialogParty: { fontSize: 13.5, fontWeight: '700', color: T.ink },
+    dialogBox: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    dialogButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    dialogBtn: { flex: 1 },
+    dialogStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    dialogResult: {},
+    loadingText: { fontSize: 13.5, fontWeight: '800', color: T.nav },
+    responseText: { flex: 1, fontSize: 13.5, fontWeight: '700', color: T.nav },
+});
 
 export default CreditLimitRequestNEW;

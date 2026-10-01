@@ -6,34 +6,45 @@ import {
     ActivityIndicator,
     FlatList,
     LayoutAnimation,
-    Modal,
-    TextInput as RNTextInput,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    useWindowDimensions,
     View
 } from 'react-native';
 // import RNFS from 'react-native-fs';
 // import { Buffer } from 'buffer';
 // import Pdf from 'react-native-pdf';
-import { crlimtreq_styles } from '@/common/Style';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import HeaderBar from '../../components/HeaderNew';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import { encode as btoa } from  'base-64';
 // import { urlSafeEncode } from './urlSafeEncode';
 // import { encodeData } from './encodingUtils';
 import { API } from '@/common/API/dynamicAPI';
-import theme from '@/components/theme';
-import { LinearGradient } from 'expo-linear-gradient';
 // import CriteriaForm from './CriteriaForm';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchAllStoredata } from '../../common/API/Functions';
 // import { useNavigation } from '@react-navigation/native';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
 import { useRouter } from 'expo-router';
+// NEW ERP theme (presentation only — every API call / handler below is unchanged)
+import { S, T } from '@/src/theme';
+import {
+    BusyOverlay,
+    Btn,
+    CONTENT_MAX,
+    EmptyState,
+    Field,
+    IconBtn,
+    Kpi,
+    KpiGrid,
+    Metric,
+    SearchBox,
+    SectionHead,
+    Segment,
+    Sheet,
+    cellWidth,
+    useSotLayout,
+} from '@/src/components/erpUi';
 interface CardData {
     [key: string]: string;
     isProcessed: boolean;
@@ -203,304 +214,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [ChartHelp, setChartHelpOpen] = useState(false);
     // 
 
-    // 1 col on phone, 2 on tablet, 3 on wide web
-    const { width } = useWindowDimensions();
-
-    const getColumns = () => {
-        if (width < 600) return 1;      // mobile
-        if (width < 1000) return 2;     // tablet
-        return 3;                       // web / large
-    };
-
-    const numColumns = getColumns();
-
-    // Explicit item width so the last row doesn't stretch weirdly
-    const GRID_PAD = 10;
-    const GRID_GAP = 10;
-    const gridItemWidth =
-        numColumns > 1
-            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : width;
-
-    const styles = StyleSheet.create({
-
-        card: {
-            backgroundColor: '#fff',
-            marginVertical: 8,
-            borderRadius: 12,
-            padding: 14,
-            elevation: 3,
-            marginHorizontal: 0,   // change from 12 → 0 (spacing handled by grid)
-            marginBottom: 12,
-        },
-
-        acceptedCard: {
-            borderLeftWidth: 4,
-            borderLeftColor: '#4CAF50'
-        },
-
-        rejectedCard: {
-            borderLeftWidth: 4,
-            borderLeftColor: '#F44336'
-        },
-
-        headerRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-        },
-
-        poNo: {
-            fontSize: 16,
-            fontWeight: 'bold',
-            color: '#333'
-        },
-
-        date: {
-            fontSize: 12,
-            color: '#777'
-        },
-
-        statusChip: {
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 20
-        },
-
-        party: {
-            marginTop: 6,
-            fontSize: 14,
-            fontWeight: '600',
-            color: '#444'
-        },
-
-        row: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 6
-        },
-
-        label: {
-            color: '#000',
-            fontSize: 12
-        },
-
-        value: {
-            color: '#222',
-            fontWeight: '500'
-        },
-
-        actionRow: {
-            flexDirection: 'row',
-            justifyContent: 'flex-end',
-            marginTop: 10
-        },
-
-        iconBtn: {
-            marginLeft: 8,
-            padding: 8,
-            borderRadius: 8,
-            justifyContent: 'center',
-            alignItems: 'center'
-        },
-
-        // chatIconBtn: {
-        //     position: 'absolute',
-        //     top: 8,
-        //     right: 8,
-        //     backgroundColor: '#4A90E2',
-        //     padding: 6,
-        //     borderRadius: 20,
-        //     elevation: 3, // android shadow
-        //     shadowColor: '#000',
-        //     shadowOpacity: 0.2,
-        //     shadowOffset: { width: 0, height: 2 },
-        //     shadowRadius: 3,
-        //     zIndex: 10
-        // },
-
-        chatIconBottom: {
-            marginTop: 10,
-            alignSelf: 'flex-end',  // right side niche
-            backgroundColor: '#2196F3',
-            padding: 8,
-            borderRadius: 20
-        },
-
-        expandHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 12,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderColor: '#eee'
-        },
-
-        expandText: {
-            fontSize: 14,
-            fontWeight: '600',
-            color: '#333'
-        },
-
-        itemContainer: {
-            marginTop: 8
-        },
-
-        itemCard: {
-            backgroundColor: '#fff',
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 12,
-            elevation: 3,
-        },
-
-        itemHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 10,
-        },
-
-        itemTitle: {
-            fontSize: 15,
-            color: '#222',
-            flex: 1,
-            paddingRight: 10,
-            fontWeight: 'bold',
-            marginBottom: 6,
-        },
-
-        chartBtn: {
-            backgroundColor: '#2196F3',
-            padding: 8,
-            borderRadius: 8,
-            elevation: 2,
-        },
-
-        itemGrid: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-        },
-
-        itemBox: {
-            width: '48%',
-            marginBottom: 10,
-        },
-
-        itemLabel: {
-            fontSize: 11,
-            color: '#888',
-        },
-
-        itemValue: {
-            fontSize: 13,
-            fontWeight: '500',
-            color: '#333',
-        },
-
-        // itemTitle: {
-        //     fontWeight: 'bold',
-        //     fontSize: 14,
-        //     marginBottom: 6,
-        //     color: '#222'
-        // },
-
-        itemRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 4
-        },
-
-        itemLabel: {
-            fontSize: 12,
-            color: '#888'
-        },
-
-        itemValue: {
-            fontSize: 13,
-            fontWeight: '500',
-            color: '#333'
-        },
-        stampContainer: {
-            position: 'absolute',
-            right: 35,      // right side se distance
-            top: 115,
-            // top: '80%',
-            left: '80%',
-            marginLeft: -50,
-            marginTop: 20,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        stampContainerPOS: {
-            position: 'absolute',
-            right: 20,
-            top: 120,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-
-        stampContainerYOS: {
-            position: 'absolute',
-            right: 20,
-            top: 120,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-
-        stamp: {
-            width: 100,
-            height: 60,
-            borderRadius: 10,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            transform: [{ rotate: '0deg' }],
-        },
-
-        stampAccepted: {
-            backgroundColor: 'rgba(76, 175, 80, 0.7)',
-            borderColor: 'rgba(46, 125, 50, 0.9)',
-        },
-
-        stampRejected: {
-            backgroundColor: 'rgba(244, 67, 54, 0.7)',
-            borderColor: 'rgba(198, 40, 40, 0.9)',
-        },
-
-        stampText: {
-            color: '#fff',
-            fontWeight: 'bold',
-            fontSize: 12,
-            textAlign: 'center',
-        },
-        prpCodeContainer: {
-            width: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-            backgroundColor: '#F5F7FA',
-            paddingVertical: 8,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: '#E0E0E0',
-        },
-
-        prpCodeText: {
-            fontSize: 16,
-            fontWeight: '700',
-            color: '#000',
-            textAlign: 'center',
-            letterSpacing: 1,
-        },
-    });
-
-
+    // NEW ERP UI: responsive layout (1 col phone, 2 tablet, 3 desktop)
+    const { isPhone, isDesktop, cols, gutter } = useSotLayout();
 
     useEffect(() => {
         const getType = async () => {
@@ -1442,181 +1157,206 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }
     };
 
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
+    // ---------------------------------------------------------------------------
+    // NEW ERP UI render helpers (presentation only — every button below calls the
+    // original handler with the original arguments).
+    // ---------------------------------------------------------------------------
+    const noStoreSelected =
+        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '';
 
+    const renderItemLines = (item: any) => (
+        <View style={styles.itemContainer}>
+            {item.d1?.map((d1Item, index) => (
+                <View key={index} style={styles.itemCard}>
+                    <View style={styles.itemHeader}>
+                        <View style={styles.itemIcon}>
+                            <Icon name="texture" size={16} color={T.copper} />
+                        </View>
+                        <Text style={styles.itemTitle} numberOfLines={2}>
+                            {d1Item.ItmName}
+                        </Text>
+                        <IconBtn
+                            icon="bar-chart"
+                            tone="soft"
+                            color={T.copper}
+                            label={`Rate chart for ${d1Item.ItmName}`}
+                            onPress={() => {
+                                console.log("NAV TEST", navigation);
+
+                                router.push({
+                                    pathname: '/ChartScreen',
+                                    params: {
+                                        item: JSON.stringify(item),
+                                        d1Item: JSON.stringify(d1Item),
+                                        token: token
+
+                                    }
+                                });
+                            }}
+                        />
+                    </View>
+                    <View style={styles.itemGrid}>
+                        <Metric label="Grade" value={showVal(d1Item.GrdName)} style={styles.itemBox} />
+                        <Metric label="Shade" value={showVal(d1Item.ShdName)} style={styles.itemBox} />
+                        <Metric label="Qty" value={showVal(d1Item.Qty)} style={styles.itemBox} />
+                        <Metric label="Rate" value={showMoney(d1Item.UnitRate)} style={styles.itemBox} />
+                        <Metric label="Amount" value={showMoney(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+
+    const renderPOCard = (item: any, type: 'history' | 'request' | 'verify') => {
         const isApproved = item.IsAuth === '1';
         const isRejected = item.IsAuth === '2';
+        const isHistory = type === 'history';
+        const disabledAction = !isConnected || item.isProcessed;
+        const expanded = !!expandedHistoryCards[item.UId];
+        const lineCount = item.d1?.length || 0;
 
         return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
-                <View style={[
-                    crlimtreq_styles.card,
-                    isApproved ? styles.acceptedCard :
-                        isRejected ? styles.rejectedCard : null
-                ]}>
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <View
+                    style={[
+                        styles.card,
+                        !isHistory && !isConnected && styles.disabledCard,
+                        isHistory
+                            ? (isApproved ? styles.acceptedCard : isRejected ? styles.rejectedCard : null)
+                            : (item.actionType === 'accept' ? styles.acceptedCard : item.actionType === 'reject' ? styles.rejectedCard : null),
+                    ]}
+                >
+                    {/* HEADER: property eyebrow, PO no + date, status */}
                     <View style={styles.headerRow}>
-                        <View style={styles.prpCodeContainer}>
-                            <Text style={styles.prpCodeText}>
-                                {item.PrpCode}
-                            </Text>
-                        </View>
-                    </View>
-
-                    {/* HEADER */}
-                    <View style={styles.headerRow}>
-                        <View>
-                            <Text style={styles.poNo}>{item.PONo}</Text>
-                            <Text style={styles.date}>{item.PODate}</Text>
-                        </View>
-
-                        {(isApproved || isRejected) && (
-                            <View style={[
-                                styles.statusChip,
-                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                            ]}>
-                                <Text style={{
-                                    color: isApproved ? '#2E7D32' : '#C62828',
-                                    fontWeight: '600'
-                                }}>
-                                    {isApproved ? 'Approved' : 'Rejected'}
-                                </Text>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.eyebrow} numberOfLines={1}>{item.PrpCode}</Text>
+                            <Text style={styles.poNo} numberOfLines={1}>{item.PONo}</Text>
+                            <View style={styles.dateRow}>
+                                <Icon name="event" size={12} color={T.muted} />
+                                <Text style={styles.date}>{item.PODate}</Text>
                             </View>
-                        )}
+                        </View>
+                        <View style={styles.tagCol}>
+                            {(isApproved || isRejected) && (
+                                <StatusTag
+                                    label={isApproved ? 'Approved' : 'Rejected'}
+                                    color={isApproved ? T.green : T.red}
+                                    icon={isApproved ? 'check' : 'close'}
+                                />
+                            )}
+                            {!isHistory && item.isProcessed && (
+                                <StatusTag
+                                    solid
+                                    // original stamp: accept → APPROVED, everything else → REJECTED;
+                                    // a verify "pending" action (IsAuth 0) is now shown as PENDING.
+                                    label={item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'pending' ? 'PENDING' : 'REJECTED'}
+                                    color={item.actionType === 'accept' ? T.green : item.actionType === 'pending' ? T.amber : T.red}
+                                />
+                            )}
+                        </View>
                     </View>
 
                     {/* PARTY */}
-                    <Text style={styles.party}>{item.ParName}</Text>
+                    <View style={styles.partyRow}>
+                        <Icon name="storefront" size={15} color={T.copper} />
+                        <Text style={styles.party} numberOfLines={2}>{item.ParName}</Text>
+                    </View>
 
                     {/* DETAILS */}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Broker</Text>
-                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                    </View>
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Net Amount</Text>
-                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                    </View>
-
-                    {API === "https://apiy.tms-webapp.com" && (
-                        < View style={styles.row}>
-                            <Text style={styles.label}>Store</Text>
-                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    <View style={styles.metricBox}>
+                        <View style={styles.metricRow}>
+                            <Metric label="Broker" value={item.BAccName || '-'} />
+                            <Metric label="Net Amount" value={item.NetAmt ? showMoney(item.NetAmt) : '-'} color={T.pd} align="right" />
                         </View>
-                    )}
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Auth By</Text>
-                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                        <View style={styles.metricRow}>
+                            {API === "https://apiy.tms-webapp.com" && (
+                                <Metric label="Store" value={item.StoreName || '-'} />
+                            )}
+                            <Metric
+                                label="Auth By"
+                                value={item.AuthorisedBy || '-'}
+                                align={API === "https://apiy.tms-webapp.com" ? 'right' : 'left'}
+                            />
+                        </View>
                     </View>
 
-                    {/* ACTION ROW */}
-                    {(isApproved || isRejected) && (
-                        <View style={styles.actionRow}>
-
-                            <View style={[
-                                styles.iconBtn,
-                                { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
-                            ]}>
-                                <Icon
-                                    name={isApproved ? 'check' : 'close'}
-                                    size={20}
-                                    color="#fff"
-                                />
-                            </View>
-                        </View>
-                    )}
-
-                    {/* 🔽 EXPAND BUTTON */}
-                    <TouchableOpacity
-                        style={styles.expandHeader}
-                        onPress={() => toggleExpandHistory(item.UId)}
-                    >
-                        <Text style={styles.expandText}>
-                            Items ({item.d1?.length || 0})
-                        </Text>
-
-                        <Icon
-                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
+                    {!isHistory && (
+                        <Field
+                            label="Auth Remark"
+                            placeholder="Add a remark…"
+                            value={editableValuesYPO[item.UId]?.ARemark || ''}
+                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
                         />
-                    </TouchableOpacity>
-
-                    {/* 🔽 EXPANDED ITEMS */}
-                    {expandedHistoryCards[item.UId] && (
-                        <View style={styles.itemContainer}>
-                            {item.d1?.map((d1Item, index) => (
-
-
-                                <View key={index} style={styles.itemCard}>
-
-                                    {/* TOP ROW (TITLE + ICON) */}
-                                    <View style={styles.itemHeader}>
-                                        <Text style={styles.itemTitle}>
-                                            {d1Item.ItmName}
-                                        </Text>
-
-                                        <TouchableOpacity
-                                            style={styles.chartBtn}
-                                            onPress={() => {
-                                                console.log("NAV TEST", navigation);
-
-                                                router.push({
-                                                    pathname: '/ChartScreen',
-                                                    params: {
-                                                        item: JSON.stringify(item),
-                                                        d1Item: JSON.stringify(d1Item),
-                                                        token: token
-
-                                                    }
-                                                });
-                                            }}
-                                        >
-                                            <Icon name="bar-chart" size={18} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* DETAILS GRID */}
-                                    < View style={styles.itemGrid} >
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Grade</Text>
-                                            <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Shade</Text>
-                                            <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Qty</Text>
-                                            <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Rate</Text>
-                                            <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Amount</Text>
-                                            <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                        </View>
-
-                                    </View>
-
-                                </View>
-                            ))
-                            }
-                        </View >
                     )}
 
-                    {String(item.isauthedit) === '1' && (
-                        <View style={crlimtreq_styles.cardActions}>
+                    {/* ACTIONS */}
+                    {type === 'request' && (
+                        <View style={styles.actionRow}>
+                            <Btn
+                                label="Approve"
+                                icon="check-circle"
+                                compact
+                                onPress={() => handleIconPress(item, 'accept')}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={disabledAction}
+                                style={[styles.actionBtn, { backgroundColor: T.green }]}
+                            />
+                            <Btn
+                                label="Reject"
+                                icon="cancel"
+                                kind="danger"
+                                compact
+                                onPress={() => handleIconPress(item, 'reject')}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={disabledAction}
+                                style={styles.actionBtn}
+                            />
+                            <Btn
+                                label="PDF"
+                                icon="file-present"
+                                kind="ghost"
+                                compact
+                                loading={getLocationLoading === item.UId}
+                                onPress={() => {
+                                    if (isConnected && item.IsAuth === '0') {
+                                        handleCallURL(item);
+                                    }
+                                }}
+                                disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
+                                style={styles.pdfBtn}
+                            />
+                        </View>
+                    )}
 
-                            <TouchableOpacity
+                    {type === 'verify' && (
+                        <View style={styles.actionRow}>
+                            <Btn
+                                label="Verify"
+                                icon="check-circle"
+                                compact
+                                onPress={() => handleIconPress(item, 'pending')}
+                                disabled={disabledAction}
+                                style={[styles.actionBtn, { backgroundColor: T.green }]}
+                            />
+                            <Btn
+                                label="Reject"
+                                icon="cancel"
+                                kind="danger"
+                                compact
+                                onPress={() => handleIconPress(item, 'verifyreject')}
+                                disabled={disabledAction}
+                                style={styles.actionBtn}
+                            />
+                        </View>
+                    )}
+
+                    {isHistory && String(item.isauthedit) === '1' && (
+                        <View style={styles.actionRow}>
+                            <Btn
+                                label="Mark Pending"
+                                icon="check-circle"
+                                kind="ghost"
+                                compact
                                 onPress={() =>
                                     handleIconPress(
                                         {
@@ -1628,304 +1368,50 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     )
                                 }
                                 disabled={!isConnected || item.isProcessed}
-                            >
-                                <Icon
-                                    name="check-circle"
-                                    size={30}
-                                    color={
-                                        !isConnected || item.isProcessed
-                                            ? "#ccc"
-                                            : "#F44336"
-                                    }
-                                />
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                </View >
-            </View>
-        );
-    };
-
-    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => {
-
-        const isApproved = item.IsAuth === '1';
-        const isRejected = item.IsAuth === '2';
-
-        return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
-                <View style={[
-                    crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-                    item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
-
-                    {item.isProcessed && (
-                        <View style={styles.stampContainerYOS}>
-                            <View
-                                style={[
-                                    styles.stamp,
-                                    item.actionType === 'accept'
-                                        ? styles.stampAccepted
-                                        : styles.stampRejected,
-                                ]}
-                            >
-                                <Text style={styles.stampText}>
-                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                                </Text>
-                            </View>
-                        </View>
-                    )}
-                    <View style={styles.headerRow}>
-                        <View style={styles.prpCodeContainer}>
-                            <Text style={styles.prpCodeText}>
-                                {item.PrpCode}
-                            </Text>
-                        </View>
-                    </View>
-                    {/* HEADER */}
-                    <View style={styles.headerRow}>
-                        <View>
-                            <Text style={styles.poNo}>{item.PONo}</Text>
-                            <Text style={styles.date}>{item.PODate}</Text>
-                        </View>
-
-                        {(isApproved || isRejected) && (
-                            <View style={[
-                                styles.statusChip,
-                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                            ]}>
-                                <Text style={{
-                                    color: isApproved ? '#2E7D32' : '#C62828',
-                                    fontWeight: '600'
-                                }}>
-                                    {isApproved ? 'Approved' : 'Rejected'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* PARTY */}
-                    <Text style={styles.party}>{item.ParName}</Text>
-
-                    {/* DETAILS */}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Broker</Text>
-                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                    </View>
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Net Amount</Text>
-                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                    </View>
-                    {API === "https://apiy.tms-webapp.com" && (
-                        < View style={styles.row}>
-                            <Text style={styles.label}>Store</Text>
-                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
-                        </View>
-                    )}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Auth By</Text>
-                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
-                    </View>
-
-                    <View style={styles.row}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={styles.label}>Auth Remark:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={editableValuesYPO[item.UId]?.ARemark || ''}
-                                onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                                style={[styles.actionBtn, { borderColor: `${T.red}55` }]}
                             />
                         </View>
-                    </View>
+                    )}
 
-                    {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
-                    {
-                        type === 'verify' && (
-                            <View style={styles.actionRow}>
-                                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                                    <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                                    <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                                </TouchableOpacity>
-                            </View>
-                        )
-                    }
-
-                    {
-                        type === 'request' && (
-                            <View style={styles.actionRow}>
-
-                                {/* ✅ ACCEPT */}
-                                <TouchableOpacity
-                                    onPress={() => handleIconPress(item, 'accept')}
-                                    // disabled={!isConnected || item.IsAuth !== '0'}
-                                    disabled={!isConnected || item.isProcessed}
-                                >
-                                    <Icon
-                                        name="check-circle"
-                                        size={35}
-                                        color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
-                                    />
-                                </TouchableOpacity>
-
-                                {/* ❌ REJECT */}
-                                <TouchableOpacity
-                                    onPress={() => handleIconPress(item, 'reject')}
-                                    // disabled={!isConnected || item.IsAuth !== '0'}
-                                    disabled={!isConnected || item.isProcessed}
-                                >
-                                    <Icon
-                                        name="cancel"
-                                        size={35}
-                                        color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
-                                    />
-                                </TouchableOpacity>
-
-                                {/* 📄 FILE */}
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        if (isConnected && item.IsAuth === '0') {
-                                            handleCallURL(item);
-                                        }
-                                    }}
-                                    disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
-                                >
-                                    {
-                                        getLocationLoading === item.UId ? (
-                                            <ActivityIndicator size={35} color="#2196F3" />
-                                        ) : (
-                                            <Icon
-                                                name="file-present"
-                                                size={35}
-                                                color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
-                                            />
-                                        )
-                                    }
-                                </TouchableOpacity>
-
-                            </View>
-                        )
-                    }
-
-                    {/* 🔽 EXPAND */}
+                    {/* EXPAND ITEMS */}
                     <TouchableOpacity
                         style={styles.expandHeader}
                         onPress={() => toggleExpandHistory(item.UId)}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded }}
                     >
+                        <Icon name="inventory-2" size={15} color={T.nav} />
                         <Text style={styles.expandText}>
-                            Items ({item.d1?.length || 0})
+                            Items ({lineCount})
                         </Text>
-
                         <Icon
-                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
+                            name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                            size={22}
+                            color={T.nav}
                         />
                     </TouchableOpacity>
 
-                    {/* 🔽 ITEMS */}
-                    {
-                        expandedHistoryCards[item.UId] && (
-                            <View style={styles.itemContainer}>
-                                {item.d1?.map((d1Item, index) => (
-
-                                    <View key={index} style={styles.itemCard}>
-
-                                        <View style={styles.itemHeader}>
-                                            <Text style={styles.itemTitle}>
-                                                {d1Item.ItmName}
-                                            </Text>
-
-                                            {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
-                                            <TouchableOpacity
-                                                style={styles.chartBtn}
-                                                // onPress={() => navigation.navigate('ChartScreen', {
-                                                //     item,
-                                                //     d1Item,
-                                                //     token
-                                                // })}
-                                                onPress={() =>
-                                                    // console.log('Chart clicked', d1Item);
-                                                    // handleChartClick(item, d1Item);
-                                                    router.push({
-                                                        pathname: '/ChartScreen',
-                                                        params: {
-                                                            item: JSON.stringify(item),
-                                                            d1Item: JSON.stringify(d1Item),
-                                                            token: token
-
-                                                        }
-                                                    })
-                                                }
-                                            >
-                                                <Icon name="bar-chart" size={18} color="#fff" />
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        <View style={styles.itemGrid}>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Grade</Text>
-                                                <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Shade</Text>
-                                                <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Qty</Text>
-                                                <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Rate</Text>
-                                                <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Amount</Text>
-                                                <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                            </View>
-
-                                        </View>
-
-                                    </View>
-                                ))}
-                            </View>
-                        )
-                    }
-                </View >
+                    {expanded && renderItemLines(item)}
+                </View>
             </View>
         );
     };
 
-    const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
-        <View style={crlimtreq_styles.tabContainer1}>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'requests' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('requests')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Request</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'history' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('history')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'verify' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('verify')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Verify</Text>
-            </TouchableOpacity>
-        </View>
-    );
+    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => renderPOCard(item, 'history');
 
+    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => renderPOCard(item, type);
+
+    const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
+        <Segment
+            value={activeTabYPO}
+            onChange={setActiveTabYPO}
+            options={[
+                { value: 'requests', label: 'Request', icon: 'pending-actions' },
+                { value: 'history', label: 'History', icon: 'history' },
+                { value: 'verify', label: 'Verify', icon: 'fact-check' },
+            ]}
+        />
+    );
 
 
     const toggleExpandHistory = (uid: string, arr) => {
@@ -1955,76 +1441,131 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }));
     };
 
-    return (
-        <>
-            {activeTab1YPO === 'requests' ? (
-                <>
-                    <HeaderBar
-                        userName={username}
-                        onSearch={setSearchQueryYPO}
-                        placeholder="Search purchase order..."
-                    />
-                </>
+    // ----- NEW ERP UI: per-tab wiring (same state, same setters as before) -----
+    const tabSearch =
+        activeTab1YPO === 'requests' ? searchQueryYPO
+            : activeTab1YPO === 'history' ? searchhistoryQueryYPO
+                : searchverifyQueryYPO;
+    const setTabSearch =
+        activeTab1YPO === 'requests' ? setSearchQueryYPO
+            : activeTab1YPO === 'history' ? setSearchhistoryQueryYPO
+                : setSearchverifyQueryYPO;
+    const tabPlaceholder =
+        activeTab1YPO === 'requests' ? 'Search purchase order...'
+            : activeTab1YPO === 'history' ? 'Search purchase history...'
+                : 'Search purchase verify...';
+    const tabRows: any[] =
+        activeTab1YPO === 'requests' ? filteredDataSPO
+            : activeTab1YPO === 'history' ? filteredhistoryDataSPO
+                : filteredverifyDataSPO;
+    const tabTitle =
+        activeTab1YPO === 'requests' ? 'Pending requests'
+            : activeTab1YPO === 'history' ? 'Authorisation history'
+                : 'Awaiting verification';
+    const tabEmpty =
+        activeTab1YPO === 'requests' ? 'No request data found!'
+            : activeTab1YPO === 'history' ? 'No history data found!'
+                : 'No verify data found!';
+    const emptyBlocked = activeTab1YPO === 'requests' ? isLoadingYPO : allhistoryLoadingYPO;
 
-            ) : activeTab1YPO === 'history' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchhistoryQueryYPO}
-                    placeholder="Search purchase history..."
-                />
-            ) : activeTab1YPO === 'verify' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchverifyQueryYPO}
-                    placeholder="Search purchase verify..."
-                />
-            ) : null}
-            <View style={[crlimtreq_styles.container, { backgroundColor: '#F5F5F5', marginBottom: -50 }]}>
-                {isLoadingYPO && <FullScreenLoader message={"Loading..."} />}
-                <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
+    const summary = useMemo(() => {
+        let net = 0;
+        let lines = 0;
+        let approved = 0;
+        let rejected = 0;
+        (tabRows || []).forEach((r: any) => {
+            net += num0(r?.NetAmt);
+            lines += Array.isArray(r?.d1) ? r.d1.length : 0;
+            const ok = r?.IsAuth === '1' || r?.actionType === 'accept';
+            const no = r?.IsAuth === '2' || r?.actionType === 'reject' || r?.actionType === 'verifyreject';
+            if (ok) approved += 1;
+            else if (no) rejected += 1;
+        });
+        return { count: (tabRows || []).length, net, lines, approved, rejected };
+    }, [tabRows]);
+
+    const listHeader = (
+        <View style={styles.listHeader}>
+            <KpiGrid isPhone={isPhone}>
+                <Kpi label="Orders" icon="receipt-long" accent={T.blue} value={String(summary.count)} sub={`${summary.lines} item line${summary.lines === 1 ? '' : 's'}`} />
+                <Kpi label="Net Amount" icon="account-balance-wallet" accent={T.pd} valueColor={T.pd} value={`₹ ${fmtINR(summary.net)}`} sub="Total of listed POs" />
+                <Kpi label="Approved" icon="check-circle" accent={T.green} valueColor={T.green} value={String(summary.approved)} sub="In this list" />
+                <Kpi label="Rejected" icon="cancel" accent={T.red} valueColor={T.red} value={String(summary.rejected)} sub="In this list" />
+            </KpiGrid>
+            <SectionHead
+                title={tabTitle}
+                meta={`${summary.count} purchase order${summary.count === 1 ? '' : 's'}${tabSearch ? ` · matching “${tabSearch}”` : ''}`}
+            />
+        </View>
+    );
+
+    const listEmpty = !emptyBlocked ? (
+        <View style={styles.emptyCard}>
+            <EmptyState
+                icon={tabSearch ? 'search-off' : 'inbox'}
+                title={tabEmpty}
+                text={tabSearch ? 'Try another PO no., party or broker name.' : 'Purchase orders will appear here when there is something to review.'}
+                action={
+                    noStoreSelected ? (
+                        <View style={styles.noStore}>
+                            <Icon name="store" size={14} color={T.red} />
+                            <Text style={styles.noStoreText}>No store Selected</Text>
+                        </View>
+                    ) : null
+                }
+            />
+        </View>
+    ) : null;
+
+    const listContentStyle = [styles.listContent, { paddingHorizontal: gutter - 5 }];
+
+    const confirmTitle =
+        selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : '';
+    const confirmIsReject = selectedActionYPO === 'reject' || selectedActionYPO === 'verifyreject';
+
+    return (
+        <View style={styles.root}>
+            {/* ───────────── Toolbar: search + tabs ───────────── */}
+            <View style={styles.toolbar}>
+                <View style={[styles.toolbarInner, { paddingHorizontal: gutter }, !isDesktop && { flexDirection: 'column', alignItems: 'stretch' }]}>
+                    <SearchBox
+                        value={tabSearch}
+                        onChangeText={setTabSearch}
+                        placeholder={tabPlaceholder}
+                        style={isDesktop ? { flex: 1 } : null}
+                    />
+                    <View style={isDesktop ? { width: 420 } : null}>
+                        <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
+                    </View>
+                </View>
+            </View>
+
+            <View style={styles.container}>
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
-                        key={`req-${numColumns}`}
+                        key={`req-${cols}`}
                         ref={flatListRefYPO}
                         data={filteredDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}   // 👈 kills black space
-                        // renderItem={renderCard}
+                        numColumns={cols}
+                        style={styles.container}
                         renderItem={({ item }) => renderCommonCard({ item, type: 'request' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        keyboardShouldPersistTaps="handled"
+                        extraData={[expandedHistoryCards, editableValuesYPO, getLocationLoading, cols]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
-                        ListEmptyComponent={
-                            !isLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
-                        }
+                        ListHeaderComponent={listHeader}
+                        ListEmptyComponent={listEmpty}
                     />
                 ) : activeTab1YPO === 'history' ? (
                     <FlatList
-                        key={`hist-${numColumns}`}
+                        key={`hist-${cols}`}
                         ref={flatHistoryListRefYPO}
                         data={filteredhistoryDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        numColumns={cols}
+                        style={styles.container}
                         renderItem={({ item }) => (
                             <>
                                 {renderAllCardHistory({ item })}
@@ -2032,93 +1573,45 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         )}
                         // renderItem={({ item }) => renderCommonCard({ item, type: 'history' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        keyboardShouldPersistTaps="handled"
+                        extraData={[expandedHistoryCards, cols]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
-                        ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
-                        }
+                        ListHeaderComponent={listHeader}
+                        ListEmptyComponent={listEmpty}
                     />
                 ) : activeTab1YPO === 'verify' ? (
                     <FlatList
-                        key={`ver-${numColumns}`}
+                        key={`ver-${cols}`}
                         ref={flatVerifyListRefYPO}
                         data={filteredverifyDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        numColumns={cols}
+                        style={styles.container}
                         renderItem={({ item }) => renderCommonCard({ item, type: 'verify' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        keyboardShouldPersistTaps="handled"
+                        extraData={[expandedHistoryCards, editableValuesYPO, cols]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
-                        ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
-                        }
+                        ListHeaderComponent={listHeader}
+                        ListEmptyComponent={listEmpty}
                     />
                 ) : null}
-                {activeTab1YPO === 'requests' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}
-                    </>
 
-                ) : activeTab1YPO === 'history' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollHistoryToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : activeTab1YPO === 'verify' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollVerifyToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : null}
-
+                {showTopButtonYPO && (
+                    <TouchableOpacity
+                        style={styles.topButton}
+                        onPress={activeTab1YPO === 'requests' ? scrollToTop : activeTab1YPO === 'history' ? scrollHistoryToTop : scrollVerifyToTop}
+                        accessibilityRole="button"
+                        accessibilityLabel="Scroll to top"
+                    >
+                        <Icon name="arrow-upward" size={22} color="#fff" />
+                    </TouchableOpacity>
+                )}
 
                 <PartyHistoryModal
                     visible={showPartyHistoryModalYPO}
@@ -2138,171 +1631,100 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     // setParnameYPO={setParnameYPO}
                     getParnameYPO={getParnameYPO}
                 />
-                {getSuccessYPO === true ? (
-                    <Modal
-                        visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowOverlayYPO(false)}
-                    >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Vouchar No.: {selectedItemYPO?.vouno}
-                                </Text>
-                                {responsemessageYPO === 'Loading...' ? (
-                                    <>
-                                        <Text style={crlimtreq_styles.loadingText}>
-                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} /> {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text style={crlimtreq_styles.responseText}>
-                                            {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                )}
-                            </View>
+
+                {/* ───────────── Confirm accept / reject / pending ───────────── */}
+                <Sheet
+                    open={showOverlayYPO}
+                    onClose={() => setShowOverlayYPO(false)}
+                    eyebrow="PURCHASE ORDER"
+                    title={confirmTitle}
+                    wideMax={440}
+                    footer={
+                        getSuccessYPO === true ? null : (
+                            <>
+                                <Btn label="Cancel" icon="close" kind="ghost" onPress={() => setShowOverlayYPO(false)} style={{ flex: 1 }} />
+                                <Btn
+                                    label={confirmIsReject ? 'Reject' : selectedActionYPO === 'pending' ? 'Confirm' : 'Approve'}
+                                    icon="check"
+                                    kind={confirmIsReject ? 'danger' : 'primary'}
+                                    onPress={handleConfirmAction}
+                                    style={[{ flex: 2 }, !confirmIsReject && { backgroundColor: T.green }]}
+                                />
+                            </>
+                        )
+                    }
+                >
+                    {getSuccessYPO === true ? (
+                        <View style={styles.confirmBox}>
+                            <Text style={styles.confirmLabel}>Vouchar No.</Text>
+                            <Text style={styles.confirmValue}>{selectedItemYPO?.vouno || '-'}</Text>
+                            {responsemessageYPO === 'Loading...' ? (
+                                <View style={styles.responseRow}>
+                                    <ActivityIndicator size="small" color={T.copper} />
+                                    <Text style={styles.responseText}>{responsemessageYPO}</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.responseRow}>
+                                    <Icon name="info-outline" size={18} color={T.nav} />
+                                    <Text style={styles.responseText}>{responsemessageYPO}</Text>
+                                </View>
+                            )}
                         </View>
-                    </Modal>
-                ) : (
-                    <Modal
-                        visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowOverlayYPO(false)}
+                    ) : (
+                        <View style={styles.confirmBox}>
+                            <Text style={styles.confirmLabel}>Party Name</Text>
+                            <Text style={styles.confirmValue}>{selectedItemYPO?.ParName}</Text>
+                            {!!selectedItemYPO?.PONo && (
+                                <Text style={styles.confirmMeta}>PO {selectedItemYPO?.PONo} · {selectedItemYPO?.PODate}</Text>
+                            )}
+                        </View>
+                    )}
+                </Sheet>
+
+                {/* ───────────── Item details carousel ───────────── */}
+                <Sheet
+                    open={showCarouselModal}
+                    onClose={() => {
+                        setShowCarouselModal(false);
+                        setSelectedD1Data([]); // Clear the data when closing
+                    }}
+                    eyebrow="ITEM DETAILS"
+                    title={getD1Party || 'Items'}
+                    wideMax={760}
+                >
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        snapToInterval={300} // Increased for better spacing
+                        snapToAlignment="center"
+                        decelerationRate="fast"
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.carouselRow}
                     >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Party Name: {selectedItemYPO?.ParName}
-                                </Text>
-                                <View style={crlimtreq_styles.overlayButtons}>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#4CAF50' }]}
-                                        onPress={handleConfirmAction}
-                                    >
-                                        <Icon name="check" size={20} color="white" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#F44336' }]}
-                                        onPress={() => setShowOverlayYPO(false)}
-                                    >
-                                        <Icon name="close" size={20} color="white" />
-                                    </TouchableOpacity>
+                        {selectedD1Data.map((d1Item, index) => (
+                            <View key={`${d1Item.SrNo || index}`} style={styles.carouselCard}>
+                                <Text style={styles.eyebrow} numberOfLines={1}>{getD1Party}</Text>
+                                <Text style={styles.itemTitle} numberOfLines={2}>{d1Item.ItmName}</Text>
+                                <View style={styles.itemGrid}>
+                                    <Metric label="Grade" value={showVal(d1Item.GrdName)} style={styles.itemBox} />
+                                    <Metric label="Shade" value={showVal(d1Item.ShdName)} style={styles.itemBox} />
+                                    <Metric label="Qty" value={showVal(d1Item.Qty)} style={styles.itemBox} />
+                                    <Metric label="Rate" value={showVal(d1Item.UnitRate)} style={styles.itemBox} />
+                                    <Metric label="Amount" value={showVal(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
+                                    <Metric label="Disc. %" value={showVal(d1Item.DisPer)} style={styles.itemBox} />
+                                    {activeTab1YPO === 'requests' && (
+                                        <>
+                                            <Metric label="Current Stock" value={showVal(d1Item.CurrentStock)} style={styles.itemBox} />
+                                            <Metric label="Last Party" value={showVal(d1Item.LastParty)} style={styles.itemBox} />
+                                            <Metric label="Last Rate" value={showVal(d1Item.LastRate)} style={styles.itemBox} />
+                                            <Metric label="Last Shade" value={showVal(d1Item.LastShade)} style={styles.itemBox} />
+                                        </>
+                                    )}
                                 </View>
                             </View>
-                        </View>
-                    </Modal>
-                )}
-                <Modal
-                    visible={showCarouselModal}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setShowCarouselModal(false);
-                    }}
-                >
-                    <View style={crlimtreq_styles.carouselModalOverlay}>
-                        <View style={crlimtreq_styles.carouselModalContainer}>
-                            {/* Close Button */}
-                            <TouchableOpacity
-                                style={crlimtreq_styles.modalCloseButton}
-                                onPress={() => {
-                                    setShowCarouselModal(false);
-                                    setSelectedD1Data([]); // Clear the data when closing
-                                }}
-                            >
-                                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-                            </TouchableOpacity>
-
-                            {/* Carousel Cards */}
-
-                            <ScrollView
-                                horizontal
-                                pagingEnabled
-                                snapToInterval={300} // Increased for better spacing
-                                snapToAlignment="center"
-                                decelerationRate="fast"
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={crlimtreq_styles.carouselCardContainer}
-                            >
-                                {selectedD1Data.map((d1Item, index) => (
-                                    <View
-                                        key={`${d1Item.SrNo || index}`}
-                                        style={[
-                                            crlimtreq_styles.carouselCard,
-                                            { marginHorizontal: 10 } // Add spacing between cards
-                                        ]}
-                                    >
-                                        <LinearGradient
-                                            colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                                            style={crlimtreq_styles.headerContainer}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}>
-
-                                            <View style={crlimtreq_styles.carouselCardContent}>
-                                                <Text style={crlimtreq_styles.carouselCardTitle}>
-                                                    {/* {d1Item.ItmName} */}
-                                                    {getD1Party}
-                                                </Text>
-                                                <View style={{ marginVertical: 10 }}>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Item Name: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ItmName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Grade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.GrdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ShdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Qty: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Qty}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.UnitRate}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Amount: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Amount}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Disc. %: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.DisPer}</Text>
-                                                    </Text>
-                                                    {activeTab1YPO === 'requests' && (
-                                                        <>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Current Stock: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.CurrentStock}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Party: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastParty}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastRate}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastShade}</Text>
-                                                            </Text>
-                                                        </>
-                                                    )}
-
-                                                </View>
-                                            </View>
-                                        </LinearGradient>
-                                    </View>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    </View>
-                </Modal>
-
+                        ))}
+                    </ScrollView>
+                </Sheet>
             </View>
 
             {/* <ChartScreen
@@ -2313,137 +1735,90 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 onClose={() => setChartVisible(false)}
             /> */}
 
-            {/* ✅ CHART MODAL (YAHAN) */}
-            <Modal
-                visible={chartVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setChartVisible(false)}
+            {/* ───────────── Chart modal ───────────── */}
+            <Sheet
+                open={chartVisible}
+                onClose={() => setChartVisible(false)}
+                eyebrow="RATE & QTY"
+                title="Chart"
+                wideMax={760}
             >
-                <View style={{ flex: 1, padding: 12 }}>
+                {chartLoading && (
+                    <ActivityIndicator size="large" color={T.copper} />
+                )}
 
-                    {chartLoading && (
-                        <ActivityIndicator size="large" color="#2196F3" />
-                    )}
+                {!chartLoading && chartData?.labels?.length > 0 && (
+                    <ScrollView horizontal>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                            {chartData.labels.map((label, index) => {
 
-                    {!chartLoading && chartData?.labels?.length > 0 && (
+                                const rate = chartData.rate[index] || 0;
+                                const qty = chartData.qty[index] || 0;
 
-                        <ScrollView horizontal>
-                            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-
-                                {chartData.labels.map((label, index) => {
-
-                                    const rate = chartData.rate[index] || 0;
-                                    const qty = chartData.qty[index] || 0;
-
-                                    return (
-                                        <View
-                                            key={index}
-                                            style={{
-                                                marginHorizontal: 8,
-                                                alignItems: 'center'
-                                            }}
-                                        >
-
-                                            {/* RATE BAR */}
-                                            <View style={{
-                                                height: rate / 2, // scale adjust karo
-                                                width: 20,
-                                                backgroundColor: '#4CAF50',
-                                                marginBottom: 4,
-                                                borderRadius: 4
-                                            }} />
-
-                                            {/* QTY BAR */}
-                                            <View style={{
-                                                height: qty / 2,
-                                                width: 20,
-                                                backgroundColor: '#2196F3',
-                                                borderRadius: 4
-                                            }} />
-
-                                            {/* LABEL */}
-                                            <Text style={{ fontSize: 10, marginTop: 6 }}>
-                                                {label}
-                                            </Text>
-
-                                        </View>
-                                    );
-                                })}
-
-                            </View>
-                        </ScrollView>
-                    )}
-
-                    {!chartLoading && (!chartData || chartData.labels?.length === 0) && (
-                        <Text style={{ textAlign: 'center', marginTop: 20 }}>
-                            No chart data available
-                        </Text>
-                    )}
-
-                </View>
-            </Modal>
-
-            <Modal visible={mailLogModal} animationType="slide" transparent>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-
-                        <Text style={styles.modalTitle}>
-                            {mailLogData.length} Sent Log(s) found
-                        </Text>
-
-                        <FlatList
-                            data={mailLogData}
-                            keyExtractor={(item, index) => index.toString()}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 10 }}
-                            renderItem={({ item }) => (
-                                <View style={styles.logCard}>
-
-                                    <View style={styles.logHeaderBox}>
-                                        <Text style={styles.logHeader}>
-                                            {item.usrname}
-                                        </Text>
+                                return (
+                                    <View key={index} style={styles.chartCol}>
+                                        {/* RATE BAR */}
+                                        <View style={[styles.chartBar, { height: rate / 2, backgroundColor: T.green, marginBottom: 4 }]} />
+                                        {/* QTY BAR */}
+                                        <View style={[styles.chartBar, { height: qty / 2, backgroundColor: T.blue }]} />
+                                        {/* LABEL */}
+                                        <Text style={styles.chartLabel}>{label}</Text>
                                     </View>
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
+                )}
 
-                                    {[
-                                        { label: 'Sent Date', value: item.sentdt },
-                                        { label: 'From', value: item.from },
-                                        { label: 'To', value: item.to },
-                                        { label: 'Subject', value: item.subject },
-                                        { label: 'Remarks', value: item.remarks },
-                                        { label: 'Sent', value: item.mailsent }
-                                    ].map((row, index) => (
-                                        <View key={index} style={styles.rowBox}>
-                                            <Text style={styles.label}>{row.label}</Text>
-                                            <Text
-                                                style={[
-                                                    styles.value,
-                                                    row.label === 'Sent' && {
-                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
-                                                    }
-                                                ]}
-                                                numberOfLines={2} // 🔥 wrap control
-                                            >
-                                                {row.value}
-                                            </Text>
-                                        </View>
-                                    ))}
+                {!chartLoading && (!chartData || chartData.labels?.length === 0) && (
+                    <EmptyState icon="bar-chart" title="No chart data available" />
+                )}
+            </Sheet>
 
-                                </View>
-                            )}
-                        />
+            {/* ───────────── Mail sent log ───────────── */}
+            <Sheet
+                open={mailLogModal}
+                onClose={() => setMailLogModal(false)}
+                eyebrow="MAIL LOG"
+                title={`${mailLogData.length} Sent Log(s) found`}
+                wideMax={560}
+                footer={<Btn label="Close" kind="ghost" onPress={() => setMailLogModal(false)} style={{ flex: 1 }} />}
+            >
+                {mailLogData.map((item: any, logIndex) => (
+                    <View key={logIndex} style={styles.logCard}>
+                        <View style={styles.logHeaderBox}>
+                            <Icon name="mail-outline" size={15} color={T.copper} />
+                            <Text style={styles.logHeader} numberOfLines={1}>
+                                {item.usrname}
+                            </Text>
+                        </View>
 
-                        <TouchableOpacity
-                            style={styles.closeBtn}
-                            onPress={() => setMailLogModal(false)}
-                        >
-                            <Text style={styles.closeText}>Close</Text>
-                        </TouchableOpacity>
-
+                        {[
+                            { label: 'Sent Date', value: item.sentdt },
+                            { label: 'From', value: item.from },
+                            { label: 'To', value: item.to },
+                            { label: 'Subject', value: item.subject },
+                            { label: 'Remarks', value: item.remarks },
+                            { label: 'Sent', value: item.mailsent }
+                        ].map((row, index) => (
+                            <View key={index} style={styles.rowBox}>
+                                <Text style={styles.label}>{row.label}</Text>
+                                <Text
+                                    style={[
+                                        styles.value,
+                                        row.label === 'Sent' && {
+                                            color: row.value === 'Yes' ? T.green : T.red
+                                        }
+                                    ]}
+                                    numberOfLines={2} // 🔥 wrap control
+                                >
+                                    {row.value}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
-                </View>
-            </Modal>
+                ))}
+            </Sheet>
 
             {/* <PdfViewerModal
                 visible={showPdfModal}
@@ -2476,7 +1851,236 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 fetchAllVerifyData={fetchAllVerifyData}
                 activeTab1YPO={activeTab1YPO}
             /> */}
-        </>
+
+            <BusyOverlay visible={isLoadingYPO} text="Loading..." />
+        </View>
     );
 };
+
+// ---------------------------------------------------------------------------
+// NEW ERP UI: display helpers + styles (presentation only)
+// ---------------------------------------------------------------------------
+const num0 = (v: any) => {
+    const x = parseFloat(String(v ?? '').replace(/,/g, ''));
+    return Number.isFinite(x) ? x : 0;
+};
+const fmtINR = (v: any) => num0(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const showVal = (v: any) => (v === undefined || v === null || String(v).trim() === '' ? '-' : String(v));
+const showMoney = (v: any) => {
+    if (v === undefined || v === null || String(v).trim() === '') return '-';
+    const x = parseFloat(String(v).replace(/,/g, ''));
+    return Number.isFinite(x) ? `₹ ${x.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : String(v);
+};
+
+function StatusTag({ label, color, icon, solid }: { label: string; color: string; icon?: string; solid?: boolean }) {
+    return (
+        <View style={[styles.tag, solid ? { backgroundColor: color, borderColor: color } : { backgroundColor: `${color}14`, borderColor: `${color}40` }]}>
+            {icon ? <Icon name={icon as any} size={12} color={solid ? '#fff' : color} /> : <View style={[styles.tagDot, { backgroundColor: solid ? '#fff' : color }]} />}
+            <Text style={[styles.tagText, { color: solid ? '#fff' : color }]} numberOfLines={1}>{label}</Text>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    // ----- shell -----
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 96,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+    gridCell: { padding: 5 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    noStore: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        height: 30,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: `${T.red}40`,
+        backgroundColor: `${T.red}10`,
+    },
+    noStoreText: { fontSize: 12, fontWeight: '800', color: T.red },
+
+    // ----- toolbar -----
+    toolbar: {
+        backgroundColor: T.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingTop: 10,
+        paddingBottom: 10,
+    },
+    toolbarInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+    },
+
+    // ----- PO card -----
+    card: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 12,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    disabledCard: { opacity: 0.6 },
+    acceptedCard: { borderLeftWidth: 4, borderLeftColor: T.green },
+    rejectedCard: { borderLeftWidth: 4, borderLeftColor: T.red },
+    headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2, textTransform: 'uppercase' },
+    poNo: { fontSize: 15, fontWeight: '800', color: T.ink, marginTop: 2 },
+    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+    date: { fontSize: 11.5, fontWeight: '600', color: T.muted },
+    tagCol: { alignItems: 'flex-end', gap: 5 },
+    tag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    tagDot: { width: 6, height: 6, borderRadius: 3 },
+    tagText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
+    partyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+    party: { flex: 1, fontSize: 14, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    metricBox: {
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    metricRow: { flexDirection: 'row', gap: 10 },
+    actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    actionBtn: { flexGrow: 1, flexBasis: 96 },
+    pdfBtn: { flexGrow: 0, minWidth: 84 },
+    expandHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 40,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+        backgroundColor: T.alt,
+    },
+    expandText: { flex: 1, fontSize: 12.5, fontWeight: '800', color: T.nav, letterSpacing: 0.3 },
+
+    // ----- item lines -----
+    itemContainer: { gap: 8 },
+    itemCard: {
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 11,
+        gap: 10,
+    },
+    itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    itemIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
+    },
+    itemTitle: { flex: 1, fontSize: 13.5, fontWeight: '800', color: T.ink, lineHeight: 18 },
+    itemGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10, columnGap: 10 },
+    itemBox: { flexGrow: 1, flexBasis: '28%', minWidth: 84 },
+
+    // ----- scroll to top -----
+    topButton: {
+        position: 'absolute',
+        right: 16,
+        bottom: 24,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.nav,
+        ...S.card,
+        elevation: 4,
+    },
+
+    // ----- confirm sheet -----
+    confirmBox: {
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 14,
+        gap: 4,
+    },
+    confirmLabel: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+    confirmValue: { fontSize: 15, fontWeight: '800', color: T.ink },
+    confirmMeta: { fontSize: 12, fontWeight: '600', color: T.muted, marginTop: 2 },
+    responseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+    responseText: { flex: 1, fontSize: 14, fontWeight: '700', color: T.nav },
+
+    // ----- carousel -----
+    carouselRow: { gap: 10, paddingVertical: 2 },
+    carouselCard: {
+        width: 280,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 10,
+    },
+
+    // ----- chart -----
+    chartCol: { marginHorizontal: 8, alignItems: 'center' },
+    chartBar: { width: 20, borderRadius: 4 },
+    chartLabel: { fontSize: 10, fontWeight: '700', color: T.muted, marginTop: 6 },
+
+    // ----- mail log -----
+    logCard: {
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 12,
+        gap: 6,
+    },
+    logHeaderBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingBottom: 8,
+        marginBottom: 2,
+        borderBottomWidth: 1,
+        borderBottomColor: T.hair,
+    },
+    logHeader: { flex: 1, fontSize: 14, fontWeight: '800', color: T.nav },
+    rowBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    label: { width: 84, fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase', paddingTop: 1 },
+    value: { flex: 1, fontSize: 13, fontWeight: '600', color: T.ink },
+});
 export default YarnPurchaseOrder;

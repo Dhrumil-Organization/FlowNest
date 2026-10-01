@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 export const C = {
-    bg: '#F4F6F9',
+    bg: '#0E7490',
     surface: '#FFFFFF',
     surface2: '#F1F5F9',
     ink: '#0F172A',
@@ -29,7 +29,7 @@ const shadow = (o = 0.05, r = 8, y = 2) => ({
 });
 
 export const s = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: C.bg },
+    screen: { flex: 0, backgroundColor: C.bg },
 
     /* kept for compatibility with older references */
     header: { backgroundColor: C.primary, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 },
@@ -103,6 +103,20 @@ export const s = StyleSheet.create({
     },
     searchInput: { flex: 1, color: C.ink, fontSize: 15, height: 46 },
     searchHint: { fontSize: 11, color: C.ink2, marginTop: 4 },
+    /* ---------- Filter chip (Browse: New Design) ---------- */
+    filterRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+    filterChip: {
+        flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingLeft: 8, paddingRight: 14,
+        borderRadius: 18, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface,
+    },
+    filterChipOn: { borderColor: C.primary, backgroundColor: C.indigoSoft },
+    filterBox: {
+        width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: C.ink2,
+        alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface,
+    },
+    filterBoxOn: { borderColor: C.primary, backgroundColor: C.primary },
+    filterText: { fontSize: 13, fontWeight: '600', color: C.ink2, letterSpacing: 0.2 },
+    filterTextOn: { color: C.primaryDark },
     resultList: { marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: C.line, overflow: 'hidden', maxHeight: 340 },
     resultRow: {
         flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12,

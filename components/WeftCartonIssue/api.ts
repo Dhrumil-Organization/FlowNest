@@ -83,10 +83,46 @@ export const cartonBalance = (t: string, prpcode: string, yearno: any, cartno: s
 export const findIssue = (t: string, prpcode: string, issdate: string, beamuid: any, dsncode: any) =>
     post(t, 'weft_find_issue', { prpcode, issdate, beamuid, dsncode });
 
-export const saveLine = (t: string, body: any) => post(t, 'weft_line_save', body);
-export const modifyLine = (t: string, body: any) => post(t, 'weft_line_modify', body);
-export const deleteLine = (t: string, body: any) => post(t, 'weft_line_delete', body);
-export const deleteIssue = (t: string, body: any) => post(t, 'weft_issue_delete', body);
+// ONLY save and modify check for a business error. Every other API keeps the original behaviour.
+// success:true can still carry { response: { error: true, error_code: '...', message } } -> that is a failure.
+async function postStrict(t: string, path: string, body: any): Promise<ApiResult> {
+    try {
+        const res = await axios.post(`${API}/api/${path}`, body, { headers: headers(t), timeout: 30000 });
+        const r = toResult(res.data);
+        const resp = res.data?.response ?? res.data?.data ?? {};
+        const isTrue = (v: any) => v === true || v === 1 || v === '1' || v === 'true';
+        const failed = isTrue(resp?.error) || isTrue(res.data?.error) || !!resp?.error_code;
+        if (failed) {
+            return { ...r, ok: false, message: resp?.message || res.data?.message || 'Could not save.', errorCode: resp?.error_code || 'SAVE_FAILED' };
+        }
+        return r;
+    } catch (e: any) {
+        if (e?.response?.data) return toResult(e.response.data);
+        return { ok: false, message: e?.code === 'ECONNABORTED' ? 'Network is slow. Try again.' : 'No connection to server.', payload: {}, errorCode: 'NETWORK' };
+    }
+}
+
+// Delete endpoints: success:true can still carry { response: { error_code: 'ISSUE_IN_USE', message } } -> that is a failure.
+// Only error_code decides here (some endpoints send error:true even when the call worked).
+async function postDelete(t: string, path: string, body: any): Promise<ApiResult> {
+    try {
+        const res = await axios.post(`${API}/api/${path}`, body, { headers: headers(t), timeout: 30000 });
+        const r = toResult(res.data);
+        const code = res.data?.response?.error_code ?? res.data?.data?.error_code ?? res.data?.error_code;
+        if (code) {
+            return { ...r, ok: false, message: res.data?.response?.message || res.data?.message || 'Could not delete.', errorCode: String(code) };
+        }
+        return r;
+    } catch (e: any) {
+        if (e?.response?.data) return toResult(e.response.data);
+        return { ok: false, message: e?.code === 'ECONNABORTED' ? 'Network is slow. Try again.' : 'No connection to server.', payload: {}, errorCode: 'NETWORK' };
+    }
+}
+
+export const saveLine = (t: string, body: any) => postStrict(t, 'weft_line_save', body);
+export const modifyLine = (t: string, body: any) => postStrict(t, 'weft_line_modify', body);
+export const deleteLine = (t: string, body: any) => postDelete(t, 'weft_line_delete', body);
+export const deleteIssue = (t: string, body: any) => postDelete(t, 'weft_issue_delete', body);
 export const issueList = (t: string, body: any) => post(t, 'weft_issue_list', body);
 
 /* ---------- existing help endpoints (same params as AddWeftIssueDetail) ---------- */
@@ -111,7 +147,7 @@ export const itemDetailFromCarton = (
     post(token, 'get_item_detail_from_carton', {
         prpcode,
         yearno,
-        strcode: parsedData?.yarnstrcode ?? '',
+        strcode: parsedData?.yarnstrcode || '002' || '',
         itmcode: parsedData?.ItmCode ?? '',
         mercode: parsedData?.MerCode ?? '',
         grdcode: parsedData?.GrdCode ?? '',
@@ -132,8 +168,7 @@ export async function fetchExpProdQty(
         dsncode: any;
         IssUId?: any;
         DsnRcpSrNo?: any; // ✅ added
-    }
-): Promise<number> {
+    }): Promise<number> {
     try {
         const res = await axios.get(
             `${API}/api/get_expprodqty_from_issueqty`,
@@ -165,6 +200,53 @@ export async function fetchExpProdQty(
                     // dsncode: p.dsncode,
                     // IssUId: '',
                     // StrCode: '002'
+                },
+                timeout: 20000,
+            }
+        );
+        const arr = listOf(res.data);
+        return Number(arr?.[0]?.ExpProdQty) || 0;
+    } catch (e) {
+        console.log(
+            'getExpectedWeftIssue error',
+            e
+        );
+        return 0;
+    }
+}
+
+export async function fetchNewExpProdQty(
+    t: string,
+    p: {
+        prpcode: string;
+        yearno: any;
+        reqqty: any;
+        itmcode: any;
+        shdcode: any;
+        srno: any;
+        beamuid: any;
+        dsncode: any;
+        IssUId?: any;
+        DsnRcpSrNo?: any; // ✅ added
+    }
+): Promise<number> {
+    try {
+        const res = await axios.get(
+            `${API}/api/getExpectedWeftIssue`,
+            {
+                headers: headers(t),
+                params: {
+                    prpcode: p.prpcode,
+                    yearno: p.yearno,
+                    txntype: 'beam_weft_issue',
+                    reqqty: p.reqqty,
+                    itmcode: p.itmcode,
+                    shdcode: p.shdcode,
+                    srno: p.srno || p.DsnRcpSrNo || '',
+                    beamuid: p.beamuid,
+                    dsncode: p.dsncode,
+                    IssUId: '',
+                    StrCode: '002'
                 },
                 timeout: 20000,
             }

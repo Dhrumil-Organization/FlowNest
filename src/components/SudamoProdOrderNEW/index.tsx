@@ -1879,6 +1879,11 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     setAuthorizationReviewItem(null);
                     if (current) handleIconPress(current, 'reject');
                 }}
+                onViewCosting={(costingItem) => {
+                    // Keep the authorization review open underneath. When the
+                    // costing viewer closes, the approver returns to this PO.
+                    openProductionCosting(costingItem);
+                }}
             />
 
             <ProductionCostingPreviewModal

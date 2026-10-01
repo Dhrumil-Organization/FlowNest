@@ -16,12 +16,11 @@ const LineRow = ({ l, onEdit, onDelete }: Props) => (
         <View style={{ flex: 1 }}>
             <Text style={s.lineTitle}>{l.BeamNo || `Beam ${l.BeamUId}`} / {l.DsnCode}</Text>
             <Text style={s.lineSub}>{l.Chees} chees, {f2(l.Qty)} kg, IssNo {l.IssNo} ({ymdShow(l.IssDate)}), SrNo {l.SrNo}.{l.SubSr}</Text>
-            {l.Locked && <Text style={s.lockText}>Return or production entry exists. Locked.</Text>}
         </View>
-        <TouchableOpacity style={[s.iconBtn, l.Locked && { opacity: 0.4 }]} disabled={l.Locked} onPress={() => onEdit(l)} accessibilityLabel="Modify line">
+        <TouchableOpacity style={s.iconBtn} onPress={() => onEdit(l)} accessibilityLabel="Modify line">
             <Icon name="edit" size={18} color={C.ink2} />
         </TouchableOpacity>
-        <TouchableOpacity style={[s.iconBtn, l.Locked && { opacity: 0.4 }]} disabled={l.Locked} onPress={() => onDelete(l)} accessibilityLabel="Delete line">
+        <TouchableOpacity style={s.iconBtn} onPress={() => onDelete(l)} accessibilityLabel="Delete line">
             <Icon name="delete-outline" size={18} color={C.ink2} />
         </TouchableOpacity>
     </View>

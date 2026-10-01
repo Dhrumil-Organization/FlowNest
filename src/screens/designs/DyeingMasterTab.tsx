@@ -47,9 +47,9 @@ export type DyeingMasterApi = {
   saveColour: (payload: {
     name: string;
     hex: string;
-    erp_shade_code: number;
-    main_design_id: string;
-    design_shade_name?: string;
+    main_shade_code?: number | null;
+    main_design_id?: string | null;
+    design_shade_name?: string | null;
     mappings: Array<{
       party_acc_code: string;
       party_name: string;
@@ -320,14 +320,6 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
       Alert.alert('Dyeing', 'Enter Shade Name.');
       return;
     }
-    if (!mainShade) {
-      Alert.alert('Dyeing', 'Select the Main Shade.');
-      return;
-    }
-    if (!design) {
-      Alert.alert('Dyeing', 'Select a Design.');
-      return;
-    }
     if (!validRows.length) {
       Alert.alert('Dyeing', 'Select a Dyeing Mill and enter its shade number.');
       return;
@@ -339,9 +331,9 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
       await api.saveColour({
         name: name.trim(),
         hex: normalizeHex(hex),
-        erp_shade_code: mainShade.shd_code,
-        main_design_id: design.id,
-        design_shade_name: designShadeName.trim() || name.trim(),
+        main_shade_code: mainShade?.shd_code ?? null,
+        main_design_id: design?.id ?? null,
+        design_shade_name: design ? (designShadeName.trim() || name.trim()) : null,
         mappings: validRows.map(r => ({
           party_acc_code: r.party!.acc_code,
           party_name: r.party!.name,
@@ -388,6 +380,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
               value={name}
               onChangeText={setName}
               placeholder="Enter shade name"
+              maxLength={30}
               placeholderTextColor="#AAA39A"
               style={s.input}
             />
@@ -406,34 +399,36 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
               />
             </View>
 
-            <Text style={[s.label, { marginTop: 14 }]}>Main Shade</Text>
-            <Text style={s.help}>Select the matching main shade.</Text>
+            <Text style={[s.label, { marginTop: 14 }]}>Main Shade (Optional)</Text>
+            <Text style={s.help}>Optional reference to an existing ERP main shade.</Text>
             <TouchableOpacity style={s.select} onPress={() => setMainShadePicker(true)} activeOpacity={0.7}>
               <View style={{ flex: 1 }}>
                 <Text style={mainShade ? s.selectValue : s.selectPlaceholder}>
-                  {mainShade ? mainShade.shd_name : 'Select Main Shade'}
+                  {mainShade ? mainShade.shd_name : 'Select Main Shade (Optional)'}
                 </Text>
                 {mainShade ? <Text style={s.selectCode}>{mainShade.shd_code}{mainShade.short_name ? ` · ${mainShade.short_name}` : ''}</Text> : null}
               </View>
               <Text style={s.chev}>⌄</Text>
             </TouchableOpacity>
 
-            <Text style={[s.label, { marginTop: 14 }]}>Design</Text>
+            <Text style={[s.label, { marginTop: 14 }]}>Design (Optional)</Text>
             <TouchableOpacity style={s.select} onPress={() => setDesignPicker(true)} activeOpacity={0.7}>
               <View style={{ flex: 1 }}>
                 <Text style={design ? s.selectValue : s.selectPlaceholder}>
-                  {design ? design.code : 'Search Design'}
+                  {design ? design.code : 'Search Design (Optional)'}
                 </Text>
                 {design ? <Text style={s.selectCode}>{design.dsn_code ? `${design.dsn_code}` : design.id}</Text> : null}
               </View>
               <Text style={s.chev}>⌄</Text>
             </TouchableOpacity>
 
-            <Text style={[s.label, { marginTop: 12 }]}>Reference Name</Text>
+            <Text style={[s.label, { marginTop: 12 }]}>Reference Name (Optional)</Text>
+            <Text style={s.help}>Used only when a Design is selected.</Text>
             <TextInput
+              editable={!!design}
               value={designShadeName}
               onChangeText={setDesignShadeName}
-              placeholder={name.trim() ? `${name.trim()} for this design` : 'Optional'}
+              placeholder={design ? (name.trim() ? `${name.trim()} for this design` : 'Optional') : 'Select a Design to add a reference name'}
               placeholderTextColor="#AAA39A"
               style={s.input}
             />
@@ -560,7 +555,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
       <SearchPicker<MainErpShade>
         visible={mainShadePicker}
         title="Select Main Shade"
-        subtitle="Choose the matching main shade"
+        subtitle="Optional reference to an existing ERP main shade"
         placeholder="Search shade name or code"
         valueLabel={mainShade ? `${mainShade.shd_name} · ${mainShade.shd_code}` : null}
         search={api.searchMainShades}
@@ -574,7 +569,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
       <SearchPicker<DyeingDesign>
         visible={designPicker}
         title="Select Design"
-        subtitle="Choose the design for this shade"
+        subtitle="Optional design association for this shade"
         placeholder="Search design name or code"
         valueLabel={design ? design.code : null}
         search={api.searchDesigns}

@@ -614,7 +614,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
         { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Fabric Stock Verification', route: 'fabric-stock-verification', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
-        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#F97316', category: 'Production'},
+        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#5E35B1', category: 'Production'},
     ];
 
     useEffect(() => {

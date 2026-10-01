@@ -709,7 +709,7 @@
 import AsyncStorage from "@/common/utils/compatibleStorage";
 import * as SQLite from "expo-sqlite";
 import { API } from "../../common/API/dynamicAPI";
-import { getCurrentFinancialYear } from "../../common/commonfunction";
+import { getEventYearNo } from "./eventYear";
 import api from "./api";
 
 const DB_NAME = "bharattex.db";
@@ -1142,7 +1142,7 @@ export async function initDb(token, prptype) {
   // Fetch and cache events
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const response = await api.get(`${API}/api/getevent`, {
         params: { prptype, yearno },
         headers: { Authorization: `Bearer ${token}` },
@@ -1159,7 +1159,7 @@ export async function initDb(token, prptype) {
 
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const response = await api.get(`${API}/api/geteventprptype`, {
         params: { prptype, yearno },
         headers: { Authorization: `Bearer ${token}` },
@@ -1177,7 +1177,7 @@ export async function initDb(token, prptype) {
   // Fetch and cache designs
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const q = "";
       const response = await api.get(`${API}/api/designs/search`, {
         params: { q, prptype, yearno },
@@ -1197,7 +1197,7 @@ export async function initDb(token, prptype) {
   // FOR S
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const q = "";
       const response = await api.get(`${API}/api/geteventitem`, {
         params: { prptype: "S", yearno },
@@ -1215,7 +1215,7 @@ export async function initDb(token, prptype) {
   // FOR K
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const q = "";
       const response = await api.get(`${API}/api/geteventitem`, {
         params: { prptype: "K", yearno },
@@ -1233,7 +1233,7 @@ export async function initDb(token, prptype) {
   // FOR V
   if (token && prptype) {
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const q = "";
       const response = await api.get(`${API}/api/geteventitem`, {
         params: { prptype: "V", yearno },
@@ -1252,7 +1252,7 @@ export async function initDb(token, prptype) {
   if (token && prptype) {
     console.log("Fetching Items R during initDb");
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const q = "";
       const response = await api.get(`${API}/api/geteventitem`, {
         params: { prptype: "R", yearno },

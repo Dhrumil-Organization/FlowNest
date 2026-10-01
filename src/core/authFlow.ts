@@ -11,12 +11,13 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
 
 import { AuthAPI } from '../api/client';
+import { normalizeErpProperty } from '@/common/API/dynamicAPI';
+import { saveCredentialsForPropertySwitch } from '../lib/biometricAuth';
 import {
-  authenticateWithBiometrics,
-  clearCredentialsForBiometric,
-  saveCredentialsForBiometric,
-  saveCredentialsForPropertySwitch,
-} from '../lib/biometricAuth';
+  forgetRememberedLogin,
+  saveRememberedLogin,
+  type SaveRememberResult,
+} from '../lib/rememberedLogin';
 import { useAppSessionStore } from '../stores/AppSessionStore';
 import { useAppStore } from '../stores/AppStore';
 import type { UserAccount } from '../types';
@@ -37,19 +38,34 @@ function makeLegacyUser(user: any): UserAccount {
 export type LoginOutcome = {
   success: boolean;
   message?: string;
+  /**
+   * 'rejected' → the ERP server answered and refused the username/password.
+   * 'error'    → network / unexpected failure (saved login must NOT be wiped).
+   */
+  failure?: 'rejected' | 'error';
   /** Only meaningful when rememberAction === 'save'. */
   rememberSaved?: boolean;
+  /** Full result of the Remember-me save (e.g. 'needs-gesture' on Safari). */
+  remember?: SaveRememberResult;
+  /** Friendly name used as the hint on the Auto Login card. */
+  displayName?: string;
 };
+
+/** The NEW ERP property the next login / saved login belongs to. */
+export async function getActiveNewErpProperty(): Promise<string> {
+  return normalizeErpProperty(await AsyncStorage.getItem('selected_property'));
+}
 
 /**
  * rememberAction:
  *  - 'save'      -> Manual login with "Remember me" checked. AFTER the
- *                    login itself succeeds, the device's own screen
- *                    lock (Face ID / Fingerprint / PIN / pattern —
- *                    whatever the person already uses to unlock their
- *                    phone) is prompted to CONFIRM it's really them
- *                    before the credentials get saved. If that
- *                    confirmation fails, nothing is saved.
+ *                    login itself succeeds, the device's own lock
+ *                    (Android screen lock / iOS Face ID+passcode /
+ *                    Windows Hello / Touch ID; a PC without any screen
+ *                    lock saves directly) is prompted to CONFIRM it's
+ *                    really them, then the credentials are saved for the
+ *                    selected NEW ERP property (src/lib/rememberedLogin).
+ *                    If that confirmation fails, nothing is saved.
  *  - 'clear'     -> Manual login with "Remember me" unchecked: wipe
  *                    any previously saved credentials.
  *  - undefined   -> Don't touch saved-credential state at all. Used by
@@ -73,7 +89,7 @@ export async function performLogin(
     });
 
     if (!res.success) {
-      return { success: false, message: res.message || 'Invalid username or password.' };
+      return { success: false, failure: 'rejected', message: res.message || 'Invalid username or password.' };
     }
     console.log('Login response:', res);
 
@@ -117,24 +133,21 @@ export async function performLogin(
     useAppStore.getState().setUser(makeLegacyUser(user));
 
     let rememberSaved: boolean | undefined;
+    let remember: SaveRememberResult | undefined;
+    const displayName = String(user?.first_name || user?.displayname || user?.name || username).trim();
 
-    if (rememberAction === 'save') {
-      // The login just succeeded with a real username/password. Before
-      // we store those credentials for next time, make the person
-      // prove it's really them via the phone's own lock method.
-      const confirmed = await authenticateWithBiometrics('Confirm to save this login');
-      if (confirmed) {
-        await saveCredentialsForBiometric(username.trim(), password.trim());
-        await useAppSessionStore.getState().setBiometricEnabled(true);
-        rememberSaved = true;
+    if (rememberAction === 'save' || rememberAction === 'clear') {
+      const property = await getActiveNewErpProperty();
+      if (rememberAction === 'save') {
+        // Login just succeeded with a real username/password. Only now do
+        // we ask the device lock (Face ID / screen lock / Windows Hello /
+        // Touch ID) to confirm, and only then save — per property.
+        remember = await saveRememberedLogin(property, { username: username.trim(), password: password.trim() }, displayName);
+        rememberSaved = remember.saved;
       } else {
-        await clearCredentialsForBiometric();
-        await useAppSessionStore.getState().setBiometricEnabled(false);
-        rememberSaved = false;
+        await forgetRememberedLogin(property);
       }
-    } else if (rememberAction === 'clear') {
-      await clearCredentialsForBiometric();
-      await useAppSessionStore.getState().setBiometricEnabled(false);
+      await useAppSessionStore.getState().setBiometricEnabled(Boolean(rememberSaved));
     }
     // rememberAction === undefined -> leave saved-credential state as is.
 
@@ -151,12 +164,17 @@ export async function performLogin(
     return {
       success: true,
       rememberSaved,
+      remember,
+      displayName,
       message:
-        rememberAction === 'save' && rememberSaved === false
-          ? 'Login successful, but "Remember me" was not saved because the screen lock could not be confirmed.'
+        rememberAction === 'save' && rememberSaved === false && remember?.reason !== 'needs-gesture'
+          ? `Login successful. ${remember?.message || '"Remember me" was not saved.'}`
           : undefined,
     };
   } catch (e: any) {
-    return { success: false, message: e?.message || 'Unable to login.' };
+    const status = Number(e?.status) || 0;
+    // 4xx (except timeout / rate-limit) = the server refused these credentials.
+    const rejected = status >= 400 && status < 500 && status !== 408 && status !== 429;
+    return { success: false, failure: rejected ? 'rejected' : 'error', message: e?.message || 'Unable to login.' };
   }
 }

@@ -27,7 +27,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { getCurrentFinancialYear } from '../../common/commonfunction';
+import { getEventYearNo } from './eventYear';
 import api from './api';
 import {
   captureCardPhoto,
@@ -228,7 +228,7 @@ export default function NewEnquiryScreen({ token, username }) {
 
       const pending = await getAllEnquiries();
       if (pending.length > 0 && !syncStatus.isSyncing) {
-        startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
+        startSyncQueue(token, await getEventYearNo(), getUserPrptype, handleSyncProgress);
       }
     };
 
@@ -277,7 +277,7 @@ export default function NewEnquiryScreen({ token, username }) {
         setLoading(true);
         try {
           const user_prptype = await AsyncStorage.getItem('user_prptype');
-          const result = await syncShowEnquiries(id, token, getCurrentFinancialYear(), user_prptype);
+          const result = await syncShowEnquiries(id, token, await getEventYearNo(), user_prptype);
           console.log('API RESULT =>', result);
           setEnquiries(result);
 
@@ -462,7 +462,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token && prptypeForApi) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/getevent`, {
             params: { prptype: prptypeForApi, yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -501,7 +501,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token && prptypeForApi) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/geteventprptype`, {
             params: { prptype: prptypeForApi, yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -544,7 +544,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token && getUserPrptype) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/designs/search`, {
             params: { q: '', prptype: getUserPrptype, yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -587,7 +587,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/geteventitem`, {
             params: { prptype: 'S', yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -629,7 +629,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/geteventitem`, {
             params: { prptype: 'K', yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -671,7 +671,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/geteventitem`, {
             params: { prptype: 'V', yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -713,7 +713,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const currentlyOnline = await isOnline();
       if (currentlyOnline && token) {
         try {
-          const yearno = getCurrentFinancialYear();
+          const yearno = await getEventYearNo();
           const response = await api.get(`${API}/api/geteventitem`, {
             params: { prptype: 'R', yearno },
             headers: { Authorization: `Bearer ${token}` },
@@ -1652,7 +1652,7 @@ export default function NewEnquiryScreen({ token, username }) {
       let saveSuccess = false;
       if (mode === 'edit') {
         const user_prptype = await AsyncStorage.getItem('user_prptype');
-        await updateEnquiries(payload?.id, token, getCurrentFinancialYear(), getUserPrptype, payload);
+        await updateEnquiries(payload?.id, token, await getEventYearNo(), getUserPrptype, payload);
         saveSuccess = true;
       } else {
         await insertEnquiry(payload);
@@ -1680,7 +1680,7 @@ export default function NewEnquiryScreen({ token, username }) {
             resolve(progress);
           }
         };
-        startSyncQueue(getToken, getCurrentFinancialYear(), getUserPrptype, syncCallback);
+        void getEventYearNo().then((yearno) => startSyncQueue(getToken, yearno, getUserPrptype, syncCallback));
       });
 
       if (syncResult.type === 'all_done' || syncResult.type === 'validation_error') {
@@ -2464,7 +2464,7 @@ export default function NewEnquiryScreen({ token, username }) {
                     style={styles.retryBtn}
                     onPress={(e) => {
                       e.stopPropagation();
-                      startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
+                      void getEventYearNo().then((yearno) => startSyncQueue(token, yearno, getUserPrptype, handleSyncProgress));
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Retry All"
@@ -2733,7 +2733,7 @@ export default function NewEnquiryScreen({ token, username }) {
               icon="refresh"
               onPress={() => {
                 setFailedItemsModalVisible(false);
-                startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
+                void getEventYearNo().then((yearno) => startSyncQueue(token, yearno, getUserPrptype, handleSyncProgress));
               }}
               style={{ flex: 1.4 }}
             />

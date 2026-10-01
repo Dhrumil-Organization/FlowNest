@@ -6,9 +6,9 @@
 // offline-first screen like NewEnquiryScreen) — show a simple message if
 // offline rather than attempting to load.
 
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import Icon from "@expo/vector-icons/MaterialIcons";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,16 +16,16 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { getCurrentFinancialYear } from '../../common/commonfunction';
+  View,
+} from "react-native";
+import { getCurrentFinancialYear } from "../../common/commonfunction";
 // import { Picker } from '@react-native-picker/picker';
-import { API } from '@/common/API/dynamicAPI';
-import HeaderBarwithBack from '@/components/Header';
-import theme from '@/components/theme';
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import api from './api';
-import { isOnline } from './CardScanService';
+import { API } from "@/common/API/dynamicAPI";
+import AsyncStorage from "@/common/utils/compatibleStorage";
+import HeaderBarwithBack from "@/components/Header";
+import theme from "@/components/theme";
+import api from "./api";
+import { isOnline } from "./CardScanService";
 
 // Configure your actual events here, or fetch from an /events endpoint
 // if you run many shows per year.
@@ -38,8 +38,8 @@ import { isOnline } from './CardScanService';
 export default function EnquiryReportScreen({ username }) {
   const router = useRouter();
   // const [getUserPrptypeFromCache, setUserPrptype] = useState < string > ('');
-  const [eventCode, setEventCode] = useState('');
-  const [prpCode, setPrpCode] = useState('');
+  const [eventCode, setEventCode] = useState("");
+  const [prpCode, setPrpCode] = useState("");
   // const [selectedEvent, setSelectedEvent] = useState(EVENTS[0].code);
   // const [EVENTS, setEVENTS] = useState(EVENTS[0].code);
   const [EVENTS, setEVENTS] = useState([]);
@@ -66,17 +66,20 @@ export default function EnquiryReportScreen({ username }) {
 
     try {
       const yearno = getCurrentFinancialYear();
-      const user_prptype = await AsyncStorage.getItem('user_prptype');
-      const res = await api.get(`${API}/api/getevent?prptype=${user_prptype}&yearno=${yearno}`, {
-        // params: { event: selectedEvent },
-        params: {},
-      });
-      console.log('event dropdown res', res);
+      const user_prptype = await AsyncStorage.getItem("user_prptype");
+      const res = await api.get(
+        `${API}/api/getevent?prptype=${user_prptype}&yearno=${yearno}`,
+        {
+          // params: { event: selectedEvent },
+          params: {},
+        }
+      );
+      console.log("event dropdown res", res);
       setEVENTS(res.data.data);
       setEventCode(res.data.data[0].EventId);
       loadPrp(res.data.data[0].EventId);
     } catch (err) {
-      console.log('Failed to load report summary', err.message);
+      console.log("Failed to load report summary", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -95,17 +98,20 @@ export default function EnquiryReportScreen({ username }) {
 
     try {
       const yearno = getCurrentFinancialYear();
-      const user_prptype = await AsyncStorage.getItem('user_prptype');
-      const res = await api.get(`${API}/api/geteventprptype?prptype=${user_prptype}&yearno=${yearno}`, {
-        // params: { event: selectedEvent },
-        params: {},
-      });
-      console.log('event dropdown res', res);
+      const user_prptype = await AsyncStorage.getItem("user_prptype");
+      const res = await api.get(
+        `${API}/api/geteventprptype?prptype=${user_prptype}&yearno=${yearno}`,
+        {
+          // params: { event: selectedEvent },
+          params: {},
+        }
+      );
+      console.log("event dropdown res", res);
       setPRPS(res.data.data);
       setPrpCode(user_prptype ? user_prptype : res.data.data[0].code);
       loadSummary(eventCode, user_prptype);
     } catch (err) {
-      console.log('Failed to load report summary', err.message);
+      console.log("Failed to load report summary", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -126,14 +132,14 @@ export default function EnquiryReportScreen({ username }) {
       const res = await api.get(
         `${API}/api/reports/enquiries/summary?prptype=${prpCode}&yearno=27`,
         {
-          // params: { event: selectedEvent },
-          params: {},
-        },
+          params: { event: selectedEvent },
+          // params: { event: eventCode },
+        }
       );
-      console.log('loadSummary res', selectedEvent, res);
+      console.log("loadSummary res", selectedEvent, res);
       setSummary(res.data);
     } catch (err) {
-      console.log('Failed to load report summary', err.message);
+      console.log("Failed to load report summary", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,9 +165,9 @@ export default function EnquiryReportScreen({ username }) {
   }
 
   function initials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+    if (!name) return "?";
+    const parts = name.trim().split(" ");
+    return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase();
   }
 
   function renderUserCard({ item }) {
@@ -176,13 +182,13 @@ export default function EnquiryReportScreen({ username }) {
           //   eventCode,
           // })
           router.push({
-            pathname: '/EnquiryReportDrilldown',
+            pathname: "/EnquiryReportDrilldown",
             params: {
               userId: item.user_id,
               userName: item.name,
               userRole: item.role,
               eventCode,
-            }
+            },
           })
         }
       >
@@ -229,9 +235,7 @@ export default function EnquiryReportScreen({ username }) {
         <View style={styles.detailOverlay123}>
           <View style={styles.detailContainer}>
             <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>
-                {`Event Select`}
-              </Text>
+              <Text style={styles.drawerTitle}>{`Event Select`}</Text>
               <TouchableOpacity onPress={() => setEventModalVisible(false)}>
                 <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
               </TouchableOpacity>
@@ -270,9 +274,7 @@ export default function EnquiryReportScreen({ username }) {
         <View style={styles.detailOverlay123}>
           <View style={styles.detailContainer}>
             <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>
-                {`Property Select`}
-              </Text>
+              <Text style={styles.drawerTitle}>{`Property Select`}</Text>
               <TouchableOpacity onPress={() => setPrpModalVisible(false)}>
                 <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
               </TouchableOpacity>
@@ -295,9 +297,7 @@ export default function EnquiryReportScreen({ username }) {
                         loadSummary(eventCode, item.code); // existing functionality
                       }}
                     >
-                      <Text style={styles.dropdownItemText}>
-                        {item.name}
-                      </Text>
+                      <Text style={styles.dropdownItemText}>{item.name}</Text>
                     </TouchableOpacity>
                   )}
                 />
@@ -308,8 +308,8 @@ export default function EnquiryReportScreen({ username }) {
       )}
       <HeaderBarwithBack
         userName={username}
-        header={'Event Report'}
-        breadcrumb={'Event Report'}
+        header={"Event Report"}
+        breadcrumb={"Event Report"}
         SearchBar={false}
       />
       <View style={styles.screen}>
@@ -335,7 +335,8 @@ export default function EnquiryReportScreen({ username }) {
             onPress={() => setEventModalVisible(true)}
           >
             <Text style={styles.dropdownText}>
-              {EVENTS.find(e => e.EventId === eventCode)?.EventName || 'Select Event'}
+              {EVENTS.find((e) => e.EventId === eventCode)?.EventName ||
+                "Select Event"}
             </Text>
 
             <Text style={styles.dropdownArrow}>▼</Text>
@@ -357,22 +358,18 @@ export default function EnquiryReportScreen({ username }) {
           </TouchableOpacity>
         </View> */}
 
-
-
-
-
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color="#c2622f" />
         ) : (
           <>
             <Text style={styles.totalsLine}>
-              {summary?.totals?.users} users · {summary?.totals?.enquiries}{' '}
+              {summary?.totals?.users} users · {summary?.totals?.enquiries}{" "}
               enquiries · {summary?.totals?.qty.toLocaleString()} m total
             </Text>
 
             <FlatList
               data={summary?.users}
-              keyExtractor={item => String(item?.user_id)}
+              keyExtractor={(item) => String(item?.user_id)}
               renderItem={renderUserCard}
               contentContainerStyle={{
                 paddingHorizontal: 16,
@@ -395,18 +392,18 @@ export default function EnquiryReportScreen({ username }) {
 }
 
 const C = {
-  brand: '#B3552C',
-  brandSoft: '#FBEEE6',
-  ink: '#1F2937',
-  muted: '#6B7280',
-  faint: '#9CA3AF',
-  bg: '#FBFAF7',
-  surface: '#FFFFFF',
-  border: '#ECE9E2',
+  brand: "#B3552C",
+  brandSoft: "#FBEEE6",
+  ink: "#1F2937",
+  muted: "#6B7280",
+  faint: "#9CA3AF",
+  bg: "#FBFAF7",
+  surface: "#FFFFFF",
+  border: "#ECE9E2",
 };
 
 const shadowSoft = {
-  shadowColor: '#000',
+  shadowColor: "#000",
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.06,
   shadowRadius: 10,
@@ -417,7 +414,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
     color: C.ink,
     paddingHorizontal: 16,
     marginTop: 16,
@@ -431,14 +428,14 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     marginBottom: 8,
     marginTop: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   totalsLine: {
     fontSize: 12,
     color: C.muted,
     paddingHorizontal: 16,
     marginBottom: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   card: {
     borderWidth: 1,
@@ -449,45 +446,55 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     ...shadowSoft,
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  cardHead: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: C.brandSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
-  avatarText: { color: C.brand, fontWeight: '800', fontSize: 14 },
-  uname: { fontSize: 15, fontWeight: '800', color: C.ink },
+  avatarText: { color: C.brand, fontWeight: "800", fontSize: 14 },
+  uname: { fontSize: 15, fontWeight: "800", color: C.ink },
   urole: { fontSize: 11.5, color: C.muted, marginTop: 1 },
   statRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     borderTopWidth: 1,
     borderTopColor: C.border,
     paddingTop: 14,
   },
-  stat: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: 22, fontWeight: '800', color: C.ink },
+  stat: { flex: 1, alignItems: "center" },
+  statNum: { fontSize: 22, fontWeight: "800", color: C.ink },
   statLbl: {
     fontSize: 10,
     color: C.faint,
     marginTop: 3,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
-    fontWeight: '600',
+    fontWeight: "600",
   },
-  empty: { textAlign: 'center', color: C.muted, fontSize: 13, marginTop: 40 },
+  empty: { textAlign: "center", color: C.muted, fontSize: 13, marginTop: 40 },
   centerScreen: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 24,
     backgroundColor: C.bg,
   },
-  offlineTitle: { fontSize: 16, fontWeight: '800', color: C.ink, marginBottom: 6 },
-  offlineSub: { fontSize: 13, color: C.muted, textAlign: 'center', lineHeight: 19 },
+  offlineTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.ink,
+    marginBottom: 6,
+  },
+  offlineSub: {
+    fontSize: 13,
+    color: C.muted,
+    textAlign: "center",
+    lineHeight: 19,
+  },
   fieldGroup: {
     marginHorizontal: 16,
     marginTop: 10,
@@ -496,7 +503,7 @@ const styles = StyleSheet.create({
 
   dropdownLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: C.muted,
     marginBottom: 6,
   },
@@ -505,12 +512,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingHorizontal: 15,
     paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   dropdownText: {
@@ -525,7 +532,7 @@ const styles = StyleSheet.create({
   },
 
   dropdownModal: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 20,
     marginTop: 120,
     borderRadius: 12,
@@ -535,35 +542,35 @@ const styles = StyleSheet.create({
   dropdownItem: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
 
   dropdownItemText: {
     fontSize: 15,
-    color: '#222',
+    color: "#222",
   },
   detailOverlay123: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent black
     zIndex: 200, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   // Detail Container
   detailContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     // padding: 20,
     paddingTop: 45,
     borderRadius: 10,
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     elevation: 5, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
+    shadowColor: "#000", // Shadow for iOS
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -571,15 +578,15 @@ const styles = StyleSheet.create({
   drawerHeader: {
     height: 60,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderColor: '#eee',
+    borderColor: "#eee",
   },
   drawerTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.BRAND_GRADIENT_END,
   },
 });

@@ -18,7 +18,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { getCurrentFinancialYear } from "../../common/commonfunction";
+import { getEventYearNo } from "./eventYear";
 import api from "./api";
 import { deleteEnquiries } from "./syncService";
 import { S, T } from "@/src/theme";
@@ -76,8 +76,9 @@ export default function EnquiryReportDrilldownScreen({
   const loadEnquiries = useCallback(async () => {
     try {
       setLoading(true);
+      const yearno = await getEventYearNo();
       const res = await api.get(
-        `${API}/api/reports/enquiries/user/${userId}?prptype=S&yearno=27`,
+        `${API}/api/reports/enquiries/user/${userId}?prptype=S&yearno=${yearno}`,
         {
           params: { event: eventCode },
         }
@@ -121,16 +122,18 @@ export default function EnquiryReportDrilldownScreen({
     try {
       const token = await AsyncStorage.getItem("access_token");
       const user_prptype = await AsyncStorage.getItem("user_prptype");
+      const yearno = await getEventYearNo();
       const result = await deleteEnquiries(
         item.id,
         token,
-        getCurrentFinancialYear(),
-        user_prptype
+        yearno,
+        user_prptype,
+        eventCode
       );
 
       console.log(
         "API RESULT =>",
-        getCurrentFinancialYear(),
+        yearno,
         user_prptype,
         result
       );

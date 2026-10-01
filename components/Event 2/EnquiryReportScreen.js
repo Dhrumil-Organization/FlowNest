@@ -21,9 +21,9 @@ import {
 import { getCurrentFinancialYear } from '../../common/commonfunction';
 // import { Picker } from '@react-native-picker/picker';
 import { API } from '@/common/API/dynamicAPI';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import api from './api';
 import { isOnline } from './CardScanService';
 
@@ -126,8 +126,8 @@ export default function EnquiryReportScreen({ username }) {
       const res = await api.get(
         `${API}/api/reports/enquiries/summary?prptype=${prpCode}&yearno=27`,
         {
-          // params: { event: selectedEvent },
-          params: {},
+          params: { event: selectedEvent },
+          // params: { event: eventCode },
         },
       );
       console.log('loadSummary res', selectedEvent, res);

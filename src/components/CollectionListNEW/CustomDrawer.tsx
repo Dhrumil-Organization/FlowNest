@@ -1,14 +1,9 @@
-import theme from '@/components/theme';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
+import { Btn, Sheet } from '@/src/components/erpUi';
+import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -17,8 +12,7 @@ import {
     View
 } from 'react-native';
 import { CustomListDrawerProps, DesignData, ItemData, ItemStatus } from './Modal';
-
-const { height } = Dimensions.get('window');
+import SearchableDropdown from './SearchableDropdown';
 
 const CustomDrawer: React.FC<CustomListDrawerProps> = ({
     isVisible,
@@ -51,7 +45,6 @@ const CustomDrawer: React.FC<CustomListDrawerProps> = ({
     setForm,
     yearOptions
 }) => {
-    const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -106,13 +99,6 @@ const CustomDrawer: React.FC<CustomListDrawerProps> = ({
     }, [searchQuery, designData, searchQueryItem, itemData]);
 
 
-    React.useEffect(() => {
-        Animated.timing(slideAnim, {
-            toValue: isVisible ? 0 : height,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
-    }, [isVisible]);
 
     useEffect(() => {
         setLocalItemStatus(selectedItemStatus);
@@ -248,462 +234,243 @@ const CustomDrawer: React.FC<CustomListDrawerProps> = ({
     };
 
 
+    const webDateStyle: any = {
+        flex: 1,
+        border: 'none',
+        outline: 'none',
+        background: 'transparent',
+        fontSize: 14,
+        fontWeight: 700,
+        color: T.ink,
+        width: '100%',
+        minWidth: 0,
+        padding: 0,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+    };
+
     return (
-        <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
-            <View style={styles.modalOverlay}>
-                <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
-                    <LinearGradient
-                        colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                        style={styles.gradientBackground}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        {/* Close Button */}
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>
-
-                        {/* Scrollable Form Container */}
-                        <ScrollView
-                            style={styles.scrollableFormContainer}
-                            contentContainerStyle={styles.scrollableFormContent}
-                            nestedScrollEnabled={true}
-                        >
-                            {/* Property */}
-                            <View style={{ marginBottom: 10 }} >
-                                <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <SearchableDropdown
-                                    data={getPropertyData}
-                                    labelKey="LngName"
-                                    valueKey="PrpCode"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    initialValue={selectedProperty ?? null}
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, PrpCode: item?.PrpCode || '' }));
-                                        setSelectedProperty(item);
-                                    }}
-                                    multiple={false}
-                                    emptyMessage="No properties available"
-                                />
-                            </View>
-                            {/* From Date */}
-                            {/* From Date */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>From Date</Text>
-
-                                {Platform.OS === 'web' ? (
-                                    // ---------------- WEB ----------------
-                                    <View style={[styles.dateInput, { paddingVertical: 4, paddingHorizontal: 8, justifyContent: 'center' }]}>
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: toISODate(fromDate),
-                                            max: toISODate(new Date()),
-                                            onChange: (e: any) => {
-                                                const v = e.target.value; // "YYYY-MM-DD"
-                                                if (v) onFromDateChange(fromISODate(v));
-                                            },
-                                            style: {
-                                                width: '100%',
-                                                border: 'none',
-                                                outline: 'none',
-                                                background: 'transparent',
-                                                color: '#fff',
-                                                fontSize: 14,
-                                                padding: 8,
-                                                cursor: 'pointer',
-                                                colorScheme: 'dark',   // makes the native calendar icon visible on dark bg
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    // ---------------- NATIVE ----------------
-                                    <>
-                                        <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromDatePicker(true)}>
-                                            <Text style={styles.dateText}>{formatDate(fromDate)}</Text>
-                                        </TouchableOpacity>
-                                        {showFromDatePicker && (
-                                            <DateTimePicker
-                                                value={fromDate}
-                                                mode="date"
-                                                display="default"
-                                                onChange={(event, date) => {
-                                                    setShowFromDatePicker(Platform.OS === 'ios');
-                                                    if (date) onFromDateChange(date);
-                                                }}
-                                            />
-                                        )}
-                                    </>
-                                )}
-                            </View>
-
-                            {/* To Date */}
-                            {/* To Date */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>To Date</Text>
-
-                                {Platform.OS === 'web' ? (
-                                    // ---------------- WEB ----------------
-                                    <View style={[styles.dateInput, { paddingVertical: 4, paddingHorizontal: 8, justifyContent: 'center' }]}>
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: toISODate(toDate),
-                                            min: toISODate(fromDate),          // can't pick before From Date
-                                            max: toISODate(new Date()),        // can't pick future
-                                            onChange: (e: any) => {
-                                                const v = e.target.value;
-                                                if (v) onToDateChange(fromISODate(v));
-                                            },
-                                            style: {
-                                                width: '100%',
-                                                border: 'none',
-                                                outline: 'none',
-                                                background: 'transparent',
-                                                color: '#fff',
-                                                fontSize: 14,
-                                                padding: 8,
-                                                cursor: 'pointer',
-                                                colorScheme: 'dark',
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    // ---------------- NATIVE ----------------
-                                    <>
-                                        <TouchableOpacity style={styles.dateInput} onPress={() => setShowToDatePicker(true)}>
-                                            <Text style={styles.dateText}>{formatDate(toDate)}</Text>
-                                        </TouchableOpacity>
-                                        {showToDatePicker && (
-                                            <DateTimePicker
-                                                value={toDate}
-                                                mode="date"
-                                                display="default"
-                                                onChange={(event, date) => {
-                                                    setShowToDatePicker(Platform.OS === 'ios');
-                                                    if (date) onToDateChange(date);
-                                                }}
-                                            />
-                                        )}
-                                    </>
-                                )}
-                            </View>
-
-                            {/* Financial Year Dropdown */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Financial Year</Text>
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedYear}</Text>
-                                </TouchableOpacity>
-                                {isYearDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            {yearOptions.map((year) => (
-                                                <TouchableOpacity
-                                                    key={year}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedYear === year && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onYearChange(year);
-                                                        setIsYearDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{year}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Sales Executive Dropdown */}
-
-
-
-
-
-
-
-                        </ScrollView>
-
-                        {/* Load Button (Fixed at Bottom) */}
-                        <View style={styles.loadButtonContainer}>
-                            <TouchableOpacity style={styles.loadButton} onPress={handleLoadPress}>
-                                {isLoading ? (
-                                    <ActivityIndicator size={24} color={theme.BRAND_GRADIENT_START} />
-                                ) : (
-                                    <Icon name="refresh" size={24} color={theme.BRAND_GRADIENT_START} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-                </Animated.View>
+        <Sheet
+            open={isVisible}
+            onClose={onClose}
+            eyebrow="COLLECTION"
+            title="Filters"
+            side
+            wideMax={460}
+            footer={
+                <>
+                    <Btn label="Cancel" kind="ghost" onPress={onClose} style={{ flex: 1 }} />
+                    <Btn
+                        label={isLoading ? 'Loading…' : 'Load'}
+                        icon="refresh"
+                        onPress={handleLoadPress}
+                        loading={isLoading}
+                        style={{ flex: 2 }}
+                    />
+                </>
+            }
+        >
+            {/* Property */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Select Property <Text style={styles.req}>*</Text></Text>
+                <SearchableDropdown
+                    data={getPropertyData}
+                    labelKey="LngName"
+                    valueKey="PrpCode"
+                    placeholder="Choose property..."
+                    title="Property"
+                    icon="business"
+                    pageSize={10}
+                    initialValue={selectedProperty ?? null}
+                    onSelect={(item) => {
+                        setForm(prev => ({ ...prev, PrpCode: item?.PrpCode || '' }));
+                        setSelectedProperty(item);
+                    }}
+                    multiple={false}
+                    emptyMessage="No properties available"
+                />
             </View>
-        </Modal>
+
+            {/* Date range */}
+            <View style={styles.dateRow}>
+                {/* From Date */}
+                <View style={[styles.group, styles.dateCol]}>
+                    <Text style={styles.label}>From Date</Text>
+
+                    {Platform.OS === 'web' ? (
+                        // Web: native HTML date input
+                        <View style={styles.dateTrigger}>
+                            <Icon name="event" size={17} color={T.copper} />
+                            {React.createElement('input', {
+                                type: 'date',
+                                value: toISODate(fromDate),
+                                max: toISODate(new Date()),
+                                'aria-label': 'From date',
+                                onChange: (e: any) => {
+                                    const v = e.target.value; // "YYYY-MM-DD"
+                                    if (v) onFromDateChange(fromISODate(v));
+                                },
+                                style: webDateStyle,
+                            })}
+                        </View>
+                    ) : (
+                        // Native: existing DateTimePicker
+                        <>
+                            <TouchableOpacity
+                                style={styles.dateTrigger}
+                                onPress={() => setShowFromDatePicker(true)}
+                                activeOpacity={0.85}
+                                accessibilityRole="button"
+                                accessibilityLabel="From date"
+                            >
+                                <Icon name="event" size={17} color={T.copper} />
+                                <Text style={styles.dateTriggerText} numberOfLines={1}>{formatDate(fromDate)}</Text>
+                                <Icon name="expand-more" size={20} color={T.muted} />
+                            </TouchableOpacity>
+                            {showFromDatePicker && (
+                                <DateTimePicker
+                                    value={fromDate}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, date) => {
+                                        setShowFromDatePicker(Platform.OS === 'ios');
+                                        if (date) onFromDateChange(date);
+                                    }}
+                                />
+                            )}
+                        </>
+                    )}
+                </View>
+
+                {/* To Date */}
+                <View style={[styles.group, styles.dateCol]}>
+                    <Text style={styles.label}>To Date</Text>
+
+                    {Platform.OS === 'web' ? (
+                        <View style={styles.dateTrigger}>
+                            <Icon name="event" size={17} color={T.copper} />
+                            {React.createElement('input', {
+                                type: 'date',
+                                value: toISODate(toDate),
+                                min: toISODate(fromDate),          // can't pick before From Date
+                                max: toISODate(new Date()),        // can't pick future
+                                'aria-label': 'To date',
+                                onChange: (e: any) => {
+                                    const v = e.target.value;
+                                    if (v) onToDateChange(fromISODate(v));
+                                },
+                                style: webDateStyle,
+                            })}
+                        </View>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.dateTrigger}
+                                onPress={() => setShowToDatePicker(true)}
+                                activeOpacity={0.85}
+                                accessibilityRole="button"
+                                accessibilityLabel="To date"
+                            >
+                                <Icon name="event" size={17} color={T.copper} />
+                                <Text style={styles.dateTriggerText} numberOfLines={1}>{formatDate(toDate)}</Text>
+                                <Icon name="expand-more" size={20} color={T.muted} />
+                            </TouchableOpacity>
+                            {showToDatePicker && (
+                                <DateTimePicker
+                                    value={toDate}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, date) => {
+                                        setShowToDatePicker(Platform.OS === 'ios');
+                                        if (date) onToDateChange(date);
+                                    }}
+                                />
+                            )}
+                        </>
+                    )}
+                </View>
+            </View>
+
+            {/* Financial Year Dropdown */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Financial Year</Text>
+                <TouchableOpacity
+                    style={[styles.dateTrigger, isYearDropdownOpen && { borderColor: T.nav }]}
+                    onPress={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Financial year ${selectedYear}`}
+                    accessibilityState={{ expanded: isYearDropdownOpen }}
+                >
+                    <Icon name="date-range" size={17} color={T.copper} />
+                    <Text style={styles.dateTriggerText}>{selectedYear}</Text>
+                    <Icon name={isYearDropdownOpen ? 'expand-less' : 'expand-more'} size={20} color={T.muted} />
+                </TouchableOpacity>
+                {isYearDropdownOpen && (
+                    <View style={styles.options}>
+                        <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                            {yearOptions.map((year, i) => {
+                                const on = selectedYear === year;
+                                return (
+                                    <TouchableOpacity
+                                        key={year}
+                                        style={[styles.option, i === 0 && { borderTopWidth: 0 }, on && styles.optionOn]}
+                                        onPress={() => {
+                                            onYearChange(year);
+                                            setIsYearDropdownOpen(false);
+                                        }}
+                                        accessibilityRole="button"
+                                        accessibilityState={{ selected: on }}
+                                    >
+                                        <Text style={[styles.optionText, on && { color: T.nav, fontWeight: '900' }]}>{year}</Text>
+                                        {on ? <Icon name="check" size={18} color={T.copper} /> : null}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
+            </View>
+        </Sheet>
     );
 };
 
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
+    group: { gap: 6 },
+    label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+    req: { color: T.red },
+    dateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    dateCol: { flex: 1, minWidth: 150 },
+    dateTrigger: {
+        height: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
     },
-    drawerContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+    dateTriggerText: { flex: 1, fontSize: 14, color: T.ink, fontWeight: '700' },
+    options: {
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        backgroundColor: T.surface,
         overflow: 'hidden',
     },
-    gradientBackground: {
-        flex: 1,
-        padding: 20,
-    },
-    closeButton: {
-        alignSelf: 'flex-end',
-        padding: 35,
-    },
-    stepIndicator: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    stepText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    formContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    inputGroup: {
-        marginBottom: 15,
-        zIndex: 10,
-    },
-    label: {
-        fontSize: 16,
-        marginBottom: 5,
-        color: '#fff',
-    },
-    dateInput: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dateText: {
-        color: '#fff',
-    },
-    dropdownButton: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dropdownText: {
-        color: '#fff',
-    },
-    dropdownOptionsContainer: {
-        position: 'relative',
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        zIndex: 100,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        maxHeight: 200,
-    },
-    dropdownOption: {
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    dropdownOptionText: {
-        color: '#333',
-    },
-    selectedOption: {
-        backgroundColor: '#e0e0e0',
-    },
-    navigationContainer: {
+    option: {
+        minHeight: 44,
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 10,
-        marginTop: 'auto',
+        paddingHorizontal: 12,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
     },
-    navButton: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: 10,
-        borderRadius: 5,
-    },
-    loadButton: {
-        backgroundColor: 'rgb(255, 255, 255)',
-        borderRadius: 5,
-        alignItems: 'center',
-        // flex: 1,
-        padding: 10,
-    },
-    loadButtonText: {
-        color: 'rgb(103, 9, 210)',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    // 
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        marginBottom: 10,
-    },
-    searchInput: {
-        flex: 1,
-        padding: 10,
-        color: '#fff',
-    },
-    searchIcon: {
-        marginLeft: 10,
-    },
-    selectedDesignsContainer: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    selectedDesignChip: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-        marginRight: 5,
-    },
-    selectedDesignText: {
-        color: '#fff',
-        fontSize: 12,
-    },
-
-    designListContainer: {
-        maxHeight: 300, // Fixed height for the design list
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    designListContent: {
-        paddingBottom: 20,
-    },
-    designItem: {
-        padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-    },
-    selectedDesignItem: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    designName: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    designCode: {
-        color: '#ccc',
-        fontSize: 12,
-    },
-    loadingIndicator: {
-        padding: 10,
-    },
-    accordionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 15,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    accordionHeaderText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    scrollableFormContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    scrollableFormContent: {
-        paddingBottom: 80, // Extra space for the Load button
-    },
-    loadButtonContainer: {
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        right: 20,
-        alignItems: 'center',
-    },
-    radioGroup: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    radioButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 20,
-    },
-    radioCircle: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 5,
-    },
-    radioInnerCircle: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#fff',
-    },
-    radioLabel: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    selectAllContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    selectAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 10,
-        borderRadius: 8,
-        marginRight: 10,
-        alignItems: 'center',
-    },
-    selectAllButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    removeAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-    },
+    optionOn: { backgroundColor: `${T.copper}10` },
+    optionText: { fontSize: 14, fontWeight: '700', color: T.ink },
 });
 
 export default CustomDrawer;

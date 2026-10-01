@@ -1,15 +1,14 @@
 import AppAlert from '@/common/utils/appAlert';
 /* CollectionCard.tsx — left-swipe preview + label-value single-line + full remark display */
-import { crlimtreq_styles } from '@/common/Style';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import theme from '@/components/theme';
+import { Btn, cellWidth, CONTENT_MAX, EmptyState, Field, IconBtn, Metric, Segment, Sheet, useSotLayout } from '@/src/components/erpUi';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Dimensions,
     FlatList,
     Image,
     Modal,
@@ -17,18 +16,16 @@ import {
     SafeAreaView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     useWindowDimensions,
     View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { API } from '../../common/API/dynamicAPI';
-import Footer from '../../components/FooterNew';
+import Footer from './CollectionFooter';
 import ChequePreviewModal, { SwipePreview } from './ChequePreview';
 
 type POTItem = { [k: string]: any };
-const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 const CollectionCard: React.FC<{
     gePOTData?: POTItem[] | null;
@@ -59,23 +56,11 @@ const CollectionCard: React.FC<{
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     // 
     const { width } = useWindowDimensions();
-    const { width: screenWidth } = useWindowDimensions();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    // NEW ERP UI: shared responsive breakpoints (1 / 2 / 3 columns)
+    const { cols, gutter, isPhone } = useSotLayout();
 
-    const getColumns = () => {
-        if (width < 600) return 1;      // mobile
-        if (width < 1000) return 2;     // tablet
-        return 3;                       // web / large
-    };
-
-    const numColumns = getColumns();
-
-    // Explicit item width so the last row doesn't stretch weirdly
-    const GRID_PAD = 10;
-    const GRID_GAP = 10;
-    const gridItemWidth =
-        numColumns > 1
-            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : width;
+    const numColumns = cols;
 
 
     useEffect(() => {
@@ -546,132 +531,145 @@ const CollectionCard: React.FC<{
         today.setHours(0, 0, 0, 0);
         const isOutdated = collectionDate < today;
 
-        // State for collapsible adjustment details
+        // NEW ERP UI: status tone (authorised = green, pending = copper)
+        const authorisedRow = isAuth === '1';
+        const tone = authorisedRow ? T.green : T.copper;
+        const showActionBar = !!attachUrl || (showCardActions && canShowAuthorize);
 
         return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[cellWidth(numColumns), styles.gridCell]}>
                 <Swipeable
                     renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
-                    containerStyle={{ borderRadius: 12, overflow: 'hidden' }}
+                    containerStyle={{ borderRadius: 14, overflow: 'hidden', flex: 1 }}
                 >
-                    <View style={[styles.card, isAuth === '1' && styles.cardAuth, isOutdated && styles.cardOutdated]}>
-                        {/* Header: Title + Status + Actions */}
-                        <View style={styles.cardHeader}>
-                            <View style={styles.headerLeft}>
-                                <Text numberOfLines={1} style={styles.title}>{title}</Text>
+                    <View style={[styles.card, authorisedRow && styles.cardAuth, isOutdated && styles.cardOutdated]}>
+                        {/* Header: party + property / bank + status */}
+                        <View style={styles.cardHead}>
+                            <View style={styles.cardIcon}>
+                                <Icon name="account-balance-wallet" size={18} color={T.copper} />
+                            </View>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text numberOfLines={2} style={styles.title}>{title}</Text>
                                 <Text numberOfLines={2} style={styles.subtitle}>
                                     {prp}{bank ? ` • ${bank}` : ''}{br ? ` • ${br}` : ''}
                                 </Text>
                             </View>
-                            <View style={styles.headerRight}>
+                            <View style={[styles.pill, { backgroundColor: `${tone}16`, borderColor: `${tone}40` }]}>
+                                <View style={[styles.pillDot, { backgroundColor: tone }]} />
+                                <Text style={[styles.pillText, { color: tone }]}>{authorisedRow ? 'AUTHORIZED' : 'PENDING'}</Text>
+                            </View>
+                        </View>
+
+                        {/* Money */}
+                        <View style={[styles.metricBox, isPhone && { flexWrap: 'wrap', rowGap: 8 }]}>
+                            <Metric label="Amount" value={`₹ ${amountDisplay}`} color={authorisedRow ? T.green : T.pd} style={isPhone ? { flexBasis: '100%' } : { flex: 1.6 }} />
+                            <Metric label="TDS Amount" value={`₹ ${tDSAmt}`} color={T.nav} />
+                            <Metric label="Discount" value={`₹ ${disAmt}`} color={T.nav} align="right" />
+                        </View>
+
+                        {/* Cheque details */}
+                        <View>
+                            <View style={[styles.kvRow, { borderTopWidth: 0 }]}>
+                                <Text style={styles.kvLabel}>Collection Date</Text>
+                                <Text style={[styles.kvValue, isOutdated && styles.outdatedText]} numberOfLines={1}>{collection}</Text>
+                            </View>
+                            <View style={styles.kvRow}>
+                                <Text style={styles.kvLabel}>Cheque No</Text>
+                                <Text style={styles.kvValue} numberOfLines={1}>{chqNo}</Text>
+                            </View>
+                            <View style={styles.kvRow}>
+                                <Text style={styles.kvLabel}>Cheque Date</Text>
+                                <Text style={styles.kvValue} numberOfLines={1}>{chqDate}</Text>
+                            </View>
+                            <View style={[styles.kvRow, { alignItems: 'flex-start' }]}>
+                                <Text style={styles.kvLabel}>Remark</Text>
+                                <Text style={[styles.kvValue, { fontWeight: '600' }]} numberOfLines={2}>
+                                    {remark || '-'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* User + past-collection flags + row actions */}
+                        <View style={styles.flagRow}>
+                            <View style={styles.flagChips}>
+                                <View style={styles.userChip}>
+                                    <Icon name="person" size={13} color={T.blue} />
+                                    <Text style={styles.userChipText} numberOfLines={1}>{userName}</Text>
+                                </View>
+                                {isOutdated && (
+                                    <View style={styles.warnChip}>
+                                        <Icon name="warning" size={13} color={T.red} />
+                                        <Text style={styles.warnChipText}>Past collection</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <View style={styles.iconRow}>
+                                {/* Same action as the left-swipe preview (swipe is not available with a mouse) */}
+                                <IconBtn icon="visibility" label="Preview cheque" color={T.nav} onPress={() => setChequePreviewItem(item)} />
                                 {showCardActions && (
                                     <>
-                                        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton}>
-                                            <Icon name="edit" size={18} color={theme.BRAND_ACCENT} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
+                                        <IconBtn icon="edit" label="Edit" color={T.nav} onPress={() => handleEdit(item)} />
+                                        <IconBtn
+                                            icon="delete"
+                                            label="Delete"
+                                            tone="danger"
+                                            color={T.red}
                                             onPress={() => {
                                                 AppAlert.alert('Delete', 'Are you sure?', [
                                                     { text: 'Cancel', style: 'cancel' },
                                                     { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(item) },
                                                 ]);
                                             }}
-                                            style={styles.iconButton}
-                                        >
-                                            <Icon name="delete" size={18} color="#e53935" />
-                                        </TouchableOpacity>
+                                        />
                                     </>
                                 )}
-                                <View style={[styles.pill, isAuth === '1' ? styles.pillAuth : styles.pillPending]}>
-                                    <Text style={styles.pillText}>{isAuth === '1' ? 'Authorized' : 'Pending'}</Text>
-                                </View>
                             </View>
                         </View>
 
-                        {/* Cheque Details (Full Width) */}
-                        <View style={styles.chequeDetails}>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Collection Date:</Text>
-                                <Text style={[styles.detailValue, isOutdated && styles.outdatedText]}>{collection}</Text>
+                        {/* View Cheque / Authorize */}
+                        {showActionBar ? (
+                            <View style={styles.actionBar}>
+                                {!!attachUrl && (
+                                    <Btn
+                                        label="View Cheque"
+                                        icon="receipt"
+                                        kind="soft"
+                                        compact
+                                        style={styles.actionBtn}
+                                        onPress={() => attachUrl ? setImageModalUrl(attachUrl) : AppAlert.alert('No Image', 'No cheque image available.')}
+                                    />
+                                )}
+                                {showCardActions && canShowAuthorize && (
+                                    <Btn
+                                        label="Authorize"
+                                        icon="check-circle"
+                                        compact
+                                        style={styles.actionBtn}
+                                        onPress={() => openAuthModal(item)}
+                                    />
+                                )}
                             </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Cheque No:</Text>
-                                <Text style={styles.detailValue}>{chqNo}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Cheque Date:</Text>
-                                <Text style={styles.detailValue}>{chqDate}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Amount:</Text>
-                                <Text style={[styles.detailValue, styles.amount]}>₹ {amountDisplay}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>TDS Amount:</Text>
-                                <Text style={[styles.detailValue, styles.amount]}>₹ {tDSAmt}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Discount Amount:</Text>
-                                <Text style={[styles.detailValue, styles.amount]}>₹ {disAmt}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Remark:</Text>
-                                <Text style={[styles.detailValue, { flex: 1 }]} numberOfLines={2}>
-                                    {remark || '-'}
-                                </Text>
-                            </View>
-                            <>
-                                <View style={styles.detailRow}>
-                                    <View style={styles.warningRow1}>
-                                        <Icon name="person" size={14} color="rgba(24, 161, 134, 0.87)" style={styles.warningIcon} />
-                                        <Text style={styles.warningText1}>{userName}</Text>
-                                    </View>
-                                    {isOutdated && (
-                                        <View style={styles.warningRow}>
-                                            <Icon name="warning" size={14} color="rgba(255, 67, 19, 0.87)" style={styles.warningIcon} />
-                                            <Text style={styles.warningText}>Past collection</Text>
-                                        </View>
-                                    )}
+                        ) : null}
 
-                                </View>
-                            </>
-                        </View>
-
-                        {/* View Cheque Button (Replaces Image Thumbnail) */}
-                        {attachUrl && (<>
-                            <TouchableOpacity
-                                onPress={() => attachUrl ? setImageModalUrl(attachUrl) : AppAlert.alert('No Image', 'No cheque image available.')}
-                                style={[styles.viewChequeButton, !attachUrl && styles.viewChequeButtonDisabled]}
-                            >
-                                <Icon name="receipt" size={18} color={attachUrl ? theme.BRAND_ACCENT : theme.TEXT_SECONDARY} />
-                                <Text style={[styles.viewChequeText, !attachUrl && styles.viewChequeTextDisabled]}>
-                                    {attachUrl ? 'View Cheque' : 'No Cheque Image'}
-                                </Text>
-                            </TouchableOpacity>
-                        </>)}
-
-                        {showCardActions && canShowAuthorize && (
-                            <TouchableOpacity
-                                onPress={() => openAuthModal(item)}
-                                style={styles.authorizeButton}
-                            >
-                                <Icon name="check-circle" size={18} color="#fff" />
-                                <Text style={styles.authorizeButtonText}>Authorize</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        {/* Adjustment Details (Full Width, Collapsible) */}
+                        {/* Adjustment Details (collapsible) */}
                         {d1rows.length > 0 && (
-                            <View style={styles.adjustmentContainer}>
+                            <View style={styles.adjBox}>
                                 <TouchableOpacity
-                                    style={styles.adjustmentHeader}
+                                    style={styles.adjHead}
                                     onPress={() => setDetailsExpanded(!detailsExpanded)}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ expanded: detailsExpanded }}
                                 >
-                                    <Text style={styles.adjustmentTitle}>Adjustment Details ({d1rows.length})</Text>
+                                    <Icon name="receipt-long" size={16} color={T.copper} />
+                                    <Text style={styles.adjTitle}>Adjustment Details</Text>
+                                    <View style={styles.countPill}>
+                                        <Text style={styles.countPillText}>{d1rows.length}</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }} />
                                     <Icon
                                         name={detailsExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
                                         size={20}
-                                        color={theme.BRAND_DARK}
+                                        color={T.nav}
                                     />
                                 </TouchableOpacity>
                                 {detailsExpanded && (
@@ -681,20 +679,20 @@ const CollectionCard: React.FC<{
                                             const billNo = safe(r.BillNo ?? r.BILLNO ?? r.BillNo ?? '');
                                             const setAmt = safe(r.SetAmt ?? r.BALAMT1 ?? r.SetAmt ?? r.SETAMT ?? '');
                                             return (
-                                                <View key={i} style={styles.adjustmentRow}>
-                                                    <View style={styles.adjustmentLeft}>
-                                                        <Text style={styles.adjustmentLabel}>{billNo || '-'}</Text>
-                                                        <Text style={styles.adjustmentDate}>{billDate || '-'}</Text>
+                                                <View key={i} style={[styles.adjRow, i % 2 === 1 && { backgroundColor: T.sub }]}>
+                                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                                        <Text style={styles.adjBill} numberOfLines={1}>{billNo || '-'}</Text>
+                                                        <Text style={styles.adjDate}>{billDate || '-'}</Text>
                                                     </View>
-                                                    <Text style={[styles.adjustmentAmount, styles.amount]}>
+                                                    <Text style={styles.adjAmount}>
                                                         ₹ {formatAmountDisplay(setAmt)}
                                                     </Text>
                                                 </View>
                                             );
                                         })}
-                                        <View style={styles.adjustmentTotalRow}>
-                                            <Text style={styles.adjustmentTotalLabel}>Total Adjustments:</Text>
-                                            <Text style={[styles.adjustmentTotalAmount, styles.amount]}>
+                                        <View style={styles.adjTotal}>
+                                            <Text style={styles.adjTotalLabel}>Total Adjustments</Text>
+                                            <Text style={styles.adjTotalAmount}>
                                                 ₹ {formatAmountDisplay(d1rows.reduce((sum, r) => sum + parseAmount(r.SetAmt ?? r.BALAMT1 ?? 0), 0))}
                                             </Text>
                                         </View>
@@ -703,19 +701,7 @@ const CollectionCard: React.FC<{
                             </View>
                         )}
                     </View>
-
-                    {/* Authorize Button (Full Width) */}
-                    {/* {showCardActions && canShowAuthorize && (
-                    <TouchableOpacity
-                        onPress={() => openAuthModal(item)}
-                        style={styles.authorizeButton}
-                    >
-                        <Icon name="check" size={18} color="#fff" />
-                        <Text style={styles.authorizeButtonText}>Authorize</Text>
-                    </TouchableOpacity>
-                )} */}
-
-                </Swipeable >
+                </Swipeable>
             </View>
         );
     };
@@ -788,22 +774,27 @@ const CollectionCard: React.FC<{
 
     return (
         <>
-            <Footer
-                text={footerText}
-                totalAmount={footerTotal}
-                isChequeList={true}
-            />
             <SafeAreaView style={styles.container}>
-                <View style={styles.tabs}>
-                    <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('pending')}>
-                        <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>Pending ({pending.length})</Text>
-                        {activeTab === 'pending' && <View style={styles.tabUnderline} />}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('authorised')}>
-                        <Text style={[styles.tabText, activeTab === 'authorised' && styles.tabTextActive]}>Authorized ({authorised.length})</Text>
-                        {activeTab === 'authorised' && <View style={styles.tabUnderline} />}
-                    </TouchableOpacity>
+                {/* Totals (was the floating footer) + Pending / Authorized tabs */}
+                <View style={[styles.head, { paddingHorizontal: gutter }]}>
+                    <View style={[styles.headInner, !isPhone && { flexDirection: 'row', alignItems: 'center' }]}>
+                        <Footer
+                            text={footerText}
+                            totalAmount={footerTotal}
+                            isChequeList={true}
+                            style={!isPhone ? { flex: 1 } : undefined}
+                        />
+                        <View style={isPhone ? undefined : { width: 380 }}>
+                            <Segment
+                                value={activeTab}
+                                options={[
+                                    { value: 'pending', label: `Pending (${pending.length})`, icon: 'schedule' },
+                                    { value: 'authorised', label: `Authorized (${authorised.length})`, icon: 'verified' },
+                                ]}
+                                onChange={(tab) => setActiveTab(tab)}
+                            />
+                        </View>
+                    </View>
                 </View>
 
                 {/* <FlatList
@@ -820,19 +811,37 @@ const CollectionCard: React.FC<{
                     style={{ flex: 1 }}
                     renderItem={({ item }) => renderItem({ item })}
                     keyExtractor={(i, idx) => safe(i?.UId ?? i?.uid ?? idx)}
-                    contentContainerStyle={crlimtreq_styles.list}
+                    contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
                     ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Text style={styles.emptyText}>No records</Text>
+                        <View style={styles.emptyCard}>
+                            <EmptyState
+                                icon={activeTab === 'pending' ? 'pending-actions' : 'verified'}
+                                title="No records"
+                                text={
+                                    searchQueryPOT?.trim()
+                                        ? 'No collection matches this search.'
+                                        : activeTab === 'pending'
+                                            ? 'No pending collections for the selected filters.'
+                                            : 'No authorized collections for the selected filters.'
+                                }
+                            />
                         </View>
                     }
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.4}
                     ListFooterComponent={
                         visibleCount < filteredData.length ? (
-                            <View style={{ paddingVertical: 16 }}>
-                                <ActivityIndicator size="small" color={theme.BRAND_ACCENT} />
-                            </View>
+                            <TouchableOpacity
+                                style={styles.loadingMore}
+                                onPress={loadMore}
+                                accessibilityRole="button"
+                                accessibilityLabel="Show more"
+                            >
+                                <ActivityIndicator size="small" color={T.copper} />
+                                <Text style={styles.loadingMoreText}>
+                                    Show more ({filteredData.length - visibleCount} left)
+                                </Text>
+                            </TouchableOpacity>
                         ) : null
                     }
                 />
@@ -841,10 +850,21 @@ const CollectionCard: React.FC<{
                 {/* image fullscreen modal */}
                 <Modal visible={!!imageModalUrl} transparent animationType="fade" onRequestClose={() => setImageModalUrl(null)}>
                     <View style={styles.fullscreen}>
-                        <TouchableOpacity style={styles.imageClose} onPress={() => setImageModalUrl(null)}>
-                            <Icon name="close" size={28} color="#fff" />
+                        <TouchableOpacity
+                            style={styles.imageClose}
+                            onPress={() => setImageModalUrl(null)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Close image"
+                        >
+                            <Icon name="close" size={22} color="#fff" />
                         </TouchableOpacity>
-                        {imageModalUrl ? <Image source={{ uri: imageModalUrl }} style={styles.fullImage} resizeMode="contain" /> : null}
+                        {imageModalUrl ? (
+                            <Image
+                                source={{ uri: imageModalUrl }}
+                                style={{ width: screenWidth, height: screenHeight, resizeMode: 'contain' } as any}
+                                resizeMode="contain"
+                            />
+                        ) : null}
                     </View>
                 </Modal>
 
@@ -852,80 +872,71 @@ const CollectionCard: React.FC<{
                 <ChequePreviewModal visible={!!chequePreviewItem} item={chequePreviewItem ?? undefined} onClose={() => setChequePreviewItem(null)} />
 
                 {/* stages modal */}
-                <Modal visible={stageModalVisible} animationType="slide" onRequestClose={() => setStageModalVisible(false)}>
-                    <SafeAreaView style={styles.modalWrap}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Details</Text>
-                            <TouchableOpacity onPress={() => setStageModalVisible(false)}><Icon name="close" size={24} color={theme.BRAND_ACCENT} /></TouchableOpacity>
+                <Sheet
+                    open={stageModalVisible}
+                    onClose={() => setStageModalVisible(false)}
+                    eyebrow="COLLECTION"
+                    title="Details"
+                    wideMax={480}
+                >
+                    {(!stageData || stageData.length === 0) ? (
+                        <Text style={styles.mutedText}>No details available</Text>
+                    ) : (
+                        <View style={styles.stageList}>
+                            {stageData.map((s, i) => (
+                                <View key={i} style={[styles.stageRow, i % 2 === 1 && { backgroundColor: T.sub }]}>
+                                    <Text style={styles.stageKey}>{s.stage}</Text>
+                                    <Text style={styles.stageQty}>{s.qty}</Text>
+                                </View>
+                            ))}
                         </View>
+                    )}
+                </Sheet>
 
-                        <View style={{ padding: 16 }}>
-                            {(!stageData || stageData.length === 0) ? (
-                                <Text style={{ color: theme.TEXT_SECONDARY }}>No details available</Text>
-                            ) : (
-                                stageData.map((s, i) => (
-                                    <View key={i} style={styles.stageRow}>
-                                        <Text style={styles.stageKey}>{s.stage}</Text>
-                                        <Text style={styles.stageQty}>{s.qty}</Text>
-                                    </View>
-                                ))
-                            )}
+                {/* Authorize confirmation */}
+                <Sheet
+                    open={authModalVisible}
+                    onClose={() => setAuthModalVisible(false)}
+                    eyebrow="COLLECTION"
+                    title="Authorize cheque"
+                    wideMax={460}
+                    footer={
+                        <>
+                            <Btn label="Cancel" kind="ghost" onPress={() => setAuthModalVisible(false)} style={{ flex: 1 }} />
+                            <Btn
+                                label="Confirm"
+                                icon="check-circle"
+                                onPress={() => confirmAuthorize()}
+                                loading={!!authLoadingLocalId}
+                                style={{ flex: 2 }}
+                            />
+                        </>
+                    }
+                >
+                    {authTarget ? (
+                        <View style={styles.authSummary}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={styles.authParty} numberOfLines={2}>
+                                    {safe(authTarget.AccName ?? authTarget.accname ?? authTarget.ParName ?? '')}
+                                </Text>
+                                <Text style={styles.authMeta} numberOfLines={1}>
+                                    Cheque {safe(authTarget.ChqNo ?? authTarget.chqno ?? '-')} · {formatDate(authTarget.ChqDate ?? authTarget.nChqDate)}
+                                </Text>
+                            </View>
+                            <Text style={styles.authAmount}>₹ {formatAmountDisplay(authTarget.Amount ?? authTarget.amount ?? authTarget.Amt)}</Text>
                         </View>
-                    </SafeAreaView>
-                </Modal>
-                {/* Authorize confirmation modal */}
-                <Modal visible={authModalVisible} transparent animationType="fade" onRequestClose={() => setAuthModalVisible(false)}>
-                    <View style={{
-                        flex: 1, backgroundColor: 'rgba(10,10,12,0.45)',
-                        justifyContent: 'center', padding: 20
-                    }}>
-                        <View style={{
-                            backgroundColor: theme.SURFACE, borderRadius: 12, padding: 16,
-                            shadowColor: theme.SHADOW, elevation: 6
-                        }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={{ fontSize: 16, fontWeight: '900', color: theme.BRAND_DARK }}>Authorize cheque</Text>
-                                <TouchableOpacity onPress={() => setAuthModalVisible(false)}>
-                                    <Icon name="close" size={20} color={theme.TEXT_SECONDARY} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={{ marginTop: 12, color: theme.TEXT_SECONDARY }}>
-                                Are you sure you want to authorize this collection?
-                            </Text>
-
-                            <View style={{ marginTop: 12 }}>
-                                <Text style={{ color: theme.TEXT_SECONDARY, fontWeight: '700', marginBottom: 6 }}>Remark (optional)</Text>
-                                <TextInput
-                                    value={authRemark}
-                                    onChangeText={setAuthRemark}
-                                    placeholder="Enter remark"
-                                    style={{
-                                        borderWidth: 1, borderColor: theme.BORDER || 'rgba(0,0,0,0.06)',
-                                        borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff'
-                                    }}
-                                    returnKeyType="done"
-                                />
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 14 }}>
-                                <TouchableOpacity onPress={() => setAuthModalVisible(false)} style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                                    <Text style={{ color: theme.TEXT_SECONDARY, fontWeight: '700' }}>Cancel</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={() => confirmAuthorize()}
-                                    style={{
-                                        backgroundColor: theme.BRAND_ACCENT, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, marginLeft: 8, flexDirection: 'row', alignItems: 'center'
-                                    }}
-                                >
-                                    {authLoadingLocalId ? <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} /> : null}
-                                    <Text style={{ color: '#fff', fontWeight: '900' }}>Confirm</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
+                    ) : null}
+                    <Text style={styles.authText}>
+                        Are you sure you want to authorize this collection?
+                    </Text>
+                    <Field
+                        label="Remark (optional)"
+                        value={authRemark}
+                        onChangeText={setAuthRemark}
+                        placeholder="Enter remark"
+                        returnKeyType="done"
+                    />
+                </Sheet>
 
             </SafeAreaView>
         </>
@@ -933,291 +944,224 @@ const CollectionCard: React.FC<{
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.BG || '#f6f7fa' },
-    // 
-    card: {
-        backgroundColor: theme.SURFACE,
-        borderRadius: 12,
-        padding: 16,
-        shadowColor: theme.SHADOW,
-        elevation: 3,
+    container: { flex: 1, backgroundColor: T.bg },
+
+    // header (totals + tabs)
+    head: { paddingTop: 10, paddingBottom: 4 },
+    headInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', gap: 10 },
+
+    // list
+    listContent: {
+        paddingTop: 6,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    gridCell: { padding: 5 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.06)',
+        borderColor: T.border,
     },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
-    },
-    headerLeft: {
-        flex: 1,
-    },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    chequeDetails: {
-        marginTop: 8,
-    },
-    detailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-        alignItems: 'center',
-    },
-    detailLabel: {
-        color: theme.TEXT_SECONDARY,
-        fontSize: 13,
-        fontWeight: '500',
-        flex: 0.4,
-    },
-    detailValue: {
-        color: theme.BRAND_DARK,
-        fontSize: 13,
-        fontWeight: '700',
-        flex: 0.6,
-        textAlign: 'right',
-    },
-    amount: {
-        color: theme.BRAND_ACCENT,
-        fontSize: 14,
-        fontWeight: '900',
-    },
-    warningRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 8,
-        backgroundColor: 'rgba(255, 235, 230, 0.8)',
-        // backgroundColor: 'rgba(255, 235, 230, 0.8)',
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 4,
-        alignSelf: 'flex-start',
-    },
-    warningRow1: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 8,
-        // backgroundColor: 'rgba(255, 235, 230, 0.8)',
-        backgroundColor: 'rgba(156, 255, 235, 0.24)',
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 4,
-        alignSelf: 'flex-start',
-    },
-    warningIcon: {
-        marginRight: 4,
-    },
-    warningText: {
-        fontSize: 11,
-        color: 'rgba(255, 67, 19, 0.87)',
-        // color: 'rgba(24, 161, 134, 0.87)',
-        fontWeight: '700',
-    },
-    warningText1: {
-        fontSize: 11,
-        // color: 'rgba(255, 67, 19, 0.87)',
-        color: 'rgba(24, 161, 134, 0.87)',
-        fontWeight: '700',
-    },
-    viewChequeButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        backgroundColor: 'rgba(46, 204, 113, 0.12)',
-        borderRadius: 8,
-        marginTop: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(46, 204, 113, 0.24)',
-    },
-    viewChequeButtonDisabled: {
-        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-        borderColor: 'rgba(0, 0, 0, 0.12)',
-    },
-    viewChequeText: {
-        color: theme.BRAND_ACCENT,
-        fontWeight: '700',
-        marginLeft: 8,
-    },
-    viewChequeTextDisabled: {
-        color: theme.TEXT_SECONDARY,
-    },
-    adjustmentContainer: {
-        marginTop: 12,
-        backgroundColor: 'rgba(0, 0, 0, 0.02)',
-        borderRadius: 8,
+    loadingMore: {
+        marginHorizontal: 5,
+        marginTop: 6,
         padding: 12,
-    },
-    adjustmentHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.BORDER,
-        marginBottom: 8,
-    },
-    adjustmentTitle: {
-        fontWeight: '800',
-        color: theme.BRAND_DARK,
-        fontSize: 13,
-    },
-    adjustmentRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.04)',
-    },
-    adjustmentLeft: {
-        flex: 1,
-    },
-    adjustmentLabel: {
-        color: theme.TEXT_SECONDARY,
-        fontSize: 12,
-    },
-    adjustmentDate: {
-        color: theme.TEXT_SECONDARY,
-        fontSize: 10,
-        marginTop: 2,
-    },
-    adjustmentAmount: {
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    adjustmentTotalRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: theme.BORDER,
-    },
-    adjustmentTotalLabel: {
-        fontWeight: '800',
-        color: theme.BRAND_DARK,
-        fontSize: 13,
-    },
-    adjustmentTotalAmount: {
-        fontSize: 14,
-    },
-    authorizeButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: theme.BRAND_ACCENT,
-        paddingVertical: 10,
-        borderRadius: 8,
-        marginTop: 12,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        gap: 8,
+        minHeight: 44,
     },
-    authorizeButtonText: {
-        color: '#fff',
-        fontWeight: '700',
-        marginLeft: 8,
+    loadingMoreText: { color: T.copper, fontSize: 12, fontWeight: '800' },
+
+    // card
+    card: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
     },
-    // 
-
-    tabs: { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 12, backgroundColor: theme.BG || '#fff' },
-    tabItem: { flex: 1, alignItems: 'center', paddingBottom: 8 },
-    tabText: { color: theme.TEXT_SECONDARY, fontWeight: '700' },
-    tabTextActive: { color: theme.BRAND_DARK },
-    tabUnderline: { height: 3, width: '60%', backgroundColor: theme.BRAND_ACCENT, marginTop: 8, borderRadius: 3 },
-
-    // card: { marginVertical: 10, backgroundColor: theme.SURFACE, borderRadius: 14, padding: 14, shadowColor: theme.SHADOW, elevation: 3, marginHorizontal: 12 },
-    cardAuth: { borderLeftWidth: 6, borderLeftColor: theme.BRAND_PRIMARY },
-
-    rowTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-    title: { fontSize: 16, fontWeight: '800', color: theme.BRAND_DARK },
-    subtitle: { fontSize: 12, color: theme.TEXT_SECONDARY, marginTop: 6 },
-
-    actions: { flexDirection: 'row', alignItems: 'center' },
-    iconButton: { padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.03)', marginRight: 8 },
-    pill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, marginRight: 8 },
-    pillPending: { backgroundColor: 'rgba(255,165,0,0.12)' },
-    pillAuth: { backgroundColor: 'rgba(46,204,113,0.12)' },
-    pillText: { fontSize: 11, color: theme.TEXT_SECONDARY, fontWeight: '700' },
-
-    content: { flexDirection: 'row', marginTop: 12 },
-    infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, flexWrap: 'nowrap' },
-    label: { minWidth: 100, color: theme.TEXT_SECONDARY, fontSize: 12 },
-    value: { color: theme.BRAND_DARK, fontSize: 12, marginLeft: 8, flexShrink: 1, fontWeight: '700' },
-    // amount: { color: theme.BRAND_ACCENT, fontSize: 15, fontWeight: '800' },
-
-    quickActions: { flexDirection: 'row', marginTop: 8 },
-    smallBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.BRAND_ACCENT, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, width: '80%' },
-    smallBtnText: { color: '#fff', marginLeft: 8, fontWeight: '700', fontSize: 13 },
-
-    sideColumn: { width: 110, alignItems: 'center', marginLeft: 12 },
-    thumbWrap: { width: 74, height: 74, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
-    thumb: { width: '100%', height: '100%' },
-    thumbPlaceholder: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
-
-    empty: { padding: 24, alignItems: 'center' }, emptyText: { color: theme.TEXT_SECONDARY },
-
-    fullscreen: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
-    fullImage: { width: WINDOW_WIDTH, height: WINDOW_HEIGHT, resizeMode: 'contain' },
-    imageClose: { position: 'absolute', top: Platform.OS === 'ios' ? 48 : 24, right: 20, zIndex: 10, padding: 6 },
-
-    modalWrap: { flex: 1, backgroundColor: theme.SURFACE },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' },
-    modalTitle: { fontSize: 16, fontWeight: '800', color: theme.BRAND_DARK },
-
-    stageRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.BG },
-    stageKey: { color: theme.TEXT_SECONDARY }, stageQty: { color: theme.BRAND_DARK, fontWeight: '700' },
-    // Add these to your existing styles
-    cardOutdated: {
-        // backgroundColor: 'rgba(228, 228, 228, 0.06)', // Very light orange background
-        borderLeftWidth: 4,
-        borderLeftColor: 'rgba(69, 69, 69, 0.32)', // Orange border for better visibility
-        opacity: 0.95, // Slightly reduce opacity for subtle effect
+    cardAuth: { borderLeftWidth: 4, borderLeftColor: T.green },
+    cardOutdated: { borderLeftWidth: 4, borderLeftColor: T.muted },
+    cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    cardIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
     },
-
-    detailsHeader: {
+    title: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    subtitle: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 2 },
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    pillDot: { width: 6, height: 6, borderRadius: 3 },
+    pillText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+    metricBox: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    kvRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
-        paddingBottom: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.BORDER || 'rgba(0,0,0,0.06)',
+        gap: 10,
+        paddingVertical: 6,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
     },
-    // detailRow: {
-    //     flexDirection: 'row',
-    //     justifyContent: 'space-between',
-    //     marginBottom: 6,
-    //     paddingVertical: 4,
-    // },
-    // detailLabel: {
-    //     color: theme.TEXT_SECONDARY,
-    //     fontSize: 12,
-    //     flex: 1,
-    // },
-    // detailValue: {
-    //     color: theme.BRAND_DARK,
-    //     fontSize: 12,
-    //     fontWeight: '700',
-    //     textAlign: 'right',
-    //     minWidth: 80,
-    // },
-    detailAmount: {
-        color: theme.BRAND_ACCENT,
-        fontSize: 13,
-        fontWeight: '800',
+    kvLabel: { flexShrink: 0, maxWidth: '45%', fontSize: 11.5, fontWeight: '700', color: T.muted },
+    kvValue: { flex: 1, fontSize: 12.5, fontWeight: '700', color: T.ink, textAlign: 'right' },
+    outdatedText: { color: T.red },
+    flagRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    flagChips: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    iconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    actionBtn: { flex: 1 },
+    userChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        height: 24,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+        backgroundColor: `${T.blue}12`,
+        borderWidth: 1,
+        borderColor: `${T.blue}33`,
+        maxWidth: '100%',
     },
-    detailsContainer: {
-        marginTop: 12,
-        backgroundColor: 'rgba(0, 0, 0, 0.02)',
-        borderRadius: 8,
+    userChipText: { fontSize: 11, fontWeight: '800', color: T.blue, flexShrink: 1 },
+    warnChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        height: 24,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+        backgroundColor: `${T.red}12`,
+        borderWidth: 1,
+        borderColor: `${T.red}33`,
+    },
+    warnChipText: { fontSize: 11, fontWeight: '800', color: T.red },
+    actionBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+
+    // adjustments
+    adjBox: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: 'hidden',
+        backgroundColor: T.surface,
+    },
+    adjHead: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 42,
+        paddingHorizontal: 10,
+        backgroundColor: T.sub,
+    },
+    adjTitle: { fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.4, textTransform: 'uppercase' },
+    countPill: {
+        minWidth: 22,
+        height: 20,
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}16`,
+    },
+    countPillText: { fontSize: 10.5, fontWeight: '900', color: T.copper },
+    adjRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+    },
+    adjBill: { fontSize: 12.5, fontWeight: '700', color: T.ink },
+    adjDate: { fontSize: 10.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+    adjAmount: { fontSize: 12.5, fontWeight: '800', color: T.nav },
+    adjTotal: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 9,
+        backgroundColor: `${T.copper}12`,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+    },
+    adjTotalLabel: { fontSize: 12, fontWeight: '900', color: T.nav },
+    adjTotalAmount: { fontSize: 13.5, fontWeight: '900', color: T.pd },
+
+    // image viewer
+    fullscreen: { flex: 1, backgroundColor: 'rgba(13,27,42,0.96)', justifyContent: 'center', alignItems: 'center' },
+    imageClose: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 48 : 20,
+        right: 16,
+        zIndex: 10,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.16)',
+    },
+
+    // stages
+    mutedText: { color: T.muted, fontSize: 13, fontWeight: '600' },
+    stageList: { borderRadius: 10, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
+    stageRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: T.hair },
+    stageKey: { color: T.muted, fontWeight: '700', fontSize: 13 },
+    stageQty: { color: T.ink, fontWeight: '800', fontSize: 13 },
+
+    // authorize sheet
+    authSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
         padding: 10,
     },
-
+    authParty: { fontSize: 14, fontWeight: '800', color: T.ink },
+    authMeta: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 2 },
+    authAmount: { fontSize: 15, fontWeight: '900', color: T.pd },
+    authText: { fontSize: 13.5, fontWeight: '600', color: T.ink, lineHeight: 19 },
 });
-
 export default CollectionCard;
-/* CollectionCard.tsx — Professional cheque collection UI with full amount visibility */

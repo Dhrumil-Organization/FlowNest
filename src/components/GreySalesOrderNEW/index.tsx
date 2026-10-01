@@ -1,10 +1,25 @@
 import { API } from '@/common/API/dynamicAPI';
 import { fetchAllStoredata } from '@/common/API/Functions';
-import { crlimtreq_styles } from '@/common/Style';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import theme from '@/components/theme';
+import {
+    Avatar,
+    Btn,
+    BusyOverlay,
+    cellWidth,
+    CONTENT_MAX,
+    EmptyState,
+    Field,
+    IconBtn,
+    Kpi,
+    KpiGrid,
+    SearchBox,
+    SectionHead,
+    Segment,
+    Sheet,
+    useSotLayout,
+} from '@/src/components/erpUi';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,16 +29,15 @@ import {
     LayoutAnimation,
     Modal,
     Platform,
-    TextInput as RNTextInput,
     StyleSheet,
     Text,
     TouchableOpacity,
     UIManager,
-    useWindowDimensions,
     View
 } from 'react-native';
-import HeaderBar from '../../components/HeaderNew';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
+import { AuthPill, fmtNum, InfoCell } from './ui';
+
 
 interface CardData {
     [key: string]: string;
@@ -173,86 +187,6 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
 
     // const { width } = Dimensions.get('window');
 
-    const styles = StyleSheet.create({
-        modalContainer: {
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            justifyContent: 'center',
-            alignItems: 'center'
-        },
-
-        modalContent: {
-            width: '100%', // ✅ simple responsive
-            maxHeight: '90%',
-            backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 16
-        },
-
-        modalTitle: {
-            fontSize: 18, // ✅ fixed
-            fontWeight: '700',
-            marginBottom: 14,
-            color: '#1e88e5',
-            textAlign: 'center'
-        },
-
-        logCard: {
-            backgroundColor: '#f4f8f4',
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 12,
-        },
-
-        logHeaderBox: {
-            backgroundColor: '#6d756d',
-            paddingVertical: 6,
-            borderRadius: 6,
-            marginBottom: 10
-        },
-
-        logHeader: {
-            textAlign: 'center',
-            fontWeight: 'bold',
-            fontSize: 15,
-            color: '#fff'
-        },
-
-        rowBox: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 6
-        },
-
-        label: {
-            fontSize: 12,
-            color: '#555',
-            fontWeight: '600',
-            flex: 1
-        },
-
-        value: {
-            fontSize: 12,
-            color: '#0a0a0a',
-            flex: 1.2,
-            textAlign: 'left'
-        },
-
-        closeBtn: {
-            backgroundColor: '#1e88e5',
-            paddingVertical: 12,
-            borderRadius: 10,
-            alignItems: 'center',
-            marginTop: 10
-        },
-
-        closeText: {
-            color: '#fff',
-            fontSize: 15,
-            fontWeight: '600'
-        }
-    });
 
     useEffect(() => {
         const getType = async () => {
@@ -281,23 +215,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
         UIManager.setLayoutAnimationEnabledExperimental?.(true);
     }
 
-    const { width } = useWindowDimensions();
-
-    const getColumns = () => {
-        if (width < 600) return 1;      // mobile
-        if (width < 1000) return 2;     // tablet
-        return 3;                       // web / large
-    };
-
-    const numColumns = getColumns();
-
-    // Explicit item width so the last row doesn't stretch weirdly
-    const GRID_PAD = 10;
-    const GRID_GAP = 10;
-    const gridItemWidth =
-        numColumns > 1
-            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : width;
+    const { isPhone, cols, gutter } = useSotLayout();
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -1020,434 +938,6 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
     };
 
 
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <View style={[
-                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card, { marginHorizontal: 0, marginBottom: 0 },
-            ]}>
-                {item.isProcessed && (
-                    <View style={[
-                        crlimtreq_styles.stampContainerYOS,
-                    ]}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-                <View style={crlimtreq_styles.dateContainer}>
-                    <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardHeaderContainer}>
-                    <View style={crlimtreq_styles.cardHeader}>
-                        <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-                </View>
-
-                <View style={crlimtreq_styles.cardContent}>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Broker:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.BAccName || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.NetAmt || ''}:
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={editableValuesYPO[item.UId]?.ARemark || ''}
-                                onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                            // keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Status:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.AuthStatus || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.StoreName || 'N/A'}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-
-                        </View>
-                    </View>
-
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardActions}>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                        <View style={crlimtreq_styles.infoIconContainer}>
-                            <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                            {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                        </View>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
-    );
-
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <View style={[
-                crlimtreq_styles.card,
-                item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-            ]}>
-                {item.IsAuth && (
-                    <View style={crlimtreq_styles.stampContainerYOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-                <View style={crlimtreq_styles.dateContainer}>
-                    <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardHeaderContainer}>
-                    <View style={crlimtreq_styles.cardHeader}>
-                        <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardContent}>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Broker:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.BAccName || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.NetAmt || ''}:
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised By:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>
-                                {item.AuthorisedBy || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.AuthorisedDate || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>
-                                {item.ARemark || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Status:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.AuthStatus || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.StoreName || 'N/A'}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-
-                        </View>
-                    </View>
-
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardActions}>
-                    {/* <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity> */}
-                    {String(item.isauthedit) === '1' && (
-                        <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                            <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                        </TouchableOpacity>
-                    )}
-                    <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                        <View style={crlimtreq_styles.infoIconContainer}>
-                            <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                            {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                        </View>
-                    </TouchableOpacity>
-
-                    {prptype === 'R' && item.mailsent === '1' && (
-                        <TouchableOpacity
-                            onPress={() => handleInfoClick(item)}
-                            disabled={!isConnected}
-                        >
-                            <View style={crlimtreq_styles.infoIconContainer}>
-                                <Icon
-                                    name="email"
-                                    size={34}
-                                    color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                                />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-
-                </View>
-            </View>
-        </View>
-    );
-
-    const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' | 'pending' } }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <View style={[
-                crlimtreq_styles.card,
-                item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
-                // item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-            ]}>
-                {item.isProcessed ? (
-                    <>
-                        <View style={crlimtreq_styles.stampContainerYOS}>
-                            <View style={[
-                                crlimtreq_styles.stamp,
-                                item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : item.actionType === 'pending' ? crlimtreq_styles.stampPendingall : item.actionType === 'reject' ? crlimtreq_styles.stampRejected : item.actionType === 'verifyreject' ? crlimtreq_styles.stampRejected : '',
-                            ]}>
-                                <Text style={crlimtreq_styles.stampText}>
-                                    {item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'reject' ? 'REJECTED' : item.actionType === 'pending' ? 'PENDING' : item.actionType === 'verifyreject' ? 'REJECTED' : ''}
-                                </Text>
-                            </View>
-                        </View>
-                    </>
-
-                ) : (
-                    <>
-                        <View style={crlimtreq_styles.stampContainerYOS}>
-                            <View style={[
-                                crlimtreq_styles.stamp,
-                                item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : item.IsAuth === '0' || item.IsAuth === 0 ? crlimtreq_styles.stampPendingall : '',
-                            ]}>
-                                <Text style={crlimtreq_styles.stampText}>
-                                    {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' || item.IsAuth === 2 ? 'REJECTED' : item.IsAuth === '0' || item.IsAuth === 0 ? 'PENDING' : ''}
-                                </Text>
-                            </View>
-                        </View>
-                    </>
-                )}
-                <View style={crlimtreq_styles.dateContainer}>
-                    <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardHeaderContainer}>
-                    <View style={crlimtreq_styles.cardHeader}>
-                        <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-                </View>
-                <View style={crlimtreq_styles.cardContent}>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Broker:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.BAccName || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.NetAmt || ''}:
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised By:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>
-                                {item.AuthorisedBy || ''}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.AuthorisedDate || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={editableValuesYPO[item.UId]?.ARemark || ''}
-                                onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                            // keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Status:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.AuthStatus || ''}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                            <Text style={crlimtreq_styles.value}>
-                                {item.StoreName || 'N/A'}
-                            </Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-
-                        </View>
-                    </View>
-
-                </View>
-                <View style={crlimtreq_styles.cardSubHeader}>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.subHeaderRow}>
-                        <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
-                        <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.cardActions}>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                        <Icon name="cancel" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                        <View style={crlimtreq_styles.infoIconContainer}>
-                            <Icon name="info" size={32} color={!isConnected ? "#ccc" : "#2196F3"} />
-                            {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                        </View>
-                    </TouchableOpacity>
-                    {prptype === 'R' && item.mailsent === '1' && (
-                        <TouchableOpacity
-                            onPress={() => handleInfoClick(item)}
-                            disabled={!isConnected}
-                        >
-                            <View style={crlimtreq_styles.infoIconContainer}>
-                                <Icon
-                                    name="email"
-                                    size={32}
-                                    color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                                />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-                </View>
-                {/* <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-            </View> */}
-            </View>
-        </View>
-    );
-
-
-
-    const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
-        <View style={crlimtreq_styles.tabContainer1}>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'requests' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('requests')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Request</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'history' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('history')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'verify' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('verify')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Verify</Text>
-            </TouchableOpacity>
-        </View>
-    );
-
     const groupedData = Object.entries(
         selectedD1Data.reduce((acc, item) => {
             const key = `${item.DsnName}_${item.ItmName}`;
@@ -1466,148 +956,319 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
 
         setOpenAccordion(prev => ({
             ...prev,
-            [key]: !prev[key]
+            [key]: !(prev[key] ?? true)
         }))
     }
 
+    // ---------------------------------------------------------------------
+    // NEW ERP UI (presentation only — every handler below is the original
+    // one, called with the original arguments).
+    // ---------------------------------------------------------------------
+    const actionLabel = (a: any) =>
+        a === 'accept' ? 'APPROVED' : a === 'reject' ? 'REJECTED' : a === 'pending' ? 'PENDING' : a === 'verifyreject' ? 'REJECTED' : '';
+    const isAuthLabel = (v: any) =>
+        v === '1' ? 'AUTHORISED' : v === '2' || v === 2 ? 'REJECTED' : v === '0' || v === 0 ? 'PENDING' : '';
+
+    const cardTone = (label: string) =>
+        label === 'APPROVED' || label === 'AUTHORISED'
+            ? styles.cardAccepted
+            : label === 'REJECTED'
+                ? styles.cardRejected
+                : null;
+
+    const renderCardShell = (
+        item: any,
+        opts: {
+            date: string;
+            stamp: string;
+            tone: any;
+            remarkEditable: boolean;
+            showAuthBy: boolean;
+            actions: React.ReactNode;
+        },
+    ) => (
+        <View style={[cellWidth(cols), styles.gridCell]}>
+            <View style={[styles.card, !isConnected && styles.cardDisabled, opts.tone]}>
+                <View style={styles.cardHead}>
+                    <View style={styles.cardIcon}>
+                        <Icon name="receipt-long" size={18} color={T.copper} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={styles.eyebrowRow}>
+                            {!!item.PrpCode && <Text style={styles.eyebrow} numberOfLines={1}>{item.PrpCode}</Text>}
+                            {!!opts.date && (
+                                <View style={styles.datePill}>
+                                    <Icon name="event" size={11} color={T.muted} />
+                                    <Text style={styles.datePillText}>{opts.date}</Text>
+                                </View>
+                            )}
+                        </View>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{item.PONo}</Text>
+                        <Text style={styles.cardParty} numberOfLines={2}>{item.ParName}</Text>
+                    </View>
+                    {opts.stamp ? <AuthPill label={opts.stamp} /> : null}
+                </View>
+
+                <View style={styles.metricBox}>
+                    <View style={styles.metricRow}>
+                        <InfoCell label="Broker" value={item.BAccName || ''} />
+                        <InfoCell label="Net Amt." value={item.NetAmt ? `₹ ${fmtNum(item.NetAmt)}` : ''} color={T.pd} />
+                    </View>
+                    {opts.showAuthBy && (
+                        <View style={styles.metricRow}>
+                            <InfoCell label="Authorised By" value={item.AuthorisedBy || ''} color={T.green} />
+                            <InfoCell label="Authorised Date" value={item.AuthorisedDate || ''} />
+                        </View>
+                    )}
+                    <View style={styles.metricRow}>
+                        <InfoCell label="Status" value={item.AuthStatus || ''} />
+                        <InfoCell label="Store Name" value={item.StoreName || 'N/A'} />
+                    </View>
+                </View>
+
+                {opts.remarkEditable ? (
+                    <Field
+                        label="Auth Remark"
+                        placeholder="Add authorisation remark…"
+                        value={editableValuesYPO[item.UId]?.ARemark || ''}
+                        onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                    />
+                ) : (
+                    <View style={styles.remarkRead}>
+                        <Text style={styles.remarkLabel}>AUTH REMARK</Text>
+                        <Text style={[styles.remarkText, !item.ARemark && { color: T.muted }]}>{item.ARemark || '—'}</Text>
+                    </View>
+                )}
+
+                <View style={styles.metaRow}>
+                    <View style={styles.metaItem}>
+                        <Icon name="person-outline" size={13} color={T.muted} />
+                        <Text style={styles.metaLabel}>Entered by</Text>
+                        <Text style={styles.metaValue} numberOfLines={1}>{item.username || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                        <Icon name="local-shipping" size={13} color={T.muted} />
+                        <Text style={styles.metaLabel}>Delivery</Text>
+                        <Text style={styles.metaValue} numberOfLines={1}>{item.dduedate || 'N/A'}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.actionRow}>{opts.actions}</View>
+            </View>
+        </View>
+    );
+
+    const itemsBtn = (item: any) => (
+        <Btn
+            label={isPhone ? 'Items' : 'View items'}
+            icon="info-outline"
+            kind="ghost"
+            compact
+            onPress={() => handleInfoPress(item.d1, item)}
+            disabled={!isConnected}
+            badge={item.d1 ? item.d1.length || undefined : undefined}
+            style={styles.actionBtn}
+        />
+    );
+
+    const mailBtn = (item: any) =>
+        prptype === 'R' && item.mailsent === '1' ? (
+            <IconBtn icon="email" label="Mail sent log" tone="soft" color={T.copper} onPress={() => handleInfoClick(item)} disabled={!isConnected} />
+        ) : null;
+
+    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => {
+        const stamp = item.isProcessed ? (item.actionType === 'accept' ? 'APPROVED' : 'REJECTED') : '';
+        return renderCardShell(item, {
+            date: item.SODate,
+            stamp,
+            tone: item.actionType === 'accept' ? styles.cardAccepted : item.actionType === 'reject' ? styles.cardRejected : null,
+            remarkEditable: true,
+            showAuthBy: false,
+            actions: (
+                <>
+                    <Btn
+                        label="Approve"
+                        icon="check-circle"
+                        compact
+                        onPress={() => handleIconPress(item, 'accept')}
+                        disabled={!isConnected || item.isProcessed}
+                        style={[styles.actionBtn, styles.approveBtn]}
+                    />
+                    <Btn
+                        label="Reject"
+                        icon="cancel"
+                        kind="danger"
+                        compact
+                        onPress={() => handleIconPress(item, 'reject')}
+                        disabled={!isConnected || item.isProcessed}
+                        style={styles.actionBtn}
+                    />
+                    {itemsBtn(item)}
+                </>
+            ),
+        });
+    };
+
+    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
+        const stamp = item.IsAuth ? (item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING') : '';
+        return renderCardShell(item, {
+            date: item.PODate,
+            stamp,
+            tone: item.IsAuth === '1' ? styles.cardAccepted : item.IsAuth === '2' ? styles.cardRejected : null,
+            remarkEditable: false,
+            showAuthBy: true,
+            actions: (
+                <>
+                    {String(item.isauthedit) === '1' && (
+                        <Btn
+                            label="Pending"
+                            icon="check-circle"
+                            compact
+                            onPress={() => handleIconPress(item, 'pending')}
+                            disabled={!isConnected || item.isProcessed}
+                            style={[styles.actionBtn, styles.approveBtn]}
+                        />
+                    )}
+                    {itemsBtn(item)}
+                    {mailBtn(item)}
+                </>
+            ),
+        });
+    };
+
+    const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' | 'pending' } }) => {
+        const stamp = item.isProcessed ? actionLabel(item.actionType) : isAuthLabel(item.IsAuth);
+        return renderCardShell(item, {
+            date: item.PODate,
+            stamp,
+            tone: item.IsAuth === '1' ? styles.cardAccepted : item.IsAuth === '2' ? styles.cardRejected : null,
+            remarkEditable: true,
+            showAuthBy: true,
+            actions: (
+                <>
+                    <Btn
+                        label="Pending"
+                        icon="check-circle"
+                        compact
+                        onPress={() => handleIconPress(item, 'pending')}
+                        disabled={!isConnected || item.isProcessed}
+                        style={[styles.actionBtn, styles.approveBtn]}
+                    />
+                    <Btn
+                        label="Reject"
+                        icon="cancel"
+                        kind="danger"
+                        compact
+                        onPress={() => handleIconPress(item, 'verifyreject')}
+                        disabled={!isConnected || item.isProcessed}
+                        style={styles.actionBtn}
+                    />
+                    {itemsBtn(item)}
+                    {mailBtn(item)}
+                </>
+            ),
+        });
+    };
+
+    const tabMeta = {
+        requests: { title: 'Pending approval', search: searchQueryYPO, setSearch: setSearchQueryYPO, placeholder: 'Search sales order...', empty: 'No request data found!', data: filteredDataSPO as any[], loading: isLoadingYPO, ref: flatListRefYPO, toTop: scrollToTop, render: renderCard, key: 'req' },
+        history: { title: 'Authorisation history', search: searchhistoryQueryYPO, setSearch: setSearchhistoryQueryYPO, placeholder: 'Search grey sales history...', empty: 'No history data found!', data: filteredhistoryDataSPO as any[], loading: allhistoryLoadingYPO, ref: flatHistoryListRefYPO, toTop: scrollHistoryToTop, render: renderAllCardHistory, key: 'hist' },
+        verify: { title: 'Verify orders', search: searchverifyQueryYPO, setSearch: setSearchverifyQueryYPO, placeholder: 'Search grey sales verify...', empty: 'No verify data found!', data: filteredverifyDataSPO as any[], loading: allhistoryLoadingYPO, ref: flatVerifyListRefYPO, toTop: scrollVerifyToTop, render: renderAllCardVerify, key: 'ver' },
+    }[activeTab1YPO];
+
+    const listRows = tabMeta.data || [];
+    const totalNet = listRows.reduce((a, r) => a + (parseFloat(String(r?.NetAmt ?? '').replace(/,/g, '')) || 0), 0);
+    const totalLines = listRows.reduce((a, r) => a + (Array.isArray(r?.d1) ? r.d1.length : 0), 0);
+    const countAuth = (v: string) => listRows.filter((r) => String(r?.IsAuth) === v).length;
+    const processedCount = listRows.filter((r) => r?.isProcessed).length;
+
+    const listHeader = (
+        <View style={styles.listHeader}>
+            <KpiGrid isPhone={isPhone}>
+                <Kpi label="Orders" value={String(listRows.length)} icon="receipt-long" accent={T.nav} />
+                <Kpi label="Net Value" value={`₹ ${fmtNum(totalNet) || '0'}`} icon="currency-rupee" accent={T.pd} valueColor={T.pd} />
+                <Kpi label="Line Items" value={String(totalLines)} icon="layers" accent={T.blue} />
+                {activeTab1YPO === 'requests' ? (
+                    <Kpi label="Processed" value={String(processedCount)} icon="task-alt" accent={T.green} />
+                ) : (
+                    <Kpi
+                        label={activeTab1YPO === 'history' ? 'Authorised' : 'Pending'}
+                        value={String(activeTab1YPO === 'history' ? countAuth('1') : countAuth('0'))}
+                        icon={activeTab1YPO === 'history' ? 'verified' : 'hourglass-empty'}
+                        accent={activeTab1YPO === 'history' ? T.green : T.copper}
+                        valueColor={activeTab1YPO === 'history' ? T.green : T.copper}
+                    />
+                )}
+            </KpiGrid>
+            <SectionHead
+                title={tabMeta.title}
+                meta={`${listRows.length} order${listRows.length === 1 ? '' : 's'}${tabMeta.search ? ` matching “${tabMeta.search}”` : ''}`}
+            />
+        </View>
+    );
+
+    const confirmTitle =
+        selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : '';
+    const isRejectAction = selectedActionYPO === 'reject' || selectedActionYPO === 'verifyreject';
+
     return (
-        <>
-            {activeTab1YPO === 'requests' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchQueryYPO}
-                    placeholder="Search sales order..."
-                />
-            ) : activeTab1YPO === 'history' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchhistoryQueryYPO}
-                    placeholder="Search grey sales history..."
-                />
-            ) : activeTab1YPO === 'verify' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchverifyQueryYPO}
-                    placeholder="Search grey sales verify..."
-                />
-            ) : null}
-            <View style={[crlimtreq_styles.container, { flex: 1, backgroundColor: '#F5F5F5', marginBottom: -50 }]}>
-                {isLoadingYPO && <FullScreenLoader message={'Loading...'} />}
-                <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                {/* <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
-                    <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
-                </TouchableOpacity> */}
-                {activeTab1YPO === 'requests' ? (
-                    <FlatList
-                        key={`req-${numColumns}`}                                     // 👈 force remount on col change
-                        ref={flatListRefYPO}
-                        data={filteredDataSPO}
-                        numColumns={numColumns}
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => renderCard({ item })}
-                        keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
-                        onScroll={({ nativeEvent }) => {
-                            setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
-                        }}
-                        ListEmptyComponent={
-                            !isLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
-                                    {!FormState.values.StrCode && (
-                                        <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                    )}
-                                </View>
-                            ) : null
-                        }
+        <View style={styles.root}>
+            {/* ───────────── Toolbar: tabs + search ───────────── */}
+            <View style={styles.toolbar}>
+                <View style={[styles.toolbarInner, { paddingHorizontal: gutter }, !isPhone && styles.toolbarWide]}>
+                    <View style={!isPhone ? styles.segWide : null}>
+                        <Segment
+                            value={activeTab1YPO}
+                            onChange={(v) => setActiveTab1YPO(v)}
+                            options={[
+                                { value: 'requests', label: 'Request', icon: 'pending-actions' },
+                                { value: 'history', label: 'History', icon: 'history' },
+                                { value: 'verify', label: 'Verify', icon: 'fact-check' },
+                            ]}
+                        />
+                    </View>
+                    <SearchBox
+                        value={tabMeta.search}
+                        onChangeText={tabMeta.setSearch}
+                        placeholder={tabMeta.placeholder}
+                        style={!isPhone ? { flex: 1 } : null}
                     />
-                ) : activeTab1YPO === 'history' ? (
-                    <FlatList
-                        key={`hist-${numColumns}`}
-                        ref={flatHistoryListRefYPO}
-                        data={filteredhistoryDataSPO}
-                        numColumns={numColumns}
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => (
-                            <>
-                                {renderAllCardHistory({ item })}
-                            </>
-                        )}
-                        keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
-                        onScroll={({ nativeEvent }) => {
-                            setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
-                        }}
-                        ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
-                                    {!FormState.values.StrCode && (
-                                        <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                    )}
-                                </View>
-                            ) : null
-                        }
-                    />
-                ) : activeTab1YPO === 'verify' ? (
-                    <FlatList
-                        key={`ver-${numColumns}`}
-                        ref={flatVerifyListRefYPO}
-                        data={filteredverifyDataSPO}
-                        numColumns={numColumns}
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => renderAllCardVerify({ item })}
-                        keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
-                        onScroll={({ nativeEvent }) => {
-                            setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
-                        }}
-                        ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
-                                    {!FormState.values.StrCode && (
-                                        <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                    )}
-                                </View>
-                            ) : null
-                        }
-                    />
-                ) : null}
-                {activeTab1YPO === 'requests' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}
-                    </>
+                </View>
+            </View>
 
-                ) : activeTab1YPO === 'history' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollHistoryToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : activeTab1YPO === 'verify' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollVerifyToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : null}
+            <View style={styles.body}>
+                <FlatList
+                    key={`${tabMeta.key}-${cols}`}
+                    ref={tabMeta.ref}
+                    data={tabMeta.data}
+                    numColumns={cols}
+                    style={styles.list}
+                    renderItem={({ item }) => tabMeta.render({ item })}
+                    keyExtractor={(item) => item.UId}
+                    contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
+                    ListHeaderComponent={listHeader}
+                    scrollEventThrottle={16}
+                    onScroll={({ nativeEvent }) => {
+                        setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
+                    }}
+                    ListEmptyComponent={
+                        !tabMeta.loading ? (
+                            <View style={styles.emptyCard}>
+                                <EmptyState
+                                    icon="inbox"
+                                    title={tabMeta.empty}
+                                    text={!FormState.values.StrCode ? 'No store Selected' : undefined}
+                                />
+                            </View>
+                        ) : null
+                    }
+                />
 
+                {showTopButtonYPO && (
+                    <TouchableOpacity style={styles.topButton} onPress={tabMeta.toTop} accessibilityLabel="Scroll to top">
+                        <Icon name="arrow-upward" size={22} color="#fff" />
+                    </TouchableOpacity>
+                )}
 
                 <PartyHistoryModal
                     visible={showPartyHistoryModalYPO}
@@ -1627,284 +1288,408 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     // setParnameYPO={setParnameYPO}
                     getParnameYPO={getParnameYPO}
                 />
-                {getSuccessYPO === true ? (
-                    <Modal
-                        visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowOverlayYPO(false)}
-                    >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Vouchar No.: {selectedItemYPO?.vouno}
-                                </Text>
-                                {responsemessageYPO === 'Loading...' ? (
-                                    <>
-                                        <Text style={crlimtreq_styles.loadingText}>
-                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} /> {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text style={crlimtreq_styles.responseText}>
-                                            {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                )}
-                            </View>
-                        </View>
-                    </Modal>
-                ) : (
-                    <Modal
-                        visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowOverlayYPO(false)}
-                    >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Party Name: {selectedItemYPO?.ParName}
-                                </Text>
-                                <View style={crlimtreq_styles.overlayButtons}>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#4CAF50' }]}
-                                        onPress={handleConfirmAction}
-                                    >
-                                        <Icon name="check" size={20} color="white" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#F44336' }]}
-                                        onPress={() => setShowOverlayYPO(false)}
-                                    >
-                                        <Icon name="close" size={20} color="white" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-                )}
-
-                <Modal
-                    visible={showCarouselModal}
-                    transparent={false}
-                    animationType="slide"
-                    onRequestClose={() => setShowCarouselModal(false)}
-                >
-                    <View style={crlimtreq_styles.carouselModalOverlay}>
-
-                        <TouchableOpacity
-                            style={crlimtreq_styles.modalCloseButton}
-                            onPress={() => {
-                                setShowCarouselModal(false)
-                                setSelectedD1Data([])
-                            }}
-                        >
-                            <Icon name="close" size={24} color={theme.BRAND_GRADIENT_START} />
-                        </TouchableOpacity>
-
-
-                        <FlatList
-                            data={groupedData}
-                            keyExtractor={(item) => item.key}
-                            showsVerticalScrollIndicator
-                            initialNumToRender={8}
-                            maxToRenderPerBatch={10}
-                            windowSize={10}
-                            removeClippedSubviews={true}
-                            contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 10 }}
-                            renderItem={({ item }) => {
-
-                                const isOpen = openAccordion[item.key] ?? true
-
-                                return (
-
-                                    <View style={crlimtreq_styles.accordionCard}>
-
-                                        <TouchableOpacity
-                                            style={crlimtreq_styles.accordionHeader}
-                                            onPress={() => toggleAccordion(item.key)}
-                                            activeOpacity={0.8}
-                                        >
-
-                                            <View style={{ flex: 1 }}>
-
-                                                <Text style={crlimtreq_styles.accordionTitle}>
-                                                    {item.designName}
-                                                </Text>
-
-                                                <Text style={crlimtreq_styles.accordionSubTitle}>
-                                                    {item.itemName}
-                                                </Text>
-
-                                            </View>
-
-                                            <View style={crlimtreq_styles.countBadge}>
-                                                <Text style={crlimtreq_styles.countText}>
-                                                    {item.items.length}
-                                                </Text>
-                                            </View>
-
-                                            <Icon
-                                                name={isOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                                                size={26}
-                                                color="#444"
-                                            />
-
-                                        </TouchableOpacity>
-
-                                        {isOpen && (
-
-                                            <View style={crlimtreq_styles.accordionBody}>
-
-                                                <FlatList
-                                                    data={item.items}
-                                                    key={numColumns}
-                                                    numColumns={numColumns}
-                                                    scrollEnabled={false}
-                                                    // columnWrapperStyle={{ justifyContent: "space-between" }}
-                                                    keyExtractor={(row, index) => index.toString()}
-                                                    {...(numColumns > 1
-                                                        ? {
-                                                            columnWrapperStyle: {
-                                                                justifyContent: 'space-between',
-                                                                gap: 10,
-                                                            },
-                                                        }
-                                                        : {})}
-                                                    renderItem={({ item: row }) => (
-
-                                                        <View style={crlimtreq_styles.gridCard}>
-
-                                                            <View style={crlimtreq_styles.gridRow}>
-                                                                <Text style={crlimtreq_styles.gridLabel}>Shade</Text>
-                                                                <Text style={crlimtreq_styles.gridValue}>{row.ShdName}</Text>
-                                                            </View>
-
-                                                            <View style={crlimtreq_styles.gridRow}>
-                                                                <Text style={crlimtreq_styles.gridLabel}>Qty</Text>
-                                                                <Text style={crlimtreq_styles.gridValue}>{row.Qty}</Text>
-                                                            </View>
-
-                                                            <View style={crlimtreq_styles.gridRow}>
-                                                                <Text style={crlimtreq_styles.gridLabel}>Rate</Text>
-                                                                <Text style={crlimtreq_styles.gridValue}>{row.UnitRate}</Text>
-                                                            </View>
-
-                                                            <View style={crlimtreq_styles.gridRow}>
-                                                                <Text style={crlimtreq_styles.gridLabel}>Amount</Text>
-                                                                <Text style={crlimtreq_styles.gridValue}>{row.Amount}</Text>
-                                                            </View>
-
-                                                            <View style={crlimtreq_styles.gridRow}>
-                                                                <Text style={crlimtreq_styles.gridLabel}>Disc %</Text>
-                                                                <Text style={crlimtreq_styles.gridValue}>{row.DisPer}</Text>
-                                                            </View>
-
-                                                        </View>
-
-                                                    )}
-                                                />
-
-                                            </View>
-
-                                        )}
-
-                                    </View>
-
-                                )
-                            }}
-                        />
-
-                    </View>
-                </Modal>
-
-                {/* <CriteriaForm
-                    isVisible={criteriaFormOpen}
-                    onClose={handleCriteriaFormClose}
-                    isLoading={isLoadingYPO}
-                    FormState={FormState}
-                    setFormState={setFormState}
-                    getAllStoreData={getAllStoreData}
-                    setAllStoreData={setAllStoreData}
-                    token={token}
-                    fetchData={fetchData}
-                    fetchAllHistoryData={fetchAllHistoryData}
-                    fetchAllVerifyData={fetchAllVerifyData}
-                    activeTab1YPO={activeTab1YPO}
-                /> */}
-
-
             </View>
 
-            <Modal visible={mailLogModal} animationType="slide" transparent>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-
-                        <Text style={styles.modalTitle}>
-                            {mailLogData.length} Sent Log(s) found
-                        </Text>
-
-                        <FlatList
-                            data={mailLogData}
-                            keyExtractor={(item, index) => index.toString()}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 10 }}
-                            renderItem={({ item }) => (
-                                <View style={styles.logCard}>
-
-                                    <View style={styles.logHeaderBox}>
-                                        <Text style={styles.logHeader}>
-                                            {item.usrname}
-                                        </Text>
+            {/* ───────────── Confirm / result dialog ───────────── */}
+            <Modal
+                visible={showOverlayYPO}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowOverlayYPO(false)}
+            >
+                <View style={styles.dialogWrap}>
+                    <View style={styles.dialog}>
+                        <View style={[styles.dialogIcon, { backgroundColor: isRejectAction ? `${T.red}14` : `${T.green}14` }]}>
+                            <Icon name={isRejectAction ? 'cancel' : 'check-circle'} size={26} color={isRejectAction ? T.red : T.green} />
+                        </View>
+                        <Text style={styles.dialogEyebrow}>SALES ORDER</Text>
+                        <Text style={styles.dialogTitle}>{confirmTitle}</Text>
+                        {getSuccessYPO === true ? (
+                            <>
+                                <Text style={styles.dialogParty}>Vouchar No.: {selectedItemYPO?.vouno}</Text>
+                                {responsemessageYPO === 'Loading...' ? (
+                                    <View style={styles.dialogStatus}>
+                                        <ActivityIndicator size="small" color={T.copper} />
+                                        <Text style={styles.dialogStatusText}>{responsemessageYPO}</Text>
                                     </View>
-
-                                    {[
-                                        { label: 'Sent Date', value: item.sentdt },
-                                        { label: 'From', value: item.from },
-                                        { label: 'To', value: item.to },
-                                        { label: 'Subject', value: item.subject },
-                                        { label: 'Remarks', value: item.remarks },
-                                        { label: 'Sent', value: item.mailsent }
-                                    ].map((row, index) => (
-                                        <View key={index} style={styles.rowBox}>
-                                            <Text style={styles.label}>{row.label}</Text>
-                                            <Text
-                                                style={[
-                                                    styles.value,
-                                                    row.label === 'Sent' && {
-                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
-                                                    }
-                                                ]}
-                                                numberOfLines={2} // 🔥 wrap control
-                                            >
-                                                {row.value}
-                                            </Text>
-                                        </View>
-                                    ))}
-
+                                ) : (
+                                    <View style={[styles.dialogStatus, { backgroundColor: `${T.green}10`, borderColor: `${T.green}30` }]}>
+                                        <Text style={[styles.dialogStatusText, { color: T.ink }]}>{responsemessageYPO}</Text>
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Text style={styles.dialogParty}>Party Name: {selectedItemYPO?.ParName}</Text>
+                                <View style={styles.dialogBtns}>
+                                    <Btn
+                                        label="Cancel"
+                                        icon="close"
+                                        kind="ghost"
+                                        onPress={() => setShowOverlayYPO(false)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <Btn
+                                        label="Confirm"
+                                        icon="check"
+                                        kind={isRejectAction ? 'danger' : 'primary'}
+                                        onPress={handleConfirmAction}
+                                        style={[{ flex: 1 }, !isRejectAction && { backgroundColor: T.green }]}
+                                    />
                                 </View>
-                            )}
-                        />
-
-                        <TouchableOpacity
-                            style={styles.closeBtn}
-                            onPress={() => setMailLogModal(false)}
-                        >
-                            <Text style={styles.closeText}>Close</Text>
-                        </TouchableOpacity>
-
+                            </>
+                        )}
                     </View>
                 </View>
             </Modal>
-        </>
+
+            {/* ───────────── Order items (d1) ───────────── */}
+            <Sheet
+                open={showCarouselModal}
+                onClose={() => {
+                    setShowCarouselModal(false)
+                    setSelectedD1Data([])
+                }}
+                eyebrow="ORDER ITEMS"
+                title={getD1Party || 'Sales order items'}
+                side
+                wideMax={760}
+            >
+                {groupedData.length === 0 ? (
+                    <EmptyState icon="layers" title="No items" text="This sales order has no item lines." />
+                ) : null}
+                {groupedData.map((item) => {
+                    const isOpen = openAccordion[item.key] ?? true
+                    const qtySum = item.items.reduce((a, r) => a + (parseFloat(String(r.Qty ?? '').replace(/,/g, '')) || 0), 0);
+                    const amtSum = item.items.reduce((a, r) => a + (parseFloat(String(r.Amount ?? '').replace(/,/g, '')) || 0), 0);
+                    return (
+                        <View key={item.key} style={styles.accCard}>
+                            <TouchableOpacity
+                                style={styles.accHead}
+                                onPress={() => toggleAccordion(item.key)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.cardIcon}>
+                                    <Icon name="texture" size={18} color={T.copper} />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={styles.accTitle} numberOfLines={2}>{item.designName}</Text>
+                                    <Text style={styles.accSub} numberOfLines={1}>{item.itemName}</Text>
+                                </View>
+                                <View style={styles.countBadge}>
+                                    <Text style={styles.countText}>{item.items.length}</Text>
+                                </View>
+                                <Icon name={isOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={24} color={T.muted} />
+                            </TouchableOpacity>
+
+                            {isOpen && (
+                                <View style={styles.table}>
+                                    <View style={[styles.tr, styles.thead]}>
+                                        <Text style={[styles.th, styles.cShade]}>Shade</Text>
+                                        <Text style={[styles.th, styles.cNum]}>Qty</Text>
+                                        <Text style={[styles.th, styles.cNum]}>Rate</Text>
+                                        <Text style={[styles.th, styles.cAmt]}>Amount</Text>
+                                        <Text style={[styles.th, styles.cDisc]}>Disc %</Text>
+                                    </View>
+                                    {item.items.map((row, index) => (
+                                        <View key={index.toString()} style={[styles.tr, index % 2 === 1 && { backgroundColor: T.sub }]}>
+                                            <Text style={[styles.td, styles.cShade]} numberOfLines={2}>{row.ShdName}</Text>
+                                            <Text style={[styles.td, styles.cNum]} numberOfLines={1}>{row.Qty}</Text>
+                                            <Text style={[styles.td, styles.cNum]} numberOfLines={1}>{row.UnitRate}</Text>
+                                            <Text style={[styles.td, styles.cAmt]} numberOfLines={1}>{row.Amount}</Text>
+                                            <Text style={[styles.td, styles.cDisc]} numberOfLines={1}>{row.DisPer}</Text>
+                                        </View>
+                                    ))}
+                                    <View style={[styles.tr, styles.tfoot]}>
+                                        <Text style={[styles.tdTot, styles.cShade]}>Total</Text>
+                                        <Text style={[styles.tdTot, styles.cNum]} numberOfLines={1}>{fmtNum(qtySum)}</Text>
+                                        <Text style={[styles.tdTot, styles.cNum]} />
+                                        <Text style={[styles.tdTot, styles.cAmt, { color: T.pd }]} numberOfLines={1}>{fmtNum(amtSum)}</Text>
+                                        <Text style={[styles.tdTot, styles.cDisc]} />
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    )
+                })}
+            </Sheet>
+
+            {/* <CriteriaForm
+                isVisible={criteriaFormOpen}
+                onClose={handleCriteriaFormClose}
+                isLoading={isLoadingYPO}
+                FormState={FormState}
+                setFormState={setFormState}
+                getAllStoreData={getAllStoreData}
+                setAllStoreData={setAllStoreData}
+                token={token}
+                fetchData={fetchData}
+                fetchAllHistoryData={fetchAllHistoryData}
+                fetchAllVerifyData={fetchAllVerifyData}
+                activeTab1YPO={activeTab1YPO}
+            /> */}
+
+            {/* ───────────── Mail sent log ───────────── */}
+            <Sheet
+                open={mailLogModal}
+                onClose={() => setMailLogModal(false)}
+                eyebrow="MAIL LOG"
+                title={`${mailLogData.length} Sent Log(s) found`}
+                footer={<Btn label="Close" kind="ghost" onPress={() => setMailLogModal(false)} style={{ flex: 1 }} />}
+            >
+                {mailLogData.map((item, index) => (
+                    <View key={index.toString()} style={styles.logCard}>
+                        <View style={styles.logHead}>
+                            <Avatar name={item.usrname} size={34} />
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={styles.logUser} numberOfLines={1}>{item.usrname}</Text>
+                                <Text style={styles.logDate} numberOfLines={1}>{item.sentdt}</Text>
+                            </View>
+                            <AuthPill label={item.mailsent === 'Yes' ? 'YES' : 'NO'} icon={item.mailsent === 'Yes' ? 'mark-email-read' : 'error-outline'} />
+                        </View>
+                        {[
+                            { label: 'Sent Date', value: item.sentdt },
+                            { label: 'From', value: item.from },
+                            { label: 'To', value: item.to },
+                            { label: 'Subject', value: item.subject },
+                            { label: 'Remarks', value: item.remarks },
+                            { label: 'Sent', value: item.mailsent }
+                        ].map((row, i) => (
+                            <View key={i} style={styles.logRow}>
+                                <Text style={styles.logLabel}>{row.label}</Text>
+                                <Text
+                                    style={[
+                                        styles.logValue,
+                                        row.label === 'Sent' && {
+                                            color: row.value === 'Yes' ? T.green : T.red,
+                                            fontWeight: '800',
+                                        }
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {row.value}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                ))}
+            </Sheet>
+
+            <BusyOverlay visible={isLoadingYPO} text="Loading..." />
+        </View>
     );
 };
+
+const styles = StyleSheet.create({
+    root: { flex: 1, backgroundColor: T.bg },
+    body: { flex: 1 },
+
+    // toolbar
+    toolbar: {
+        backgroundColor: T.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingTop: 10,
+        paddingBottom: 10,
+    },
+    toolbarInner: { gap: 8, width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    toolbarWide: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    segWide: { width: 380 },
+
+    // list
+    list: { flex: 1, backgroundColor: T.bg },
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 4 },
+    gridCell: { padding: 5 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+
+    // card
+    card: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    cardDisabled: { opacity: 0.6 },
+    cardAccepted: { borderColor: `${T.green}66`, backgroundColor: `${T.green}06` },
+    cardRejected: { borderColor: `${T.red}55`, backgroundColor: `${T.red}05` },
+    cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    cardIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
+    },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    datePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.hair,
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    datePillText: { fontSize: 10.5, fontWeight: '700', color: T.muted },
+    cardTitle: { fontSize: 15, fontWeight: '800', color: T.ink, marginTop: 3 },
+    cardParty: { fontSize: 12.5, fontWeight: '700', color: T.nav, marginTop: 2, lineHeight: 17 },
+    metricBox: {
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    metricRow: { flexDirection: 'row', gap: 10 },
+    remarkRead: {
+        borderLeftWidth: 3,
+        borderLeftColor: `${T.copper}66`,
+        paddingLeft: 9,
+        paddingVertical: 2,
+    },
+    remarkLabel: { fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.5 },
+    remarkText: { fontSize: 12.5, fontWeight: '600', color: T.ink, marginTop: 2 },
+    metaRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 6 },
+    metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, minWidth: 0 },
+    metaLabel: { fontSize: 11, fontWeight: '600', color: T.muted },
+    metaValue: { fontSize: 11.5, fontWeight: '800', color: T.ink, flexShrink: 1 },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 8,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        paddingTop: 10,
+    },
+    actionBtn: { flexGrow: 1, flexBasis: 0, minWidth: 92 },
+    approveBtn: { backgroundColor: T.green },
+
+    topButton: {
+        position: 'absolute',
+        right: 18,
+        bottom: 22,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: T.nav,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...S.card,
+    },
+
+    // confirm dialog
+    dialogWrap: {
+        flex: 1,
+        backgroundColor: 'rgba(13,27,42,0.45)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    dialog: {
+        width: '100%',
+        maxWidth: 400,
+        backgroundColor: T.surface,
+        borderRadius: 16,
+        padding: 20,
+        alignItems: 'center',
+        gap: 6,
+        ...S.card,
+    },
+    dialogIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+    dialogEyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    dialogTitle: { fontSize: 18, fontWeight: '900', color: T.ink, textAlign: 'center' },
+    dialogParty: { fontSize: 13, fontWeight: '600', color: T.muted, textAlign: 'center', marginTop: 2 },
+    dialogStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 12,
+        alignSelf: 'stretch',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    dialogStatusText: { fontSize: 13.5, fontWeight: '700', color: T.muted, textAlign: 'center', flexShrink: 1 },
+    dialogBtns: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 16 },
+
+    // items sheet
+    accCard: {
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: 'hidden',
+    },
+    accHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+    accTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+    accSub: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 2 },
+    countBadge: {
+        minWidth: 24,
+        height: 24,
+        borderRadius: 12,
+        paddingHorizontal: 7,
+        backgroundColor: `${T.copper}16`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    countText: { fontSize: 11.5, fontWeight: '900', color: T.copper },
+    table: { borderTopWidth: 1, borderTopColor: T.hair },
+    tr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
+    thead: { backgroundColor: T.nav, paddingVertical: 7 },
+    th: { fontSize: 10.5, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+    td: { fontSize: 12, fontWeight: '600', color: T.ink },
+    tfoot: { backgroundColor: `${T.copper}12` },
+    tdTot: { fontSize: 12, fontWeight: '900', color: T.nav },
+    cShade: { flex: 1.5, minWidth: 0 },
+    cNum: { flex: 1, textAlign: 'right' },
+    cAmt: { flex: 1.3, textAlign: 'right' },
+    cDisc: { flex: 0.8, textAlign: 'right' },
+
+    // mail log sheet
+    logCard: {
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 12,
+        gap: 6,
+    },
+    logHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+    logUser: { fontSize: 14, fontWeight: '800', color: T.ink },
+    logDate: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
+    logRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    logLabel: { width: 78, fontSize: 11, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.3, paddingTop: 1 },
+    logValue: { flex: 1, fontSize: 12.5, fontWeight: '600', color: T.ink },
+});
+
 export default GreySalesOrder;

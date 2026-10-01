@@ -1,25 +1,23 @@
 import AppAlert from '@/common/utils/appAlert';
-import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
+    StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from 'react-native';
 // import { encode as base64_encode } from 'react-native-base64';
-import { crlimtreq_styles } from '@/common/Style';
-import FullScreenLoader from '@/components/FullScreenLoader';
 // import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import HeaderBar from '../HeaderBar/HeaderBar';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // import { API } from '../../common/API/dynamicAPI';
+import { Btn, Toolbar, useSotLayout } from '@/src/components/erpUi';
+import { T } from '@/src/theme';
 import { fetchCurrentYearData, fetchPropertyData, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
-import HeaderBar from '../../components/HeaderNew';
-import theme from '../theme';
 import CollectionCard from './CollectionCard';
 import CustomDrawer from './CustomDrawer';
 
@@ -748,6 +746,17 @@ const CollectionList: React.FC<Props> = ({ token, username, API }) => {
     const closeDrawer = () => setIsDrawerVisible(false);
 
 
+    // ---------- NEW ERP UI (presentation only) ----------
+    const { isPhone } = useSotLayout();
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const dmy = (d: Date) => `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
+    const activeFilterCount = selectedProperty ? 1 : 0;
+    const filterChips = [
+        { icon: 'business', text: selectedProperty?.LngName || 'All properties' },
+        { icon: 'event', text: dmy(fromDate) === dmy(toDate) ? dmy(fromDate) : `${dmy(fromDate)} → ${dmy(toDate)}` },
+        { icon: 'date-range', text: `FY ${selectedYear}` },
+    ];
+
     return (
         <>
             {/* <Footer
@@ -756,36 +765,40 @@ const CollectionList: React.FC<Props> = ({ token, username, API }) => {
                 totalAmount={gePOTData.reduce((sum, item) => sum + parseFloat(item.Amount || '0'), 0)}
             /> */}
 
-            <GestureHandlerRootView style={{ flex: 1 }}>
-
-                {/* <HeaderBarwithBack
-                userName={username}
-                // onSearch={setSearchQuery}
-                header={'Cheque Entry'}
-                subHeader={'Manage your cheque records'}
-            /> */}
-                <HeaderBar
-                    userName={username}
+            <GestureHandlerRootView style={styles.root}>
+                {/* Search + filters + New Collection (replaces the old HeaderBar and floating list / Add icons) */}
+                <Toolbar
+                    search={searchQueryPOT}
                     onSearch={setSearchQueryPOT}
-                    placeholder="Search data..."
+                    placeholder={isPhone ? 'Search collections...' : 'Search party, cheque no, bank, remark...'}
+                    onFilters={openDrawer}
+                    filterCount={activeFilterCount}
+                    chips={filterChips}
+                    onChipPress={openDrawer}
+                    actions={
+                        <Btn
+                            label={isPhone ? 'New' : 'New Collection'}
+                            icon="add"
+                            kind="copper"
+                            compact
+                            onPress={() => handleAdd()}
+                            style={{ height: 42 }}
+                        />
+                    }
                 />
-                <View style={crlimtreq_styles.container_list}>
-                    {isLoading ? <FullScreenLoader message="Loading..." /> : (<><View style={crlimtreq_styles.container}>
-                        {/* Top-right List Icon */}
-                        <TouchableOpacity style={[crlimtreq_styles.listIconContainer, { backgroundColor: theme.BRAND_DARK }]} onPress={openDrawer}>
-                            <Icon name="list" size={24} color="white" />
-                        </TouchableOpacity>
 
-                        <TouchableOpacity style={[crlimtreq_styles.listIconContaineradd, { backgroundColor: theme.BRAND_DARK }]} onPress={() => handleAdd()}>
-                            {/* <Icon name="list" size={24} color="white" /> */}
-                            <Icon name="add" size={24} color="white" />
-                            <Text style={crlimtreq_styles.listIconText}>Add</Text>
-                        </TouchableOpacity>
-
-                        {/* Main Content: Replace Text with ProdOrderTrackingTable */}
+                <View style={styles.container}>
+                    {isLoading ? (
+                        <View style={styles.loadingWrap}>
+                            <View style={styles.loadingCard}>
+                                <ActivityIndicator size="large" color={T.copper} />
+                                <Text style={styles.loadingText}>Loading...</Text>
+                            </View>
+                        </View>
+                    ) : (
                         <CollectionCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} onDelete={(item) => handleDelete(item)} onAuthorize={handleAuthorizeFromList}
                             fromDate={fromDate} toDate={toDate} hasDailyCollectionReport={hasDailyCollectionReport} />
-                    </View></>)}
+                    )}
                 </View>
 
                 <CustomDrawer
@@ -823,4 +836,22 @@ const CollectionList: React.FC<Props> = ({ token, username, API }) => {
         </>
     );
 };
+
+const styles = StyleSheet.create({
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+    loadingCard: {
+        backgroundColor: T.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        paddingHorizontal: 28,
+        paddingVertical: 22,
+        alignItems: 'center',
+        gap: 10,
+    },
+    loadingText: { fontSize: 13, fontWeight: '800', color: T.nav },
+});
+
 export default CollectionList;

@@ -1,13 +1,11 @@
-import { crlimtreq_styles } from '@/common/Style';
 import AppAlert from '@/common/utils/appAlert';
-import theme from '@/components/theme';
-import Icon from '@expo/vector-icons/MaterialIcons';
+import { T } from '@/src/theme';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { API } from '../../common/API/dynamicAPI';
 import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
-import HeaderBar from '../../components/HeaderNew';
+import { BusyOverlay, Toolbar, useSotLayout } from '../erpUi';
 import CustomDrawer from './CustomDrawer';
 import { CardPayload, DesignData, ExeData, ItemData, ItemStatus, POTData } from './Modal';
 import ProdOrderTrackingCard from './ProdOrderTrackingCard';
@@ -368,22 +366,49 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
     const closeDrawer = () => setIsDrawerVisible(false);
     console.log('🔵 POT Data:', gePOTData);
 
-    return (
-        <>
-            <HeaderBar
-                userName={username}
-                onSearch={setSearchQueryPOT}
-                placeholder="Search order..."
-            />
-            <View style={crlimtreq_styles.container}>
-                {/* Top-right List Icon */}
-                <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
-                    <Icon name="list" size={24} color="white" />
-                </TouchableOpacity>
+    // ---------------------------------------------------------------------
+    // NEW ERP UI (presentation only — every handler / prop below is the
+    // original one, called with the original arguments).
+    // ---------------------------------------------------------------------
+    const { isPhone } = useSotLayout();
+    const activeFilterCount =
+        (selectedExe?.Code ? 1 : 0) +
+        (selectedDesigns.length ? 1 : 0) +
+        (selectedItems.length ? 1 : 0) +
+        (selectedItemStatus !== 'All' ? 1 : 0);
+    const filterChips: { icon: string; text: string }[] = [
+        { icon: 'event', text: `${formatDate(fromDate)} → ${formatDate(toDate)}` },
+        { icon: 'calendar-today', text: `FY ${selectedYear}` },
+        { icon: 'flag', text: `Status: ${selectedItemStatus}` },
+        { icon: 'badge', text: selectedExe?.SalesExecutive || 'All executives' },
+        ...(selectedDesigns.length ? [{ icon: 'style', text: `${selectedDesigns.length} design${selectedDesigns.length === 1 ? '' : 's'}` }] : []),
+        ...(selectedItems.length ? [{ icon: 'category', text: `${selectedItems.length} item${selectedItems.length === 1 ? '' : 's'}` }] : []),
+    ];
 
-                {/* Main Content: Replace Text with ProdOrderTrackingTable */}
-                <ProdOrderTrackingCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} />
+    return (
+        <View style={styles.root}>
+            {/* Toolbar: search (was the dark HeaderNew band) + Filters (was the list icon) */}
+            <Toolbar
+                search={searchQueryPOT}
+                onSearch={setSearchQueryPOT}
+                placeholder={isPhone ? 'Search order...' : 'Search order, design, item, executive...'}
+                onFilters={openDrawer}
+                filterCount={activeFilterCount}
+                chips={filterChips}
+                onChipPress={openDrawer}
+            />
+
+            <View style={styles.body}>
+                <ProdOrderTrackingCard
+                    gePOTData={gePOTData}
+                    searchQueryPOT={searchQueryPOT}
+                    getpayload={getpayload}
+                    token={token}
+                    parentDesignData={parentDesignData}
+                    onOpenFilters={openDrawer}
+                />
             </View>
+
             <CustomDrawer
                 isVisible={isDrawerVisible}
                 onClose={closeDrawer}
@@ -411,21 +436,15 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
                 onItemStatusChange={handleItemStatusChange}
                 yearOptions={yearOptions}
             />
-        </>
+
+            <BusyOverlay visible={isLoading && !isDrawerVisible} text="Loading production orders…" />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    listIconContainer: {
-        position: 'absolute',
-        top: 1.5,
-        right: 2.5,
-        zIndex: 1,
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        color: '#fff',
-        borderRadius: 3,
-        padding: 4,
-    },
+    root: { flex: 1, backgroundColor: T.bg },
+    body: { flex: 1, backgroundColor: T.bg },
 });
 
 export default ProdOrderTracking;

@@ -3,7 +3,7 @@ import { SalesOrderTrackingScreen } from '@/src/screens/production/SalesOrderTra
 
 export default function SalesOrderTrackingRoute() {
   return (
-    <PermissionRouteGuard resource="production.purchase_order" action="view">
+    <PermissionRouteGuard resource="production.sales_order_tracking" action="view">
       <SalesOrderTrackingScreen />
     </PermissionRouteGuard>
   );

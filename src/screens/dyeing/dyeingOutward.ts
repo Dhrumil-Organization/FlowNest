@@ -60,6 +60,7 @@ export type OutwardRow = {
   OutDate: string; // API `OutDate` (YYYY-MM-DD or '')
   accName: string; // API `accname` — outward party
   accname: string; // API `accname` — outward party
+  dsnname: string; // API `dsnname` — design name
 };
 
 const pick = (row: any, keys: string[]): any => {
@@ -96,6 +97,18 @@ const SHD_NAME_KEYS = ['ShdName', 'shdname', 'ShadeName', 'shadename', 'Shade', 
 const OUT_NO_KEYS = ['OutNo', 'outno', 'OUTNO', 'OutwardNo', 'outwardno'];
 const OUT_DATE_KEYS = ['OutDate', 'outdate', 'OUTDATE'];
 const ACC_NAME_KEYS = ['accname', 'AccName', 'ACCNAME', 'Accname'];
+const DESIGN_KEYS = [
+  'dsnname',
+  'DsnName',
+  'Dsnname',
+  'DSNNAME',
+  'dsnName',
+  'DesignName',
+  'designName',
+  'designname',
+  'Design',
+  'design',
+];
 const MILL_KEYS = ['MillName', 'millname', 'Mill', 'OutwardParty', 'PartyName', 'partyname', 'AccName', 'accname', 'ProcessHouse'];
 
 const numOrNull = (v: any): number | null => {
@@ -154,6 +167,7 @@ const toRow = (raw: any): OutwardRow | null => {
     outNo: str(pick(raw, OUT_NO_KEYS)),
     OutDate: parseAnyDate(pick(raw, OUT_DATE_KEYS)),
     accName: str(pick(raw, ACC_NAME_KEYS)),
+    dsnname: str(pick(raw, DESIGN_KEYS)),
   };
 };
 
@@ -213,6 +227,7 @@ export const toOutwardRows = (response: any): OutwardRow[] => {
         outNo: prev.outNo || row.outNo,
         OutDate: prev.OutDate || row.OutDate,
         accName: prev.accName || row.accName,
+        dsnname: prev.dsnname || row.dsnname,
       });
     });
   });

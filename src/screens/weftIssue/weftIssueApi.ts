@@ -17,7 +17,7 @@ export type Carton = {
   PUId: any; PSrNo: any; PSubSr: any; SrNo: any; SubSr: any; TranType: any;
   ItmCode: any; ItmName: any; MerCode: any; MerName: any; GrdCode: any; GrdName: any;
   ShdCode: any; ShdName: any; Denier: any; yearNo: any; DsnRcpSrNo: any;
-  UId: any; uid?: any; ExpProdQty?: any; [k: string]: any;
+  UId: any; uid?: any; ExpProdQty?: any;[k: string]: any;
 };
 
 /** legacy normalizeCarton */
@@ -137,8 +137,8 @@ export function createWeftIssueApi(API: string, token: string) {
     years: async (prpcode: string) => listOf(await c.get('/api/getyear', { params: { prpcode } })),
 
     /** POST /api/get_yarn_issue_browse — dates yyyy-mm-dd or '' */
-    browse: async (p: { prptype: string; prpcode: string; yearno: string; fromdate: string; todate: string }) => {
-      const res = await post('/api/get_yarn_issue_browse', { ...p, strcode: '002', txntype: TXN, status: '' });
+    browse: async (p: { prptype: string; prpcode: string; yearno: string; fromdate: string; todate: string; ExpProdQtyType: string }) => {
+      const res = await post('/api/get_yarn_issue_browse', { ...p, strcode: '002', txntype: TXN, status: '', ExpProdQtyType: p.ExpProdQtyType, });
       return res.data?.success && Array.isArray(res.data?.response?.data) ? res.data.response.data : [];
     },
     /** POST /api/get_yarn_issue_show */
@@ -186,14 +186,18 @@ export function createWeftIssueApi(API: string, token: string) {
       prpcode: string; yearno: string; qty: any; itmcode: any; shdcode: any; srno: any; beamuid: any; dsncode: any; issuid: any;
     }) => {
       const res = mode === 'new'
-        ? await c.get('/api/getExpectedWeftIssue', { params: {
-          prpcode: p.prpcode, yearno: p.yearno, txntype: TXN, reqqty: p.qty, itmcode: p.itmcode, shdcode: p.shdcode,
-          srno: p.srno, beamuid: p.beamuid, dsncode: p.dsncode, IssUId: p.issuid,
-        } })
-        : await c.get('/api/get_expprodqty_from_issueqty', { params: {
-          PrpCode: p.prpcode, YearNo: p.yearno, txntype: TXN, WfIssQty: p.qty, MRUId: '0', MRSrNo: '0',
-          ItmCode: p.itmcode, ShdCode: p.shdcode, PlnWfSrNo: p.srno, beamuid: p.beamuid, dsncode: p.dsncode,
-        } });
+        ? await c.get('/api/getExpectedWeftIssue', {
+          params: {
+            prpcode: p.prpcode, yearno: p.yearno, txntype: TXN, reqqty: p.qty, itmcode: p.itmcode, shdcode: p.shdcode,
+            srno: p.srno, beamuid: p.beamuid, dsncode: p.dsncode, IssUId: p.issuid,
+          }
+        })
+        : await c.get('/api/get_expprodqty_from_issueqty', {
+          params: {
+            PrpCode: p.prpcode, YearNo: p.yearno, txntype: TXN, WfIssQty: p.qty, MRUId: '0', MRSrNo: '0',
+            ItmCode: p.itmcode, ShdCode: p.shdcode, PlnWfSrNo: p.srno, beamuid: p.beamuid, dsncode: p.dsncode,
+          }
+        });
       const arr = res.data?.data?.data;
       return Array.isArray(arr) && arr.length ? (arr[0].ExpProdQty || 0) : 0;
     },

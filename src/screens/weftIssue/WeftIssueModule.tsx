@@ -44,7 +44,7 @@ type Issue = {
   IssDate: string; IssNo: string; suffix: string; month: string; UId: any; yarnstrcode: string;
   BeamNo: string; BeamUId: any; WarpLen: any; TranDate: any; StkType: string;
   DsnCode: any; DsnName: string; IssDsnCode: any; IssDsnName: string;
-  ItmCode: any; ItmName: string; srno: any; [k: string]: any;
+  ItmCode: any; ItmName: string; srno: any;[k: string]: any;
 };
 
 const STOCK_TYPES = [{ StkType: 'I', stktypename: 'In house' }, { StkType: 'P', stktypename: 'Process house' }];
@@ -277,7 +277,7 @@ function ListView(p: {
     try {
       const list = await api.browse({
         prptype: p.prptype, prpcode: str(prp.PrpCode), yearno: str(year.YearNo),
-        fromdate: dmyToIso(p.fromDate), todate: dmyToIso(p.toDate),
+        fromdate: dmyToIso(p.fromDate), todate: dmyToIso(p.toDate), ExpProdQtyType: p.mode === 'new' ? '1' : '0',
       });
       if (id === reqId.current) setRows(list);
     } catch (e) {

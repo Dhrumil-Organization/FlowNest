@@ -1,16 +1,18 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import theme from '@/components/theme';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { debounce } from 'lodash';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Platform, Animated as RNAnimated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import HeaderBarwithBack from '../../../components/HeaderNew';
-
-const { width } = Dimensions.get('window');
-const isTablet = width >= 600;
-const AnimatedFlatList = RNAnimated.createAnimatedComponent(FlatList);
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    CONTENT_MAX,
+    EmptyState,
+    PanelHeader,
+    SearchBox,
+    SectionHead,
+    useSotLayout,
+} from '../sotUi';
 
 interface GrandTotal {
     [key: string]: number;
@@ -34,83 +36,52 @@ interface ChallanData {
 }
 
 interface SOPartyDetailsProps {
-    route: {
+    route?: {
         params: {
             party: any;
         };
     };
-    token: string;
-    navigation: any;
+    token?: string;
+    navigation?: any;
     username: string;
+    party: any;
+    setChallanView: (v: boolean) => void;
+    setChallanPartyName: (v: string) => void;
 }
 
-const SummaryCard = ({ title, value, icon, color }: { title: string; value: string; icon: string; color: string }) => (
-    <View style={[styles.summaryCard, { backgroundColor: color }]}>
-        <View style={styles.cardIcon}>
-            <Icon name={icon} size={24} color="white" />
-        </View>
-        <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardValue}>{value}</Text>
-    </View>
-);
+// Stage → icon / colour (same keys the legacy carousel used, NEW ERP tokens).
+const STAGE_ICONS: Record<string, string> = {
+    purchase: 'shopping-cart',
+    jobin: 'work',
+    jobin_prod: 'factory',
+    Repack: 'inventory',
+    Grading: 'grade',
+};
+const STAGE_COLORS: Record<string, string> = {
+    purchase: T.green,
+    jobin: T.blue,
+    jobin_prod: T.copper,
+    Repack: T.purple,
+    Grading: T.yd,
+};
 
-const Carousel = ({ data }: { data: { key: string; value: number }[] }) => {
-    const scrollX = useRef(new RNAnimated.Value(0)).current;
-    const flatListRef = useRef<FlatList>(null);
-
-    const renderCard = ({ item }: { item: { key: string; value: number } }) => {
-        const icons: Record<string, string> = {
-            purchase: 'shopping-cart',
-            jobin: 'work',
-            jobin_prod: 'factory',
-            Repack: 'inventory',
-            Grading: 'grade',
-        };
-
-        const colors: Record<string, string> = {
-            purchase: '#4CAF50',
-            jobin: '#2196F3',
-            jobin_prod: '#FF9800',
-            Repack: '#9C27B0',
-            Grading: '#00BCD4',
-        };
-
-        return (
-            <SummaryCard
-                title={item.key.replace(/_/g, ' ')}
-                value={item.value.toLocaleString('en-IN')}
-                icon={icons[item.key] || 'info'}
-                color={colors[item.key] || '#757575'}
-            />
-        );
-    };
-
+const StageCard = ({ name, value }: { name: string; value: number }) => {
+    const color = STAGE_COLORS[name] || T.muted;
     return (
-        <View style={styles.carouselContainer}>
-            <AnimatedFlatList
-                ref={flatListRef}
-                data={data}
-                renderItem={renderCard}
-                keyExtractor={(item) => item.key}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={width * 0.4}
-                decelerationRate="fast"
-                onScroll={RNAnimated.event(
-                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: true }
-                )}
-                contentContainerStyle={styles.carouselContent}
-                snapToAlignment="start"
-                scrollEventThrottle={16}
-            />
+        <View style={styles.stageCard}>
+            <View style={[styles.stageIcon, { backgroundColor: `${color}16` }]}>
+                <Icon name={(STAGE_ICONS[name] || 'info') as any} size={18} color={color} />
+            </View>
+            <Text style={styles.stageName} numberOfLines={1}>{name.replace(/_/g, ' ')}</Text>
+            <Text style={[styles.stageValue, { color }]} numberOfLines={1}>{value.toLocaleString('en-IN')}</Text>
         </View>
     );
 };
 
-// Updated AccordionTable with fixed height, scrollable table, and horizontal scrolling
-// Updated AccordionTable with proper fixed header/footer and both scroll directions
-// Updated AccordionTable with proper alignment and dynamic height
+const money = (v: number) =>
+    v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Collapsible challan card with its step-wise table.
 const AccordionTable = ({ data }: { data: ChallanData }) => {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -119,119 +90,74 @@ const AccordionTable = ({ data }: { data: ChallanData }) => {
     const totalQty = data.data.reduce((sum, item) => sum + parseFloat(item.totalqty), 0);
     const totalAmount = data.data.reduce((sum, item) => sum + item.amount, 0);
 
-    // Column widths for horizontal scrolling
+    // Column widths (table scrolls horizontally on narrow phones)
     const columnWidths = {
-        step: 180,  // More width for step name
-        qty: 100,
-        rate: 100,
-        amount: 130  // More width for amount with commas
+        step: 170,
+        qty: 96,
+        rate: 96,
+        amount: 124,
     };
 
     return (
-        <View style={styles.accordionContainer}>
-            <TouchableOpacity style={styles.accordionHeader} onPress={toggleAccordion}>
-                <View style={styles.accordionHeaderLeft}>
-                    <Text style={styles.challanNumber}>{data.chalno}</Text>
-                    <Text style={styles.challanDate}>{data.chaldate}</Text>
+        <View style={[styles.challanCard, isOpen && styles.challanCardOpen]}>
+            <TouchableOpacity style={styles.challanHead} onPress={toggleAccordion} accessibilityRole="button">
+                <View style={styles.challanIcon}>
+                    <Icon name="description" size={18} color={T.nav} />
                 </View>
-                <View style={styles.accordionHeaderRight}>
-                    <Text style={styles.accordionToggle}>{isOpen ? '▲' : '▼'}</Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.challanNumber} numberOfLines={1}>{data.chalno}</Text>
+                    <View style={styles.challanMetaRow}>
+                        <Icon name="event" size={12} color={T.muted} />
+                        <Text style={styles.challanDate}>{data.chaldate}</Text>
+                        {!!data.chalqty && (
+                            <>
+                                <Text style={styles.dot}>•</Text>
+                                <Text style={styles.challanDate}>{data.chalqty} m</Text>
+                            </>
+                        )}
+                    </View>
+                    {!!(data.dsnname || data.shdname) && (
+                        <Text style={styles.challanDesign} numberOfLines={1}>
+                            {data.dsnname}{data.shdname ? ` · ${data.shdname}` : ''}
+                        </Text>
+                    )}
                 </View>
+                <View style={styles.challanAmt}>
+                    <Text style={styles.challanAmtLabel}>Amount</Text>
+                    <Text style={styles.challanAmtValue}>₹ {money(totalAmount)}</Text>
+                </View>
+                <Icon name={isOpen ? 'expand-less' : 'expand-more'} size={22} color={T.muted} />
             </TouchableOpacity>
 
             {isOpen && (
                 <View style={styles.tableContainer}>
-                    {/* Horizontally scrollable content */}
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={true}
-                        style={styles.horizontalScrollView}
-                    >
-
-
-
-                        <View>
-                            {/* Vertically scrollable rows - dynamic height based on content */}
-
-                            {/* Fixed Header Row */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ flexGrow: 1 }}>
+                        <View style={{ flex: 1, minWidth: columnWidths.step + columnWidths.qty + columnWidths.rate + columnWidths.amount }}>
                             <View style={styles.headerRow}>
-                                <View style={[styles.headerCell, { width: columnWidths.step }]}>
-                                    <Text style={styles.headerCellText}>STEP NAME</Text>
-                                </View>
-                                <View style={[styles.headerCell, { width: columnWidths.qty }]}>
-                                    <Text style={styles.headerCellTextRight}>QUANTITY</Text>
-                                </View>
-                                <View style={[styles.headerCell, { width: columnWidths.rate }]}>
-                                    <Text style={styles.headerCellTextRight}>RATE (₹)</Text>
-                                </View>
-                                <View style={[styles.headerCell, { width: columnWidths.amount }]}>
-                                    <Text style={styles.headerCellTextRight}>AMOUNT (₹)</Text>
-                                </View>
+                                <Text style={[styles.headerCellText, { flex: 1.8, minWidth: columnWidths.step }]}>STEP NAME</Text>
+                                <Text style={[styles.headerCellTextRight, { flex: 1, minWidth: columnWidths.qty }]}>QUANTITY</Text>
+                                <Text style={[styles.headerCellTextRight, { flex: 1, minWidth: columnWidths.rate }]}>RATE (₹)</Text>
+                                <Text style={[styles.headerCellTextRight, { flex: 1.3, minWidth: columnWidths.amount }]}>AMOUNT (₹)</Text>
                             </View>
-                            <ScrollView
-                                style={styles.verticalScrollView}
-                                showsVerticalScrollIndicator={true}
-                            >
-                                {data.data.map((item, index) => (
-                                    <View key={index} style={[
-                                        styles.dataRow,
-                                        index % 2 === 0 ? styles.evenRow : styles.oddRow
-                                    ]}>
-                                        {/* Step Name - Center Aligned */}
-                                        <View style={[styles.dataCell, { width: columnWidths.step }]}>
-                                            <Text style={styles.cellTextCenter} numberOfLines={0}>
-                                                {item.stepname}
-                                            </Text>
-                                        </View>
-
-                                        {/* Quantity - Right Aligned */}
-                                        <View style={[styles.dataCell, { width: columnWidths.qty }]}>
-                                            <Text style={styles.cellTextRight}>
-                                                {parseFloat(item.totalqty).toFixed(2)}
-                                            </Text>
-                                        </View>
-
-                                        {/* Rate - Right Aligned */}
-                                        <View style={[styles.dataCell, { width: columnWidths.rate }]}>
-                                            <Text style={styles.cellTextRight}>
-                                                {parseFloat(item.rate).toFixed(2)}
-                                            </Text>
-                                        </View>
-
-                                        {/* Amount - Right Aligned */}
-                                        <View style={[styles.dataCell, { width: columnWidths.amount }]}>
-                                            <Text style={styles.cellTextRight}>
-                                                {item.amount.toLocaleString('en-IN', {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2
-                                                })}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                ))}
-                            </ScrollView>
-
-                            {/* Fixed Footer Row */}
+                            {data.data.map((item, index) => (
+                                <View key={index} style={[styles.dataRow, index % 2 === 1 && styles.oddRow]}>
+                                    <Text style={[styles.cellText, { flex: 1.8, minWidth: columnWidths.step }]}>{item.stepname}</Text>
+                                    <Text style={[styles.cellTextRight, { flex: 1, minWidth: columnWidths.qty }]}>
+                                        {parseFloat(item.totalqty).toFixed(2)}
+                                    </Text>
+                                    <Text style={[styles.cellTextRight, { flex: 1, minWidth: columnWidths.rate }]}>
+                                        {parseFloat(item.rate).toFixed(2)}
+                                    </Text>
+                                    <Text style={[styles.cellTextRight, { flex: 1.3, minWidth: columnWidths.amount }]}>
+                                        {money(item.amount)}
+                                    </Text>
+                                </View>
+                            ))}
                             <View style={styles.footerRow}>
-                                <View style={[styles.footerCell, { width: columnWidths.step }]}>
-                                    <Text style={styles.footerCellText}>TOTAL</Text>
-                                </View>
-                                <View style={[styles.footerCell, { width: columnWidths.qty }]}>
-                                    <Text style={styles.footerCellTextRight}>
-                                        {totalQty.toFixed(2)}
-                                    </Text>
-                                </View>
-                                <View style={[styles.footerCell, { width: columnWidths.rate }]}>
-                                    <Text style={styles.footerCellTextRight}>-</Text>
-                                </View>
-                                <View style={[styles.footerCell, { width: columnWidths.amount }]}>
-                                    <Text style={styles.footerCellTextRight}>
-                                        {totalAmount.toLocaleString('en-IN', {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2
-                                        })}
-                                    </Text>
-                                </View>
+                                <Text style={[styles.footerCellText, { flex: 1.8, minWidth: columnWidths.step }]}>TOTAL</Text>
+                                <Text style={[styles.footerCellTextRight, { flex: 1, minWidth: columnWidths.qty }]}>{totalQty.toFixed(2)}</Text>
+                                <Text style={[styles.footerCellTextRight, { flex: 1, minWidth: columnWidths.rate }]}>-</Text>
+                                <Text style={[styles.footerCellTextRight, { flex: 1.3, minWidth: columnWidths.amount }]}>{money(totalAmount)}</Text>
                             </View>
                         </View>
                     </ScrollView>
@@ -244,6 +170,7 @@ const AccordionTable = ({ data }: { data: ChallanData }) => {
 const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username, party, setChallanView, setChallanPartyName }) => {
     // const { party } = route.params;
     const params = useLocalSearchParams();
+    const { gutter } = useSotLayout();
     // const party = params?.party;
     const [getChallanResponse, setChallanResponse] = useState(null);
     const [renderedChallans, setRenderedChallans] = useState<ChallanData[]>([]);
@@ -365,19 +292,25 @@ const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username, party, s
         return num.toFixed(2);
     };
 
+    const partyLabel = typeof party === 'object' ? party?.partyname : party;
+    const goBack = () => {
+        setChallanView(false)
+        setChallanPartyName('')
+    };
+
     if (!getChallanResponse) {
         return (
-            <>
-                <HeaderBarwithBack
-                    userName={username}
-                    header={typeof party === 'object' ? party.partyname : party}
-                    subHeader={'Manage your Challans'}
-                    backNavigateScreen={'SOPartyDetails'}
+            <View style={styles.root}>
+                <PanelHeader
+                    onBack={goBack}
+                    crumbs={['Sales Orders', 'Challans']}
+                    title={partyLabel || 'Challans'}
                 />
                 <View style={styles.loadingContainer}>
-                    <Text>Loading...</Text>
+                    <ActivityIndicator size="large" color={T.copper} />
+                    <Text style={styles.loadingText}>Loading...</Text>
                 </View>
-            </>
+            </View>
         );
     }
 
@@ -406,372 +339,173 @@ const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username, party, s
     const totalQuantity = dataAll.reduce((sum, item) => sum + parseFloat(item.chalqty || '0'), 0);
 
     return (
-        <>
-            {/* <HeaderBarwithBack
-                userName={username}
-                header={typeof party === 'object' ? party?.partyname : party}
-                subHeader={'Manage your Challans'}
-                // backNavigateScreen={'SOPartyDetails'}
-                breadcrumb={typeof party === 'object' ? party?.partyname : party}
-                SearchBar={false}
-            /> */}
+        <View style={styles.root}>
+            <PanelHeader
+                onBack={goBack}
+                crumbs={['Sales Orders', 'Challans']}
+                title={partyLabel || 'Challans'}
+                subtitle={`${dataAll.length} challan${dataAll.length === 1 ? '' : 's'} · ${formatValue(totalQuantity)} m`}
+            />
 
-            <LinearGradient
-                // colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-                style={styles.container1}>
-                <View style={styles.breadcrumbChip}>
-                    <View style={styles.breadcrumbRow}>
-                        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => {
-                            setChallanView(false)
-                            setChallanPartyName('')
-                        }
-                        }>
-                            <Icon name="arrow-back" size={18} color="#fff" />
-                            <Text style={styles.breadcrumbBackText}>Back</Text>
-                        </TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            {/* <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.replace('/(tabs)')}>
-                                    <Icon name="home" size={18} color="#fff" />
-                                </TouchableOpacity> */}
-                            <Text style={styles.breadcrumbSeparator}>›</Text>
-                            <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
-                                {typeof party === 'object' ? party?.partyname : party}
-                            </Text>
-                        </View>
-                    </View>
+            <View style={[styles.searchContainer, { paddingHorizontal: gutter }]}>
+                <View style={styles.searchInner}>
+                    <SearchBox
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search challan no, date, step, amount…"
+                    />
                 </View>
-            </LinearGradient >
-
-            <View style={styles.searchContainer}>
-                <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search Challans..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholderTextColor="#999"
-                />
-                {searchQuery !== '' && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')}>
-                        <Icon name="close" size={20} color="#666" />
-                    </TouchableOpacity>
-                )}
             </View>
 
-            <Text style={styles.sectionTitle}>Production Summary</Text>
-            {grandTotalEntries.length > 0 && <Carousel data={grandTotalEntries} />}
-
-            <Text style={styles.sectionTitle}>Challan Details</Text>
-            {dataAll.length > 0 && (
-                <Text style={styles.subTitle}>
-                    Total Challans: {dataAll.length} | Total Quantity: {formatValue(totalQuantity)}
-                    {searchQuery !== '' && ` | Filtered: ${filteredChallans.length}`}
-                </Text>
-            )}
-
-            {filteredChallans.length > 0 ? (
-                <FlatList
-                    data={renderedChallans}
-                    renderItem={({ item }) => <AccordionTable data={item} />}
-                    keyExtractor={(item) => item.uid || Math.random().toString()}
-                    onEndReached={loadMoreChallans}
-                    onEndReachedThreshold={0.5}
-                    ListFooterComponent={
-                        loading ? (
-                            <View style={styles.loadingIndicator}>
-                                <Text>Loading more...</Text>
-                            </View>
-                        ) : null
-                    }
-                    contentContainerStyle={styles.listContent}
-                />
-            ) : (
-                <View style={styles.loadingContainer}>
-                    <Text>No challans found</Text>
-                </View>
-            )}
-        </>
+            <FlatList
+                style={styles.container}
+                data={filteredChallans.length > 0 ? renderedChallans : []}
+                renderItem={({ item }) => <AccordionTable data={item} />}
+                keyExtractor={(item, index) => `${item.uid || 'chal'}-${index}`}
+                onEndReached={loadMoreChallans}
+                onEndReachedThreshold={0.5}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter }]}
+                ListHeaderComponent={
+                    <View style={styles.listHeader}>
+                        {grandTotalEntries.length > 0 && (
+                            <>
+                                <SectionHead title="Production Summary" />
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.stageRow}
+                                >
+                                    {grandTotalEntries.map(e => (
+                                        <StageCard key={e.key} name={e.key} value={e.value} />
+                                    ))}
+                                </ScrollView>
+                            </>
+                        )}
+                        <SectionHead
+                            title="Challan Details"
+                            meta={
+                                dataAll.length > 0
+                                    ? `Total Challans: ${dataAll.length} | Total Quantity: ${formatValue(totalQuantity)}${searchQuery !== '' ? ` | Filtered: ${filteredChallans.length}` : ''}`
+                                    : undefined
+                            }
+                        />
+                    </View>
+                }
+                ListEmptyComponent={<EmptyState icon="description" title="No challans found" />}
+                ListFooterComponent={
+                    loading ? (
+                        <View style={styles.loadingIndicator}>
+                            <ActivityIndicator size="small" color={T.copper} />
+                        </View>
+                    ) : renderedChallans.length < filteredChallans.length ? (
+                        <TouchableOpacity style={styles.moreBtn} onPress={loadMoreChallans}>
+                            <Text style={styles.moreBtnText}>Show more challans</Text>
+                        </TouchableOpacity>
+                    ) : null
+                }
+            />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        padding: 15,
-    },
-    container1: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
-        paddingTop: Platform.OS === 'android' ? 0 : 0,
-        // borderBottomLeftRadius: 16,
-        // borderBottomRightRadius: 16,
-        elevation: 6,
-    },
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+    loadingText: { fontSize: 13, fontWeight: '700', color: T.muted },
     searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        margin: 10,
-        paddingHorizontal: 10,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-    },
-    searchIcon: {
-        marginRight: 10,
-    },
-    searchInput: {
-        flex: 1,
-        padding: 12,
-        fontSize: 14,
-        color: '#000',
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginHorizontal: 15,
-        marginTop: 10,
-        marginBottom: 5,
-    },
-    subTitle: {
-        fontSize: 14,
-        color: '#666',
-        marginHorizontal: 15,
-        marginBottom: 10,
-    },
-    carouselContainer: {
-        marginBottom: 20,
-    },
-    carouselContent: {
-        paddingHorizontal: 15,
-    },
-    summaryCard: {
-        width: width * 0.4,
-        padding: 15,
-        borderRadius: 10,
-        marginRight: 10,
-        height: 120,
-        justifyContent: 'space-between',
-    },
-    cardIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    cardTitle: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    cardValue: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    accordionContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        marginBottom: 10,
-        marginHorizontal: 12,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    accordionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: T.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: T.border,
+        paddingVertical: 8,
     },
-    accordionHeaderLeft: {},
-    challanNumber: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#2c3e50',
+    searchInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    listContent: {
+        paddingTop: 12,
+        paddingBottom: 28,
+        gap: 10,
+        width: '100%',
+        maxWidth: 1000,
+        alignSelf: 'center',
+        flexGrow: 1,
     },
-    challanDate: {
-        fontSize: 12,
-        color: '#7f8c8d',
-        marginTop: 2,
-    },
-    accordionHeaderRight: {},
-    accordionToggle: {
-        fontSize: 16,
-        color: '#7f8c8d',
-        fontWeight: '500',
-    },
+    listHeader: { gap: 10, marginBottom: 2 },
+    loadingIndicator: { paddingVertical: 16, alignItems: 'center' },
+    moreBtn: { alignItems: 'center', paddingVertical: 14 },
+    moreBtnText: { fontSize: 13, fontWeight: '800', color: T.copper },
 
-    // Table Container
-    tableContainer: {
-        backgroundColor: '#ffffff',
-        padding: 0,
+    stageRow: { gap: 8, paddingRight: 4 },
+    stageCard: {
+        width: 140,
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 12,
+        gap: 6,
     },
+    stageIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+    stageName: { fontSize: 10.5, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+    stageValue: { fontSize: 17, fontWeight: '900' },
 
-    // Horizontal Scroll View
-    horizontalScrollView: {
-        flexGrow: 0,
+    challanCard: {
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: 'hidden',
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
     },
-
-    // Vertical Scroll View - Dynamic height
-    verticalScrollView: {
-        flexGrow: 0,
-        backgroundColor: '#ffffff',
-        maxHeight: 400, // Maximum height, but will shrink to content
+    challanCardOpen: { borderColor: `${T.nav}55` },
+    challanHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+    challanIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.alt,
     },
+    challanNumber: { fontSize: 14, fontWeight: '900', color: T.nav },
+    challanMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+    challanDate: { fontSize: 11.5, fontWeight: '600', color: T.muted },
+    dot: { color: T.muted, fontSize: 11, marginHorizontal: 2 },
+    challanDesign: { fontSize: 11.5, fontWeight: '700', color: T.ink, marginTop: 2 },
+    challanAmt: { alignItems: 'flex-end' },
+    challanAmtLabel: { fontSize: 9.5, fontWeight: '700', color: T.muted, textTransform: 'uppercase' },
+    challanAmtValue: { fontSize: 13, fontWeight: '900', color: T.green, marginTop: 1 },
 
-    // Header Row
+    tableContainer: { borderTopWidth: 1, borderTopColor: T.hair },
     headerRow: {
         flexDirection: 'row',
-        backgroundColor: '#2c3e50',
-        borderBottomWidth: 2,
-        borderBottomColor: '#1a252f',
+        backgroundColor: T.nav,
+        paddingVertical: 9,
+        paddingHorizontal: 6,
     },
-    headerCell: {
-        padding: 12,
-        borderRightWidth: 1,
-        borderRightColor: '#34495e',
-        justifyContent: 'center',
-        backgroundColor: '#2c3e50',
-    },
-    headerCellText: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#ffffff',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        textAlign: 'center',
-    },
-    headerCellTextRight: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#ffffff',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        textAlign: 'right',
-    },
-
-    // Data Rows
+    headerCellText: { color: '#fff', fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, paddingHorizontal: 6 },
+    headerCellTextRight: { color: '#fff', fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, paddingHorizontal: 6, textAlign: 'right' },
     dataRow: {
         flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 9,
+        paddingHorizontal: 6,
         borderBottomWidth: 1,
-        borderBottomColor: '#ecf0f1',
-        minHeight: 45,
+        borderBottomColor: T.hair,
     },
-    evenRow: {
-        backgroundColor: '#f8f9fa',
-    },
-    oddRow: {
-        backgroundColor: '#ffffff',
-    },
-    dataCell: {
-        padding: 10,
-        borderRightWidth: 1,
-        borderRightColor: '#ecf0f1',
-        justifyContent: 'center',
-    },
-    cellTextCenter: {
-        fontSize: 12,
-        color: '#2c3e50',
-        flexWrap: 'wrap',
-        lineHeight: 18,
-        textAlign: 'center',
-    },
-    cellTextRight: {
-        fontSize: 12,
-        color: '#2c3e50',
-        textAlign: 'right',
-        flexWrap: 'wrap',
-        fontWeight: '500',
-        lineHeight: 18,
-    },
-
-    // Footer Row
+    oddRow: { backgroundColor: T.sub },
+    cellText: { fontSize: 12.5, fontWeight: '600', color: T.ink, paddingHorizontal: 6 },
+    cellTextRight: { fontSize: 12.5, fontWeight: '700', color: T.ink, paddingHorizontal: 6, textAlign: 'right' },
     footerRow: {
         flexDirection: 'row',
-        backgroundColor: '#ecf0f1',
-        borderTopWidth: 2,
-        borderTopColor: '#bdc3c7',
+        paddingVertical: 10,
+        paddingHorizontal: 6,
+        backgroundColor: `${T.copper}12`,
     },
-    footerCell: {
-        padding: 12,
-        borderRightWidth: 1,
-        borderRightColor: '#bdc3c7',
-        justifyContent: 'center',
-        backgroundColor: '#ecf0f1',
-    },
-    footerCellText: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#2c3e50',
-        textTransform: 'uppercase',
-        textAlign: 'center',
-    },
-    footerCellTextRight: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#2c3e50',
-        textAlign: 'right',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    loadingIndicator: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    listContent: {
-        paddingBottom: 20,
-    },
-    breadcrumbChip: {
-        marginTop: 12,
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        borderBlockColor: 'rgba(255,255,255,0.15)',
-        borderTopWidth: 1,
-        paddingVertical: 6,
-        width: '100%',
-    },
-    breadcrumbRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-    },
-    breadcrumbSeparator: {
-        color: '#fff',
-        marginHorizontal: 6,
-    },
-    breadcrumbBackText: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '500',
-        opacity: 0.9,
-    },
-    breadcrumbCurrent: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '600',
-        flexShrink: 1,
-        textAlign: 'right',
-    },
+    footerCellText: { fontSize: 12, fontWeight: '900', color: T.nav, paddingHorizontal: 6 },
+    footerCellTextRight: { fontSize: 12, fontWeight: '900', color: T.nav, paddingHorizontal: 6, textAlign: 'right' },
 });
 
 export default SOPartyDetailsPart1;

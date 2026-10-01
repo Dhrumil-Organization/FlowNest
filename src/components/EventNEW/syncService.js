@@ -800,11 +800,15 @@ export async function syncShowEnquiries(id, token, yearno, prptype) {
   }
 }
 
-export async function deleteEnquiries(id, token, yearno, prptype) {
+export async function deleteEnquiries(id, token, yearno, prptype, eventCode) {
   try {
     const res = await api.delete(
       `${API}/api/enquiries/${id}?prptype=${prptype}&yearno=${yearno}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        // Event report: the selected event is sent with key `event`.
+        ...(eventCode ? { params: { event: eventCode } } : {}),
+      },
     );
     return res.data;
   } catch (err) {

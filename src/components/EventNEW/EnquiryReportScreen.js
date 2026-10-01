@@ -19,14 +19,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getCurrentFinancialYear } from "../../common/commonfunction";
+import { getEventYearNo } from "./eventYear";
 // import { Picker } from '@react-native-picker/picker';
 import { API } from "@/common/API/dynamicAPI";
 import AsyncStorage from "@/common/utils/compatibleStorage";
-import api from "./api";
-import { isOnline } from "./CardScanService";
-import EnquiryReportDrilldownScreen from "./EnquiryReportDrilldownScreen";
-import { S, T } from "@/src/theme";
 import {
   CONTENT_MAX,
   EmptyState,
@@ -41,6 +37,10 @@ import {
   cellWidth,
   useSotLayout,
 } from "@/src/components/erpUi";
+import { S, T } from "@/src/theme";
+import api from "./api";
+import { isOnline } from "./CardScanService";
+import EnquiryReportDrilldownScreen from "./EnquiryReportDrilldownScreen";
 
 // Configure your actual events here, or fetch from an /events endpoint
 // if you run many shows per year.
@@ -89,7 +89,7 @@ export default function EnquiryReportScreen({
     setOffline(false);
 
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const user_prptype = await AsyncStorage.getItem("user_prptype");
       const res = await api.get(
         `${API}/api/getevent?prptype=${user_prptype}&yearno=${yearno}`,
@@ -121,13 +121,12 @@ export default function EnquiryReportScreen({
     setOffline(false);
 
     try {
-      const yearno = getCurrentFinancialYear();
+      const yearno = await getEventYearNo();
       const user_prptype = await AsyncStorage.getItem("user_prptype");
       const res = await api.get(
         `${API}/api/geteventprptype?prptype=${user_prptype}&yearno=${yearno}`,
         {
-          // params: { event: selectedEvent },
-          params: {},
+          params: { event: eventCode },
         }
       );
       console.log("event dropdown res", res);
@@ -153,11 +152,12 @@ export default function EnquiryReportScreen({
     setOffline(false);
 
     try {
+      const yearno = await getEventYearNo();
       const res = await api.get(
-        `${API}/api/reports/enquiries/summary?prptype=${prpCode}&yearno=27`,
+        `${API}/api/reports/enquiries/summary?prptype=${prpCode}&yearno=${yearno}`,
         {
-          // params: { event: selectedEvent },
-          params: {},
+          params: { event: selectedEvent },
+          // params: {},
         }
       );
       console.log("loadSummary res", selectedEvent, res);

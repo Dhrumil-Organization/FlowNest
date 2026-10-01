@@ -1,7 +1,6 @@
 import { crlimtreq_styles } from '@/common/Style';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import theme from '@/components/theme';
 import { Ionicons } from '@expo/vector-icons';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -29,7 +28,6 @@ import {
   generateFinancialYearOptions,
   getCurrentFinancialYearMain,
 } from '../../common/API/Functions';
-import HeaderBar from '../../components/HeaderNew';
 import CustomDrawer from './CustomDrawer';
 import {
   DesignData,
@@ -39,6 +37,26 @@ import {
   WiseStatus
 } from './Modal';
 import SOPartyDetails from './SOPartyDetails/SOPartyDetails';
+import { S, T } from '@/src/theme';
+import {
+  Avatar,
+  BusyOverlay,
+  Btn,
+  CONTENT_MAX,
+  EmptyState,
+  Kpi,
+  KpiGrid,
+  Metric,
+  PanelHeader,
+  ProgressBar,
+  SearchBox,
+  SectionHead,
+  SortChip,
+  StatusPill,
+  cellWidth,
+  pct,
+  useSotLayout,
+} from './sotUi';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -57,8 +75,16 @@ const ResponsiveText = (props: React.ComponentProps<typeof Text>) => <Text {...p
 const AppShell = ({ children, style, ...props }: any) => (
   <View style={[{ flex: 1 }, style]} {...props}>{children}</View>
 );
-const Section = ({ children, style, ...props }: any) => (
-  <View style={style} {...props}>{children}</View>
+const Section = ({ children, style, title, subtitle, ...props }: any) => (
+  <View style={style} {...props}>
+    {title ? (
+      <View style={{ marginBottom: 8 }}>
+        <Text style={{ fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
+        {subtitle ? <Text style={{ fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 2 }}>{subtitle}</Text> : null}
+      </View>
+    ) : null}
+    {children}
+  </View>
 );
 
 const useResponsive = () => {
@@ -1098,7 +1124,7 @@ const SalesOrderTracking: React.FC<{
       );
       if (index !== -1) {
         setTimeout(() => {
-          flatListRef.current?.scrollToIndex({ index, animated: true });
+          flatListRef.current?.scrollToIndex({ index: Math.floor(index / Math.max(cols, 1)), animated: true });
           setHasAutoScrolled(true);
         }, 300);
       }
@@ -1792,88 +1818,84 @@ const SalesOrderTracking: React.FC<{
   const openDrawer = () => setIsDrawerVisible(true);
   const closeDrawer = () => setIsDrawerVisible(false);
 
-  const renderPartyCard = ({ item }: { item: Party }) => (
-    <TouchableOpacity
-      style={[
-        styles.partyCard,
-        lastViewedParcode === item.parcode && styles.recentlyViewedCard,
-      ]}
-      // onPress={() => handleCardPress(item)}
-      onPress={() => handleCardPressforDesign(item)}
-    >
-      <View style={styles.partyHeader}>
-        <View
-          style={[
-            styles.partyAvatar,
-            { backgroundColor: getColorForInitial(item.parcode) },
-          ]}
+  // ===== NEW ERP UI: layout + derived display values (presentation only) =====
+  const { isPhone, cols, gutter } = useSotLayout();
+  const isDesignWise = selectedItemStatus1 === 'Design Wise';
+  const activeFilterCount =
+    (selectedParty?.length ? 1 : 0) +
+    (selectedDesigns?.length ? 1 : 0) +
+    (selectedSalesExes?.length ? 1 : 0) +
+    (selectedItemStatus !== 'All' ? 1 : 0);
+  const hasLoadedOnce = Object.keys(getMainPayload || {}).length > 0;
+  const shownParties = searchQueryPOT.trim()
+    ? filteredData.length
+    : (renderedData && renderedData.length) || 0;
+
+  const renderPartyCard = ({ item }: { item: Party }) => {
+    const recent = lastViewedParcode === item.parcode;
+    const deliveredPct = 100 - pct(item.pendingmtr, item.totmtr);
+    return (
+      <View style={[cellWidth(cols), styles.gridCell]}>
+        <TouchableOpacity
+          style={[styles.partyCard, recent && styles.recentlyViewedCard]}
+          activeOpacity={0.85}
+          // onPress={() => handleCardPress(item)}
+          onPress={() => handleCardPressforDesign(item)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open designs for ${item.partyname}`}
         >
-          {getTrackingLoader ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text style={styles.partyAvatarText}>
-              {getInitials(item.partyname)}
-            </Text>
-          )}
-        </View>
-        <View style={styles.partyInfo}>
-          <Text style={styles.partyName}>{item.partyname}</Text>
-          <View style={styles.partyOrdersContainer}>
-            <Text style={styles.partyOrdersText}>{item.noof} orders</Text>
+          <View style={styles.partyHeader}>
+            <Avatar name={item.partyname} size={40} />
+            <View style={styles.partyInfo}>
+              <Text style={styles.partyName} numberOfLines={2}>
+                {item.partyname}
+              </Text>
+              <View style={styles.partyMetaRow}>
+                {!!item.parcode && <Text style={styles.partyCode}>#{item.parcode}</Text>}
+                <View style={styles.partyOrdersContainer}>
+                  <Icon name="receipt-long" size={11} color={T.blue} />
+                  <Text style={styles.partyOrdersText}>{item.noof} orders</Text>
+                </View>
+                {recent && (
+                  <View style={styles.recentlyViewedBadge}>
+                    <Icon name="history" size={11} color={T.copper} />
+                    <Text style={styles.recentlyViewedText}>Recent</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <Icon name="chevron-right" size={22} color={T.muted} style={styles.chevronIcon} />
           </View>
-        </View>
-        <Icon
-          name="chevron-right"
-          size={24}
-          color="#999"
-          style={styles.chevronIcon}
-        />
+
+          <View style={styles.progressRow}>
+            <View style={{ flex: 1 }}>
+              <ProgressBar value={deliveredPct} color={T.green} />
+            </View>
+            <Text style={styles.progressText}>{Math.round(deliveredPct)}% delivered</Text>
+          </View>
+
+          <View style={styles.partyValues}>
+            <View style={styles.valueRow}>
+              <Metric label="Total Meter" value={formatNumber(item.totmtr)} />
+              <Metric label="Pending Meter" value={formatNumber(item.pendingmtr)} color={T.copper} align="right" />
+            </View>
+            <View style={styles.valueRow}>
+              <Metric label="Amount" value={`₹ ${formatValue(item.amount)}`} />
+              <Metric label="Pending Amount" value={`₹ ${formatValue(item.pendingamt)}`} color={T.pd} align="right" />
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
-      <View style={styles.partyValues}>
-        <View style={styles.valueRow}>
-          <View style={styles.valueItem}>
-            <Text style={styles.valueLabel}>Total Meter:</Text>
-            <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
-          </View>
-          <View style={styles.valueItem}>
-            <Text style={[styles.valueLabel, { color: '#E65100' }]}>
-              Pending Meter:
-            </Text>
-            <Text style={[styles.valueText, { color: '#E65100' }]}>
-              {formatNumber(item.pendingmtr)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.valueRow}>
-          <View style={styles.valueItem}>
-            <Text style={styles.valueLabel}>Amount:</Text>
-            <Text style={styles.valueText}>{formatValue(item.amount)}</Text>
-          </View>
-          <View style={styles.valueItem}>
-            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
-              Pending Amount:
-            </Text>
-            <Text style={[styles.valueText, { color: '#4CAF50' }]}>
-              {formatValue(item.pendingamt)}
-            </Text>
-          </View>
-        </View>
-      </View>
-      {lastViewedParcode === item.parcode && (
-        <View style={styles.recentlyViewedBadge}>
-          <Text style={styles.recentlyViewedText}>Recently Viewed</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderFooter = () => {
     if (!loading) return null;
     return (
       <ActivityIndicator
         style={styles.loadingIndicator}
-        size="large"
-        color={theme.BRAND_GRADIENT_END}
+        size="small"
+        color={T.copper}
       />
     );
   };
@@ -1928,193 +1950,293 @@ const SalesOrderTracking: React.FC<{
     }
   };
 
-  return (
-    <>
-      <View style={{ backgroundColor: '#fff', height: '100%' }}>
-        {getTrackingLoader && <FullScreenLoader />}
-        <HeaderBar
-          userName={username}
-          placeholder="Search sales order..."
-          onSearch={setSearchQueryPOT}
-        />
-        <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
-          <Icon name="list" size={24} color="white" />
+  // ---------------------------------------------------------------------------
+  // NEW ERP UI helpers (presentation only — every handler below is the
+  // original one, called with the original arguments).
+  // ---------------------------------------------------------------------------
+  const listContentStyle = [styles.listContent, { paddingHorizontal: gutter - 5 }];
+
+  const filterChips: { icon: string; text: string }[] = [
+    { icon: 'calendar-today', text: `FY ${selectedYear}` },
+    { icon: 'local-shipping', text: `Delivery ≤ ${formatDate(delDate)}` },
+    { icon: isDesignWise ? 'style' : 'groups', text: selectedItemStatus1 },
+    { icon: 'flag', text: `Status: ${selectedItemStatus}` },
+    ...(selectedParty?.length ? [{ icon: 'person', text: `${selectedParty.length} part${selectedParty.length === 1 ? 'y' : 'ies'}` }] : []),
+    ...(selectedDesigns?.length ? [{ icon: 'category', text: `${selectedDesigns.length} item${selectedDesigns.length === 1 ? '' : 's'}` }] : []),
+    ...(selectedSalesExes?.length ? [{ icon: 'badge', text: `${selectedSalesExes.length} sales exe.` }] : []),
+  ];
+
+  const designPanelParty =
+    getDData?.partyname || selectedDesignData?.designdetails?.[0]?.partyname || '';
+  const subPanelParty = selectedPartyDetails?.designdetails?.[0]?.partyname || '';
+
+  const renderDesignCard = (
+    item: any,
+    onPress: () => void,
+    extra?: React.ReactNode,
+    showStatus = false,
+  ) => {
+    const deliveredPct = 100 - pct(item.pending, item.totmtr);
+    return (
+      <View style={[cellWidth(cols), styles.gridCell]}>
+        <TouchableOpacity style={styles.designCard} activeOpacity={0.85} onPress={onPress}>
+          <View style={styles.designHeader}>
+            <View style={styles.designIcon}>
+              <Icon name="texture" size={18} color={T.copper} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.designName} numberOfLines={2}>{item.Dsnname}</Text>
+              <Text style={styles.designCode} numberOfLines={1}>{item.dsncode}</Text>
+            </View>
+            {showStatus ? <StatusPill status={item.status} /> : <Icon name="chevron-right" size={22} color={T.muted} />}
+          </View>
+          <View style={styles.progressRow}>
+            <View style={{ flex: 1 }}>
+              <ProgressBar value={deliveredPct} color={T.green} />
+            </View>
+            <Text style={styles.progressText}>{Math.round(deliveredPct)}%</Text>
+          </View>
+          <View style={styles.designValues}>
+            <View style={styles.valueRow}>
+              <Metric label="Total Meter" value={formatNumber(item.totmtr)} />
+              <Metric label="Pending Meter" value={formatNumber(item.pending)} color={T.copper} align="right" />
+            </View>
+            <View style={styles.valueRow}>
+              <Metric label="Total Amount" value={`₹ ${formatValue(item.totamt)}`} />
+              <Metric label="Pending Amount" value={`₹ ${formatValue(item.pendingamt)}`} color={T.pd} align="right" />
+            </View>
+          </View>
+          {extra}
         </TouchableOpacity>
-        <CustomDrawer
-          isVisible={isDrawerVisible}
-          onClose={closeDrawer}
-          fromDate={fromDate}
-          delDate={delDate}
-          selectedYear={selectedYear}
-          onFromDateChange={setFromDate}
-          onToDateChange={setDelDate}
-          onYearChange={setSelectedYear}
-          onLoadPress={handleConfirmAction}
-          exeData={salesExeData}
-          onExeChange={setSelectedExe}
-          selectedExe={selectedExe?.SalesExecutive || 'Select Executive'}
-          designData={designData}
-          getPartyData={getPartyData}
-          isLoading={isLoading}
-          setIsLoading={setIsLoading}
-          onDesignSelect={setSelectedDesigns}
-          onItemSelectItem={setSelectedItems}
-          onItemSelectParty={setSelectedParty}
-          selectedDesigns={selectedDesigns}
-          setSelectedDesigns={setSelectedDesigns}
-          selectedItems={selectedItems}
-          setSelectedItems={setSelectedItems}
-          itemData={itemData}
-          selectedItemStatus={selectedItemStatus}
-          selectedItemStatus1={selectedItemStatus1}
-          onItemStatusChange={setSelectedItemStatus}
-          onItemStatusChange1={setSelectedItemStatus1}
-          setSelectedParty={setSelectedParty}
-          selectedParty={selectedParty}
-          yearOptions={yearOptions}
-          setSelectedSalesExes={setSelectedSalesExes}
-          selectedSalesExes={selectedSalesExes}
-          onSalesExeSelect={setSelectedSalesExes}
-        //salesExeData={salesExeData}
-        />
-        {salessumdata.length > 0 ? (
-          <View style={styles.container}>
-            <View style={styles.summaryContainer}>
-              <View style={[styles.summaryBox, { backgroundColor: '#E3F2FD' }]}>
-                <Text style={styles.summaryLabel}>Total Orders</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(salessumdata[0]?.noof || '0')}
-                </Text>
-              </View>
-              <View style={[styles.summaryBox, { backgroundColor: '#E8F5E8' }]}>
-                <Text style={styles.summaryLabel}>Total Meter</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(salessumdata[0]?.totmtr || '0')}
-                </Text>
-                <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
-                  Amount
-                </Text>
-                <Text style={styles.summaryValue}>
-                  {formatValue(salessumdata[0]?.amount || '0')}
-                </Text>
-              </View>
-              <View style={[styles.summaryBox, { backgroundColor: '#FFF3E0' }]}>
-                <Text style={styles.summaryLabel}>Pending Meter</Text>
-                <Text style={[styles.summaryValue, { color: '#E65100' }]}>
-                  {salessumdata[0]?.pendingmtr || '0'}
-                </Text>
-                <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
-                  Pending Amount
-                </Text>
-                <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
-                  {formatValue(salessumdata[0]?.pendingamt || '0')}
-                </Text>
-              </View>
-            </View>
-            <View
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text style={styles.sectionTitle}>
-                PARTIES (
-                {searchQueryPOT.trim()
-                  ? filteredData.length
-                  : (renderedData && renderedData.length) || '0'}
-                )
-              </Text>
-              <Text style={styles.sectionTitle}>
-                ALL PARTIES ({salesdataTotal || '0'})
-              </Text>
-            </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={styles.sectionTitle}></Text>
-              <TouchableOpacity
-                onPress={toggleSortOrder}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <Icon
-                  name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'}
-                  size={12}
-                  color="#333"
+      </View>
+    );
+  };
+
+  const renderSummaryBlock = (
+    summary: any,
+    key: React.Key,
+    onPress: () => void,
+    opts: { partyName?: string; showOrders?: boolean; cta: string },
+  ) => (
+    <TouchableOpacity key={key} style={styles.summaryCard} activeOpacity={0.88} onPress={onPress}>
+      <View style={styles.summaryTop}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.summaryEyebrow}>SUMMARY</Text>
+          {opts.partyName ? (
+            <Text style={styles.partyNameInSummary} numberOfLines={1}>{opts.partyName}</Text>
+          ) : null}
+        </View>
+        <View style={styles.summaryCta}>
+          <Text style={styles.summaryCtaText}>{opts.cta}</Text>
+          <Icon name="arrow-forward" size={14} color={T.copper} />
+        </View>
+      </View>
+      <View style={styles.summaryGrid}>
+        {opts.showOrders ? (
+          <Metric label="Orders" value={formatNumber(summary?.noofchallan || '0')} style={styles.summaryMetric} />
+        ) : (
+          <Metric label="Challan Qty" value={formatNumber(summary?.chalqty || '0')} style={styles.summaryMetric} />
+        )}
+        <Metric label="Total Meter" value={formatNumber(summary?.totmtr || '0')} style={styles.summaryMetric} />
+        <Metric label="Total Amount" value={`₹ ${formatValue(summary?.totamt || '0')}`} style={styles.summaryMetric} />
+        <Metric label="Pending Mtr" value={formatNumber(summary?.pending || '0')} color={T.copper} style={styles.summaryMetric} />
+        <Metric label="Pending Amt" value={`₹ ${formatValue(summary?.pendingamt || '0')}`} color={T.pd} style={styles.summaryMetric} />
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.root}>
+      {/* ───────────── Toolbar: search + filters ───────────── */}
+      <View style={styles.toolbar}>
+        <View style={[styles.toolbarInner, { paddingHorizontal: gutter }]}>
+          <SearchBox
+            value={searchQueryPOT}
+            onChangeText={setSearchQueryPOT}
+            placeholder={isPhone ? 'Search party, design, item…' : 'Search by party, party code, design or item…'}
+            style={{ flex: 1 }}
+          />
+          <Btn
+            label={isPhone ? '' : 'Filters'}
+            icon="tune"
+            onPress={openDrawer}
+            compact
+            badge={activeFilterCount || undefined}
+            style={styles.filterBtn}
+          />
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.chipRow, { paddingHorizontal: gutter }]}
+        >
+          {filterChips.map((c, i) => (
+            <TouchableOpacity key={`${c.text}-${i}`} style={styles.filterChip} onPress={openDrawer}>
+              <Icon name={c.icon as any} size={13} color={T.copper} />
+              <Text style={styles.filterChipText} numberOfLines={1}>{c.text}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <CustomDrawer
+        isVisible={isDrawerVisible}
+        onClose={closeDrawer}
+        fromDate={fromDate}
+        delDate={delDate}
+        selectedYear={selectedYear}
+        onFromDateChange={setFromDate}
+        onToDateChange={setDelDate}
+        onYearChange={setSelectedYear}
+        onLoadPress={handleConfirmAction}
+        exeData={salesExeData}
+        onExeChange={setSelectedExe}
+        selectedExe={selectedExe?.SalesExecutive || 'Select Executive'}
+        designData={designData}
+        getPartyData={getPartyData}
+        isLoading={isLoading}
+        setIsLoading={setIsLoading}
+        onDesignSelect={setSelectedDesigns}
+        onItemSelectItem={setSelectedItems}
+        onItemSelectParty={setSelectedParty}
+        selectedDesigns={selectedDesigns}
+        setSelectedDesigns={setSelectedDesigns}
+        selectedItems={selectedItems}
+        setSelectedItems={setSelectedItems}
+        itemData={itemData}
+        selectedItemStatus={selectedItemStatus}
+        selectedItemStatus1={selectedItemStatus1}
+        onItemStatusChange={setSelectedItemStatus}
+        onItemStatusChange1={setSelectedItemStatus1}
+        setSelectedParty={setSelectedParty}
+        selectedParty={selectedParty}
+        yearOptions={yearOptions}
+        setSelectedSalesExes={setSelectedSalesExes}
+        selectedSalesExes={selectedSalesExes}
+        onSalesExeSelect={setSelectedSalesExes}
+      //salesExeData={salesExeData}
+      />
+
+      {/* ───────────── Party list ───────────── */}
+      {salessumdata.length > 0 ? (
+        <FlatList
+          key={`sot-party-${cols}`}
+          ref={flatListRef}
+          style={styles.container}
+          data={renderedData} // <-- Yahan `renderedData` use karo
+          numColumns={cols}
+          renderItem={renderPartyCard}
+          keyExtractor={(item, index) => `${item.parcode}-${index}`}
+          onEndReached={loadMoreData}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={listContentStyle}
+          keyboardShouldPersistTaps="handled"
+          onScrollToIndexFailed={info => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true,
+              });
+            }, 200);
+          }}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <KpiGrid isPhone={isPhone}>
+                <Kpi
+                  label="Total Orders"
+                  icon="receipt-long"
+                  accent={T.blue}
+                  value={formatNumber(salessumdata[0]?.noof || '0')}
                 />
-                <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
-                  Sort by Pending Amt.
-                </Text>
-              </TouchableOpacity>
+                <Kpi
+                  label="Total Meter"
+                  icon="straighten"
+                  accent={T.nav}
+                  value={formatNumber(salessumdata[0]?.totmtr || '0')}
+                  sub={`₹ ${formatValue(salessumdata[0]?.amount || '0')} amount`}
+                />
+                <Kpi
+                  label="Pending Meter"
+                  icon="pending-actions"
+                  accent={T.copper}
+                  valueColor={T.copper}
+                  value={formatNumber(salessumdata[0]?.pendingmtr || '0')}
+                  sub={`${Math.round(pct(salessumdata[0]?.pendingmtr, salessumdata[0]?.totmtr))}% of total`}
+                />
+                <Kpi
+                  label="Pending Amount"
+                  icon="account-balance-wallet"
+                  accent={T.pd}
+                  valueColor={T.pd}
+                  value={`₹ ${formatValue(salessumdata[0]?.pendingamt || '0')}`}
+                />
+              </KpiGrid>
+              <SectionHead
+                title="Parties"
+                meta={`${shownParties} shown · ${salesdataTotal || '0'} total`}
+                right={<SortChip label="Pending Amt" order={sortOrder} onPress={toggleSortOrder} />}
+              />
             </View>
-            <FlatList
-              ref={flatListRef}
-              data={renderedData} // <-- Yahan `renderedData` use karo
-              renderItem={renderPartyCard}
-              keyExtractor={(item, index) => `${item.parcode}-${index}`}
-              onEndReached={loadMoreData}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={renderFooter}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                !isLoading ? (
-                  <View style={crlimtreq_styles.emptyContainer}>
-                    <Text style={crlimtreq_styles.emptyText}>
-                      No request data found!
-                    </Text>
-                  </View>
-                ) : null
+          }
+          ListEmptyComponent={
+            !isLoading ? (
+              <EmptyState icon="search-off" title="No matching parties" text="Try another party, design or item name." />
+            ) : null
+          }
+          extraData={[lastViewedParcode, cols]}
+          onContentSizeChange={() => setIsListReady(true)}
+        />
+      ) : (
+        <ScrollView style={styles.container} contentContainerStyle={listContentStyle}>
+          <View style={styles.emptyCard}>
+            <EmptyState
+              icon={hasLoadedOnce ? 'inbox' : 'track-changes'}
+              title={hasLoadedOnce ? 'No data found!' : 'Track your sales orders'}
+              text={
+                hasLoadedOnce
+                  ? 'Nothing matched these filters. Change the filters and load again.'
+                  : 'Choose the delivery date, year and filters, then tap Load to see party-wise or design-wise pending orders.'
               }
-              extraData={lastViewedParcode}
-              onContentSizeChange={() => setIsListReady(true)}
+              action={<Btn label="Open filters" icon="tune" onPress={openDrawer} />}
             />
           </View>
-        ) : (
-          <>
-            <View style={styles.container}>
-              <View style={crlimtreq_styles.emptyContainer}>
-                <Text style={crlimtreq_styles.emptyText}>No data found!</Text>
-              </View>
+        </ScrollView>
+      )}
+
+      {/* ───────────── Main design summary (drill-down 1) ───────────── */}
+      {isDesignModalVisible && (
+        <View style={[styles.panel, { zIndex: 200 }]}>
+          <PanelHeader
+            onBack={closeDesignModal}
+            crumbs={['Sales Order Tracking', isDesignWise ? 'Design Wise' : designPanelParty]}
+            title="Main Design Summary"
+            subtitle={`${filteredDesignDetails.length} design${filteredDesignDetails.length === 1 ? '' : 's'}`}
+          />
+          <View style={[styles.panelSearch, { paddingHorizontal: gutter }]}>
+            <View style={styles.panelSearchInner}>
+              <SearchBox
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search designs…"
+                loading={getTrackingLoader}
+              />
             </View>
-          </>
-        )}
-        {isDesignModalVisible && (
-          <View style={styles.detailOverlay123}>
-            <View style={styles.detailContainer}>
-              <View style={styles.modalContainer}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Main Design Summary</Text>
-                  <TouchableOpacity onPress={closeDesignModal}>
-                    <Icon name="close" size={24} color="#333" />
-                  </TouchableOpacity>
-                </View>
-                {getTrackingLoader ? (
-                  <ActivityIndicator
-                    style={{ marginBottom: 10 }}
-                    size={24}
-                    color={theme.BRAND_GRADIENT_END}
-                  />
-                ) : (
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search designs..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                )}
-                {selectedDesignData?.design_summary.map((summary, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={
-                      selectedItemStatus1 === 'Design Wise'
-                        ? styles.summaryCard123
-                        : styles.summaryCard
-                    }
-                    onPress={() => {
+          </View>
+          <FlatList
+            key={`sot-dsn-${cols}`}
+            style={styles.container}
+            numColumns={cols}
+            data={filteredDesignDetails.slice(0, designPage * designItemsPerPage)}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={listContentStyle}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                {selectedDesignData?.design_summary.map((summary, index) =>
+                  renderSummaryBlock(
+                    summary,
+                    index,
+                    () => {
                       // handleCardPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
                       handleCardSubDesignPress(
                         getDData,
@@ -2122,592 +2244,221 @@ const SalesOrderTracking: React.FC<{
                         selectedDesignData?.payload,
                       );
                       setisALL(true);
-                    }}
-                  >
-                    {selectedItemStatus1 === 'Design Wise' ? null : (
-                      <Text style={styles.partyNameInSummary}>
-                        Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
-                      </Text>
-                    )}
-                    {selectedItemStatus1 === 'Design Wise' ? (
-                      <>
-                        <View style={styles.summaryContainer}>
-                          <View
-                            style={[
-                              styles.summaryBox,
-                              { backgroundColor: '#E3F2FD' },
-                            ]}
-                          >
-                            <Text style={styles.summaryLabel}>Total Orders</Text>
-                            <Text style={styles.summaryValue}>
-                              {formatNumber(summary?.noofchallan || '0')}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.summaryBox,
-                              { backgroundColor: '#E8F5E8' },
-                            ]}
-                          >
-                            <Text style={styles.summaryLabel}>Total Meter</Text>
-                            <Text style={styles.summaryValue}>
-                              {formatNumber(summary.totmtr)}
-                            </Text>
-                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
-                              Total Amount
-                            </Text>
-                            <Text style={styles.summaryValue}>
-                              {formatValue(summary.totamt)}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.summaryBox,
-                              { backgroundColor: '#FFF3E0' },
-                            ]}
-                          >
-                            <Text style={styles.summaryLabel}>Pending Meter</Text>
-                            <Text style={[styles.summaryValue, { color: '#E65100' }]}>
-                              {formatNumber(summary.pending)}
-                            </Text>
-                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
-                              Pending Amount
-                            </Text>
-                            <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
-                              {formatValue(summary.pendingamt)}
-                            </Text>
-                          </View>
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Total Meter:</Text>
-                          <Text style={styles.summaryValue}>
-                            {formatNumber(summary.totmtr)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Total Amount:</Text>
-                          <Text style={styles.summaryValue}>
-                            {formatValue(summary.totamt)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Challan Qty:</Text>
-                          <Text style={styles.summaryValue}>
-                            {formatNumber(summary.chalqty)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Pending Meter:</Text>
-                          <Text style={[styles.summaryValue, { color: '#E65100' }]}>
-                            {formatNumber(summary.pending)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Pending Amount:</Text>
-                          <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
-                            {formatValue(summary.pendingamt)}
-                          </Text>
-                        </View>
-                      </>
-                    )}
-
-                    {/*  */}
-                  </TouchableOpacity>
-                ))}
-                {/* <Text style={styles.sectionTitle}>Main Item Details</Text> */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={styles.sectionTitle}>Main Design Details</Text>
-                  <TouchableOpacity
-                    onPress={toggleSortOrder1}
-                    style={{ flexDirection: 'row', alignItems: 'center' }}
-                  >
-                    <Icon
-                      name={sortOrder1 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
-                      size={12}
-                      color="#333"
-                    />
-                    <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
-                      Sort by Pending Amt.
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={filteredDesignDetails.slice(
-                    0,
-                    designPage * designItemsPerPage,
-                  )}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.designCard}
-                      onPress={() => {
-                        const payload = {
-                          ...selectedDesignData!.payload,
-                          dsncodes: [item.dsncode],
-                          itemcodes: [item.dsncode],
-                        };
-                        // handleCardPress(getDData, { parname: item.partyname }, payload);
-                        handleCardSubDesignPress(
-                          getDData,
-                          { parname: item.partyname },
-                          payload,
-                          item,
-                        );
-                        setisALL(false);
-                      }}
-                    >
-                      <View style={styles.designHeader}>
-                        <Text style={styles.designName}>{item.Dsnname}</Text>
-                        <Text style={styles.designCode}>{item.dsncode}</Text>
-                      </View>
-                      {/* 👇 ADD THIS */}
-                      {/* <TouchableOpacity
-                                            style={styles.jobChartBtn}
-                                            onPress={(e) => {
-                                                openJobChart(item, selectedPartyDetails?.payload);
-                                            }}
-                                        >
-                                            <Icon name="receipt-long" size={14} color={theme.BRAND_GRADIENT_END} />
-                                            <Text style={styles.jobChartBtnText}>Job Chart</Text>
-                                        </TouchableOpacity> */}
-                      <View style={styles.designValues}>
-                        <View style={styles.valueRow}>
-                          <View style={styles.valueItem}>
-                            <Text style={styles.valueLabel}>Total Meter:</Text>
-                            <Text style={styles.valueText}>
-                              {formatNumber(item.totmtr)}
-                            </Text>
-                          </View>
-                          <View style={styles.valueItem}>
-                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>
-                              Pending Meter:
-                            </Text>
-                            <Text style={[styles.valueText, { color: '#E65100' }]}>
-                              {formatNumber(item.pending)}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.valueRow}>
-                          <View style={styles.valueItem}>
-                            <Text style={styles.valueLabel}>Total Amount:</Text>
-                            <Text style={styles.valueText}>
-                              {formatValue(item.totamt)}
-                            </Text>
-                          </View>
-                          <View style={styles.valueItem}>
-                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
-                              Pending Amount:
-                            </Text>
-                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>
-                              {formatValue(item.pendingamt)}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={(item, index) => `${item.dsncode}-${index}`}
-                  onEndReached={loadMoreDesignDetails}
-                  onEndReachedThreshold={0.5}
-                  ListFooterComponent={
-                    designPage * designItemsPerPage < filteredDesignDetails.length ? (
-                      <ActivityIndicator
-                        size="large"
-                        color={theme.BRAND_GRADIENT_END}
-                      />
-                    ) : null
-                  }
-                />
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/*  */}
-        {isPartyDetailsModalVisible && (
-          <View style={styles.detailOverlay456}>
-            <View style={styles.detailContainer}>
-              <View style={styles.modalContainer}>
-                {!isAll ? (
-                  <>
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Sub Design Summary</Text>
-                      <TouchableOpacity
-                        onPress={() => setIsPartyDetailsModalVisible(false)}
-                      >
-                        <Icon name="close" size={24} color="#333" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Search Input */}
-                    {getTrackingLoader ? (
-                      <ActivityIndicator
-                        style={{ marginBottom: 10 }}
-                        size={24}
-                        color={theme.BRAND_GRADIENT_END}
-                      />
-                    ) : (
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search sub design details..."
-                        value={searchQueryPartyDetails}
-                        onChangeText={setSearchQueryPartyDetails}
-                      />
-                    )}
-                    {selectedPartyDetails?.design_summary.map((summary, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.summaryCard}
-                        onPress={() => {
-                          // handleCardPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
-                          // handleCardSubDesignPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
-                          handleCardPress(
-                            selectedPartyDetails?.payload,
-                            {
-                              parname:
-                                selectedPartyDetails?.designdetails[0].partyname,
-                            },
-                            { dsnname: 'All Items' },
-                            selectedPartyDetails?.payload,
-                            summary,
-                          );
-                        }}
-                      >
-                        {selectedItemStatus1 === 'Design Wise' ? null : (
-                          <Text style={styles.partyNameInSummary}>
-                            Party:{' '}
-                            {selectedPartyDetails?.designdetails[0]?.partyname || ''}
-                          </Text>
-                        )}
-
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Total Meter:</Text>
-                          <Text style={styles.summaryValue}>{summary.totmtr}</Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Total Amount:</Text>
-                          <Text style={styles.summaryValue}>
-                            {formatValue(summary.totamt)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Challan Qty:</Text>
-                          <Text style={styles.summaryValue}>
-                            {formatNumber(summary.chalqty)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Pending Meter:</Text>
-                          <Text style={[styles.summaryValue, { color: '#E65100' }]}>
-                            {formatNumber(summary.pending)}
-                          </Text>
-                        </View>
-                        <View style={styles.summaryRow}>
-                          <Text style={styles.summaryLabel}>Pending Amount:</Text>
-                          <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
-                            {formatValue(summary.pendingamt)}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                ) : (
-                  <View>
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Sub Design Summary</Text>
-                      <TouchableOpacity
-                        onPress={() => setIsPartyDetailsModalVisible(false)}
-                      >
-                        <Icon name="close" size={24} color="#333" />
-                      </TouchableOpacity>
-                    </View>
-                    {getTrackingLoader ? (
-                      <ActivityIndicator
-                        style={{ marginBottom: 10 }}
-                        size={24}
-                        color={theme.BRAND_GRADIENT_END}
-                      />
-                    ) : (
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search sub design details..."
-                        value={searchQueryPartyDetails}
-                        onChangeText={setSearchQueryPartyDetails}
-                      />
-                    )}
-                  </View>
+                    },
+                    {
+                      partyName: isDesignWise ? undefined : selectedDesignData?.designdetails[0]?.partyname || '',
+                      showOrders: isDesignWise,
+                      cta: 'All sub designs',
+                    },
+                  ),
                 )}
-                {/* Party Details List */}
-                {/* <FlatList
-                        data={filteredPartyDetails}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.partyDetailCard}
-                                onPress={() => {
-                                    const payload = {
-                                        deldate: item.delDate || selectedDesignData?.payload.deldate,
-                                        uid: item.uid,
-                                        mdsncode: item.dsncode,
-                                        parcode: item.parcode,
-                                        prptype: 'S',
-                                        txntype: 'prodorderlist',
-                                    };
-                                    handleCardPress(selectedDesignData?.payload, { parname: item.partyname }, payload, item);
-                                }}
-                            >
-                                <Text style={styles.partyDetailName}>{item.partyname}</Text>
-                                <Text style={styles.partyDetailCode}>Design: {item.Dsnname}</Text>
-                                <Text style={styles.partyDetailMeter}>Meter: {item.totmtr}</Text>
-                                <Text style={[
-                                    styles.partyDetailStatus,
-                                    { color: item.status === 'CLOSED' ? '#4CAF50' : '#E65100' }
-                                ]}>Status: {item.status}</Text>
-                            </TouchableOpacity>
-                        )}
-                        keyExtractor={(item, index) => `${item.uid}-${index}`}
-                        ListEmptyComponent={
-                            <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>No party details found!</Text>
-                            </View>
-                        }
-                    /> */}
-                {/* <Text style={styles.sectionTitle}>Sub Design Details</Text> */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={styles.sectionTitle}>Sub Design Details</Text>
-                  <TouchableOpacity
-                    onPress={toggleSortOrder2}
-                    style={{ flexDirection: 'row', alignItems: 'center' }}
-                  >
-                    <Icon
-                      name={sortOrder2 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
-                      size={12}
-                      color="#333"
-                    />
-                    <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
-                      Sort by Pending Amt.
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={filteredPartyDetails.slice(
-                    0,
-                    subdesignPage * subdesignItemsPerPage,
-                  )}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.designCard}
-                      onPress={() => {
-                        const payload = {
-                          ...selectedPartyDetails!.payload,
-                          dsncodes: [item.dsncode],
-                          itemcodes: [item.dsncode],
-                        };
-                        // handleCardPress(getDData, { parname: item.partyname }, payload);
-                        // handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
-                        handleCardPress(
-                          selectedPartyDetails?.payload,
-                          { parname: item.partyname },
-                          { dsnname: item.Dsnname },
-                          payload,
-                          item,
-                        );
-                      }}
-                    >
-                      <View style={styles.designHeader}>
-                        <Text style={styles.designName}>{item.Dsnname}</Text>
-                        <Text style={styles.designCode}>{item.dsncode}</Text>
-                      </View>
-                      {/* <View style={styles.designSubheader}>
-                                            <Text style={styles.designNameSub}>Shade: {item.shdname} ({item.shdcode})</Text>
-                                        </View> */}
-
-                      <View style={styles.designValues}>
-                        <View style={styles.valueRow}>
-                          <View style={styles.valueItem}>
-                            <Text style={styles.valueLabel}>Total Meter:</Text>
-                            <Text style={styles.valueText}>
-                              {formatNumber(item.totmtr)}
-                            </Text>
-                          </View>
-                          <View style={styles.valueItem}>
-                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>
-                              Pending Meter:
-                            </Text>
-                            <Text style={[styles.valueText, { color: '#E65100' }]}>
-                              {formatNumber(item.pending)}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.valueRow}>
-                          <View style={styles.valueItem}>
-                            <Text style={styles.valueLabel}>Total Amount:</Text>
-                            <Text style={styles.valueText}>
-                              {formatValue(item.totamt)}
-                            </Text>
-                          </View>
-                          <View style={styles.valueItem}>
-                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
-                              Pending Amount:
-                            </Text>
-                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>
-                              {formatValue(item.pendingamt)}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.valueRow}>
-                          <View style={styles.valueItem}>
-                            <Text style={styles.valueLabel}>So No:</Text>
-                            <Text style={styles.valueText}>{item.sono}</Text>
-                          </View>
-                          <View style={styles.valueItem}>
-                            <Text style={[styles.valueLabel]}>So Date:</Text>
-                            <Text style={[styles.valueText]}>{item.sodate}</Text>
-                          </View>
-                        </View>
-                        <View style={[styles.valueRow, { marginTop: 8 }]}>
-                          <View style={[styles.valueItem, { flex: 1 }]}>
-                            <Text style={styles.valueLabel}>Allocation:</Text>
-                            <TouchableOpacity
-                              style={[
-                                styles.allocationPendingPill,
-                                {
-                                  backgroundColor: isSubDesignAllocated(item) ? '#FFF3E0' : '#F3F4F6',
-                                  borderColor: isSubDesignAllocated(item) ? '#F59E0B' : '#9CA3AF',
-                                },
-                              ]}
-                              onPress={(e) => {
-                                e.stopPropagation?.();
-                                openJobChart(item, selectedPartyDetails?.payload);
-                              }}
-                              hitSlop={8}
-                              accessibilityRole="button"
-                              accessibilityLabel="Open Job Chart"
-                            >
-                              <Text
-                                style={[
-                                  styles.allocationPendingText,
-                                  { color: isSubDesignAllocated(item) ? '#F59E0B' : '#6B7280' },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {subDesignAllocationPendingText(item)}
-                              </Text>
-                              <Icon
-                                name="arrow-forward"
-                                size={12}
-                                color={isSubDesignAllocated(item) ? '#F59E0B' : '#6B7280'}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                          {/* <View style={styles.valueItem}>
-                                                    <Text style={styles.valueLabel}>APC Code:</Text>
-                                                    <Text style={[styles.valueText, { color: theme.BRAND_GRADIENT_END, fontWeight: '800' }]}>
-                                                        {String(item?.apccode ?? item?.apcCode ?? '—').trim() || '—'}
-                                                    </Text>
-                                                </View> */}
-                          <View style={styles.designSubheader}>
-                            <View
-                              style={[
-                                styles.jobChartBtn,
-                                {
-                                  backgroundColor:
-                                    item.status === 'CLOSED'
-                                      ? '#FFEBEE'
-                                      : item.status === 'PENDING'
-                                        ? '#FFF3E0'
-                                        : item.status === 'PARTIAL'
-                                          ? '#E8F5E8'
-                                          : 'transparent',
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.jobChartBtnText,
-                                  {
-                                    color:
-                                      item.status === 'CLOSED'
-                                        ? '#E65100'
-                                        : item.status === 'PENDING'
-                                          ? '#E65100'
-                                          : item.status === 'PARTIAL'
-                                            ? '#4CAF50'
-                                            : theme.BRAND_GRADIENT_END,
-                                  },
-                                ]}
-                              >
-                                {item.status}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={(item, index) => `${item.dsncode}-${index}`}
-                  onEndReached={loadMoreSubDesignDetails}
-                  onEndReachedThreshold={0.5}
-                  ListFooterComponent={
-                    subdesignPage * subdesignItemsPerPage <
-                      filteredPartyDetails.length ? (
-                      <ActivityIndicator
-                        size="large"
-                        color={theme.BRAND_GRADIENT_END}
-                      />
-                    ) : null
-                  }
+                <SectionHead
+                  title="Main Design Details"
+                  meta="Tap a design to see its sub designs"
+                  right={<SortChip label="Pending Amt" order={sortOrder1} onPress={toggleSortOrder1} />}
                 />
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* INTEGRATED JOB CHART — same screen, no route change */}
-        {jobChartVisible && jobChartRef && (
-          <View style={styles.jobChartFullOverlay}>
-            <IntegratedJobChart
-              token={token}
-              refData={jobChartRef}
-              trackingPayload={jobChartRef.trackingPayload || selectedPartyDetails?.payload || {}}
-              onClose={() => {
-                setJobChartVisible(false);
-                setJobChartRef(null);
-              }}
-            />
-          </View>
-        )}
-
-
-      </View>
-      {getSOParty && (
-        <View style={styles.detailOverlay789}>
-          <View style={styles.detailContainer789}>
-            <SOPartyDetails token={token} username={username}
-              party={getSOParty_party}
-              selectedSalesExes={getSOParty_selectedSalesExes}
-              setSOParty_party={setSOParty_party}
-              setSOParty_selectedSalesExes={setSOParty_selectedSalesExes}
-              setSOParty={setSOParty}
-            />
-          </View>
+            }
+            renderItem={({ item }) =>
+              renderDesignCard(item, () => {
+                const payload = {
+                  ...selectedDesignData!.payload,
+                  dsncodes: [item.dsncode],
+                  itemcodes: [item.dsncode],
+                };
+                // handleCardPress(getDData, { parname: item.partyname }, payload);
+                handleCardSubDesignPress(
+                  getDData,
+                  { parname: item.partyname },
+                  payload,
+                  item,
+                );
+                setisALL(false);
+              })
+            }
+            keyExtractor={(item, index) => `${item.dsncode}-${index}`}
+            onEndReached={loadMoreDesignDetails}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={<EmptyState icon="search-off" title="No designs found" />}
+            ListFooterComponent={
+              designPage * designItemsPerPage < filteredDesignDetails.length ? (
+                <ActivityIndicator style={styles.loadingIndicator} size="small" color={T.copper} />
+              ) : null
+            }
+          />
         </View>
       )}
-    </>
+
+      {/* ───────────── Sub design summary (drill-down 2) ───────────── */}
+      {isPartyDetailsModalVisible && (
+        <View style={[styles.panel, { zIndex: 300 }]}>
+          <PanelHeader
+            onBack={() => setIsPartyDetailsModalVisible(false)}
+            crumbs={['Sales Order Tracking', isDesignWise ? 'Design Wise' : subPanelParty, 'Main Design']}
+            title="Sub Design Summary"
+            subtitle={`${filteredPartyDetails.length} sub design${filteredPartyDetails.length === 1 ? '' : 's'}`}
+          />
+          <View style={[styles.panelSearch, { paddingHorizontal: gutter }]}>
+            <View style={styles.panelSearchInner}>
+              <SearchBox
+                value={searchQueryPartyDetails}
+                onChangeText={setSearchQueryPartyDetails}
+                placeholder="Search sub design details…"
+                loading={getTrackingLoader}
+              />
+            </View>
+          </View>
+          <FlatList
+            key={`sot-sub-${cols}`}
+            style={styles.container}
+            numColumns={cols}
+            data={filteredPartyDetails.slice(0, subdesignPage * subdesignItemsPerPage)}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={listContentStyle}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                {!isAll &&
+                  selectedPartyDetails?.design_summary.map((summary, index) =>
+                    renderSummaryBlock(
+                      summary,
+                      index,
+                      () => {
+                        handleCardPress(
+                          selectedPartyDetails?.payload,
+                          {
+                            parname: selectedPartyDetails?.designdetails[0].partyname,
+                          },
+                          { dsnname: 'All Items' },
+                          selectedPartyDetails?.payload,
+                          summary,
+                        );
+                      },
+                      {
+                        partyName: isDesignWise ? undefined : selectedPartyDetails?.designdetails[0]?.partyname || '',
+                        showOrders: false,
+                        cta: 'All orders',
+                      },
+                    ),
+                  )}
+                <SectionHead
+                  title="Sub Design Details"
+                  meta="Tap a sub design to open its sales orders"
+                  right={<SortChip label="Pending Amt" order={sortOrder2} onPress={toggleSortOrder2} />}
+                />
+              </View>
+            }
+            renderItem={({ item }) =>
+              renderDesignCard(
+                item,
+                () => {
+                  const payload = {
+                    ...selectedPartyDetails!.payload,
+                    dsncodes: [item.dsncode],
+                    itemcodes: [item.dsncode],
+                  };
+                  // handleCardPress(getDData, { parname: item.partyname }, payload);
+                  // handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
+                  handleCardPress(
+                    selectedPartyDetails?.payload,
+                    { parname: item.partyname },
+                    { dsnname: item.Dsnname },
+                    payload,
+                    item,
+                  );
+                },
+                <View style={styles.subFooter}>
+                  <View style={styles.soMeta}>
+                    <View style={styles.soMetaItem}>
+                      <Icon name="tag" size={13} color={T.muted} />
+                      <Text style={styles.soMetaText} numberOfLines={1}>SO {item.sono || '—'}</Text>
+                    </View>
+                    <View style={styles.soMetaItem}>
+                      <Icon name="event" size={13} color={T.muted} />
+                      <Text style={styles.soMetaText} numberOfLines={1}>{item.sodate || '—'}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.allocationPendingPill,
+                      isSubDesignAllocated(item) ? styles.allocationOn : styles.allocationOff,
+                    ]}
+                    onPress={e => {
+                      e?.stopPropagation?.();
+                      openJobChart(item, selectedPartyDetails?.payload);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Job Chart"
+                  >
+                    <Icon
+                      name="assignment"
+                      size={14}
+                      color={isSubDesignAllocated(item) ? T.copper : T.nav}
+                    />
+                    <Text
+                      style={[
+                        styles.allocationPendingText,
+                        { color: isSubDesignAllocated(item) ? T.copper : T.nav },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {isSubDesignAllocated(item)
+                        ? `Alloc. pending ${subDesignAllocationPendingText(item)}`
+                        : subDesignAllocationPendingText(item)}
+                    </Text>
+                    <Icon
+                      name="arrow-forward"
+                      size={13}
+                      color={isSubDesignAllocated(item) ? T.copper : T.nav}
+                    />
+                  </TouchableOpacity>
+                </View>,
+                true,
+              )
+            }
+            keyExtractor={(item, index) => `${item.dsncode}-${index}`}
+            onEndReached={loadMoreSubDesignDetails}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={<EmptyState icon="search-off" title="No sub designs found" />}
+            ListFooterComponent={
+              subdesignPage * subdesignItemsPerPage < filteredPartyDetails.length ? (
+                <ActivityIndicator style={styles.loadingIndicator} size="small" color={T.copper} />
+              ) : null
+            }
+          />
+        </View>
+      )}
+
+      {/* ───────────── SO party details (drill-down 3) ───────────── */}
+      {getSOParty && (
+        <View style={[styles.panel, { zIndex: 400 }]}>
+          <SOPartyDetails token={token} username={username}
+            party={getSOParty_party}
+            selectedSalesExes={getSOParty_selectedSalesExes}
+            setSOParty_party={setSOParty_party}
+            setSOParty_selectedSalesExes={setSOParty_selectedSalesExes}
+            setSOParty={setSOParty}
+          />
+        </View>
+      )}
+
+      {/* INTEGRATED JOB CHART — same screen, no route change */}
+      {jobChartVisible && jobChartRef && (
+        <View style={styles.jobChartFullOverlay}>
+          <IntegratedJobChart
+            token={token}
+            refData={jobChartRef}
+            trackingPayload={jobChartRef.trackingPayload || selectedPartyDetails?.payload || {}}
+            onClose={() => {
+              setJobChartVisible(false);
+              setJobChartRef(null);
+            }}
+          />
+        </View>
+      )}
+
+      <BusyOverlay visible={getTrackingLoader || (isLoading && !isDrawerVisible)} text="Loading sales orders…" />
+    </View>
   );
 };
 
@@ -2925,18 +2676,19 @@ function IntegratedJobChart({ token, refData, trackingPayload, onClose }: Integr
     return {
       ...legacy,
       colors: {
-        surface: colors.surface || legacy.surface || '#FFFFFF',
-        background: colors.background || legacy.background || '#FFFFFF',
-        backgroundSoft: colors.backgroundSoft || '#F7F7F7',
-        border: colors.border || '#D9DDE3',
-        text: colors.text || '#20242A',
-        textMuted: colors.textMuted || '#68707D',
-        textDim: colors.textDim || '#98A0AA',
-        success: colors.success || '#2E7D32',
-        warning: colors.warning || '#F59E0B',
-        danger: colors.danger || '#D32F2F',
-        common: colors.common || legacy.BRAND_GRADIENT_END || '#68707D',
-        redBright: colors.redBright || legacy.BRAND_GRADIENT_END || '#D32F2F',
+        // NEW ERP palette (src/constants/theme.ts) — same keys, new tokens.
+        surface: T.surface,
+        background: T.bg,
+        backgroundSoft: T.sub,
+        border: T.border,
+        text: T.ink,
+        textMuted: T.muted,
+        textDim: '#B5AEA6',
+        success: T.green,
+        warning: T.copper,
+        danger: T.red,
+        common: colors.common || T.nav,
+        redBright: colors.redBright || T.red,
       },
     };
   }, [baseTheme]);
@@ -3946,8 +3698,8 @@ function IntegratedJobChart({ token, refData, trackingPayload, onClose }: Integr
                     },
                   ]}
                 >
-                  <Ionicons name="add" size={16} color={parseWholeNumber(editorShadeCount) > 0 && parseWholeNumber(editorShadeCount) !== editorShades.length ? '#111' : theme.colors.textDim} />
-                  <ResponsiveText style={[jobChartStyles.secondaryButtonText, { color: parseWholeNumber(editorShadeCount) > 0 && parseWholeNumber(editorShadeCount) !== editorShades.length ? '#111' : theme.colors.textDim }]}>
+                  <Ionicons name="add" size={16} color={parseWholeNumber(editorShadeCount) > 0 && parseWholeNumber(editorShadeCount) !== editorShades.length ? '#fff' : theme.colors.textDim} />
+                  <ResponsiveText style={[jobChartStyles.secondaryButtonText, { color: parseWholeNumber(editorShadeCount) > 0 && parseWholeNumber(editorShadeCount) !== editorShades.length ? '#fff' : theme.colors.textDim }]}>
                     Apply
                   </ResponsiveText>
                 </Pressable>
@@ -4067,8 +3819,8 @@ function IntegratedJobChart({ token, refData, trackingPayload, onClose }: Integr
                     },
                   ]}
                 >
-                  {editorSaving ? <ActivityIndicator size="small" color="#111" /> : <Ionicons name="checkmark" size={17} color={editorCanSave ? '#111' : theme.colors.textDim} />}
-                  <ResponsiveText style={[jobChartStyles.editorSaveText, { color: editorCanSave ? '#111' : theme.colors.textDim }]}>
+                  {editorSaving ? <ActivityIndicator size="small" color="#111" /> : <Ionicons name="checkmark" size={17} color={editorCanSave ? '#fff' : theme.colors.textDim} />}
+                  <ResponsiveText style={[jobChartStyles.editorSaveText, { color: editorCanSave ? '#fff' : theme.colors.textDim }]}>
                     {editorMode === 'create' ? 'Create chart' : 'Save changes'}
                   </ResponsiveText>
                 </Pressable>
@@ -4693,7 +4445,7 @@ const jobChartStyles = StyleSheet.create({
     gap: 6,
   },
   createButtonText: {
-    color: '#111',
+    color: '#fff',
     fontSize: responsiveFontSize(11),
     fontWeight: '900',
   },
@@ -4827,7 +4579,7 @@ const jobChartStyles = StyleSheet.create({
     gap: 6,
   },
   editorSaveText: {
-    color: '#111',
+    color: '#fff',
     fontSize: responsiveFontSize(11),
     fontWeight: '900',
   },
@@ -4953,7 +4705,7 @@ const jobChartStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0,0,0,0.62)',
+    backgroundColor: 'rgba(13,27,42,0.55)',
   },
   confirmCard: {
     width: '100%',
@@ -4973,9 +4725,9 @@ const jobChartStyles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: T.alt,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: T.border,
   },
   confirmTitle: {
     fontSize: responsiveFontSize(18),
@@ -5013,7 +4765,7 @@ const jobChartStyles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   confirmButtonText: {
-    color: '#111',
+    color: '#fff',
     fontSize: responsiveFontSize(13),
     fontWeight: '900',
     textAlign: 'center',
@@ -5110,854 +4862,228 @@ const jobChartStyles = StyleSheet.create({
   },
 });
 const styles = StyleSheet.create({
-  listIconContainer: {
-    position: 'absolute',
-    top: 130,
-    right: 20,
-    zIndex: 1,
-    backgroundColor: theme.BRAND_GRADIENT_END,
-    borderRadius: 3,
-    padding: 4,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: isTablet ? 20 : 10,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  summaryBox: {
-    flex: 1,
-    marginHorizontal: 5,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: isTablet ? 14 : 12,
-    color: '#555',
-    alignSelf: 'flex-end',
-  },
-  summaryValue: {
-    fontSize: isTablet ? 14 : 12,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 5,
-    alignSelf: 'flex-end',
-  },
-  sectionTitle: {
-    fontSize: isTablet ? 18 : 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  partyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  partyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  partyAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  partyAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  partyInfo: {
-    flex: 1,
-  },
-  partyName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  partyOrdersContainer: {
-    marginTop: 4,
-  },
-  partyOrdersText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  chevronIcon: {
-    marginLeft: 'auto',
-  },
-  partyValues: {
-    marginTop: 8,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  valueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  valueLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 4,
-  },
-  valueText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  recentlyViewedCard: {
-    borderWidth: 2,
-    borderColor: theme.BRAND_GRADIENT_END,
-  },
-  recentlyViewedBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: theme.BRAND_GRADIENT_END,
-    padding: 4,
-    borderRadius: 4,
-  },
-  recentlyViewedText: {
-    color: 'white',
-    fontSize: 10,
-  },
-  loadingIndicator: {
-    padding: 20,
-  },
+  // ----- shell -----
+  root: { flex: 1, backgroundColor: T.bg },
+  container: { flex: 1, backgroundColor: T.bg },
   listContent: {
-    paddingBottom: 20,
-  },
-  //
-  modalContainer: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  summaryCard123: {
-    shadowOffset: { width: 0, height: 2 },
-  },
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  designCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  designHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  designSubheader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  designName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  designCode: {
-    fontSize: 12,
-    color: '#666',
-  },
-  designNameSub: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  designCodeSub: {
-    fontSize: 12,
-    color: '#666',
-  },
-  partyNameInSummary: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-
-  searchInput: {
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    color: '#000',
-  },
-  designValues: {
-    marginTop: 8,
-  },
-  designValueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  designValueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  designValueLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 4,
-  },
-  designValueText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  partyDetailCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  partyDetailName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  partyDetailCode: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  partyDetailMeter: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  partyDetailStatus: {
-    fontSize: 14,
-    // color: item.status === 'CLOSED' ? '#4CAF50' : '#E65100',
-    fontWeight: 'bold',
-  },
-  // Empty State
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  detailOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-    zIndex: 100, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailOverlay123: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-    zIndex: 200, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailOverlay456: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-    zIndex: 300, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailOverlay789: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-    zIndex: 400, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Detail Container
-  detailContainer: {
-    backgroundColor: '#fff',
-    // padding: 20,
-    paddingTop: 45,
-    borderRadius: 10,
+    paddingTop: 10,
+    paddingBottom: 28,
     width: '100%',
-    height: '100%',
-    elevation: 5, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  detailContainer789: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    width: '100%',
-    height: '100%',
-    elevation: 5, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  allocationPendingPill: {
-    minHeight: 30,
-    maxWidth: 160,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-  },
-  allocationPendingText: {
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  jobChartBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    borderWidth: 1,
-    borderColor: theme.BRAND_GRADIENT_END,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 8,
-  },
-  jobChartBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  jobChartOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 500,
-    justifyContent: 'flex-end',
-  },
-  jobChartSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: '85%',
-  },
-  jobChartHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#ddd',
-    borderRadius: 2,
+    maxWidth: CONTENT_MAX,
     alignSelf: 'center',
-    marginBottom: 10,
+    flexGrow: 1,
   },
-  jobChartHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  jobChartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  jobChartRefCard: {
+  listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+  gridCell: { padding: 5 },
+  loadingIndicator: { marginVertical: 16 },
+  emptyCard: {
+    margin: 5,
+    backgroundColor: T.surface,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 10,
+    borderColor: T.border,
+  },
+
+  // ----- toolbar -----
+  toolbar: {
+    backgroundColor: T.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  toolbarInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    maxWidth: CONTENT_MAX,
+    alignSelf: 'center',
+  },
+  filterBtn: { height: 42, minWidth: 46 },
+  chipRow: { gap: 6, alignItems: 'center' },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: T.sub,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  filterChipText: { fontSize: 11.5, fontWeight: '700', color: T.nav, maxWidth: 200 },
+
+  // ----- party card -----
+  partyCard: {
+    backgroundColor: T.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
     padding: 14,
-    marginBottom: 12,
-  },
-  jobChartRefRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  jobChartRefLabel: {
-    fontSize: 10,
-    color: '#999',
-    fontWeight: '600',
-  },
-  jobChartRefValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#E65100',
-  },
-  jobChartSectionLabel: {
-    fontSize: 11,
-    color: '#999',
-    backgroundColor: '#f5f5f5',
-    padding: 6,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  jobChartRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  jobChartRowLabel: {
-    fontSize: 13,
-    color: '#333',
-  },
-  jobChartRowValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  jobChartTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  jobChartTotalLabel: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '600',
-  },
-  jobChartTotalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#E65100',
-  },
-  jobChartAddRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-  },
-  jobChartAddBtn: {
-    backgroundColor: theme.BRAND_GRADIENT_END,
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  shadeDropdown: {
-    position: 'absolute',
-    top: 42,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    maxHeight: 180,
-    zIndex: 999,
-    elevation: 5,
-  },
-  shadeDropdownItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  jobChartHint: {
-    fontSize: 11,
-    color: '#999',
-    textAlign: 'center',
-    marginVertical: 8,
-  },
-  jobChartCopyBtn: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  jobChartCopyBtnText: {
-    color: '#333',
-    fontWeight: '600',
-  },
-  jobChartSaveBtn: {
-    backgroundColor: theme.BRAND_GRADIENT_END,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 50,
-  },
-  jobChartSaveBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  // 
-  shadePickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    zIndex: 999, // higher than jobChartOverlay's 500, sits on top of job chart sheet
-    justifyContent: 'flex-end',
-    height: '100%',
-  },
-  shadePickerSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: '80%',
-    minHeight: '50%',
-  },
-  shadeSelectBtn: {
+    gap: 12,
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 0,
-  },
-  shadeSelectText: {
-    color: '#333',
-    fontSize: 14,
-    flex: 1,
-    marginRight: 6,
-  },
-  shadeSelectPlaceholder: {
-    color: '#999',
-    fontSize: 14,
-    flex: 1,
-    marginRight: 6,
-  },
-  shadePickerRow: {
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  shadePickerRowText: {
-    fontSize: 15,
-    color: '#333',
-  },
-  // 
-  // ===== FULL SCREEN JOB CHART =====
-  jobChartFullOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#f5f5f5',
-    zIndex: 500,
-  },
-  jobChartFullHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 54,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  jobChartBackBtn: {
-    marginRight: 10,
-    padding: 4,
-  },
-  jobChartFullTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  jobChartFullSubtitle: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 2,
-  },
-  jobChartDateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.BRAND_GRADIENT_END,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  jobChartDateBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  jobChartProgressWrap: {
-    marginTop: 10,
-  },
-  jobChartProgressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  jobChartPendingValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#E65100',
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#eee',
-    borderRadius: 4,
-    marginTop: 6,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: 8,
-    borderRadius: 4,
-  },
-  jobChartAllocatedText: {
-    fontSize: 11,
-    color: '#666',
-  },
-  jobChartLockBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
-  jobChartLockBannerText: {
-    fontSize: 12,
-    color: '#E65100',
-    marginLeft: 6,
-    flex: 1,
-  },
-  allocGroupSection: {
-    marginBottom: 16,
-  },
-  allocGroupHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  allocGroupDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  allocGroupTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  allocGroupCount: {
-    fontSize: 11,
-    color: '#999',
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  allocRowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
+    ...S.card,
+    shadowOpacity: 0.04,
     elevation: 1,
   },
-  allocRowName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  allocRowCode: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
-  },
-  allocRowQty: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 8,
-  },
-  allocRowRemoveBtn: {
-    padding: 4,
-  },
-  jobChartEmptyText: {
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  jobChartBottomBar: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    padding: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-  },
-  shadePickerRowDisabled: {
-    opacity: 0.5,
-  },
-  shadePickerUsedTag: {
-    fontSize: 10,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  // Group block containers
-  groupBlockNew: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  groupBlockToday: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  groupBlockPrevious: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  groupHeader: {
+  recentlyViewedCard: { borderColor: T.copper, borderWidth: 1.5, backgroundColor: '#FFFCF8' },
+  partyHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  partyInfo: { flex: 1, minWidth: 0 },
+  partyName: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+  partyMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  partyCode: { fontSize: 11, fontWeight: '700', color: T.muted },
+  partyOrdersContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  groupDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  groupTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  groupCount: {
-    fontSize: 12,
-    color: '#666',
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    paddingHorizontal: 8,
+    gap: 3,
+    backgroundColor: `${T.blue}12`,
+    borderRadius: 10,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 12,
   },
-  groupTotal: {
+  partyOrdersText: { fontSize: 10.5, fontWeight: '800', color: T.blue },
+  recentlyViewedBadge: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: `${T.copper}16`,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
-  groupTotalLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 6,
+  recentlyViewedText: { fontSize: 10.5, fontWeight: '800', color: T.copper },
+  chevronIcon: { marginLeft: 2 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressText: { fontSize: 10.5, fontWeight: '800', color: T.green, minWidth: 34, textAlign: 'right' },
+  partyValues: {
+    gap: 10,
+    backgroundColor: T.sub,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
   },
-  groupTotalValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  // Update allocRowCard to remove left border (now handled by group blocks)
+  valueRow: { flexDirection: 'row', gap: 10 },
+  valueItem: { flex: 1 },
+  valueLabel: { fontSize: 10, fontWeight: '700', color: T.muted, textTransform: 'uppercase' },
+  valueText: { fontSize: 14, fontWeight: '800', color: T.ink },
 
+  // ----- drill-down panels -----
+  panel: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: T.bg,
+  },
+  panelSearch: {
+    backgroundColor: T.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingVertical: 8,
+  },
+  panelSearchInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+
+  summaryCard: {
+    backgroundColor: T.nav,
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+  },
+  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  summaryEyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+  partyNameInSummary: { fontSize: 15, fontWeight: '800', color: '#fff', marginTop: 2 },
+  summaryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF14',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  summaryCtaText: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 10,
+    columnGap: 12,
+    backgroundColor: T.surface,
+    borderRadius: 10,
+    padding: 10,
+  },
+
+  summaryMetric: { flexGrow: 1, flexBasis: 96, minWidth: 96 },
+
+  designCard: {
+    backgroundColor: T.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+    padding: 13,
+    gap: 11,
+    flex: 1,
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
+  },
+  designHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  designIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${T.copper}14`,
+  },
+  designName: { fontSize: 14, fontWeight: '800', color: T.ink, lineHeight: 18 },
+  designCode: { fontSize: 11, fontWeight: '700', color: T.muted, marginTop: 2 },
+  designValues: {
+    gap: 10,
+    backgroundColor: T.sub,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
+  },
+  subFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: T.hair,
+    paddingTop: 10,
+  },
+  soMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
+  soMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  soMetaText: { fontSize: 11.5, fontWeight: '700', color: T.ink },
+  allocationPendingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    height: 30,
+    maxWidth: '100%',
+  },
+  allocationOn: { backgroundColor: `${T.copper}14`, borderColor: `${T.copper}55` },
+  allocationOff: { backgroundColor: T.surface, borderColor: T.border },
+  allocationPendingText: { fontSize: 11.5, fontWeight: '800', flexShrink: 1 },
+
+  // kept for the (unused) legacy inline-allocation helper above
+  jobChartLockBanner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  jobChartLockBannerText: { fontSize: 12, color: T.amber },
+
+  // ----- integrated job chart host -----
+  jobChartFullOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 500,
+    elevation: 30,
+    backgroundColor: T.bg,
+  },
 });
 
 export default React.memo(SalesOrderTracking);

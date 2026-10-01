@@ -6519,7 +6519,6 @@ function YarnsTab() {
                     <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
                 </View>
 
-                {!hasSingleBlend && (
                     <TouchableOpacity
                         style={ym2.headerAddBtn}
                         onPress={() => openSubCreate(browseParent)}
@@ -6527,7 +6526,7 @@ function YarnsTab() {
                         <Ionicons name="add" size={18} color="#fff" />
                         <Text style={ym2.headerAddText}>Create</Text>
                     </TouchableOpacity>
-                )}
+                    
                 <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
                 </TouchableOpacity>

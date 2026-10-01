@@ -1,7 +1,7 @@
 import { createWebKVStore } from '../../common/utils/webIndexedDB';
 import api from './api';
 import { API } from '../../common/API/dynamicAPI';
-import { getCurrentFinancialYear } from '../../common/commonfunction';
+import { getEventYearNo } from './eventYear';
 
 const store = createWebKVStore('FlowNestEventCache');
 const groups = {
@@ -64,7 +64,7 @@ export const clearCachedItemR = () => chunkClear(groups.itemR);
 export async function initDb(token, prptype) {
   if (!token || !prptype) return;
   try {
-    const yearno = getCurrentFinancialYear();
+    const yearno = await getEventYearNo();
     const response = await api.get(`${API}/api/getevent`, {
       params: { prptype, yearno },
       headers: { Authorization: `Bearer ${token}` },

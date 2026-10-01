@@ -106,6 +106,14 @@ export async function getCredentialsForPropertySwitch(): Promise<{ username: str
   }
 }
 
+export async function clearCredentialsForPropertySwitch() {
+  try {
+    await SecureStore.deleteItemAsync(PROPERTY_SWITCH_CRED_KEY);
+  } catch {
+    // nothing to clear
+  }
+}
+
 /**
  * Triggers the native biometric prompt.
  * Returns true only on a successful match.

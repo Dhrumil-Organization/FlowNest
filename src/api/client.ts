@@ -150,7 +150,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const message = data?.message || data?.error || `HTTP ${res.status}`;
-    throw new Error(message);
+    const error: Error & { status?: number } = new Error(message);
+    error.status = res.status;
+    throw error;
   }
 
   return data as T;

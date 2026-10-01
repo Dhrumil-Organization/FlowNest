@@ -6,7 +6,7 @@ import { s, C } from '../styles';
 import { fetchDesigns, fetchRecipe } from '../api';
 
 export type Beam = { UId: any; BeamNo: string; [k: string]: any };
-export type Design = { DsnCode: any; DsnName?: string; [k: string]: any };
+export type Design = { DsnCode: any; DsnName?: string; IssDsnCode?: any; IssDsnName?: string; isnewdesign?: any; [k: string]: any };
 export type LineValue = { beam: Beam | null; stkType?: 'I' | 'P'; dsn: Design | null; rsr: number | null; rsrRow?: any };
 
 type Props = {
@@ -127,6 +127,17 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
                         loading={dLoading}
                         onPress={() => setPick('dsn')}
                     />
+                    {!!value.dsn?.IssDsnName && (
+                        <View style={{
+                            marginTop: 6, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8,
+                            backgroundColor: C.indigoSoft, borderLeftWidth: 4, borderLeftColor: C.indigo,
+                        }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: C.indigo }}>ISSUE DESIGN</Text>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: C.ink, marginTop: 1 }}>
+                                {Number(value.dsn.IssDsnCode) > 0 ? `${value.dsn.IssDsnCode}  ` : ''}{value.dsn.IssDsnName}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
 

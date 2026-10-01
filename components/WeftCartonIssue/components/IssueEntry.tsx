@@ -2,7 +2,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as api from '../api';
-import { f2, makeClientRef, r3 } from '../helpers';
+import { f2, flagOf, makeClientRef, r3 } from '../helpers';
 import { C, s } from '../styles';
 import type { Carton } from '../types';
 import LineFields, { Beam, LineValue } from './LineFields';
@@ -18,6 +18,7 @@ type Props = {
     bus: EntryBus;                                // carries typed chees to the progress bar
     onSaved: (e: SavedEntry, message: string) => void;             // screen updates balance + "issued now" list locally
     onStale: () => void;                          // server says balance changed: reload it
+    onError?: (message: string) => void;          // save rejected by the server: screen shows the error modal
 };
 
 const emptyLine: LineValue = { beam: null, stkType: undefined, dsn: null, rsr: null };
@@ -29,7 +30,7 @@ const emptyLine: LineValue = { beam: null, stkType: undefined, dsn: null, rsr: n
  */
 const IssueEntry = ({
     token, prpcode, yearno, stkType = 'I', dmy, ymd, shift, expProdQtyType,
-    carton, beams, beamsLoading, isMobile = false, bus, onSaved, onStale,
+    carton, beams, beamsLoading, isMobile = false, bus, onSaved, onStale, onError,
 }: Props) => {
     const [line, setLine] = useState<LineValue>(emptyLine);
     const [chees, setChees] = useState('');
@@ -77,27 +78,39 @@ const IssueEntry = ({
         setSaving(true);
 
         try {
-            const exp = await api.fetchExpProdQty(token, {
-                prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
-                srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
-                IssUId: undefined,
-            });
+            const isNewDesign = flagOf(line.dsn) === '1';
+            const exp = isNewDesign
+                ? await api.fetchNewExpProdQty(token, {
+                    prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+                    srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                    IssUId: undefined, DsnRcpSrNo: line.rsr,
+                })
+                : await api.fetchExpProdQty(token, {
+                    prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+                    srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                    IssUId: undefined, DsnRcpSrNo: line.rsr,
+                });
 
             const r = await api.saveLine(token, {
                 prpcode, yearno, IssDate: ymd, Shift: shift, StkType: line.stkType || stkType || 'I',
                 IssTo: '', Remark: '',
                 BeamUId: line.beam.UId, BeamNo: line.beam.BeamNo || '', DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
-                ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
+                IssDsnCode: line.dsn.IssDsnCode || 0, IssDsnName: line.dsn.IssDsnName || '',
+                ExpProdQty: exp, ExpQty: exp, ExpProdQtyType: isNewDesign ? '1' : '0', ExpQtyType: isNewDesign ? '1' : '0',
                 Chees: ch, Wt: w, ClientRefId: clientRef.current,
                 CartNo: carton.CartNo, TranType: carton.TranType, PUId: carton.PUId, PSrNo: carton.PSrNo, PSubSr: carton.PSubSr,
                 ItmCode: carton.ItmCode, MerCode: carton.MerCode, GrdCode: carton.GrdCode, ShdCode: carton.ShdCode, Denier: carton.Denier,
             });
 
             if (!r.ok) {
-                // NETWORK: keep clientRef so the retry cannot create a second line
-                setFormErr(r.message || 'Could not save. Try again.');
+                // NETWORK: keep clientRef so the retry cannot create a second line.
+                // A real server rejection (SAVE_FAILED, already issued ...) is final -> new ref for the next try.
+                if (r.errorCode !== 'NETWORK') clientRef.current = null;
+                const msg = r.message || 'Could not save. Try again.';
+                if (onError) onError(msg); else setFormErr(msg);   // modal like the success one; form stays as it is
+                // only these two codes need a balance reload (as before). Nothing else is refreshed on error.
                 if (r.errorCode === 'BALANCE_EXCEEDED' || r.errorCode === 'CARTON_EMPTY') onStale();
-                return;
+                return; // no line is added, no success message
             }
 
             const saved: SavedEntry = { chees: ch, wt: w, beam: line.beam.BeamNo || '', dsn: `${line.dsn.DsnCode ?? ''}` };

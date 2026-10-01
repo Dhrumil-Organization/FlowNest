@@ -1,15 +1,17 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { cartonBalance, fetchExpProdQty, findIssue, modifyLine } from '../api';
-import { f2, r3, ymdShow } from '../helpers';
+import { cartonBalance, fetchExpProdQty, fetchNewExpProdQty, findIssue, modifyLine } from '../api';
+import { f2, flagOf, r3, typeOf, ymdShow } from '../helpers';
 import { C, s, tagStyle } from '../styles';
 import LineFields, { Beam, LineValue } from './LineFields';
 
 export type EditableLine = {
     UId: number; SrNo: number; SubSr: number; CartNo: string; Chees: number; Qty: number;
-    DsnRcpSrNo: number; IssNo: string; IssDate: any; BeamUId: any; BeamNo: string; DsnCode: any; DsnName?: string;
+    DsnRcpSrNo: number; IssNo: string; IssDate: any; BeamUId: any; BeamNo: string; DsnCode: any; DsnName?: string; IssDsnCode?: any; IssDsnName?: string; isnewdesign?: any; ExpProdQty?: any; ExpQty?: any; ExpProdQtyType?: any; ExpQtyType?: any;
     ItmCode?: string; ShdCode?: any; StkType?: string;
+    Shift?: any; MerCode?: any; GrdCode?: any; IssTo?: any; Remark?: any; ClientRefId?: any;
+    TranType?: any; PUId?: any; PSrNo?: any; PSubSr?: any; Denier?: any;
 };
 
 type Props = {
@@ -35,18 +37,24 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
     const [effect, setEffect] = useState<{ kind: 'ok' | 'new' | 'info'; text: string } | null>(null);
     const [err, setErr] = useState('');
     const [saving, setSaving] = useState(false);
+    const [errorNotice, setErrorNotice] = useState<{ title: string; message: string } | null>(null); // modify failed modal
+    // The design object we started with (from the browse response). If val.dsn is a different
+    // object, the user picked a design from the list -> that design's own flags are used.
+    const initialDsn = useRef<any>(null);
 
     useEffect(() => {
         if (!visible || !line) return;
+        initialDsn.current = { DsnCode: line.DsnCode, DsnName: line.DsnName, IssDsnCode: line.IssDsnCode, IssDsnName: line.IssDsnName, isnewdesign: typeOf(line) };
         setVal({
             beam: { UId: line.BeamUId, BeamNo: line.BeamNo },
             stkType: (line.StkType === 'P' ? 'P' : line.StkType === 'I' ? 'I' : stkType) as 'I' | 'P',
-            dsn: { DsnCode: line.DsnCode, DsnName: line.DsnName },
+            dsn: initialDsn.current,
             rsr: Number(line.DsnRcpSrNo),
         });
         setChees(String(line.Chees));
         setWt(f2(line.Qty));
         setErr('');
+        setErrorNotice(null);
         setInfo(null);
         cartonBalance(token, prpcode, yearno, line.CartNo).then(r => {
             const c = r.payload?.data;
@@ -98,19 +106,66 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         if (info && w > availWt + 0.0005) return setErr(`Only ${f2(availWt)} kg available for this line.`);
 
         setSaving(true);
-        const exp = await fetchExpProdQty(token, {
+
+        // 1) Did the user pick a design in this modify? (new object from the design list)
+        const designPicked = val.dsn !== initialDsn.current;
+
+        // 2) Which type?
+        //    design picked  -> flag of the picked design (isnewdesign) -> 1 / 0
+        //    design not picked -> ExpProdQtyType already present in the browse response
+        const isNewDesign = designPicked
+            ? flagOf(val.dsn) === '1'
+            : typeOf(line) === '1';
+        const payloadExpType = isNewDesign ? '1' : '0';
+
+        // 3) IssDsnCode / IssDsnName
+        //    design picked  -> the picked design's own values (never fall back to the old line)
+        //    not picked     -> values from the browse response
+        const issDsnCode = designPicked ? (val.dsn.IssDsnCode ?? 0) : (line.IssDsnCode ?? 0);
+        const issDsnName = designPicked ? (val.dsn.IssDsnName ?? '') : (line.IssDsnName ?? '');
+
+        // 4) Qty api: only when something that affects ExpProdQty changed.
+        //    Which api is decided by the type above (1 -> getExpectedWeftIssue, 0 -> get_expprodqty_from_issueqty)
+        const beamChanged = String(val.beam.UId) !== String(line.BeamUId);
+        const rsrChanged = Number(val.rsr) !== Number(line.DsnRcpSrNo);
+        const qtyChanged = Number(w) !== Number(line.Qty) || Number(ch) !== Number(line.Chees);
+        const shouldFetchExpProdQty = designPicked || beamChanged || rsrChanged || qtyChanged;
+        const existingExp = Number(line.ExpProdQty ?? line.ExpQty) || 0;
+
+        const expParams = {
             prpcode, yearno, reqqty: w, itmcode: info?.itm ?? line.ItmCode, shdcode: info?.shd ?? line.ShdCode,
             srno: val.rsr, beamuid: val.beam.UId, dsncode: val.dsn.DsnCode,
-            IssUId: line.UId,
-        });
+            IssUId: line.UId, DsnRcpSrNo: val.rsr,
+        };
+        const exp = shouldFetchExpProdQty
+            ? (isNewDesign ? await fetchNewExpProdQty(token, expParams) : await fetchExpProdQty(token, expParams))
+            : existingExp;
+
         const r = await modifyLine(token, {
             prpcode, yearno, uid: line.UId, srno: line.SrNo, subsr: line.SubSr,
             OldChees: line.Chees, OldQty: line.Qty,
             BeamUId: val.beam.UId, BeamNo: val.beam.BeamNo || line.BeamNo || '', DsnCode: val.dsn.DsnCode, DsnRcpSrNo: val.rsr, StkType: val.stkType || stkType,
-            Chees: ch, Wt: w, ExpProdQty: exp, ExpProdQtyType: expProdQtyType,
+            IssDsnCode: issDsnCode, IssDsnName: issDsnName,
+            Chees: ch, Wt: w, ExpProdQty: exp, ExpQty: exp, ExpProdQtyType: payloadExpType, ExpQtyType: payloadExpType,
+            // keys that Add sends but Modify did not: values come from the browse response (existing keys above untouched)
+            IssDate: line.IssDate != null ? String(line.IssDate) : '',
+            Shift: Number(line.Shift) || 1,
+            IssTo: line.IssTo ?? '', Remark: line.Remark ?? '',
+            ClientRefId: line.ClientRefId ?? '',
+            CartNo: line.CartNo,
+            TranType: line.TranType != null ? String(line.TranType) : '',
+            PUId: line.PUId != null ? String(line.PUId) : '',
+            PSrNo: line.PSrNo != null ? String(line.PSrNo) : '',
+            PSubSr: line.PSubSr != null ? String(line.PSubSr) : '',
+            ItmCode: line.ItmCode ?? '', MerCode: line.MerCode ?? '', GrdCode: line.GrdCode ?? '', ShdCode: line.ShdCode ?? '',
+            Denier: Number(line.Denier) || 0,
         });
         setSaving(false);
-        if (!r.ok) return setErr(r.message || 'Could not save the change.');
+        if (!r.ok) {
+            // server rejected the modify: same error modal as save; OK keeps the user on this form
+            setErrorNotice({ title: 'Save Failed', message: r.message || 'Could not save the change.' });
+            return;
+        }
         onSaved(r.message || 'Line updated.');
     };
 
@@ -176,6 +231,25 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
                     </ScrollView>
                 </View>
             </KeyboardAvoidingView>
+
+            <Modal visible={!!errorNotice} transparent animationType="fade" onRequestClose={() => setErrorNotice(null)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                    <View style={{ width: Platform.OS === 'web' ? 420 : '92%', maxWidth: '100%', backgroundColor: '#fff', borderRadius: 18, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+                        <View style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: C.badSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                            <Icon name="error-outline" size={34} color={C.bad} />
+                        </View>
+                        <Text style={{ fontSize: 19, fontWeight: '800', color: C.ink, marginBottom: 7, textAlign: 'center' }}>{errorNotice?.title}</Text>
+                        <Text style={{ fontSize: 14, lineHeight: 21, color: C.ink2, textAlign: 'center', marginBottom: 20 }}>{errorNotice?.message}</Text>
+                        <TouchableOpacity
+                            style={[s.btn, { width: '100%', height: 46, marginTop: 0, backgroundColor: C.bad, borderColor: C.bad }]}
+                            onPress={() => setErrorNotice(null)}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={s.btnPrimaryText}>OK</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </Modal>
     );
 };

@@ -998,7 +998,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                     <View style={yp.header}>
                         {stage === 'items' ? (
                             <TouchableOpacity
-                            onPress={goBackToMain}
+                                onPress={goBackToMain}
                                 style={yp.backBtn}
                             >
                                 <Text style={yp.backTxt}>‹ Main Yarn</Text>
@@ -4087,12 +4087,12 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
             ) : filteredRows.length === 0 ? (
                 <Text style={mst.emptyText}>No executives found for this period.</Text>
             ) : (<FlatList
-                    data={filteredRows}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderRow}
-                    contentContainerStyle={mst.listContent}
-                    scrollEnabled={false}
-                />
+                data={filteredRows}
+                keyExtractor={(item) => item.id}
+                renderItem={renderRow}
+                contentContainerStyle={mst.listContent}
+                scrollEnabled={false}
+            />
             )}
 
             {/* Footer with Total and Save Button */}
@@ -5084,7 +5084,7 @@ const styles = StyleSheet.create({
 
 function YarnsTab() {
     const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = useERP();
-    const { width: screenWidth } = useWindowDimensions();type YarnItem = any;
+    const { width: screenWidth } = useWindowDimensions(); type YarnItem = any;
     type Option = { id: string | number; name?: string;[key: string]: any };
     type PartyOption = { acccode: string; accountname: string;[key: string]: any };
 
@@ -6014,6 +6014,7 @@ function YarnsTab() {
         return partyItems.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
     }, [partyItems, search]);
 
+
     const field = (
         label: string,
         value: any,
@@ -6068,33 +6069,58 @@ function YarnsTab() {
         </View>
     );
 
-    const renderCard = ({ item, index }: { item: any; index: number }) => (
-        <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
-            <View style={ym2.cardHeader}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
-                    <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+    const getHasMultipleBlend = (item: any) => {
+        const blendNames = String(item?.BlendNames || '')
+            .split(',')
+            .map(x => x.trim())
+            .filter(Boolean);
+
+        return blendNames.length > 1;
+    };
+
+    const renderCard = ({ item, index }: { item: any; index: number }) => {
+        const hasMultipleBlend = getHasMultipleBlend(item);
+
+        return (
+            <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
+                <View style={ym2.cardHeader}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
+                        <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+                    </View>
+                    <View style={ym2.badge}><Text style={ym2.badgeText}>{activeTab === 'Spun' ? 'SPUN' : 'FILAMENT'}</Text></View>
                 </View>
-                <View style={ym2.badge}><Text style={ym2.badgeText}>{activeTab === 'Spun' ? 'SPUN' : 'FILAMENT'}</Text></View>
-            </View>
-            <View style={ym2.divider} />
-            <View style={ym2.infoGrid}>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Blend</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.BlendNames || item.WBlend || '-'}</Text></View>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || '-'}</Text></View>
-            </View>
-            <View style={ym2.cardActions}><TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
+                <View style={ym2.divider} />
+                <View style={ym2.infoGrid}>
+                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Blend</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.BlendNames || item.WBlend || '-'}</Text></View>
+                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
+                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || '-'}</Text></View>
+                </View>
+                <View style={ym2.cardActions}><TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
                     <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'MAIN')}>
-                    <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={ym2.outlineBtn} onPress={() => loadSubList(item)}>
+                    <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'MAIN')}>
+                        <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
+                    </TouchableOpacity>
+
+                    {/* <TouchableOpacity style={ym2.outlineBtn} onPress={() => loadSubList(item)}>
                     <Ionicons name="git-branch-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Sub Items</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
+
+                    {hasMultipleBlend && (
+                        <TouchableOpacity
+                            style={ym2.outlineBtn}
+                            onPress={() => loadSubList(item)}
+                        >
+                            <Ionicons name="git-branch-outline" size={16} color={T.ink} />
+                            <Text style={ym2.outlineText}>Sub Items</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
-        </View>
-    );
+        );
+    };
+
 
     const renderSubCard = ({ item }: { item: any }) => (
         <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
@@ -6492,6 +6518,16 @@ function YarnsTab() {
                     <Text style={ym2.subHeaderTitle}>Sub Items</Text>
                     <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
                 </View>
+
+                {!hasSingleBlend && (
+                    <TouchableOpacity
+                        style={ym2.headerAddBtn}
+                        onPress={() => openSubCreate(browseParent)}
+                    >
+                        <Ionicons name="add" size={18} color="#fff" />
+                        <Text style={ym2.headerAddText}>Create</Text>
+                    </TouchableOpacity>
+                )}
                 <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
                 </TouchableOpacity>

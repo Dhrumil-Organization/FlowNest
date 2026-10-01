@@ -14,11 +14,13 @@ import {
   ChecklistBox,
   PasswordToggle,
 } from '../../components/auth/AuthUI';
-import { performLogin } from '../../core/authFlow';
+import { getActiveNewErpProperty, performLogin } from '../../core/authFlow';
 import {
-  getBiometricLabel,
-  isBiometricSupported,
-} from '../../lib/biometricAuth';
+  getRememberedLogin,
+  getRememberSupport,
+  saveRememberedLogin,
+  type RememberSupport,
+} from '../../lib/rememberedLogin';
 import { T } from '../../theme';
 
 type PasswordValidation = {
@@ -42,7 +44,7 @@ const validatePassword = (pwd: string): PasswordValidation => ({
 const isPasswordValid = (v: PasswordValidation) => Object.values(v).every(Boolean);
 
 /* ---------- FORM COMPONENT (owns ALL form state) ---------- */
-function RoleLoginForm() {
+function RoleLoginForm({ notice }: { notice?: string | null }) {
   const router = useRouter();
 
   const [username, setUsername] = useState('');
@@ -50,9 +52,11 @@ function RoleLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [bioSupported, setBioSupported] = useState(false);
-  const [bioLabel, setBioLabel] = useState('screen lock');
-  const [rememberMe, setRememberMe] = useState(true);
+  // "Remember me" is strictly opt-in: nothing is saved unless the user
+  // switches it on here (it starts ON only if this property already has
+  // a saved login on this device, so switching it OFF removes it).
+  const [rememberSupport, setRememberSupport] = useState<RememberSupport | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
   const [getNotitoken, setGetNotitoken] = useState('');
   const [getDeviceId, setGetDeviceId] = useState('');
   // Keep password validation derived from the current value.
@@ -98,13 +102,11 @@ function RoleLoginForm() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const supported = await isBiometricSupported();
+      const [support, property] = await Promise.all([getRememberSupport(), getActiveNewErpProperty()]);
+      const existing = await getRememberedLogin(property);
       if (!active) return;
-      setBioSupported(supported);
-      if (supported) {
-        const label = await getBiometricLabel();
-        if (active) setBioLabel(label);
-      }
+      setRememberSupport(support);
+      setRememberMe(Boolean(existing) && support.available);
     })();
     return () => {
       active = false;
@@ -132,12 +134,7 @@ function RoleLoginForm() {
 
     setLoading(true);
     try {
-      const rememberAction =
-        bioSupported && rememberMe
-          ? 'save'
-          : bioSupported
-          ? 'clear'
-          : undefined;
+      const rememberAction = rememberSupport?.available && rememberMe ? 'save' : 'clear';
 
       const outcome = await performLogin(
         username,
@@ -149,6 +146,33 @@ function RoleLoginForm() {
 
       if (!outcome.success) {
         AppAlert.alert('Login failed', outcome.message || 'Unable to login.');
+        return;
+      }
+
+      // Safari (web) only opens Touch ID / Face ID inside a fresh tap. The
+      // login already succeeded, so offer one more tap to finish saving.
+      if (outcome.remember?.reason === 'needs-gesture') {
+        const creds = { username: username.trim(), password: password.trim() };
+        const hint = outcome.displayName || creds.username;
+        const label = rememberSupport?.label || 'your device lock';
+        openNewErpDashboard();
+        AppAlert.alert(
+          'Remember this login?',
+          `Confirm with ${label} to finish saving your login on this browser.`,
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: `Use ${label}`,
+              onPress: () => {
+                void (async () => {
+                  const property = await getActiveNewErpProperty();
+                  const result = await saveRememberedLogin(property, creds, hint);
+                  if (!result.saved && result.message) AppAlert.alert('Remember me', result.message);
+                })();
+              },
+            },
+          ],
+        );
         return;
       }
 
@@ -171,7 +195,7 @@ function RoleLoginForm() {
   }, [
     canSubmit,
     validation,
-    bioSupported,
+    rememberSupport,
     rememberMe,
     username,
     password,
@@ -180,8 +204,23 @@ function RoleLoginForm() {
     openNewErpDashboard,
   ]);
 
+  const rememberDesc = !rememberSupport
+    ? ''
+    : !rememberSupport.available
+    ? rememberSupport.reason || 'Remember me is not available on this device.'
+    : rememberSupport.requiresUnlock
+    ? `Next time choose Auto Login and confirm with your ${rememberSupport.label}. Saved encrypted on this device only.`
+    : 'This computer has no screen lock, so Auto Login will sign you in directly. Saved encrypted on this browser only.';
+
   return (
     <>
+      {notice ? (
+        <View style={styles.noticeBox}>
+          <Icon name="info-outline" size={17} color={T.copper} />
+          <Text style={styles.noticeText}>{notice}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.contextCard}>
         <View style={styles.contextIcon}>
           <Icon name="shield" size={18} color={T.copper} />
@@ -245,21 +284,27 @@ function RoleLoginForm() {
         style={{ marginTop: 18 }}
       />
 
-      {bioSupported && (
-        <View style={styles.bioBox}>
+      {rememberSupport && (
+        <View
+          style={[
+            styles.bioBox,
+            rememberMe && rememberSupport.available && styles.bioBoxOn,
+            !rememberSupport.available && styles.bioBoxDisabled,
+          ]}
+        >
           <View style={styles.bioIconWrap}>
-            <Icon name="fingerprint" size={20} color={T.copper} />
+            <Icon name={rememberSupport.icon as any} size={20} color={rememberSupport.available ? T.copper : T.muted} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.bioTitle}>Remember me</Text>
-            <Text style={styles.bioSub}>
-              We&apos;ll confirm with your {bioLabel} and save this login for next time.
-            </Text>
+            <Text style={styles.bioSub}>{rememberDesc}</Text>
           </View>
           <Switch
-            value={rememberMe}
+            value={rememberMe && rememberSupport.available}
             onValueChange={setRememberMe}
+            disabled={!rememberSupport.available || loading}
             trackColor={{ true: T.copper }}
+            accessibilityLabel="Remember me"
           />
         </View>
       )}
@@ -268,7 +313,7 @@ function RoleLoginForm() {
 }
 
 /* ---------- SHELL (does NOT re-render on typing) ---------- */
-export function RoleLoginScreen() {
+export function RoleLoginScreen({ notice, onBack }: { notice?: string | null; onBack?: () => void } = {}) {
   const router = useRouter();
 
   const goBack = useCallback(() => {
@@ -279,7 +324,7 @@ export function RoleLoginScreen() {
     () => [
       { icon: 'verified-user', title: 'Secure ERP session', desc: 'Role-based permissions applied to every module.' },
       { icon: 'apartment', title: 'Property aware', desc: 'Connects to the property you selected in the previous step.' },
-      { icon: 'fingerprint', title: 'Remember me', desc: 'Sign in faster next time with your device screen lock.' },
+      { icon: 'fingerprint', title: 'Remember me', desc: 'Next time sign in with Face ID, your phone screen lock or Windows Hello / Touch ID.' },
     ],
     []
   );
@@ -289,12 +334,12 @@ export function RoleLoginScreen() {
       eyebrow="NEW ERP SYSTEM"
       title="Sign in"
       subtitle="Username and password only. Year, property, group and store are derived automatically from your ERP user defaults."
-      onBack={goBack}
+      onBack={onBack || goBack}
       brandTitle="Welcome to the New ERP"
       brandSubtitle="Login creates your business context and permission context for every screen you open."
       highlights={highlights}
     >
-      <RoleLoginForm />
+      <RoleLoginForm notice={notice} />
     </AuthShell>
   );
 }
@@ -351,6 +396,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bioBoxOn: { borderColor: T.copper },
+  bioBoxDisabled: { opacity: 0.75 },
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderLeftWidth: 3,
+    borderLeftColor: T.copper,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  noticeText: { flex: 1, color: T.ink, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
   bioTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
   bioSub: { color: T.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-});
+});

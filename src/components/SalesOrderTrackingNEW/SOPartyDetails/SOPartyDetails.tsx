@@ -1,20 +1,33 @@
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import theme from '@/components/theme';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { API } from '../../../common/API/dynamicAPI';
-import HeaderBarwithBack from '../../../components/HeaderNew';
+import {
+    BusyOverlay,
+    CONTENT_MAX,
+    EmptyState,
+    IconBtn,
+    Kpi,
+    KpiGrid,
+    Metric,
+    PanelHeader,
+    ProgressBar,
+    SearchBox,
+    SectionHead,
+    SortChip,
+    StatusPill,
+    cellWidth,
+    statusTone,
+    useSotLayout,
+} from '../sotUi';
 import SOPartyDetailsPart1 from '../SOPartyDetailsPart1/SOPartyDetailsPart1';
 
-const { width } = Dimensions.get('window');
-const isTablet = width >= 600;
 
 interface PartyDetail {
     Dsnname: string;
@@ -189,19 +202,26 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
         }, 500);
     }, [restPage, restLoading, restOrders, renderedRestOrders]);
 
+    // NEW ERP UI: responsive columns (hook must run before the early return).
+    const { isPhone, cols, gutter } = useSotLayout();
+
     if (!getDetailData) {
         return (
-            <>
-                <HeaderBarwithBack
-                    userName={username}
-                    header={getPartyName || ""}
-                    subHeader={'Manage your Sales Orders'}
-                    backNavigateScreen={'Sales Order Tracking'}
+            <View style={styles.root}>
+                <PanelHeader
+                    onBack={() => {
+                        setSOParty(false)
+                        setSOParty_party('')
+                        setSOParty_selectedSalesExes([])
+                    }}
+                    crumbs={['Sales Order Tracking', 'Sales Orders']}
+                    title={getPartyName || 'Sales Orders'}
                 />
                 <View style={styles.loadingContainer}>
-                    <Text>Loading...</Text>
+                    <ActivityIndicator size="large" color={T.copper} />
+                    <Text style={styles.loadingText}>Loading...</Text>
                 </View>
-            </>
+            </View>
         );
     }
 
@@ -387,25 +407,11 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
         }
     };
 
-    const SummaryCard = ({ title, value1, label1, value2, label2, backgroundColor }: {
-        title: string,
-        value1: string,
-        label1: string,
-        value2: string,
-        label2: string,
-        backgroundColor: string
-    }) => (
-        <View style={[styles.summaryBox, { backgroundColor }]}>
-            <Text style={styles.summaryTitle}>{title}</Text>
-            <View style={styles.valueRow}>
-                <Text style={styles.valueText}>{label1}: {value1}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.valueRow}>
-                <Text style={styles.valueText}>{label2}: {value2}</Text>
-            </View>
-        </View>
-    );
+    const goBack = () => {
+        setSOParty(false)
+        setSOParty_party('')
+        setSOParty_selectedSalesExes([])
+    };
 
     const renderOrderCard = (item: PartyDetail, isToday: boolean = false) => {
         const orderTotal = parseFloat(item.totmtr);
@@ -415,613 +421,420 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username, party 
             100
         );
         const hasAllocation = item.allocationdate && item.allocationdate !== '0' && item.allocationdate !== '';
+        const tone = statusTone(item.status);
 
         return (
-            <TouchableOpacity
-                style={[
-                    styles.orderCard,
-                    hasAllocation && styles.orderCardWithAllocation,
-                    isToday && styles.orderCardToday
-                ]}
-                onPress={() => handleCardPress(item)}
-            >
-                <View style={styles.orderHeadermain}>
-                    <Text style={styles.orderId}>{item.partyname}</Text>
-                    {item.status === 'PENDING' || item.status === 'PARTIAL' ? (
-                        <TouchableOpacity
-                            onPress={() => handleCardPressCurrent(item)}
-                            style={styles.orderButtonContainer}
-                        >
-                            <Text style={[styles.orderStatus, { color: '#FF0000' }]}>
-                                Closed Order
-                            </Text>
-                            <Icon name="close" size={20} color="#FF0000" />
-                        </TouchableOpacity>
-                    ) : null}
-                </View>
-                <View style={styles.orderHeader}>
-                    <Text style={styles.orderId}>SO-{item.sono}</Text>
-                    <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
-                        {item.status}
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() => printSalesOrderPdf(item, 'A4')}
-                        style={styles.orderButtonContainer}
-                    >
-                        {printAPILoading ? (
-                            <ActivityIndicator size={20} color="#0000ff" />
-                        ) : (
-                            <Icon name="print" size={20} color="blue" />
-                        )}
-                    </TouchableOpacity>
-                </View>
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <TouchableOpacity
+                    style={[
+                        styles.orderCard,
+                        hasAllocation && styles.orderCardWithAllocation,
+                        isToday && styles.orderCardToday
+                    ]}
+                    activeOpacity={0.88}
+                    onPress={() => handleCardPress(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open challans for SO-${item.sono}`}
+                >
+                    <View style={[styles.statusStripe, { backgroundColor: tone.fg }]} />
 
-                <Text style={styles.orderDate}>Sodate: {item.sodate} | Duedate: {item.duedate}</Text>
-                <Text style={styles.designShadeText}>
-                    {item.Dsnname} | Shade: {item.shdname}
-                </Text>
+                    <View style={styles.orderHeader}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <View style={styles.orderIdRow}>
+                                <Text style={styles.orderId}>SO-{item.sono}</Text>
+                                <StatusPill status={item.status} />
+                            </View>
+                            <Text style={styles.orderParty} numberOfLines={1}>{item.partyname}</Text>
+                        </View>
+                        <IconBtn
+                            icon="print"
+                            label={`Print SO-${item.sono}`}
+                            onPress={() => printSalesOrderPdf(item, 'A4')}
+                            loading={printAPILoading}
+                            color={T.blue}
+                        />
+                    </View>
 
-                <View style={styles.orderStats}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>TOTAL</Text>
-                        <Text style={styles.statValue}>{formatValue(item.totmtr)}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>DELIVERED</Text>
-                        <Text style={styles.statValue}>{formatValue(item.chalqty)}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>CHALLANS</Text>
-                        <Text style={styles.statValue}>{item.noofchallan}</Text>
-                    </View>
-                </View>
-
-                {item.status !== 'PENDING' && (
-                    <View style={styles.orderProgressContainer}>
-                        <View style={[
-                            styles.progressBarSmall,
-                            {
-                                width: `${orderPercentage}%`,
-                                backgroundColor: getStatusColor(item.status)
-                            }
-                        ]} />
-                    </View>
-                )}
-
-                <Text style={styles.orderQty}>
-                    Bal Qty: {item.BQty}
-                </Text>
-                <Text style={styles.orderQty}>
-                    Unit Rate: {item.UnitRate}
-                </Text>
-                <Text style={styles.orderQty}>
-                    Qty: {item.chalqty}/{item.totmtr}
-                </Text>
-                {hasAllocation && (
-                    <View style={styles.allocationBadge}>
-                        <Text style={styles.allocationBadgeText}>
-                            {item.allocationdate === todayStr ? 'Today' : `Allocated at: ${formatAllocationDate(item.allocationdate || '')}`}
+                    <View style={styles.designShadeRow}>
+                        <Icon name="texture" size={14} color={T.copper} />
+                        <Text style={styles.designShadeText} numberOfLines={2}>
+                            {item.Dsnname} <Text style={{ color: T.muted }}>· Shade: </Text>{item.shdname}
                         </Text>
                     </View>
-                )}
-            </TouchableOpacity>
+
+                    <View style={styles.dateRow}>
+                        <View style={styles.dateItem}>
+                            <Icon name="event" size={13} color={T.muted} />
+                            <Text style={styles.dateText}>SO {item.sodate || '—'}</Text>
+                        </View>
+                        <View style={styles.dateItem}>
+                            <Icon name="event-available" size={13} color={T.muted} />
+                            <Text style={styles.dateText}>Due {item.duedate || '—'}</Text>
+                        </View>
+                        {hasAllocation ? (
+                            <View style={[styles.allocationBadge, isToday && styles.allocationBadgeToday]}>
+                                <Icon name="assignment-turned-in" size={12} color={isToday ? '#fff' : T.green} />
+                                <Text style={[styles.allocationBadgeText, isToday && { color: '#fff' }]}>
+                                    {item.allocationdate === todayStr ? 'Allocated today' : `Allocated ${formatAllocationDate(item.allocationdate || '')}`}
+                                </Text>
+                            </View>
+                        ) : null}
+                    </View>
+
+                    <View style={styles.orderStats}>
+                        <Metric label="Total" value={String(formatValue(item.totmtr))} />
+                        <Metric label="Delivered" value={String(formatValue(item.chalqty))} color={T.green} />
+                        <Metric label="Challans" value={String(item.noofchallan)} align="right" />
+                    </View>
+
+                    {item.status !== 'PENDING' && (
+                        <View style={styles.orderProgressRow}>
+                            <View style={{ flex: 1 }}>
+                                <ProgressBar value={orderPercentage} color={tone.fg} />
+                            </View>
+                            <Text style={[styles.orderProgressText, { color: tone.fg }]}>{Math.round(orderPercentage)}%</Text>
+                        </View>
+                    )}
+
+                    <View style={styles.qtyRow}>
+                        <View style={styles.qtyCell}>
+                            <Text style={styles.qtyLabel}>Bal Qty</Text>
+                            <Text style={[styles.qtyValue, { color: T.copper }]}>{item.BQty}</Text>
+                        </View>
+                        <View style={styles.qtyCell}>
+                            <Text style={styles.qtyLabel}>Unit Rate</Text>
+                            <Text style={styles.qtyValue}>₹ {item.UnitRate}</Text>
+                        </View>
+                        <View style={styles.qtyCell}>
+                            <Text style={styles.qtyLabel}>Qty</Text>
+                            <Text style={styles.qtyValue}>{item.chalqty}/{item.totmtr}</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.orderFooter}>
+                        {item.status === 'PENDING' || item.status === 'PARTIAL' ? (
+                            <TouchableOpacity
+                                onPress={() => handleCardPressCurrent(item)}
+                                style={styles.closeOrderBtn}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Close order SO-${item.sono}`}
+                            >
+                                <Icon name="block" size={15} color={T.red} />
+                                <Text style={styles.closeOrderText}>Close Order</Text>
+                            </TouchableOpacity>
+                        ) : <View />}
+                        <View style={styles.viewChallans}>
+                            <Text style={styles.viewChallansText}>View challans</Text>
+                            <Icon name="chevron-right" size={18} color={T.nav} />
+                        </View>
+                    </View>
+                </TouchableOpacity>
+            </View>
         );
     };
 
-    return (
-        <>
+    const listHeader = (
+        <View style={styles.listHeader}>
+            <TouchableOpacity
+                style={styles.accordionHeader}
+                onPress={() => setIsAccordionOpen(!isAccordionOpen)}
+                accessibilityRole="button"
+            >
+                <Text style={styles.accordionTitle}>Summary</Text>
+                <Icon
+                    name={isAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={20}
+                    color={T.nav}
+                />
+            </TouchableOpacity>
 
-            {/* <HeaderBarwithBack
-                userName={username}
-                header={party && party?.partyname || party || ""}
-                subHeader={'Manage your Sales Orders'}
-                breadcrumb={getPartyName}
-                SearchBar={false}
-            /> */}
-            <LinearGradient
-                // colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-                style={styles.container1}>
-                <View style={styles.breadcrumbChip}>
-                    <View style={styles.breadcrumbRow}>
-                        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => {
-                            setSOParty(false)
-                            setSOParty_party('')
-                            setSOParty_selectedSalesExes([])
-                        }
-                        }>
-                            <Icon name="arrow-back" size={18} color="#fff" />
-                            <Text style={styles.breadcrumbBackText}>Back</Text>
-                        </TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            {/* <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.replace('/(tabs)')}>
-                                    <Icon name="home" size={18} color="#fff" />
-                                </TouchableOpacity> */}
-                            <Text style={styles.breadcrumbSeparator}>›</Text>
-                            <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
-                                {getPartyName}
+            {isAccordionOpen && (
+                <>
+                    <KpiGrid isPhone={isPhone}>
+                        <Kpi
+                            label="Total"
+                            icon="straighten"
+                            accent={T.nav}
+                            value={`₹ ${formatValue(summary.totamt)}`}
+                            sub={`${summary.totmtr} meter`}
+                        />
+                        <Kpi
+                            label="Delivered"
+                            icon="local-shipping"
+                            accent={T.green}
+                            valueColor={T.green}
+                            value={`₹ ${formatValue(summary.chalamt)}`}
+                            sub={`${summary.chalqty} meter`}
+                        />
+                        <Kpi
+                            label="Pending"
+                            icon="pending-actions"
+                            accent={T.copper}
+                            valueColor={T.copper}
+                            value={`₹ ${formatValue(summary.pendingamt)}`}
+                            sub={`${summary.pending} meter`}
+                        />
+                        <Kpi
+                            label="Orders"
+                            icon="receipt-long"
+                            accent={T.purple}
+                            value={String(summary.noofchallan)}
+                            sub={`${deliveryPercentage}% delivered`}
+                        />
+                    </KpiGrid>
+
+                    <View style={styles.deliveryContainer}>
+                        <View style={styles.deliveryHeader}>
+                            <Text style={styles.deliveryTitle}>Overall Delivery</Text>
+                            <Text style={styles.deliveryPercentage}>{deliveryPercentage}%</Text>
+                        </View>
+                        <ProgressBar value={deliveryPercentage} color={T.green} height={8} />
+                        <View style={styles.amountContainer}>
+                            <Text style={styles.amountText}>
+                                {formatCurrency(summary.chalamt)} delivered
+                            </Text>
+                            <Text style={styles.amountText}>
+                                {formatCurrency(summary.totamt)} total
                             </Text>
                         </View>
                     </View>
-                </View>
-            </LinearGradient >
-            {apiloading && <FullScreenLoader />
-            }
+                </>
+            )}
 
-            <View style={styles.searchContainer}>
-                {apiloading ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search Sales Orders..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />}
-            </View>
+            <SectionHead
+                title="Sales Orders"
+                meta={`${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'} · tap a card for challans`}
+                right={<SortChip label="Date" order={sortOrder} onPress={toggleSortOrder} />}
+            />
 
-            <ScrollView style={styles.container}>
-                <TouchableOpacity
-                    style={styles.accordionHeader}
-                    onPress={() => setIsAccordionOpen(!isAccordionOpen)}
-                >
-                    <Text style={styles.accordionTitle}>Summary</Text>
-                    <Icon
-                        name={isAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                        size={20}
-                        color="#333"
-                    />
-                </TouchableOpacity>
-
-                {isAccordionOpen && (
-                    <>
-                        <View style={styles.summaryContainer}>
-                            <SummaryCard
-                                title="Total"
-                                value1={formatValue(summary.totamt)}
-                                label1="Amount"
-                                value2={summary.totmtr}
-                                label2="Meter"
-                                backgroundColor="#E3F2FD"
-                            />
-
-                            <SummaryCard
-                                title="Delivered"
-                                value1={formatValue(summary.chalamt)}
-                                label1="Amount"
-                                value2={summary.chalqty}
-                                label2="Meter"
-                                backgroundColor="#E8F5E8"
-                            />
-
-                            <SummaryCard
-                                title="Pending"
-                                value1={formatValue(summary.pendingamt)}
-                                label1="Amount"
-                                value2={summary.pending}
-                                label2="Meter"
-                                backgroundColor="#FFF3E0"
-                            />
-
-                            <SummaryCard
-                                title="Orders"
-                                value1={summary.noofchallan}
-                                label1="Count"
-                                value2={`${deliveryPercentage}%`}
-                                label2="Delivery"
-                                backgroundColor="#F3E5F5"
-                            />
-                        </View>
-
-                        <View style={styles.deliveryContainer}>
-                            <View style={styles.deliveryHeader}>
-                                <Text style={styles.deliveryTitle}>Overall Delivery</Text>
-                                <Text style={styles.deliveryPercentage}>{deliveryPercentage}%</Text>
-                            </View>
-                            <View style={styles.progressBarContainer}>
-                                <View style={[styles.progressFill, { width: `${deliveryPercentage}%` }]} />
-                            </View>
-                            <View style={styles.amountContainer}>
-                                <Text style={styles.amountText}>
-                                    {formatCurrency(summary.chalamt)} delivered
-                                </Text>
-                                <Text style={styles.amountText}>
-                                    {formatCurrency(summary.totamt)} total
-                                </Text>
-                            </View>
-                        </View>
-                    </>
-                )}
-
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text>
-                    <TouchableOpacity onPress={toggleSortOrder} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Icon name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'} size={16} color="#333" />
-                        <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>Sort by Date</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.deliveryContainer123}>
-                    {todayOrders.length > 0 && (
-                        <View style={styles.todaySection}>
-                            <Text style={styles.todaySectionTitle}>📌 Today's Allocations</Text>
-                            {todayOrders.map((item, idx) => (
-                                <View key={`today-${item.sono}-${item.srno}-${idx}`}>
-                                    {renderOrderCard(item, true)}
-                                </View>
-                            ))}
-                        </View>
-                    )}
-
-                    {restOrders.length > 0 && (
-                        <>
-                            {todayOrders.length > 0 && (
-                                <Text style={styles.sectionTitle}>Other Orders</Text>
-                            )}
-                            <FlatList
-                                data={renderedRestOrders}
-                                renderItem={({ item }) => renderOrderCard(item, false)}
-                                keyExtractor={(item, index) => `${item.sono}_${item.srno}_${index}`}
-                                onEndReached={loadMoreRestOrders}
-                                onEndReachedThreshold={0.5}
-                                ListFooterComponent={restLoading ? (
-                                    <View style={styles.loadingIndicator}>
-                                        <Text>Loading more...</Text>
-                                    </View>
-                                ) : null}
-                                scrollEnabled={false}
-                            />
-                        </>
-                    )}
-                </View>
-            </ScrollView>
-
-            {getChallanView && (
-                <View style={styles.detailOverlay78910}>
-                    <View style={styles.detailContainer78910}>
-                        <SOPartyDetailsPart1 username={username} party={getChallanPartyName} setChallanView={setChallanView} setChallanPartyName={setChallanPartyName} />
+            {todayOrders.length > 0 && (
+                <View style={styles.todaySection}>
+                    <View style={styles.todayHead}>
+                        <Icon name="push-pin" size={15} color={T.green} />
+                        <Text style={styles.todaySectionTitle}>Today's Allocations ({todayOrders.length})</Text>
+                    </View>
+                    <View style={styles.todayGrid}>
+                        {todayOrders.map((item, idx) => (
+                            <React.Fragment key={`today-${item.sono}-${item.srno}-${idx}`}>
+                                {renderOrderCard(item, true)}
+                            </React.Fragment>
+                        ))}
                     </View>
                 </View>
             )}
-        </>
+
+            {restOrders.length > 0 && todayOrders.length > 0 && (
+                <Text style={styles.otherTitle}>Other Orders</Text>
+            )}
+        </View>
+    );
+
+    return (
+        <View style={styles.root}>
+            <PanelHeader
+                onBack={goBack}
+                crumbs={['Sales Order Tracking', 'Sales Orders']}
+                title={getPartyName || 'Sales Orders'}
+                subtitle={`${filteredOrders.length} sales order${filteredOrders.length === 1 ? '' : 's'}`}
+            />
+
+            <View style={[styles.searchContainer, { paddingHorizontal: gutter }]}>
+                <View style={styles.searchInner}>
+                    <SearchBox
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search SO no, design, shade, status…"
+                        loading={apiloading}
+                    />
+                </View>
+            </View>
+
+            <FlatList
+                key={`sop-${cols}`}
+                style={styles.container}
+                data={renderedRestOrders}
+                numColumns={cols}
+                renderItem={({ item }) => renderOrderCard(item, false)}
+                keyExtractor={(item, index) => `${item.sono}_${item.srno}_${index}`}
+                onEndReached={loadMoreRestOrders}
+                onEndReachedThreshold={0.5}
+                ListHeaderComponent={listHeader}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
+                ListEmptyComponent={
+                    todayOrders.length === 0 ? (
+                        <EmptyState icon="search-off" title="No sales orders found" text="Try a different search." />
+                    ) : null
+                }
+                ListFooterComponent={restLoading ? (
+                    <View style={styles.loadingIndicator}>
+                        <ActivityIndicator size="small" color={T.copper} />
+                    </View>
+                ) : renderedRestOrders.length < restOrders.length ? (
+                    <TouchableOpacity style={styles.moreBtn} onPress={loadMoreRestOrders}>
+                        <Text style={styles.moreBtnText}>Show more orders</Text>
+                    </TouchableOpacity>
+                ) : null}
+            />
+
+            {getChallanView && (
+                <View style={styles.detailOverlay78910}>
+                    <SOPartyDetailsPart1 username={username} party={getChallanPartyName} setChallanView={setChallanView} setChallanPartyName={setChallanPartyName} />
+                </View>
+            )}
+
+            <BusyOverlay visible={apiloading} text="Please wait…" />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        padding: 15,
-    },
-    container1: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
-        paddingTop: Platform.OS === 'android' ? 0 : 0,
-        // borderBottomLeftRadius: 16,
-        // borderBottomRightRadius: 16,
-        elevation: 6,
-    },
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: T.bg },
+    loadingText: { fontSize: 13, fontWeight: '700', color: T.muted },
     searchContainer: {
-        padding: 10,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: T.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: T.border,
+        paddingVertical: 8,
     },
-    searchInput: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 14,
-        color: '#000',
+    searchInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
     },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 4 },
+    gridCell: { padding: 5 },
+    loadingIndicator: { paddingVertical: 16, alignItems: 'center' },
+    moreBtn: { alignItems: 'center', paddingVertical: 14 },
+    moreBtnText: { fontSize: 13, fontWeight: '800', color: T.copper },
+
     accordionHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 5,
-        backgroundColor: '#f5f5f5',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-        marginBottom: 5,
-    },
-    accordionTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    summaryContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 5,
-    },
-    summaryBox: {
-        width: isTablet ? '24%' : '48%',
-        padding: 12,
-        borderRadius: 10,
-        marginBottom: 10,
-        height: 110,
-    },
-    summaryTitle: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
-    },
-    valueRow: {
-        marginBottom: 6,
-    },
-    valueText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: 'rgba(0,0,0,0.1)',
-        marginVertical: 6,
-    },
-    deliveryContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 15,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    deliveryContainer123: {
-        marginBottom: 20,
-    },
-    deliveryHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    deliveryTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    deliveryPercentage: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#4CAF50',
-    },
-    progressBarContainer: {
-        height: 10,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 5,
-        marginBottom: 10,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: '#4CAF50',
-        borderRadius: 5,
-    },
-    amountContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    amountText: {
-        fontSize: 12,
-        color: '#666',
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    orderCard: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 15,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        backgroundColor: T.surface,
         borderWidth: 1,
-        borderColor: 'transparent',
+        borderColor: T.border,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 40,
     },
-    orderCardWithAllocation: {
-        borderColor: 'rgb(178, 219, 252)',
-        borderWidth: 2,
-        backgroundColor: 'rgb(255, 255, 255)',
+    accordionTitle: { fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' },
+
+    deliveryContainer: {
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 10,
     },
-    orderCardToday: {
-        borderColor: 'rgb(178, 219, 252)',
-        borderWidth: 2,
-        backgroundColor: '#F5F9FF',
+    deliveryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    deliveryTitle: { fontSize: 13, fontWeight: '800', color: T.ink },
+    deliveryPercentage: { fontSize: 18, fontWeight: '900', color: T.green },
+    amountContainer: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 },
+    amountText: { fontSize: 11.5, fontWeight: '700', color: T.muted },
+
+    todaySection: {
+        backgroundColor: `${T.green}0C`,
+        borderWidth: 1,
+        borderColor: `${T.green}33`,
+        borderRadius: 14,
+        padding: 6,
+        paddingTop: 10,
     },
-    orderHeader: {
+    todayHead: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6, marginBottom: 2 },
+    todaySectionTitle: { fontSize: 12, fontWeight: '900', color: T.green, letterSpacing: 0.5, textTransform: 'uppercase' },
+    todayGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    otherTitle: { fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 },
+
+    orderCard: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        paddingLeft: 16,
+        gap: 10,
+        overflow: 'hidden',
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    orderCardWithAllocation: { borderColor: `${T.green}55` },
+    orderCardToday: { borderColor: T.green, borderWidth: 1.5 },
+    statusStripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+    orderHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    orderIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    orderId: { fontSize: 15, fontWeight: '900', color: T.nav },
+    orderParty: { fontSize: 12, fontWeight: '700', color: T.muted, marginTop: 3 },
+    designShadeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+    designShadeText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: T.ink, lineHeight: 17 },
+    dateRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+    dateItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    dateText: { fontSize: 11.5, fontWeight: '600', color: T.muted },
+    allocationBadge: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 5,
+        gap: 4,
+        backgroundColor: `${T.green}14`,
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
     },
-    orderHeadermain: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 5,
-        paddingBottom: 4,
-        borderColor: theme.BORDER,
-        borderBottomWidth: 2,
-    },
-    orderButtonContainer: {
-        display: 'flex',
-        flexDirection: 'row'
-    },
-    orderId: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    orderStatus: {
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    orderDate: {
-        fontSize: 12,
-        color: '#666',
-        marginBottom: 2,
-    },
-    designShadeText: {
-        fontSize: 11,
-        color: '#666',
-        marginBottom: 8,
-    },
+    allocationBadgeToday: { backgroundColor: T.green },
+    allocationBadgeText: { fontSize: 10.5, fontWeight: '800', color: T.green },
     orderStats: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 10,
-    },
-    statItem: {
-        alignItems: 'center',
-    },
-    statLabel: {
-        fontSize: 10,
-        color: '#666',
-    },
-    statValue: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 2,
-    },
-    orderProgressContainer: {
-        height: 6,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 3,
-        marginBottom: 10,
-        overflow: 'hidden',
-    },
-    progressBarSmall: {
-        height: '100%',
-        borderRadius: 3,
-    },
-    orderQty: {
-        fontSize: 12,
-        color: '#666',
-        alignSelf: 'flex-end',
-    },
-    loadingIndicator: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    allocationBadge: {
-        alignSelf: 'flex-start',
-        backgroundColor: '#E3F2FD',
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 12,
-        marginTop: 4,
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#90CAF9',
+        borderColor: T.hair,
+        padding: 10,
     },
-    allocationBadgeText: {
-        color: '#1565C0',
-        fontSize: 10,
-        fontWeight: 'bold',
-    },
-    todaySection: {
-        marginBottom: 16,
-        backgroundColor: ' #F5F9FF',
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#64B5F6',
-        shadowColor: '#64B5F6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    todaySectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#1565C0',
-        marginBottom: 8,
-        paddingLeft: 4,
-    },
-    breadcrumbChip: {
-        marginTop: 12,
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        borderBlockColor: 'rgba(255,255,255,0.15)',
-        borderTopWidth: 1,
-        paddingVertical: 6,
-        width: '100%',
-    },
-    breadcrumbRow: {
+    orderProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    orderProgressText: { fontSize: 11, fontWeight: '900', minWidth: 32, textAlign: 'right' },
+    qtyRow: { flexDirection: 'row', gap: 8 },
+    qtyCell: { flex: 1, minWidth: 0 },
+    qtyLabel: { fontSize: 10, fontWeight: '700', color: T.muted, textTransform: 'uppercase' },
+    qtyValue: { fontSize: 12.5, fontWeight: '800', color: T.ink, marginTop: 1 },
+    orderFooter: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        paddingTop: 9,
+    },
+    closeOrderBtn: {
+        flexDirection: 'row',
         alignItems: 'center',
-        width: '100%',
+        gap: 5,
+        height: 32,
+        paddingHorizontal: 11,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: `${T.red}40`,
+        backgroundColor: `${T.red}0D`,
     },
-    breadcrumbSeparator: {
-        color: '#fff',
-        marginHorizontal: 6,
-    },
-    breadcrumbBackText: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '500',
-        opacity: 0.9,
-    },
-    breadcrumbCurrent: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '600',
-        flexShrink: 1,
-        textAlign: 'right',
-    },
+    closeOrderText: { fontSize: 12, fontWeight: '800', color: T.red },
+    viewChallans: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    viewChallansText: { fontSize: 12, fontWeight: '800', color: T.nav },
+
     detailOverlay78910: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 500, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-    
-      // Detail Container
-      detailContainer: {
-        backgroundColor: '#fff',
-        // padding: 20,
-        paddingTop: 45,
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-        elevation: 5, // Shadow for Android
-        shadowColor: '#000', // Shadow for iOS
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      },
-      detailContainer78910: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-        elevation: 5, // Shadow for Android
-        shadowColor: '#000', // Shadow for iOS
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      },
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: T.bg,
+        zIndex: 500,
+        elevation: 20,
+    },
 });
 
 export default SOPartyDetails;

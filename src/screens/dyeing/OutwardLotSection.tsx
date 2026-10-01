@@ -108,6 +108,7 @@ export const outNoOf = (r: OutwardRow, challanOf: (row: OutwardRow) => string) =
 /** "OutDate · accname" line of an outward (no uid). */
 const outDateOf = (r: OutwardRow) => (r.OutDate ? showDate(r.OutDate) : r.date ? showDate(r.date) : '');
 const accOf = (r: OutwardRow) => r.accName || r.mill || '';
+const designOf = (r: OutwardRow) => r.dsnname || '';
 
 /** '' / invalid -> null, else the positive number. */
 const parseQty = (text: string): number | null | 'BAD' => {
@@ -296,9 +297,9 @@ export function OutwardLotSection({
               {!!selected && (
                 <Text style={st.pickerSub} numberOfLines={1}>
                   {[outDateOf(selected),
-                    accOf(selected),
-                    selected.qty != null ? `Out ${qtyLabel(selected.qty)} m` : '',
-                    selected.balance != null && selected.qty != null && selected.balance !== selected.qty ? `Bal ${qtyLabel(selected.balance)} m` : '',
+                  accOf(selected),
+                  selected.qty != null ? `Out ${qtyLabel(selected.qty)} m` : '',
+                  selected.balance != null && selected.qty != null && selected.balance !== selected.qty ? `Bal ${qtyLabel(selected.balance)} m` : '',
                   ].filter(Boolean).join(' · ')}
                 </Text>
               )}
@@ -366,7 +367,8 @@ export function OutwardLotSection({
                 <View style={{ flex: 1.3, minWidth: 0 }}>
                   <Text style={st.tdText} numberOfLines={1}>{labelOf(row)}</Text>
                   <Text style={st.tdSub} numberOfLines={1}>
-                    {[outDateOf(row), row.qty != null ? `Out ${qtyLabel(row.qty)} m` : '']
+                    {/* {[outDateOf(row), row.qty != null ? `Out ${qtyLabel(row.qty)} m` : ''] */}
+                    {[outDateOf(row), row.accname != null ? `${row.accname}` : '-']
                       .filter(Boolean).join(' · ')}
                   </Text>
                   {!!accOf(row) && <Text style={st.tdSub} numberOfLines={1}>{accOf(row)}</Text>}
@@ -528,7 +530,7 @@ function OutwardHelp({
   const list = useMemo(() => {
     const query = q.trim().toLowerCase();
     const base = query
-      ? state.rows.filter((r) => [outNoOf(r, challanOf), outDateOf(r), r.OutDate, accOf(r), r.chartNo, r.lotNo, r.shdName]
+      ? state.rows.filter((r) => [outNoOf(r, challanOf), outDateOf(r), r.OutDate, designOf(r), accOf(r), r.chartNo, r.lotNo, r.shdName]
         .join(' ').toLowerCase().includes(query))
       : state.rows;
     // open outwards first, outwards that already have a lot last
@@ -610,13 +612,19 @@ function OutwardHelp({
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={st.tdText} numberOfLines={1}>{outNoOf(item, challanOf)}</Text>
                       <Text style={st.tdSub} numberOfLines={1}>
-                        {[outDateOf(item),
+                        {[
+                          outDateOf(item),
+                          designOf(item),
                           accOf(item),
                           item.chartNo && item.chartNo !== chartNo ? `Chart ${item.chartNo}` : '',
                           item.shdName ? item.shdName : '',
                           item.qty != null ? `Out ${qtyLabel(item.qty)} m` : '',
-                          item.balance != null && item.qty != null && item.balance !== item.qty ? `Bal ${qtyLabel(item.balance)} m` : '',
-                        ].filter(Boolean).join(' · ')}
+                          item.balance != null && item.qty != null && item.balance !== item.qty
+                            ? `Bal ${qtyLabel(item.balance)} m`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </Text>
                       {!!item.takenBy && <Text style={st.takenBy} numberOfLines={1}>Taken: {item.takenBy}</Text>}
                     </View>

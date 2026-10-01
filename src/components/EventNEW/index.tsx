@@ -1,4 +1,6 @@
 // index.tsx - S: design fields always visible, placeholder design if none exists
+// NEW ERP UI: re-skinned to the NEW ERP theme (T tokens + shared erpUi kit).
+//   Logic above the "Render functions" marker is unchanged from the legacy screen.
 // UPDATED:
 //  1) Online -> Property / Event / Items / Designs load fresh from API and the
 //     local cache is refreshed with that response. Offline -> falls back to the
@@ -9,7 +11,6 @@
 import { API } from '@/common/API/dynamicAPI';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,17 +20,14 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { getCurrentFinancialYear } from '../../common/commonfunction';
-import HeaderBarwithBack from '../../components/HeaderNew';
 import api from './api';
 import {
   captureCardPhoto,
@@ -58,6 +56,24 @@ import {
 import EnquiryReportScreen from './EnquiryReportScreen';
 import { abortSync, startSyncQueue } from './syncQueue';
 import { syncShowEnquiries, updateEnquiries } from './syncService';
+import { S, T } from '@/src/theme';
+import {
+  BusyOverlay,
+  Btn,
+  Card,
+  CONTENT_MAX,
+  EmptyState,
+  IconBtn,
+  PickField,
+  ProgressBar,
+  SearchBox,
+  SectionHead,
+  Segment,
+  Sheet,
+  pct,
+  useSotLayout,
+} from '@/src/components/erpUi';
+import { CardTile, DashedBtn, FormField, LinkBtn, ModalPanel, OptionRow, Tag } from './ui';
 
 const DESIGNATIONS = [
   'Owner', 'Partner', 'Director', 'Purchase Manager',
@@ -1695,21 +1711,94 @@ export default function NewEnquiryScreen({ token, username }) {
   };
 
   // --- Render functions ---
+  // ===== NEW ERP UI (presentation only) — every handler below is the
+  // original one, called with the original arguments. =====
+  const { isPhone, gutter, width: screenW } = useSotLayout();
+  const twoCol = screenW >= 1024;
+  const wideForm = !isPhone;
+  const selectedEventName = EVENTS.find(e => e.EventId === eventCode)?.EventName || '';
+  const selectedPrpName = PRPS.find(e => e.code === getUserPrptype)?.name || '';
+  // S items always show at least one design slot (blank placeholder), so count it.
+  const designCountAll = selectedItems.reduce((n, it) => n + ((it.designs && it.designs.length) || 1), 0);
+
+  // Same statements as the original item modal's close button / onRequestClose.
+  const closeItemModal = () => {
+    setItemModalVisible(false);
+    setEditingItemIndex(null);
+  };
+  // Same statements as the original design modal's close button / onRequestClose.
+  const closeDesignModal = () => {
+    setDesignModalVisible(false);
+    setEditingDesignItemIndex(null);
+    setEditingDesignIndex(null);
+    setDesignSearchQuery('');
+    setDisplayedDesigns([]);
+    setHasMore(false);
+    setAllDesigns([]);
+  };
+
+  const renderQtyRow = (
+    qty: string,
+    rate: string,
+    unit: string,
+    remark: string,
+    onQty: (t: string) => void,
+    onRate: (t: string) => void,
+    onUnit: (t: string) => void,
+    onRemark: (t: string) => void,
+  ) => (
+    <View style={[styles.qtyGrid, wideForm && { flexWrap: 'nowrap' }]}>
+      <View style={styles.qtyCell}>
+        <FormField compact label="Qty" value={qty} onChangeText={onQty} keyboardType="numeric" placeholder="0" />
+      </View>
+      <View style={styles.qtyCell}>
+        <FormField compact label="Rate" value={rate} onChangeText={onRate} keyboardType="numeric" placeholder="0" />
+      </View>
+      <View style={[styles.qtyCell, { flex: 0.8 }]}>
+        <FormField compact label="Unit" value={unit} onChangeText={onUnit} placeholder="" />
+      </View>
+      <View style={[wideForm ? { flex: 2.2, minWidth: 0 } : { width: '100%' }]}>
+        <FormField
+          compact
+          label="Remark / Color Requirements"
+          value={remark}
+          onChangeText={onRemark}
+          placeholder="Optional remark"
+        />
+      </View>
+    </View>
+  );
 
   const renderItemCard = (item, itemIndex) => {
     const isPrptypeS = getUserPrptype === 'S';
+    const designsShown = item.designs && item.designs.length > 0 ? item.designs.length : 1;
 
     return (
       <View key={itemIndex} style={styles.itemCard}>
-        <TouchableOpacity style={{ alignItems: 'flex-end' }} onPress={() => removeItem(itemIndex)}>
-          <Icon name="delete" size={22} color={C.danger} />
-        </TouchableOpacity>
+        <View style={styles.itemHead}>
+          <View style={styles.itemNo}>
+            <Text style={styles.itemNoText}>{itemIndex + 1}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.itemEyebrow}>
+              ITEM {itemIndex + 1}
+              {isPrptypeS ? ` · ${designsShown} DESIGN${designsShown > 1 ? 'S' : ''}` : ''}
+            </Text>
+            <Text style={[styles.itemTitle, !item.item_name && { color: T.muted }]} numberOfLines={1}>
+              {item.item_name || (item.is_new_item ? 'New item' : 'No item selected')}
+            </Text>
+          </View>
+          {!isPrptypeS && item.is_new_item ? <Tag label="New" tone="green" /> : null}
+          <IconBtn icon="delete" tone="danger" color={T.red} label="Remove item" onPress={() => removeItem(itemIndex)} />
+        </View>
 
-        {isPrptypeS ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Item</Text>
-            <TouchableOpacity
-              style={[styles.dropdown, { backgroundColor: item.item_name ? '#f0f0f0' : '#fff' }]}
+        <View style={styles.itemBody}>
+          {isPrptypeS ? (
+            <PickField
+              label="Item"
+              icon="inventory-2"
+              value={item.item_name}
+              placeholder="Select Item"
               onPress={() => {
                 setEditingItemIndex(itemIndex);
                 setItemSearchQuery('');
@@ -1724,274 +1813,173 @@ export default function NewEnquiryScreen({ token, username }) {
                 else loadItems();
                 setItemModalVisible(true);
               }}
-            >
-              <Text style={styles.dropdownText}>
-                {item.item_name || 'Select Item'}
-              </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.fieldGroup}>
-            <View style={styles.tabContainerSmall1}>
-              <TouchableOpacity
-                style={[styles.tabSmall1, !item.is_new_item && styles.activeTabSmall]}
-                onPress={() => toggleItemTab(itemIndex, 'Existing')}
-              >
-                <Text style={[styles.tabTextSmall, !item.is_new_item && styles.activeTabTextSmall]}>Existing</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tabSmall1, item.is_new_item && styles.activeTabSmall]}
-                onPress={() => toggleItemTab(itemIndex, 'New')}
-              >
-                <Text style={[styles.tabTextSmall, item.is_new_item && styles.activeTabTextSmall]}>New</Text>
-              </TouchableOpacity>
-            </View>
-            {item.is_new_item ? (
-              <View>
-                <Field label="Item Name *">
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter item name"
-                    value={item.item_name}
-                    onChangeText={(text) => updateItemField(itemIndex, 'item_name', text)}
-                  />
-                </Field>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.dropdown, { backgroundColor: item.item_name ? '#f0f0f0' : '#fff' }]}
-                onPress={() => {
-                  setEditingItemIndex(itemIndex);
-                  setItemSearchQuery('');
-                  setAllItems([]);
-                  setDisplayedItems([]);
-                  setHasMoreItem(false);
-                  loadingMoreItemsRef.current = false;
-                  setLoadingMoreItems(false);
-                  if (getUserPrptype === 'K') loadItems_K();
-                  else if (getUserPrptype === 'V') loadItems_V();
-                  else if (getUserPrptype === 'R') loadItems_R();
-                  else loadItems();
-                  setItemModalVisible(true);
-                }}
-              >
-                <Text style={styles.dropdownText}>
-                  {item.item_name || 'Select Item'}
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {!isPrptypeS && (
-          <View style={styles.designFields}>
-            {/* <View style={[styles.fieldGroup, { flexDirection: 'row', justifyContent: 'space-between' }]}> */}
-            <View style={styles.designFieldsRow}>
-              <View style={{ flex: 1.15 }}>
-                {/* <Field label="Qty"> */}
-                <Text style={styles.designFieldLabel}>Qty</Text>
-                <TextInput
-                  style={styles.designFieldInput}
-                  value={item.item_qty}
-                  onChangeText={(text) => updateItemField(itemIndex, 'item_qty', text)}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-                {/* </Field> */}
-              </View>
-              <View style={{ flex: 1.15 }}>
-                {/* <Field label="Rate"> */}
-                <Text style={styles.designFieldLabel}>Rate</Text>
-                <TextInput
-                  style={styles.designFieldInput}
-                  value={item.item_rate}
-                  onChangeText={(text) => updateItemField(itemIndex, 'item_rate', text)}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-                {/* </Field> */}
-              </View>
-              {/* </View> */}
-              <View style={{ flex: 1.15 }}>
-                {/* <Field label="Unit"> */}
-                <Text style={styles.designFieldLabel}>Unit</Text>
-                <TextInput
-                  style={styles.designFieldInput}
-                  value={item.item_unit}
-                  onChangeText={(text) => updateItemField(itemIndex, 'item_unit', text)}
-                  placeholder=""
-                />
-                {/* </Field> */}
-              </View>
-            </View>
-            <Text style={[styles.designFieldLabel, { marginTop: 8, marginBottom: 4 }]}>
-              Remark / Color Requirements
-            </Text>
-            <TextInput
-              style={[styles.designFieldInput, styles.remarkInput]}
-              value={item.item_remark}
-              onChangeText={(text) => updateItemField(itemIndex, 'item_remark', text)}
-              placeholder="Optional remark"
             />
-            {/* </Field> */}
-          </View>
-        )}
-
-        {isPrptypeS && (
-          <View style={styles.designsContainer}>
-            <View style={styles.designsHeader}>
-              <Text style={styles.designsTitle}>
-                Design{item.designs && item.designs.length > 1 ? 's' : ''}
-                {item.item_name ? ` for "${item.item_name}"` : ''}
-              </Text>
-            </View>
-
-            {/* Accordion show/hide + count — only appears once an item has more than 1 design */}
-            {item.designs && item.designs.length > 1 && (
-              <TouchableOpacity
-                style={styles.designAccordionBtn}
-                onPress={() => toggleDesignsExpanded(itemIndex)}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.designAccordionText}>{item.designs.length} Designs</Text>
-                <Icon
-                  name={isDesignsExpanded(itemIndex) ? 'expand-less' : 'expand-more'}
-                  size={22}
-                  color={C.brandDark}
+          ) : (
+            <View style={{ gap: 10 }}>
+              <Segment
+                value={item.is_new_item ? 'New' : 'Existing'}
+                options={[
+                  { value: 'Existing', label: 'Existing', icon: 'inventory-2' },
+                  { value: 'New', label: 'New', icon: 'add-circle-outline' },
+                ]}
+                onChange={(v) => toggleItemTab(itemIndex, v as 'Existing' | 'New')}
+              />
+              {item.is_new_item ? (
+                <FormField
+                  label="Item Name"
+                  required
+                  placeholder="Enter item name"
+                  value={item.item_name}
+                  onChangeText={(text) => updateItemField(itemIndex, 'item_name', text)}
                 />
-              </TouchableOpacity>
+              ) : (
+                <PickField
+                  label="Item"
+                  icon="inventory-2"
+                  value={item.item_name}
+                  placeholder="Select Item"
+                  onPress={() => {
+                    setEditingItemIndex(itemIndex);
+                    setItemSearchQuery('');
+                    setAllItems([]);
+                    setDisplayedItems([]);
+                    setHasMoreItem(false);
+                    loadingMoreItemsRef.current = false;
+                    setLoadingMoreItems(false);
+                    if (getUserPrptype === 'K') loadItems_K();
+                    else if (getUserPrptype === 'V') loadItems_V();
+                    else if (getUserPrptype === 'R') loadItems_R();
+                    else loadItems();
+                    setItemModalVisible(true);
+                  }}
+                />
+              )}
+            </View>
+          )}
+
+          {!isPrptypeS &&
+            renderQtyRow(
+              item.item_qty,
+              item.item_rate,
+              item.item_unit,
+              item.item_remark,
+              (text) => updateItemField(itemIndex, 'item_qty', text),
+              (text) => updateItemField(itemIndex, 'item_rate', text),
+              (text) => updateItemField(itemIndex, 'item_unit', text),
+              (text) => updateItemField(itemIndex, 'item_remark', text),
             )}
 
-            {(!item.designs || item.designs.length <= 1 || isDesignsExpanded(itemIndex)) && (
-              (item.designs && item.designs.length > 0 ? item.designs : [blankDesign()]).map((design, designIndex) => {
-                const displayDesign = design || blankDesign();
-                const modeForThisDesign =
-                  (designModePerItem[itemIndex] && designModePerItem[itemIndex][designIndex]) || 'Existing';
+          {isPrptypeS && (
+            <View style={styles.designsContainer}>
+              <View style={styles.designsHeader}>
+                <Text style={styles.designsTitle} numberOfLines={1}>
+                  Design{item.designs && item.designs.length > 1 ? 's' : ''}
+                  {item.item_name ? ` for "${item.item_name}"` : ''}
+                </Text>
+              </View>
 
-                console.log("modeForThisDesign: ", modeForThisDesign);
+              {/* Accordion show/hide + count — only appears once an item has more than 1 design */}
+              {item.designs && item.designs.length > 1 && (
+                <TouchableOpacity
+                  style={styles.designAccordionBtn}
+                  onPress={() => toggleDesignsExpanded(itemIndex)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                >
+                  <Icon name="layers" size={16} color={T.copper} />
+                  <Text style={styles.designAccordionText}>{item.designs.length} Designs</Text>
+                  <Text style={styles.designAccordionHint}>{isDesignsExpanded(itemIndex) ? 'Hide' : 'Show'}</Text>
+                  <Icon
+                    name={isDesignsExpanded(itemIndex) ? 'expand-less' : 'expand-more'}
+                    size={22}
+                    color={T.nav}
+                  />
+                </TouchableOpacity>
+              )}
 
-                return (
-                  <View key={designIndex} style={styles.designCard}>
-                    {/* Design badge + remove (remove only allowed for extra designs, not the first) */}
-                    <View style={styles.designCardHeader}>
-                      <Text style={styles.designCardBadge}>Design {designIndex + 1}</Text>
-                      {designIndex > 0 && (
-                        <TouchableOpacity
-                          onPress={() => removeDesignRow(itemIndex, designIndex)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Icon name="close" size={18} color={C.danger} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+              {(!item.designs || item.designs.length <= 1 || isDesignsExpanded(itemIndex)) && (
+                (item.designs && item.designs.length > 0 ? item.designs : [blankDesign()]).map((design, designIndex) => {
+                  const displayDesign = design || blankDesign();
+                  const modeForThisDesign =
+                    (designModePerItem[itemIndex] && designModePerItem[itemIndex][designIndex]) || 'Existing';
 
-                    {/* Per-design Existing/New tab */}
-                    <View style={styles.tabContainerSmall1}>
-                      <TouchableOpacity
-                        style={[styles.tabSmall1, modeForThisDesign === 'Existing' && styles.activeTabSmall]}
-                        onPress={() => toggleDesignMode(itemIndex, designIndex, 'Existing')}
-                      >
-                        <Text style={[styles.tabTextSmall, modeForThisDesign === 'Existing' && styles.activeTabTextSmall]}>Existing</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.tabSmall1, modeForThisDesign === 'New' && styles.activeTabSmall]}
-                        onPress={() => toggleDesignMode(itemIndex, designIndex, 'New')}
-                      >
-                        <Text style={[styles.tabTextSmall, modeForThisDesign === 'New' && styles.activeTabTextSmall]}>New</Text>
-                      </TouchableOpacity>
-                    </View>
+                  console.log("modeForThisDesign: ", modeForThisDesign);
 
-                    {/* Design selection or name input based on mode */}
-                    {modeForThisDesign === 'Existing' ? (
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.label}>Design</Text>
-                        <TouchableOpacity
-                          style={[styles.dropdown, { backgroundColor: displayDesign.dsn_name ? '#f0f0f0' : '#fff' }]}
+                  return (
+                    <View key={designIndex} style={styles.designCard}>
+                      {/* Design badge + remove (remove only allowed for extra designs, not the first) */}
+                      <View style={styles.designCardHeader}>
+                        <Tag label={`Design ${designIndex + 1}`} />
+                        <View style={{ flex: 1 }} />
+                        {designIndex > 0 && (
+                          <TouchableOpacity
+                            onPress={() => removeDesignRow(itemIndex, designIndex)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={styles.designRemove}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove design ${designIndex + 1}`}
+                          >
+                            <Icon name="close" size={16} color={T.red} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Per-design Existing/New tab */}
+                      <Segment
+                        value={modeForThisDesign === 'New' ? 'New' : 'Existing'}
+                        options={[
+                          { value: 'Existing', label: 'Existing', icon: 'style' },
+                          { value: 'New', label: 'New', icon: 'add-circle-outline' },
+                        ]}
+                        onChange={(v) => toggleDesignMode(itemIndex, designIndex, v as 'Existing' | 'New')}
+                      />
+
+                      {/* Design selection or name input based on mode */}
+                      {modeForThisDesign === 'Existing' ? (
+                        <PickField
+                          label="Design"
+                          icon="style"
+                          value={displayDesign.dsn_name}
+                          placeholder="Select Design"
                           // onPress={() => openDesignModalForItem(itemIndex, designIndex)}
                           onPress={() => id ? openDesignModalForItem(itemIndex, designIndex) : openDesignModalForItem123(itemIndex, designIndex)}
-                        >
-                          <Text style={styles.dropdownText}>
-                            {displayDesign.dsn_name || 'Select Design'}
-                          </Text>
-                          <Text style={styles.dropdownArrow}>▼</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      // New mode: inline text field for design name
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.label}>Design Name *</Text>
-                        <TextInput
-                          style={styles.input}
+                        />
+                      ) : (
+                        // New mode: inline text field for design name
+                        <FormField
+                          label="Design Name"
+                          required
                           placeholder="Enter design name"
                           value={displayDesign.dsn_name}
                           onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_name', text)}
                         />
-                      </View>
-                    )}
+                      )}
 
-                    {/* Design fields: Qty, Rate & Unit share one compact row, Remark below */}
-                    <View style={styles.designFields}>
-                      <View style={styles.designFieldsRow}>
-                        <View style={{ flex: 1.15 }}>
-                          <Text style={styles.designFieldLabel}>Qty</Text>
-                          <TextInput
-                            style={styles.designFieldInput}
-                            value={displayDesign.dsn_qty}
-                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_qty', text)}
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                        </View>
-                        <View style={{ flex: 1.15 }}>
-                          <Text style={styles.designFieldLabel}>Rate</Text>
-                          <TextInput
-                            style={styles.designFieldInput}
-                            value={displayDesign.dsn_rate}
-                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_rate', text)}
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                        </View>
-                        <View style={{ flex: 0.9 }}>
-                          <Text style={styles.designFieldLabel}>Unit</Text>
-                          <TextInput
-                            style={styles.designFieldInput}
-                            value={displayDesign.unit}
-                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'unit', text)}
-                            placeholder=""
-                          />
-                        </View>
-                      </View>
-                      <Text style={[styles.designFieldLabel, { marginTop: 8, marginBottom: 4 }]}>
-                        Remark / Color Requirements
-                      </Text>
-                      <TextInput
-                        style={[styles.designFieldInput, styles.remarkInput]}
-                        value={displayDesign.remark}
-                        onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'remark', text)}
-                        placeholder="Optional remark"
-                      />
+                      {/* Design fields: Qty, Rate & Unit share one compact row, Remark below */}
+                      {renderQtyRow(
+                        displayDesign.dsn_qty,
+                        displayDesign.dsn_rate,
+                        displayDesign.unit,
+                        displayDesign.remark,
+                        (text) => updateDesignField(itemIndex, designIndex, 'dsn_qty', text),
+                        (text) => updateDesignField(itemIndex, designIndex, 'dsn_rate', text),
+                        (text) => updateDesignField(itemIndex, designIndex, 'unit', text),
+                        (text) => updateDesignField(itemIndex, designIndex, 'remark', text),
+                      )}
                     </View>
-                  </View>
-                );
-              })
-            )}
+                  );
+                })
+              )}
 
-            {/* Add Design – appends another design row to THIS item */}
-            <TouchableOpacity
-              style={[styles.addDesignBtn, isAddDesignDisabledForItem(itemIndex) && styles.disabledBtn]}
-              onPress={() => addDesignRow(itemIndex)}
-              disabled={isAddDesignDisabledForItem(itemIndex)}
-            >
-              <Icon name="add" size={18} color={isAddDesignDisabledForItem(itemIndex) ? '#aaa' : C.brand} />
-              <Text style={[styles.addDesignBtnText, { color: isAddDesignDisabledForItem(itemIndex) ? '#aaa' : C.brand }]}>
-                {' '}Add Design
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              {/* Add Design – appends another design row to THIS item */}
+              <DashedBtn
+                label="Add Design"
+                onPress={() => addDesignRow(itemIndex)}
+                disabled={isAddDesignDisabledForItem(itemIndex)}
+              />
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -2017,92 +2005,459 @@ export default function NewEnquiryScreen({ token, username }) {
     }
 
     return (
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Items</Text>
+      <View style={styles.section}>
+        <SectionHead
+          title="Items"
+          meta={
+            selectedItems.length
+              ? `${selectedItems.length} item${selectedItems.length > 1 ? 's' : ''}${isPrptypeS ? ` · ${designCountAll} design${designCountAll === 1 ? '' : 's'}` : ''}`
+              : 'Add what the party is asking for'
+          }
+        />
 
         {/* Selected Items List */}
         {selectedItems.map((item, index) => renderItemCard(item, index))}
 
         {selectedItems.length === 0 && (
-          <Text style={styles.noItemsText}>No items added. Tap "Add Item" to start.</Text>
+          <View style={styles.noItems}>
+            <Icon name="inventory-2" size={22} color={T.copper} />
+            <Text style={styles.noItemsText}>No items added. Tap "Add Item" to start.</Text>
+          </View>
         )}
 
         {/* Add Item Button */}
-        <TouchableOpacity
-          style={[styles.addItemBtn, styles.scanBtnDash, isAddDisabled && styles.disabledBtn]}
+        <DashedBtn
+          label="Add New Item"
           onPress={isPrptypeS ? addBlankItemForS : addBlankItem}
           disabled={isAddDisabled}
-        >
-          <Icon name="add" size={20} color={isAddDisabled ? '#aaa' : C.brand} />
-          <Text style={[styles.scanBtnTextDash, { color: isAddDisabled ? '#aaa' : C.brand }]}> Add New Item</Text>
-        </TouchableOpacity>
+        />
+        {isAddDisabled ? (
+          <Text style={styles.addHint}>
+            {isPrptypeS ? 'Fill design name and qty of every design to add another item.' : 'Fill item name and qty to add another item.'}
+          </Text>
+        ) : null}
       </View>
     );
   };
 
+  // --- Visiting-card capture block (all stages) ---
+  const renderStageHead = (title: string, onClose: () => void) => (
+    <View style={styles.stageHead}>
+      <View style={styles.stageIcon}>
+        <Icon name="credit-card" size={18} color={T.copper} />
+      </View>
+      <Text style={styles.stageTitle} numberOfLines={1}>{title}</Text>
+      <IconBtn icon="close" label="Cancel" onPress={onClose} disabled={scanning} />
+    </View>
+  );
+
+  const renderProcessing = () =>
+    scanning ? (
+      <View style={styles.processing}>
+        <ActivityIndicator color={T.copper} />
+        <Text style={styles.processingText}>Processing card... Please wait</Text>
+      </View>
+    ) : null;
+
+  const renderScanBlock = () => (
+    <Card style={styles.block}>
+      {cardCaptureStage === null && (
+        <>
+          <View style={styles.blockHead}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.eyebrow}>VISITING CARD</Text>
+              <Text style={styles.blockTitle}>Scan visiting card (optional)</Text>
+            </View>
+            {scannedFromCard ? <Tag label="Scanned" tone="green" /> : null}
+          </View>
+          <View style={[styles.scanRow, isPhone && { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <Btn
+              label="Scan visiting card"
+              icon="photo-camera"
+              kind="copper"
+              onPress={() => handleScanCard()}
+              disabled={!online || scanning}
+              loading={scanning}
+              style={isPhone ? null : { flex: 1 }}
+            />
+            <View style={[styles.orWrap, isPhone && { flexDirection: 'row' }]}>
+              {isPhone ? <View style={styles.orLine} /> : null}
+              <Text style={styles.orText}>OR</Text>
+              {isPhone ? <View style={styles.orLine} /> : null}
+            </View>
+            <Btn
+              label="Upload Card"
+              icon="file-upload"
+              kind="ghost"
+              onPress={() => handleUploadCard()}
+              style={[isPhone ? null : { flex: 1 }, (!online || scanning) && { opacity: 0.55 }]}
+            />
+          </View>
+          <View style={[styles.hintRow, !online && { backgroundColor: `${T.red}0D`, borderColor: `${T.red}30` }]}>
+            <Icon name={online ? 'auto-awesome' : 'wifi-off'} size={15} color={online ? T.copper : T.red} />
+            <Text style={styles.scanHint}>
+              {online
+                ? 'Captures name, address, mobile, email, company & GSTIN automatically. Needs internet.'
+                : "No internet — card scan is unavailable. Type details below."}
+            </Text>
+          </View>
+        </>
+      )}
+
+      {cardCaptureStage === 'front_preview' && (
+        <View>
+          {renderStageHead('Front Side Captured', handleCancelCardCapture)}
+          <Image source={{ uri: pendingFrontUri }} style={styles.cardImage} resizeMode="contain" />
+          <Text style={styles.stageQuestion}>Would you like to scan the back side?</Text>
+          <View style={styles.stageBtns}>
+            <Btn label="Skip" kind="ghost" onPress={handleSkipBackSide} disabled={scanning} loading={scanning} style={styles.stageBtn} />
+            <Btn
+              label="Scan Back"
+              icon="photo-camera"
+              onPress={handleScanBackSide}
+              disabled={capturingBack || scanning}
+              loading={capturingBack}
+              style={styles.stageBtn}
+            />
+          </View>
+          {renderProcessing()}
+        </View>
+      )}
+
+      {cardCaptureStage === 'both_preview' && (
+        <View>
+          {renderStageHead('Front + Back Captured', handleCancelCardCapture)}
+          <View style={styles.previewPair}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardSideLabel}>Front</Text>
+              <Image source={{ uri: pendingFrontUri }} style={styles.cardImage} resizeMode="contain" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardSideLabel}>Back</Text>
+              <Image source={{ uri: pendingBackUri }} style={styles.cardImage} resizeMode="contain" />
+            </View>
+          </View>
+          <View style={styles.stageBtns}>
+            <Btn
+              label="Retake Back"
+              icon="replay"
+              kind="ghost"
+              onPress={handleRetakeBackSide}
+              disabled={capturingBack || scanning}
+              loading={capturingBack}
+              style={styles.stageBtn}
+            />
+            <Btn
+              label="Confirm & Process"
+              icon="document-scanner"
+              onPress={handleConfirmAndProcess}
+              disabled={scanning}
+              loading={scanning}
+              style={styles.stageBtn}
+            />
+          </View>
+          {renderProcessing()}
+        </View>
+      )}
+
+      {uploadStage === 'front_preview' && (
+        <View>
+          {renderStageHead('Front Image Picked', () => { setUploadStage(null); setPendingFrontUpload(null); })}
+          <Image source={{ uri: pendingFrontUpload }} style={styles.cardImage} resizeMode="contain" />
+          <Text style={styles.stageQuestion}>Would you like to pick the back side?</Text>
+          <View style={styles.stageBtns}>
+            <Btn label="Skip" kind="ghost" onPress={handleUploadSkipBack} disabled={scanning} style={styles.stageBtn} />
+            <Btn label="Upload Back" icon="file-upload" onPress={handleUploadBack} disabled={scanning} style={styles.stageBtn} />
+          </View>
+          {renderProcessing()}
+        </View>
+      )}
+
+      {uploadStage === 'both_preview' && (
+        <View>
+          {renderStageHead('Front + Back Picked', () => { setUploadStage(null); setPendingFrontUpload(null); setPendingBackUpload(null); })}
+          <View style={styles.previewPair}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardSideLabel}>Front</Text>
+              <Image source={{ uri: pendingFrontUpload }} style={styles.cardImage} resizeMode="contain" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardSideLabel}>Back</Text>
+              <Image source={{ uri: pendingBackUpload }} style={styles.cardImage} resizeMode="contain" />
+            </View>
+          </View>
+          <View style={styles.stageBtns}>
+            <Btn label="Retake Back" icon="replay" kind="ghost" onPress={handleUploadRetakeBack} disabled={scanning} style={styles.stageBtn} />
+            <Btn
+              label="Confirm & Process"
+              icon="document-scanner"
+              onPress={handleUploadConfirm}
+              disabled={scanning}
+              loading={scanning}
+              style={styles.stageBtn}
+            />
+          </View>
+          {renderProcessing()}
+        </View>
+      )}
+    </Card>
+  );
+
+  const fieldW = wideForm ? styles.fieldHalf : styles.fieldFull;
+
+  const renderPartyBlock = () => (
+    <Card style={styles.block}>
+      <SectionHead
+        title="Party details"
+        meta={scannedFromCard ? 'Filled from the visiting card — please check before saving' : 'Who you met at the stall'}
+      />
+      <View style={styles.formGrid}>
+        <FormField
+          style={styles.fieldFull}
+          label="Party name"
+          required
+          highlight={!!cardFields.party_name}
+          placeholder="Company / party"
+          value={partyName}
+          onChangeText={setPartyName}
+        />
+        <FormField
+          style={styles.fieldFull}
+          label="Address"
+          highlight={!!cardFields.address}
+          placeholder="Street, city, state"
+          value={address}
+          onChangeText={setAddress}
+          multiline
+        />
+        <FormField
+          style={fieldW}
+          label="GST no. (optional)"
+          highlight={!!cardFields.gst_no}
+          placeholder="24XXXXXXXXXXXZ5"
+          value={gstNo}
+          onChangeText={setGstNo}
+          autoCapitalize="characters"
+        />
+        <FormField
+          style={fieldW}
+          label="Contact name"
+          highlight={!!cardFields.contact_name}
+          placeholder="Person met at the stall"
+          value={contactName}
+          onChangeText={setContactName}
+        />
+        <FormField
+          style={fieldW}
+          label="Designation"
+          highlight={!!cardFields.designation}
+          placeholder="Designation"
+          value={designation}
+          onChangeText={setDesignation}
+        />
+        <FormField
+          style={fieldW}
+          label="Mobile"
+          required
+          highlight={!!cardFields.mobile}
+          placeholder="98XXXXXXXX"
+          value={mobile}
+          onChangeText={setMobile}
+          keyboardType="phone-pad"
+        />
+        <FormField
+          style={styles.fieldFull}
+          label="Email"
+          required
+          highlight={!!cardFields.email}
+          placeholder="email@example.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+    </Card>
+  );
+
+  const renderEventBlock = () => (
+    <Card style={styles.block}>
+      <SectionHead title="Event & property" meta={mode === 'edit' ? 'Property is locked while editing' : undefined} />
+      <View style={styles.formGrid}>
+        <PickField
+          style={fieldW}
+          label="Property"
+          icon="business"
+          value={selectedPrpName}
+          placeholder="Select Property"
+          onPress={() => setPrpModalVisible(true)}
+          disabled={mode === 'edit'}
+        />
+        <PickField
+          style={fieldW}
+          label="Event"
+          icon="event"
+          value={selectedEventName}
+          placeholder="Select Event"
+          onPress={() => setEventModalVisible(true)}
+        />
+      </View>
+    </Card>
+  );
+
+  const renderCardPreview = () => (
+    <>
+      {(front_img || backUri) && online && (
+        <Card style={styles.block}>
+          <SectionHead title="Card Preview" meta="Images saved with this enquiry" />
+          <View style={styles.cardRow}>
+            <CardTile label="Front" source={{ uri: front_img, headers: { Connection: 'close' } }} />
+            <CardTile
+              label="Back"
+              source={backUri ? { uri: getImageUri(backUri) } : null}
+              emptyLabel="Upload Back"
+              onEmptyPress={handleUploadBackSide}
+            >
+              {backUri ? (
+                <>
+                  <LinkBtn label="Replace" icon="swap-horiz" onPress={handleUploadBackSide} />
+                  <LinkBtn label="Remove" icon="delete-outline" danger onPress={() => setBackUri('')} />
+                </>
+              ) : null}
+            </CardTile>
+          </View>
+        </Card>
+      )}
+
+      {!online && (
+        <Card style={styles.block}>
+          <SectionHead title="Card Preview (Offline)" meta="Attach photos now — they upload when you're back online" />
+          <View style={styles.cardRow}>
+            <CardTile
+              label="Front"
+              source={front_off_Uri ? { uri: getImageUri(front_off_Uri) } : null}
+              emptyLabel="Upload Front"
+              onEmptyPress={handleUploadFront_off_Side}
+            >
+              {front_off_Uri ? (
+                <>
+                  <LinkBtn label="Replace" icon="swap-horiz" onPress={handleUploadFront_off_Side} />
+                  <LinkBtn label="Remove" icon="delete-outline" danger onPress={() => setFront_off_Uri('')} />
+                </>
+              ) : null}
+            </CardTile>
+            <CardTile
+              label="Back"
+              source={backUri ? { uri: getImageUri(backUri) } : null}
+              emptyLabel="Upload Back"
+              onEmptyPress={handleUploadBackSide}
+            >
+              {backUri ? (
+                <>
+                  <LinkBtn label="Replace" icon="swap-horiz" onPress={handleUploadBackSide} />
+                  <LinkBtn label="Remove" icon="delete-outline" danger onPress={() => setBackUri('')} />
+                </>
+              ) : null}
+            </CardTile>
+          </View>
+        </Card>
+      )}
+    </>
+  );
+
+  // Connectivity chip: in the toolbar, or in the page header on a phone in edit mode (toolbar holds 2 buttons).
+  const chipInBar = !(isPhone && id);
+  const netChip = (
+    <View
+      style={[styles.netChip, { backgroundColor: `${online ? T.green : T.red}12`, borderColor: `${online ? T.green : T.red}40` }]}
+      accessibilityLabel={online ? 'Online — card scan available' : 'Offline — saving locally, will sync later'}
+    >
+      <View style={[styles.netDot, { backgroundColor: online ? T.green : T.red }]} />
+      <Text style={[styles.netText, { color: online ? T.green : T.red }]} numberOfLines={1}>
+        {isPhone
+          ? (online ? 'Online' : 'Offline')
+          : (online ? 'Online — card scan available' : 'Offline — saving locally, will sync later')}
+      </Text>
+    </View>
+  );
+
+  const syncTone = syncStatus.isSyncing ? T.blue : syncStatus.failed > 0 ? T.red : T.green;
+
   // --- Main render ---
   return (
-    <>
-      {loading && <FullScreenLoader />}
-      <HeaderBarwithBack
-        userName={username}
-        header={'Event'}
-        subHeaderText={online ? '● Online — card scan available' : '● Offline — saving locally, will sync later'}
-        breadcrumb={'Event'}
-        SearchBar={false}
-        headerConnectColor={online ? 'green' : 'red'}
-        headerConnectAnimation={true}
-      />
+    <View style={styles.root}>
+      {/* Status + actions toolbar (the global AppHeader already shows "Event") */}
+      <View style={styles.topBar}>
+        <View style={[styles.topInner, { paddingHorizontal: gutter }]}>
+          {chipInBar ? netChip : null}
+          {chipInBar ? <View style={{ flex: 1 }} /> : null}
+          {id && (
+            <Btn
+              label="Add Enquiry"
+              icon="add"
+              kind="ghost"
+              compact
+              style={chipInBar ? null : { flex: 1 }}
+              // onPress={() => router.push({ pathname: '/EnquiryReportScreen' })}
+              onPress={() => {
+                setMode('added');
+                initializeDefaultItems();
+              }}
+            />
+          )}
+          <Btn
+            label="Show Report"
+            icon="insights"
+            compact
+            style={chipInBar ? null : { flex: 1 }}
+            // onPress={() => router.push({ pathname: '/EnquiryReportScreen' })}
+            onPress={() => {
+              showInqReport(true);
+            }}
+          />
+        </View>
+      </View>
 
       {syncStatus.visible && (
-        <TouchableOpacity
-          style={[
-            styles.syncBanner,
-            syncStatus.failed > 0 ? styles.syncBannerError : styles.syncBannerSuccess,
-            syncStatus.isSyncing && styles.syncBannerSyncing
-          ]}
-          onPress={showFailedItems}
-          activeOpacity={0.8}
-        >
-          <View style={styles.syncBannerRow}>
-            <View style={styles.syncBannerIcon}>
-              <Icon
-                name={
-                  syncStatus.isSyncing
-                    ? 'sync'
-                    : syncStatus.failed > 0
-                      ? 'warning-amber'
-                      : 'check-circle'
-                }
-                size={22}
-                color={
-                  syncStatus.isSyncing
-                    ? '#1976D2'
-                    : syncStatus.failed > 0
-                      ? '#F57C00'
-                      : '#2E7D32'
-                }
-              />
+        <View style={[styles.bannerWrap, { paddingHorizontal: gutter }]}>
+          <TouchableOpacity
+            style={[styles.syncBanner, { backgroundColor: `${syncTone}0F`, borderColor: `${syncTone}40` }]}
+            onPress={showFailedItems}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+          >
+            <View style={[styles.syncBannerIcon, { backgroundColor: `${syncTone}1A` }]}>
+              {syncStatus.isSyncing ? (
+                <ActivityIndicator size="small" color={syncTone} />
+              ) : (
+                <Icon name={syncStatus.failed > 0 ? 'warning-amber' : 'check-circle'} size={20} color={syncTone} />
+              )}
             </View>
             <View style={styles.syncBannerContent}>
               <Text style={styles.syncBannerText}>{syncStatus.message}</Text>
               {syncStatus.isSyncing && (
-                <View>
-                  <Text style={styles.syncDetailText}>
+                <View style={styles.syncRow}>
+                  <Text style={styles.syncDetailText} numberOfLines={1}>
                     {syncStatus.currentItemName
                       ? `Syncing: ${syncStatus.currentItemName}`
                       : `Progress: ${syncStatus.synced + syncStatus.failed}/${syncStatus.total}`
                     }
                   </Text>
-                  <TouchableOpacity onPress={abortSync} style={styles.cancelSyncBtn}>
+                  <TouchableOpacity onPress={abortSync} style={styles.cancelSyncBtn} accessibilityRole="button">
+                    <Icon name="stop-circle" size={14} color={T.red} />
                     <Text style={styles.cancelSyncText}>Cancel Sync</Text>
                   </TouchableOpacity>
                 </View>
               )}
+              {syncStatus.isSyncing && syncStatus.total > 0 ? (
+                <View style={{ marginTop: 8 }}>
+                  <ProgressBar value={pct(syncStatus.synced + syncStatus.failed, syncStatus.total)} color={T.blue} />
+                </View>
+              ) : null}
               {!syncStatus.isSyncing && syncStatus.failed > 0 && (
                 <View style={styles.bannerActions}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="touch-app" size={16} color={C.muted} style={{ marginRight: 5 }} />
+                  <View style={styles.tapHint}>
+                    <Icon name="touch-app" size={15} color={T.muted} />
                     <Text style={styles.bannerTapHint}>Tap to see failed items</Text>
                   </View>
                   <TouchableOpacity
@@ -2111,637 +2466,220 @@ export default function NewEnquiryScreen({ token, username }) {
                       e.stopPropagation();
                       startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry All"
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="refresh" size={16} color="#fff" style={{ marginRight: 5 }} />
-                      <Text style={styles.retryText}>Retry All</Text>
-                    </View>
+                    <Icon name="refresh" size={15} color="#fff" />
+                    <Text style={styles.retryText}>Retry All</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
-          </View>
-        </TouchableOpacity>
-      )}
-      <View style={{ display: 'flex', flexDirection: 'row', backgroundColor: '#fff' }} >
-        <TouchableOpacity
-          style={[styles.reportBtn, { width: '40%' }]}
-          // onPress={() => router.push({ pathname: '/EnquiryReportScreen' })}
-          onPress={() => {
-            showInqReport(true);
-          }}
-        >
-          <Text style={styles.reportBtnText}>Show Report</Text>
-        </TouchableOpacity>
-        {id && (
-          <TouchableOpacity
-            style={[styles.reportBtn, { width: '40%' }]}
-            // onPress={() => router.push({ pathname: '/EnquiryReportScreen' })}
-            onPress={() => {
-              setMode('added');
-              initializeDefaultItems();
-            }}
-          >
-            <Text style={styles.reportBtnText}>Add Enquiry</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
-        <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={styles.scanBlock}>
-            {cardCaptureStage === null && (
-              <>
-                <Text style={styles.scanTitle}>Scan visiting card (optional)</Text>
-                <View style={{ display: 'flex', flexDirection: 'row' }}>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, marginHorizontal: 10, marginBottom: 10 }, (!online || scanning) && styles.scanBtnDisabled]}
-                    onPress={() => handleScanCard()}
-                    disabled={!online || scanning}
-                  >
-                    {scanning ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.scanBtnText}>Scan visiting card</Text>
-                    )}
-                  </TouchableOpacity>
-                  <Text style={{ marginTop: 10, color: '#000' }}>OR</Text>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, marginHorizontal: 10, marginBottom: 10 }, (!online || scanning) && styles.scanBtnDisabled]}
-                    onPress={() => handleUploadCard()}
-                  >
-                    <Text style={styles.scanBtnText}>Upload Card</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.scanHint}>
-                  {online
-                    ? 'Captures name, address, mobile, email, company & GSTIN automatically. Needs internet.'
-                    : "No internet — card scan is unavailable. Type details below."}
-                </Text>
-              </>
-            )}
-
-            {cardCaptureStage === 'front_preview' && (
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={styles.scanTitle}>Front Side Captured</Text>
-                  <TouchableOpacity onPress={handleCancelCardCapture} disabled={scanning}>
-                    <Icon name="close" size={22} color={C.muted} />
-                  </TouchableOpacity>
-                </View>
-                <Image source={{ uri: pendingFrontUri }} style={styles.cardImage} resizeMode="contain" />
-                <Text style={[styles.scanHint, { textAlign: 'center', marginTop: 10 }]}>
-                  Would you like to scan the back side?
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: C.brand }]}
-                    onPress={handleSkipBackSide}
-                    disabled={scanning}
-                  >
-                    {scanning ? (
-                      <ActivityIndicator color={C.brand} />
-                    ) : (
-                      <Text style={[styles.scanBtnText, { color: C.brand }]}>Skip</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1 }]}
-                    onPress={handleScanBackSide}
-                    disabled={capturingBack || scanning}
-                  >
-                    {capturingBack ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.scanBtnText}>Scan Back</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {scanning && (
-                  <View style={{ marginTop: 12, alignItems: 'center' }}>
-                    <ActivityIndicator color={C.brand} />
-                    <Text style={styles.scanHint}>Processing card... Please wait</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {cardCaptureStage === 'both_preview' && (
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={styles.scanTitle}>Front + Back Captured</Text>
-                  <TouchableOpacity onPress={handleCancelCardCapture} disabled={scanning}>
-                    <Icon name="close" size={22} color={C.muted} />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardSideLabel}>Front</Text>
-                    <Image source={{ uri: pendingFrontUri }} style={styles.cardImage} resizeMode="contain" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardSideLabel}>Back</Text>
-                    <Image source={{ uri: pendingBackUri }} style={styles.cardImage} resizeMode="contain" />
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: C.brand }]}
-                    onPress={handleRetakeBackSide}
-                    disabled={capturingBack || scanning}
-                  >
-                    {capturingBack ? (
-                      <ActivityIndicator color={C.brand} />
-                    ) : (
-                      <Text style={[styles.scanBtnText, { color: C.brand }]}>Retake Back</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1 }]}
-                    onPress={handleConfirmAndProcess}
-                    disabled={scanning}
-                  >
-                    {scanning ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.scanBtnText}>Confirm & Process</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {scanning && (
-                  <View style={{ marginTop: 12, alignItems: 'center' }}>
-                    <ActivityIndicator color={C.brand} />
-                    <Text style={styles.scanHint}>Processing card... Please wait</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {uploadStage === 'front_preview' && (
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={styles.scanTitle}>Front Image Picked</Text>
-                  <TouchableOpacity onPress={() => { setUploadStage(null); setPendingFrontUpload(null); }} disabled={scanning}>
-                    <Icon name="close" size={22} color={C.muted} />
-                  </TouchableOpacity>
-                </View>
-                <Image source={{ uri: pendingFrontUpload }} style={styles.cardImage} resizeMode="contain" />
-                <Text style={[styles.scanHint, { textAlign: 'center', marginTop: 10 }]}>
-                  Would you like to pick the back side?
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: C.brand }]}
-                    onPress={handleUploadSkipBack}
-                    disabled={scanning}
-                  >
-                    <Text style={[styles.scanBtnText, { color: C.brand }]}>Skip</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1 }]}
-                    onPress={handleUploadBack}
-                    disabled={scanning}
-                  >
-                    <Text style={styles.scanBtnText}>Upload Back</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {uploadStage === 'both_preview' && (
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={styles.scanTitle}>Front + Back Picked</Text>
-                  <TouchableOpacity onPress={() => { setUploadStage(null); setPendingFrontUpload(null); setPendingBackUpload(null); }} disabled={scanning}>
-                    <Icon name="close" size={22} color={C.muted} />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardSideLabel}>Front</Text>
-                    <Image source={{ uri: pendingFrontUpload }} style={styles.cardImage} resizeMode="contain" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardSideLabel}>Back</Text>
-                    <Image source={{ uri: pendingBackUpload }} style={styles.cardImage} resizeMode="contain" />
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: C.brand }]}
-                    onPress={handleUploadRetakeBack}
-                    disabled={scanning}
-                  >
-                    <Text style={[styles.scanBtnText, { color: C.brand }]}>Retake Back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.scanBtn, { flex: 1 }]}
-                    onPress={handleUploadConfirm}
-                    disabled={scanning}
-                  >
-                    {scanning ? <ActivityIndicator color="#fff" /> : <Text style={styles.scanBtnText}>Confirm & Process</Text>}
-                  </TouchableOpacity>
-                </View>
-                {scanning && (
-                  <View style={{ marginTop: 12, alignItems: 'center' }}>
-                    <ActivityIndicator color={C.brand} />
-                    <Text style={styles.scanHint}>Processing card... Please wait</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Property</Text>
-            <TouchableOpacity
-              style={mode === 'edit' ? [styles.dropdown, styles.dropdownDisabled] : styles.dropdown}
-              onPress={() => setPrpModalVisible(true)}
-              disabled={mode === 'edit'}
-            >
-              <Text style={mode === 'edit' ? [styles.dropdownText, styles.dropdownTextDisabled] : styles.dropdownText}>
-                {PRPS.find(e => e.code === getUserPrptype)?.name || 'Select Property'}
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={[styles.content, { paddingHorizontal: gutter }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.pageHead}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.eyebrow}>EVENT ENQUIRY</Text>
+              <Text style={styles.pageTitle} numberOfLines={1}>
+                {mode === 'edit' ? 'Edit enquiry' : 'New enquiry'}
               </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
+              {(selectedEventName || selectedPrpName) ? (
+                <Text style={styles.pageSub} numberOfLines={1}>
+                  {[selectedEventName, selectedPrpName].filter(Boolean).join('  ·  ')}
+                </Text>
+              ) : null}
+            </View>
+            {mode === 'edit' && enquiries?.id ? <Tag label={`#${enquiries.id}`} tone="blue" /> : null}
+            {!chipInBar ? netChip : null}
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Event</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => setEventModalVisible(true)}
-            >
-              <Text style={styles.dropdownText}>
-                {EVENTS.find(e => e.EventId === eventCode)?.EventName || 'Select Event'}
-              </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
+          <View style={twoCol ? styles.cols : styles.stack}>
+            <View style={twoCol ? styles.colLeft : styles.stack}>
+              {renderScanBlock()}
+              {renderEventBlock()}
+              {renderPartyBlock()}
+            </View>
+            <View style={twoCol ? styles.colRight : styles.stack}>
+              {renderItemsSection()}
+              {renderCardPreview()}
+            </View>
           </View>
-
-          <Field label="Party name *">
-            <TextInput
-              style={[styles.input, cardFields.party_name && styles.cardFilledInput]}
-              placeholder="Company / party"
-              value={partyName}
-              onChangeText={setPartyName}
-            />
-          </Field>
-
-          <Field label="Address">
-            <TextInput
-              style={[styles.input, styles.textarea, cardFields.address && styles.cardFilledInput]}
-              placeholder="Street, city, state"
-              value={address}
-              onChangeText={setAddress}
-              multiline
-            />
-          </Field>
-
-          <Field label="GST no. (optional)">
-            <TextInput
-              style={[styles.input, cardFields.gst_no && styles.cardFilledInput]}
-              placeholder="24XXXXXXXXXXXZ5"
-              value={gstNo}
-              onChangeText={setGstNo}
-              autoCapitalize="characters"
-            />
-          </Field>
-
-          <Field label="Contact name">
-            <TextInput
-              style={[styles.input, cardFields.contact_name && styles.cardFilledInput]}
-              placeholder="Person met at the stall"
-              value={contactName}
-              onChangeText={setContactName}
-            />
-          </Field>
-
-          <Field label="Designation">
-            <TextInput
-              style={[styles.input, cardFields.designation && styles.cardFilledInput]}
-              placeholder="Designation"
-              value={designation}
-              onChangeText={setDesignation}
-            />
-          </Field>
-
-          <Field label="Mobile">
-            <TextInput
-              style={[styles.input, cardFields.mobile && styles.cardFilledInput]}
-              placeholder="98XXXXXXXX"
-              value={mobile}
-              onChangeText={setMobile}
-              keyboardType="phone-pad"
-            />
-          </Field>
-
-          <Field label="Email">
-            <TextInput
-              style={[styles.input, cardFields.email && styles.cardFilledInput]}
-              placeholder="email@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </Field>
-
-          {renderItemsSection()}
-
-          {(front_img || backUri) && online && (
-            <View style={styles.cardPreviewContainer}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <Icon name="credit-card" size={22} color={C.brand} style={{ marginRight: 6 }} />
-                <Text style={styles.cardPreviewTitle}>Card Preview</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <View style={styles.cardTile}>
-                  <Text style={styles.cardSideLabel}>Front</Text>
-                  <Image
-                    source={{ uri: front_img, headers: { Connection: 'close' } }}
-                    style={styles.cardImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={styles.cardTile}>
-                  <Text style={styles.cardSideLabel}>Back</Text>
-                  {backUri ? (
-                    <Image
-                      source={{ uri: getImageUri(backUri) }}
-                      style={styles.cardImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <TouchableOpacity style={styles.uploadPlaceholder} onPress={handleUploadBackSide}>
-                      <Text style={styles.uploadPlaceholderText}>Upload Back</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              {backUri && (
-                <View style={styles.cardActionsNNN}>
-                  <TouchableOpacity onPress={handleUploadBackSide}>
-                    <Text style={styles.actionText}>Replace</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setBackUri('')}>
-                    <Text style={[styles.actionText, styles.actionRemove]}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
-
-          {!online && (
-            <View style={styles.cardPreviewContainer}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <Icon name="credit-card" size={22} color={C.brand} style={{ marginRight: 6 }} />
-                <Text style={styles.cardPreviewTitle}>Card Preview (Offline)</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <View style={styles.cardTile}>
-                  <Text style={styles.cardSideLabel}>Front</Text>
-                  {front_off_Uri ? (
-                    <Image source={{ uri: getImageUri(front_off_Uri) }} style={styles.cardImage} resizeMode="contain" />
-                  ) : (
-                    <TouchableOpacity style={styles.uploadPlaceholder} onPress={handleUploadFront_off_Side}>
-                      <Text style={styles.uploadPlaceholderText}>Upload Front</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={styles.cardTile}>
-                  <Text style={styles.cardSideLabel}>Back</Text>
-                  {backUri ? (
-                    <Image source={{ uri: getImageUri(backUri) }} style={styles.cardImage} resizeMode="contain" />
-                  ) : (
-                    <TouchableOpacity style={styles.uploadPlaceholder} onPress={handleUploadBackSide}>
-                      <Text style={styles.uploadPlaceholderText}>Upload Back</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              {(front_off_Uri || backUri) && (
-                <View style={styles.cardActions}>
-                  {front_off_Uri && (
-                    <TouchableOpacity onPress={handleUploadFront_off_Side}>
-                      <Text style={styles.actionText}>Replace</Text>
-                    </TouchableOpacity>
-                  )}
-                  {backUri && (
-                    <TouchableOpacity onPress={handleUploadBackSide}>
-                      <Text style={styles.actionText}>Replace</Text>
-                    </TouchableOpacity>
-                  )}
-                  {front_off_Uri && (
-                    <TouchableOpacity onPress={() => setFront_off_Uri('')}>
-                      <Text style={[styles.actionText, styles.actionRemove]}>Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                  {backUri && (
-                    <TouchableOpacity onPress={() => setBackUri('')}>
-                      <Text style={[styles.actionText, styles.actionRemove]}>Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.saveBtn} onPress={() => handleSave(mode)} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{mode === 'edit' ? 'Update enquiry' : 'Save enquiry'}</Text>}
-          </TouchableOpacity>
         </ScrollView>
+
+        {/* Sticky save bar */}
+        <View style={styles.saveBar}>
+          <View style={[styles.saveInner, { paddingHorizontal: gutter }]}>
+            {!isPhone ? (
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.saveTitle} numberOfLines={1}>{partyName || 'Unnamed party'}</Text>
+                <Text style={styles.saveMeta} numberOfLines={1}>
+                  {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}
+                  {getUserPrptype === 'S' ? ` · ${designCountAll} design${designCountAll === 1 ? '' : 's'}` : ''}
+                  {online ? ' · syncs to server on save' : ' · offline: saved on this device'}
+                </Text>
+              </View>
+            ) : null}
+            <Btn
+              label={mode === 'edit' ? 'Update enquiry' : 'Save enquiry'}
+              icon={mode === 'edit' ? 'save' : 'check'}
+              onPress={() => handleSave(mode)}
+              loading={saving}
+              style={isPhone ? { flex: 1 } : { minWidth: 220 }}
+            />
+          </View>
+        </View>
       </KeyboardAvoidingView>
 
-      <Modal
-        visible={prpModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPrpModalVisible(false)}
+      <Sheet
+        open={prpModalVisible}
+        onClose={() => setPrpModalVisible(false)}
+        eyebrow="PROPERTY"
+        title="Select Property"
+        wideMax={460}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPrpModalVisible(false)}
-        >
-          <View style={styles.dropdownModal}>
-            <FlatList
-              data={PRPS}
-              keyExtractor={(item) => String(item.code)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setPrpCode(item.code);
-                    setPrpModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      <Modal
-        visible={eventModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEventModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setEventModalVisible(false)}
-        >
-          <View style={styles.dropdownModal}>
-            <FlatList
-              data={EVENTS}
-              keyExtractor={(item) => String(item.EventId)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setEventCode(item.EventId);
-                    setEventModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{item.EventName}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      <Modal
-        visible={itemModalVisible}
-        animationType="slide"
-        onRequestClose={() => {
-          setItemModalVisible(false);
-          setEditingItemIndex(null);
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Item</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setItemModalVisible(false);
-                setEditingItemIndex(null);
-              }}
-            >
-              <Icon name="close" size={24} color={C.muted} />
-            </TouchableOpacity>
-          </View>
-
-          <TextInput
-            style={styles.modalSearchInput}
-            placeholder="Search Items..."
-            value={itemSearchQuery}
-            onChangeText={setItemSearchQuery}
+        {PRPS.map((item) => (
+          <React.Fragment key={String(item.code)}>
+          <OptionRow
+            label={item.name}
+            icon="business"
+            selected={item.code === getUserPrptype}
+            onPress={() => {
+              setPrpCode(item.code);
+              setPrpModalVisible(false);
+            }}
           />
+          </React.Fragment>
+        ))}
+      </Sheet>
 
-          {loadingItems ? (
-            <ActivityIndicator size="large" color={C.brand} style={styles.modalLoader} />
-          ) : (
-            <FlatList
-              data={displayedItems}
-              keyExtractor={(item) => String(item.dsn_code)}
-              renderItem={({ item }) => {
-                const alreadyAdded = selectedItems.some(
-                  i => String(i.item_code) === String(item.dsn_code) && !i.is_new_item
-                );
-                return (
-                  <TouchableOpacity
-                    style={[styles.modalDesignItem, alreadyAdded && styles.modalDesignItemSelected]}
+      <Sheet
+        open={eventModalVisible}
+        onClose={() => setEventModalVisible(false)}
+        eyebrow="EVENT"
+        title="Select Event"
+        wideMax={460}
+      >
+        {EVENTS.map((item) => (
+          <React.Fragment key={String(item.EventId)}>
+          <OptionRow
+            label={item.EventName}
+            icon="event"
+            selected={item.EventId === eventCode}
+            onPress={() => {
+              setEventCode(item.EventId);
+              setEventModalVisible(false);
+            }}
+          />
+          </React.Fragment>
+        ))}
+      </Sheet>
+
+      <ModalPanel
+        open={itemModalVisible}
+        onClose={closeItemModal}
+        eyebrow={editingItemIndex !== null ? `ITEM ${editingItemIndex + 1}` : 'ITEMS'}
+        title="Select Item"
+      >
+        <View style={styles.modalSearch}>
+          <SearchBox value={itemSearchQuery} onChangeText={setItemSearchQuery} placeholder="Search Items..." />
+        </View>
+
+        {loadingItems ? (
+          <View style={styles.modalLoading}>
+            <ActivityIndicator size="large" color={T.copper} />
+            <Text style={styles.modalLoadingText}>Loading items...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={displayedItems}
+            keyExtractor={(item) => String(item.dsn_code)}
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.modalList}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const alreadyAdded = selectedItems.some(
+                i => String(i.item_code) === String(item.dsn_code) && !i.is_new_item
+              );
+              return (
+                <View style={{ paddingBottom: 8 }}>
+                  <OptionRow
+                    label={item.name}
+                    sub={`Code ${item.dsn_code}${item.UOM ? ` · ${item.UOM}` : ''}`}
+                    icon="inventory-2"
+                    done={alreadyAdded}
                     onPress={() => {
                       if (editingItemIndex === null) return;
                       addItemToCard(item, editingItemIndex);
                     }}
-                  >
-                    <Text style={styles.modalDesignItemText}>{item.name}</Text>
-                    <Text style={styles.modalDesignItemCode}>{item.dsn_code}</Text>
-                    {alreadyAdded && <Icon name="check-circle" size={20} color={C.muted} />}
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={<Text style={styles.modalNoDesignsText}>No items found</Text>}
-              onEndReached={loadMoreItems}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={
-                loadingItems ? (
-                  <ActivityIndicator size="large" color={C.brand} style={{ margin: 10 }} />
-                ) : loadingMoreItems ? (
-                  <ActivityIndicator size="small" color={C.brand} style={{ margin: 10 }} />
-                ) : null
-              }
-            />
-          )}
-        </View>
-      </Modal>
-
-      <Modal
-        visible={designModalVisible}
-        animationType="slide"
-        onRequestClose={() => {
-          setDesignModalVisible(false);
-          setEditingDesignItemIndex(null);
-          setEditingDesignIndex(null);
-          setDesignSearchQuery('');
-          setDisplayedDesigns([]);
-          setHasMore(false);
-          setAllDesigns([]);
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Design</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setDesignModalVisible(false);
-                setEditingDesignItemIndex(null);
-                setEditingDesignIndex(null);
-                setDesignSearchQuery('');
-                setDisplayedDesigns([]);
-                setHasMore(false);
-                setAllDesigns([]);
-              }}
-            >
-              <Icon name="close" size={24} color={C.muted} />
-            </TouchableOpacity>
-          </View>
-
-          <TextInput
-            style={styles.modalSearchInput}
-            placeholder="Search Designs..."
-            value={designSearchQuery}
-            onChangeText={setDesignSearchQuery}
+                  />
+                </View>
+              );
+            }}
+            ListEmptyComponent={<EmptyState icon="inventory-2" title="No items found" text="Try a different name or code." />}
+            onEndReached={loadMoreItems}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingItems ? (
+                <ActivityIndicator size="large" color={T.copper} style={{ margin: 10 }} />
+              ) : loadingMoreItems ? (
+                <ActivityIndicator size="small" color={T.copper} style={{ margin: 10 }} />
+              ) : null
+            }
           />
+        )}
+      </ModalPanel>
 
-          {loadingDesigns ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
-              <ActivityIndicator size="large" color={C.brand} />
-              <Text style={{ marginTop: 10, color: C.muted }}>Loading designs...</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={displayedDesigns}
-              keyExtractor={(item, index) => `${item.dsn_code}_${index}`}
-              renderItem={({ item }) => {
-                const alreadyAdded = editingDesignItemIndex !== null
-                  ? (selectedItems[editingDesignItemIndex]?.designs || []).some(
-                    d => String(d.dsn_code) === String(item.dsn_code) && !d.is_new
-                  )
-                  : false;
-                return (
-                  <TouchableOpacity
-                    style={[styles.modalDesignItem, alreadyAdded && styles.modalDesignItemSelected]}
+      <ModalPanel
+        open={designModalVisible}
+        onClose={closeDesignModal}
+        eyebrow={
+          editingDesignItemIndex !== null && selectedItems[editingDesignItemIndex]?.item_name
+            ? `DESIGNS · ${String(selectedItems[editingDesignItemIndex]?.item_name).toUpperCase()}`
+            : 'DESIGNS'
+        }
+        title="Select Design"
+      >
+        <View style={styles.modalSearch}>
+          <SearchBox value={designSearchQuery} onChangeText={setDesignSearchQuery} placeholder="Search Designs..." />
+        </View>
+
+        {loadingDesigns ? (
+          <View style={styles.modalLoading}>
+            <ActivityIndicator size="large" color={T.copper} />
+            <Text style={styles.modalLoadingText}>Loading designs...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={displayedDesigns}
+            keyExtractor={(item, index) => `${item.dsn_code}_${index}`}
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.modalList}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const alreadyAdded = editingDesignItemIndex !== null
+                ? (selectedItems[editingDesignItemIndex]?.designs || []).some(
+                  d => String(d.dsn_code) === String(item.dsn_code) && !d.is_new
+                )
+                : false;
+              return (
+                <View style={{ paddingBottom: 8 }}>
+                  <OptionRow
+                    label={item.name}
+                    sub={`Code ${item.dsn_code}`}
+                    icon="style"
+                    done={alreadyAdded}
                     onPress={() => {
                       // if (alreadyAdded) {
                       //   AppAlert.alert('Already added', `${item.name} is already selected.`);
@@ -2758,706 +2696,377 @@ export default function NewEnquiryScreen({ token, username }) {
                         setAllDesigns([]);
                       }
                     }}
-                  >
-                    <Text style={styles.modalDesignItemText}>{item.name}</Text>
-                    <Text style={styles.modalDesignItemCode}>{item.dsn_code}</Text>
-                    {alreadyAdded && <Icon name="check-circle" size={20} color={C.muted} />}
-                  </TouchableOpacity>
-                );
-              }}
-              onEndReached={loadMoreDesigns}
-              onEndReachedThreshold={0.5}
-              ListEmptyComponent={<Text style={styles.modalNoDesignsText}>No designs found for this item</Text>}
-              ListFooterComponent={
-                loadingDesigns ? (
-                  <ActivityIndicator size="large" color={C.brand} style={{ margin: 10 }} />
-                ) : loadingMoreDesigns ? (
-                  <ActivityIndicator size="small" color={C.brand} style={{ margin: 10 }} />
-                ) : null
-              }
-            />
-          )}
-        </View>
-      </Modal>
-
-      <Modal
-        visible={failedItemsModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setFailedItemsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.failedItemsModal}>
-            <View style={styles.failedItemsHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name="cancel" size={22} color={C.danger} style={{ marginRight: 6 }} />
-                <Text style={styles.failedItemsTitle}>Failed Sync Items</Text>
-              </View>
-              <TouchableOpacity onPress={() => setFailedItemsModalVisible(false)}>
-                <Icon name="close" size={22} color={C.muted} />
-              </TouchableOpacity>
-            </View>
-
-            {failedItemsList.length === 0 ? (
-              <Text style={styles.noFailedItemsText}>No failed items to show</Text>
-            ) : (
-              <FlatList
-                data={failedItemsList}
-                keyExtractor={(item, index) => item.local_id || index.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.failedItemCard}>
-                    <Text style={styles.failedItemName}>{item.party_name || 'Unknown Party'}</Text>
-                    <Text style={styles.failedItemId}>ID: {item.local_id || 'N/A'}</Text>
-                    <Text style={styles.failedItemError}>
-                      Error: {typeof item.error === 'string' ? item.error : JSON.stringify(item.error || 'Unknown error')}
-                    </Text>
-                  </View>
-                )}
+                  />
+                </View>
+              );
+            }}
+            onEndReached={loadMoreDesigns}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={
+              <EmptyState
+                icon="style"
+                title="No designs found for this item"
+                text="Pick an item first, or switch this design to “New” and type its name."
               />
-            )}
+            }
+            ListFooterComponent={
+              loadingDesigns ? (
+                <ActivityIndicator size="large" color={T.copper} style={{ margin: 10 }} />
+              ) : loadingMoreDesigns ? (
+                <ActivityIndicator size="small" color={T.copper} style={{ margin: 10 }} />
+              ) : null
+            }
+          />
+        )}
+      </ModalPanel>
 
-            <View style={styles.failedItemsActions}>
-              <TouchableOpacity
-                style={[styles.failedItemsBtn, styles.retryAllBtn]}
-                onPress={() => {
-                  setFailedItemsModalVisible(false);
-                  startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="refresh" size={18} color="#fff" style={{ marginRight: 5 }} />
-                  <Text style={styles.failedItemsBtnText}>Retry All Failed</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.failedItemsBtn, styles.closeBtn]}
-                onPress={() => setFailedItemsModalVisible(false)}
-              >
-                <Text style={styles.failedItemsBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={debugModalVisible}
-        animationType="slide"
-        onRequestClose={() => setDebugModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: '#fdfcf9', padding: 16, marginTop: 45 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: '700' }}> Local Enquiries</Text>
-            <TouchableOpacity onPress={() => setDebugModalVisible(false)}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name="close" size={22} color={C.muted} style={{ marginRight: 4 }} />
-                <Text style={styles.modalCloseText}>Close</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {debugData.length === 0 ? (
-            <Text style={{ textAlign: 'center', marginTop: 40, color: '#6b7280' }}>No local data</Text>
-          ) : (
-            <FlatList
-              data={debugData}
-              keyExtractor={(item) => item.local_id}
-              renderItem={({ item }) => (
-                <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#eee' }}>
-                  <Text style={{ fontWeight: '700' }}>{item.party_name || 'No name'}</Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                    local_id: {item.local_id} | server_id: {item.server_id || '—'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                    sync: {item.sync_status} | event_code: {item.event_code || '—'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                    created: {new Date(item.created_at).toLocaleString()}
-                  </Text>
-                </View>
-              )}
+      <Sheet
+        open={failedItemsModalVisible}
+        onClose={() => setFailedItemsModalVisible(false)}
+        eyebrow="SYNC"
+        title="Failed Sync Items"
+        footer={
+          <>
+            <Btn label="Close" kind="ghost" onPress={() => setFailedItemsModalVisible(false)} style={{ flex: 1 }} />
+            <Btn
+              label="Retry All Failed"
+              icon="refresh"
+              onPress={() => {
+                setFailedItemsModalVisible(false);
+                startSyncQueue(token, getCurrentFinancialYear(), getUserPrptype, handleSyncProgress);
+              }}
+              style={{ flex: 1.4 }}
             />
-          )}
-        </View>
-      </Modal>
+          </>
+        }
+      >
+        {failedItemsList.length === 0 ? (
+          <EmptyState icon="cloud-done" title="No failed items to show" />
+        ) : (
+          failedItemsList.map((item, index) => (
+            <View key={item.local_id || index.toString()} style={styles.failedItemCard}>
+              <View style={styles.failedHead}>
+                <Icon name="cancel" size={18} color={T.red} />
+                <Text style={styles.failedItemName} numberOfLines={2}>{item.party_name || 'Unknown Party'}</Text>
+              </View>
+              <Text style={styles.failedItemId}>ID: {item.local_id || 'N/A'}</Text>
+              <Text style={styles.failedItemError}>
+                Error: {typeof item.error === 'string' ? item.error : JSON.stringify(item.error || 'Unknown error')}
+              </Text>
+            </View>
+          ))
+        )}
+      </Sheet>
+
+      <ModalPanel
+        open={debugModalVisible}
+        onClose={() => setDebugModalVisible(false)}
+        eyebrow="DEBUG"
+        title="Local Enquiries"
+      >
+        {debugData.length === 0 ? (
+          <EmptyState icon="storage" title="No local data" />
+        ) : (
+          <FlatList
+            data={debugData}
+            keyExtractor={(item) => item.local_id}
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.modalList}
+            renderItem={({ item }) => (
+              <View style={styles.debugCard}>
+                <Text style={styles.debugTitle}>{item.party_name || 'No name'}</Text>
+                <Text style={styles.debugMeta}>
+                  local_id: {item.local_id} | server_id: {item.server_id || '—'}
+                </Text>
+                <Text style={styles.debugMeta}>
+                  sync: {item.sync_status} | event_code: {item.event_code || '—'}
+                </Text>
+                <Text style={styles.debugMeta}>
+                  created: {new Date(item.created_at).toLocaleString()}
+                </Text>
+              </View>
+            )}
+          />
+        )}
+      </ModalPanel>
+
+      <BusyOverlay visible={loading} text="Loading…" />
 
       {getInqReport && (
-        <View style={styles.detailOverlay123}>
-          <View style={styles.detailContainer123}>
-            <EnquiryReportScreen token={token} username={username} showInqReport={showInqReport} />
-          </View>
+        <View style={styles.reportPanel}>
+          <EnquiryReportScreen token={token} username={username} showInqReport={showInqReport} />
         </View>
       )}
-    </>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
     </View>
   );
 }
 
-// ─── STYLES ────────────────────────────────────────────────────────────────
-
-const C = {
-  brand: '#B3552C',
-  brandDark: '#8F4220',
-  brandSoft: '#FBEEE6',
-  brandBorder: '#E8C9B6',
-  ink: '#1F2937',
-  body: '#374151',
-  muted: '#6B7280',
-  faint: '#9CA3AF',
-  bg: '#FBFAF7',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F7F5F1',
-  border: '#ECE9E2',
-  borderInput: '#E2E0DA',
-  success: '#1E8E3E',
-  successBg: '#E9F7EE',
-  successBorder: '#BFE6CC',
-  danger: '#D7382F',
-  dangerBg: '#FDECEA',
-  dangerBorder: '#F4C7C3',
-  info: '#1A73E8',
-  infoBg: '#E8F0FE',
-  infoBorder: '#C6DAFC',
-  black: '#111315',
-};
-
-const shadowSoft = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 2,
-};
-
-const shadowBtn = {
-  shadowColor: C.brand,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.22,
-  shadowRadius: 8,
-  elevation: 3,
-};
+// ─── STYLES (NEW ERP tokens) ───────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-
-  // Scan card block
-  scanBlock: {
-    margin: 16,
-    marginTop: 8,
-    borderWidth: 1.5,
-    borderColor: C.brandBorder,
-    borderStyle: 'dashed',
-    backgroundColor: C.brandSoft,
-    borderRadius: 14,
-    padding: 16,
-  },
-  scanTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: C.brandDark,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  scanBtn: {
-    backgroundColor: C.brand,
-    borderRadius: 11,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadowBtn,
-    flexDirection: 'row',
-  },
-  scanBtnDash: {
-    backgroundColor: '#ffba8981',
-    borderRadius: 11,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadowBtn,
-    flexDirection: 'row',
-    borderStyle: 'dashed',
-    borderColor: C.brand,
-    borderWidth: 1.5,
-  },
-  reportBtn: {
-    backgroundColor: C.black,
-    // borderRadius: 11,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 5,
-    marginHorizontal: 5,
-    ...shadowSoft,
-  },
-  scanBtnDisabled: {
-    backgroundColor: '#C9C4BB',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  scanBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 0.2 },
-  scanBtnTextDash: { color: C.brand, fontWeight: '700', fontSize: 14, letterSpacing: 0.2 },
-  reportBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 0.2 },
-  scanHint: { fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 17 },
-
-  // Form fields
-  fieldGroup: { paddingHorizontal: 16, marginBottom: 16 },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.body,
-    marginBottom: 7,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 11,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    fontSize: 14.5,
-    // color: C.ink,
-    color: '#000',
-    backgroundColor: C.surface,
-  },
-  textarea: { minHeight: 74, textAlignVertical: 'top', paddingTop: 12 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  halfField: { flex: 1 },
-
-  // Chips (only for designation, removed for units)
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 22,
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    backgroundColor: C.surface,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  chipActive: { borderColor: C.brand, backgroundColor: C.brandSoft },
-  chipText: { fontSize: 13, color: C.body },
-  chipTextActive: { color: C.brandDark, fontWeight: '700' },
-
-  // Save button
-  saveBtn: {
-    backgroundColor: C.brand,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    ...shadowBtn,
-  },
-  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.3 },
-
-  cancelBtn: {
-    backgroundColor: '#9ca3af',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    ...shadowSoft,
-  },
-  cancelBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  dropdown: {
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownDisabled: { backgroundColor: '#f5f5f5', borderColor: '#ddd' },
-  dropdownText: { flex: 1, color: C.ink, fontSize: 14 },
-  dropdownTextDisabled: { color: C.muted, backgroundColor: '#f5f5f5' },
-  dropdownArrow: { color: '#666', fontSize: 12 },
-  dropdownModal: { backgroundColor: '#fff', marginHorizontal: 20, marginTop: 120, borderRadius: 12, maxHeight: 300, width: '80%', alignSelf: 'center', ...shadowSoft },
-  dropdownItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  dropdownItemText: { fontSize: 15, color: '#222' },
-
-  // Items & Designs
-  addItemBtn: { marginBottom: 12 },
-  itemCard: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    ...shadowSoft,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  itemHeaderLeft: { flex: 1 },
-  itemName: { fontSize: 16, fontWeight: '700', color: C.ink },
-  itemCode: { fontSize: 12, color: C.muted, marginTop: 2 },
-
-  designsContainer: { marginTop: 10 },
-  designsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  designsTitle: { fontSize: 13, fontWeight: '700', color: C.body, flex: 1 },
-
-  // Accordion show/hide + count button, sits above the design card(s), full width
-  designAccordionBtn: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  root: { flex: 1, backgroundColor: T.bg },
+  screen: { flex: 1, backgroundColor: T.bg },
+  content: {
     width: '100%',
-    backgroundColor: C.brandSoft,
-    borderWidth: 1,
-    borderColor: C.brandBorder,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-  },
-  designAccordionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.brandDark,
+    maxWidth: CONTENT_MAX,
+    alignSelf: 'center',
+    paddingTop: 14,
+    paddingBottom: 28,
   },
 
-  designCard: {
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderLeftWidth: 3,
-    borderLeftColor: C.brand,
-  },
-  designCardHeader: {
+  // toolbar
+  topBar: { backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border },
+  topInner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 2,
+    gap: 8,
+    paddingVertical: 9,
+    width: '100%',
+    maxWidth: CONTENT_MAX,
+    alignSelf: 'center',
   },
-  designCardBadge: {
+  netChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  netDot: { width: 8, height: 8, borderRadius: 4 },
+  netText: { fontSize: 12, fontWeight: '800', flexShrink: 1 },
+
+  // sync banner
+  bannerWrap: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', paddingTop: 10 },
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  syncBannerIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  syncBannerContent: { flex: 1, minWidth: 0 },
+  syncBannerText: { fontSize: 13.5, fontWeight: '800', color: T.ink },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' },
+  syncDetailText: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: T.muted },
+  cancelSyncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 28,
+    paddingHorizontal: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: `${T.red}40`,
+    backgroundColor: T.surface,
+  },
+  cancelSyncText: { color: T.red, fontSize: 12, fontWeight: '800' },
+  bannerActions: { flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 },
+  tapHint: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  bannerTapHint: { fontSize: 12, fontWeight: '600', color: T.muted },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: T.nav,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  retryText: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
+
+  // page
+  pageHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+  pageTitle: { fontSize: 20, fontWeight: '900', color: T.nav, marginTop: 2 },
+  pageSub: { fontSize: 12, fontWeight: '600', color: T.muted, marginTop: 2 },
+  cols: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  colLeft: { flex: 5, minWidth: 0, gap: 14 },
+  colRight: { flex: 6, minWidth: 0, gap: 14 },
+  stack: { gap: 14 },
+  block: { gap: 12 },
+  blockHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  blockTitle: { fontSize: 15, fontWeight: '800', color: T.ink, marginTop: 2 },
+  section: { gap: 10 },
+
+  // form grid
+  formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  fieldFull: { width: '100%' },
+  fieldHalf: { flexGrow: 1, flexBasis: '40%', minWidth: 200 },
+
+  // scan block
+  scanRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  orWrap: { alignItems: 'center', justifyContent: 'center', gap: 8 },
+  orLine: { flex: 1, height: 1, backgroundColor: T.border },
+  orText: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 1 },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
+    backgroundColor: T.sub,
+  },
+  scanHint: { flex: 1, fontSize: 12, lineHeight: 17, color: T.muted, fontWeight: '600' },
+  stageHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  stageIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${T.copper}16`,
+  },
+  stageTitle: { flex: 1, fontSize: 14.5, fontWeight: '800', color: T.ink },
+  stageQuestion: { fontSize: 13, fontWeight: '700', color: T.nav, textAlign: 'center', marginTop: 12 },
+  stageBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  stageBtn: { flexGrow: 1, flexBasis: 190 },
+  previewPair: { flexDirection: 'row', gap: 10 },
+  processing: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 },
+  processingText: { fontSize: 12.5, fontWeight: '700', color: T.muted },
+  cardSideLabel: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: C.brandDark,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: C.brandBorder,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    overflow: 'hidden',
-  },
-  designFields: { marginTop: 4 },
-  designFieldsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  designFieldLabel: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 4 },
-  designFieldInput: {
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    fontSize: 13,
-    backgroundColor: C.surface,
-    color: '#000',
-  },
-  remarkInput: { minHeight: 34, color: '#000' },
-  noDesignsText: { fontSize: 12, color: C.muted, textAlign: 'center', paddingVertical: 10 },
-  noItemsText: { fontSize: 13, color: C.muted, textAlign: 'center', paddingVertical: 20 },
-
-  // Add Design button (per item, appended below its design cards)
-  addDesignBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: C.brand,
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginTop: 2,
-    backgroundColor: '#fff',
-  },
-  addDesignBtnText: {
-    fontWeight: '700',
-    fontSize: 13,
-  },
-
-  // Tab styles for small tabs inside item card
-  tabContainerSmall: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 8,
-    backgroundColor: C.surface,
-    marginBottom: 8,
-    padding: 2,
-    alignSelf: 'flex-start',
-  },
-  tabContainerSmall1: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 8,
-    backgroundColor: C.surface,
-    marginBottom: 8,
-    padding: 2,
-    alignSelf: 'flex-start',
-    flex: 1,
-    width: '100%',
-  },
-  tabSmall: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  tabSmall1: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    flex: 1,
-    width: '100%',
-    alignContent: 'center',
-  },
-  activeTabSmall: {
-    backgroundColor: C.brandSoft,
-    borderColor: C.brand,
-  },
-  tabTextSmall: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: C.body,
-  },
-  activeTabTextSmall: {
-    color: C.brandDark,
-    fontWeight: '700',
-  },
-
-  // Card preview
-  cardPreviewContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 14,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.border,
-    ...shadowSoft,
-  },
-  cardPreviewTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
-  cardTile: {
-    flex: 1,
-    minWidth: 140,
-    marginHorizontal: 4,
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: 'center',
-  },
-  cardSideLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.muted,
+    color: T.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
-    alignSelf: 'flex-start',
   },
-  cardImage: { width: '100%', height: 140, borderRadius: 10, backgroundColor: '#F0EFEC' },
-  cardActions: { flexDirection: 'row', justifyContent: 'space-around', width: '50%', marginTop: 10 },
-  cardActionsNNN: { flexDirection: 'row', justifyContent: 'space-around', width: '50%', marginTop: 10, alignSelf: 'flex-end' },
-  actionText: { fontSize: 13, color: C.brand, fontWeight: '700' },
-  actionRemove: { color: C.danger },
-  uploadPlaceholder: {
-    width: '100%',
-    height: 140,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: C.brand,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FEF7F0',
-  },
-  uploadPlaceholderText: { color: C.brand, fontWeight: '700', fontSize: 13 },
+  cardImage: { width: '100%', height: 170, borderRadius: 10, backgroundColor: T.alt },
+  cardRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
 
-  // Sync banner
-  syncBanner: {
-    padding: 14,
-    marginHorizontal: 12,
-    marginTop: 8,
+  // items
+  itemCard: {
+    backgroundColor: T.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: 'hidden',
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
+  },
+  itemHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: T.sub,
+    borderBottomWidth: 1,
+    borderBottomColor: T.hair,
+  },
+  itemNo: { width: 30, height: 30, borderRadius: 9, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center' },
+  itemNoText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  itemEyebrow: { fontSize: 9.5, fontWeight: '800', color: T.copper, letterSpacing: 1 },
+  itemTitle: { fontSize: 14, fontWeight: '800', color: T.ink, marginTop: 1 },
+  itemBody: { padding: 12, gap: 12 },
+  qtyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  qtyCell: { flex: 1, minWidth: 0 },
+  designsContainer: { gap: 10 },
+  designsHeader: { flexDirection: 'row', alignItems: 'center' },
+  designsTitle: { flex: 1, fontSize: 11, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' },
+  designAccordionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${T.copper}40`,
+    backgroundColor: `${T.copper}0D`,
+  },
+  designAccordionText: { flex: 1, fontSize: 13, fontWeight: '800', color: T.nav },
+  designAccordionHint: { fontSize: 11.5, fontWeight: '700', color: T.muted },
+  designCard: {
+    backgroundColor: T.sub,
+    borderRadius: 12,
+    padding: 10,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderLeftWidth: 3,
+    borderLeftColor: T.copper,
+  },
+  designCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  designRemove: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: `${T.red}40`,
+    backgroundColor: `${T.red}0D`,
+  },
+  noItems: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 20,
     borderRadius: 12,
     borderWidth: 1,
-    ...shadowSoft,
+    borderColor: T.border,
+    backgroundColor: T.surface,
   },
-  syncBannerSuccess: { backgroundColor: C.successBg, borderColor: C.successBorder },
-  syncBannerError: { backgroundColor: C.dangerBg, borderColor: C.dangerBorder },
-  syncBannerSyncing: { backgroundColor: C.infoBg, borderColor: C.infoBorder },
-  syncBannerRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  syncBannerIcon: { marginRight: 10, marginTop: 1 },
-  syncBannerContent: { flex: 1 },
-  syncBannerText: { fontSize: 13.5, fontWeight: '700', color: C.ink },
-  syncDetailText: { fontSize: 12, color: C.body, marginTop: 4 },
-  cancelSyncBtn: { marginTop: 6 },
-  cancelSyncText: { color: C.danger, fontSize: 12, fontWeight: '600' },
-  bannerActions: { flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap' },
-  bannerTapHint: { fontSize: 12, color: C.muted, marginRight: 12 },
-  retryBtn: { backgroundColor: C.brand, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
-  retryText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  noItemsText: { fontSize: 13, fontWeight: '600', color: T.muted, textAlign: 'center' },
+  addHint: { fontSize: 11.5, fontWeight: '600', color: T.muted, textAlign: 'center' },
 
-  // Modals
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(17,19,21,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContainer: { flex: 1, backgroundColor: C.bg, padding: 16 },
-  modalHeader: {
+  // save bar
+  saveBar: { backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border },
+  saveInner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 45,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: C.ink },
-  modalSearchInput: {
-    borderWidth: 1,
-    borderColor: C.borderInput,
-    borderRadius: 11,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 14.5,
-    color: C.ink,
-    backgroundColor: C.surface,
-    marginBottom: 10,
-  },
-  modalLoader: { marginTop: 20 },
-  modalDesignItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    backgroundColor: C.surface,
-    borderRadius: 10,
-    marginBottom: 8,
-    ...shadowSoft,
-  },
-  modalDesignItemSelected: { borderColor: C.success, borderWidth: 2 },
-  modalDesignItemText: { fontSize: 16, color: C.ink, fontWeight: '600', flex: 1 },
-  modalDesignItemCode: { fontSize: 12, color: C.muted, marginHorizontal: 10 },
-  modalNoDesignsText: { textAlign: 'center', color: C.muted, marginTop: 20 },
-
-  // Failed Items Modal
-  failedItemsModal: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 20,
+    gap: 12,
+    paddingVertical: 10,
     width: '100%',
-    maxHeight: '80%',
-    ...shadowSoft,
+    maxWidth: CONTENT_MAX,
+    alignSelf: 'center',
   },
-  failedItemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    paddingBottom: 12,
-  },
-  failedItemsTitle: { fontSize: 18, fontWeight: '800', color: C.danger },
+  saveTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+  saveMeta: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+
+  // modals
+  modalSearch: { padding: 12, paddingBottom: 6 },
+  modalList: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 24 },
+  modalLoading: { flex: 1, alignItems: 'center', paddingTop: 48, gap: 10 },
+  modalLoadingText: { fontSize: 13, fontWeight: '700', color: T.muted },
   failedItemCard: {
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
+    backgroundColor: T.surface,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: `${T.red}30`,
+    borderLeftWidth: 3,
+    borderLeftColor: T.red,
   },
-  failedItemName: { fontSize: 15.5, fontWeight: '700', color: C.ink },
-  failedItemId: { fontSize: 12, color: C.muted, marginTop: 2 },
-  failedItemError: { fontSize: 13, color: C.danger, marginTop: 6 },
-  noFailedItemsText: { textAlign: 'center', color: C.muted, padding: 20 },
-  failedItemsActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
+  failedHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  failedItemName: { flex: 1, fontSize: 14.5, fontWeight: '800', color: T.ink },
+  failedItemId: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 3 },
+  failedItemError: { fontSize: 12.5, fontWeight: '600', color: T.red, marginTop: 6 },
+  debugCard: {
+    backgroundColor: T.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: T.border,
   },
-  failedItemsBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, flex: 1, alignItems: 'center', marginHorizontal: 5 },
-  retryAllBtn: { backgroundColor: C.brand },
-  closeBtn: { backgroundColor: '#6B7280' },
-  failedItemsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  modalCloseText: { fontSize: 16, color: C.muted },
+  debugTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+  debugMeta: { fontSize: 12, color: T.muted, marginTop: 2 },
 
-  // Disabled button style
-  disabledBtn: {
-    opacity: 0.6,
-    borderColor: '#aaa',
-  },
-
-  // 🟢 Highlight scanned fields
-  cardFilledInput: {
-    backgroundColor: C.successBg,
-    borderColor: C.successBorder,
-  },
-  detailOverlay123: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-    zIndex: 100, // Higher than summary modal
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailContainer123: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    width: '100%',
-    height: '100%',
-    elevation: 5, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+  // report overlay (in-screen full panel)
+  reportPanel: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: T.bg,
+    zIndex: 100,
+    elevation: 10,
   },
 });

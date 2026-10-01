@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.48",
+    "version": "1.0.52",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -10,7 +10,7 @@
     // "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "48",
+      "buildNumber": "52",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
@@ -24,7 +24,7 @@
       }
     },
     "android": {
-      "versionCode": 48, 
+      "versionCode": 52, 
       "package": "com.anonymous.FlowNest",
       "googleServicesFile": "./google-services.json",
       "permissions": [

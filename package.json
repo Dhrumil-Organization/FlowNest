@@ -5,6 +5,9 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "build:web": "node ./scripts/build-web.js",
+    "version:bump": "node ./scripts/bump-version.js",
+    "store:live": "node ./scripts/set-store-version.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",

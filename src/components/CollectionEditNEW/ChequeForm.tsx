@@ -1,5 +1,7 @@
 import AppAlert from '@/common/utils/appAlert';
-// ChequeForm.tsx (updated with initial blocking modal)
+// ChequeForm.tsx (NEW ERP re-skin — all state, effects, validation and save
+// handlers above `return` are the original code, unchanged; only the JSX and
+// styles below were rebuilt with the NEW ERP theme / erpUi kit)
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -16,14 +18,17 @@ import {
     View
 } from 'react-native';
 // import { launchImageLibrary } from 'react-native-image-picker';
-import theme from '@/components/theme';
+import { Btn, Card, CONTENT_MAX, Field, Metric, SectionHead, useSotLayout } from '@/src/components/erpUi';
+import { S, T } from '@/src/theme';
 import * as ImagePicker from 'expo-image-picker';
 // import CameraPage from './CameraPage'; // modal camera component
-import PartyDropdown from '@/Shared/PartyDropdown';
-import PartyDropdownAdj from '@/Shared/PartyDropdownAdj';
-import PartyDropdownType from '@/Shared/PartyDropdownType';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
+// Local NEW ERP copies of the shared pickers (the @/Shared originals are used by legacy screens)
+import PartyDropdown from './PartyDropdown';
+import PartyDropdownAdj from './PartyDropdownAdj';
+import PartyDropdownType from './PartyDropdownType';
+import SearchableDropdown from './SearchableDropdown';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+
 
 interface PropertyData {
     PrpCode: string;
@@ -131,6 +136,9 @@ interface Props {
     selectedadj?: AdjData | null;
     setSelectedadj?: (item: AdjData | null) => void;
     getSaveLoading?: boolean;
+    // NEW UI (presentation only)
+    onBack?: () => void;
+    mode?: 'add' | 'edit';
     // ShowChequeData: (form: any) => Promise<any>;
 }
 
@@ -239,7 +247,10 @@ const ChequeForm: React.FC<Props> = ({
     getAdjLoading,
     selectedadj,
     setSelectedadj,
-    getSaveLoading
+    getSaveLoading,
+    // NEW UI (presentation only)
+    onBack,
+    mode = 'add',
 
 }) => {
     const [step, setStep] = useState<number>(1);
@@ -646,64 +657,841 @@ const ChequeForm: React.FC<Props> = ({
 
 
 
+
+    // ---------------------------------------------------------------
+    // NEW ERP presentation helpers (display only — no business logic)
+    // ---------------------------------------------------------------
+    const { isPhone, width: winW, gutter } = useSotLayout();
+    const twoCol = winW >= 900;
+    const half = isPhone ? styles.fieldFull : styles.fieldHalf;
+    const isEdit = mode === 'edit';
+
+    // start each step at the top of the form (presentation only)
+    const scrollRef = React.useRef<any>(null);
+    useEffect(() => {
+        try { scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false }); } catch { }
+    }, [step]);
+
+    const num = (v: any) => {
+        const n = parseFloat(String(v ?? '').replace(/,/g, ''));
+        return Number.isFinite(n) ? n : 0;
+    };
+    const inr = (n: number, dp = 2) =>
+        `₹ ${n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
+
+    // same sum the save validation uses (form.d1 SetAmt vs form.Amount)
+    const d1List: any[] = Array.isArray(form.d1) ? form.d1 : [];
+    const adjustedSum = d1List.reduce((sum, item) => sum + (parseFloat(item?.SetAmt) || 0), 0);
+    const chequeAmt = parseFloat(form.Amount) || 0;
+    const unadjusted = chequeAmt - adjustedSum;
+    const overAdjusted = adjustedSum > chequeAmt;
+
+    const payLabel = String(selectedpayment?.paytype ?? selectedPayment?.paytype ?? form.PayType ?? '');
+    const propLabel = String(selectedProperty?.LngName ?? form.PrpCode ?? '');
+    const partyLabel = String(form.AccName ?? '');
+    const bankOptional = form.PayType == 'NEFT' || form.PayType == 'RTGS';
+
+    const label = (text: string, required?: boolean) => (
+        <Text style={styles.label}>
+            {text}
+            {required ? <Text style={{ color: T.red }}> *</Text> : null}
+        </Text>
+    );
+
+    const webDate = (value: string, onPick: (v: string) => void, ariaLabel: string, max?: string) => (
+        <View style={styles.dateBox}>
+            <Icon name="event" size={17} color={T.copper} />
+            {React.createElement('input', {
+                type: 'date',
+                value,
+                ...(max ? { max } : {}),
+                'aria-label': ariaLabel,
+                onChange: (e: any) => {
+                    const v = e.target.value; // "YYYY-MM-DD"
+                    if (v) onPick(v);
+                },
+                style: {
+                    flex: 1,
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    color: T.ink,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    padding: 0,
+                    minWidth: 0,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                } as any,
+            })}
+        </View>
+    );
+
+    const nativeDate = (value: string, placeholder: string, onPress: () => void) => (
+        <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.dateBox}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${placeholder}: ${value ? formatDisplayDate(value) : 'not set'}`}
+        >
+            <Icon name="event" size={17} color={T.copper} />
+            <Text style={[styles.dateText, !value && styles.placeholderText]} numberOfLines={1}>
+                {value ? formatDisplayDate(value) : placeholder}
+            </Text>
+            <Icon name="expand-more" size={20} color={T.muted} />
+        </TouchableOpacity>
+    );
+
+    const moneyBox = (props: any, big?: boolean) => (
+        <View style={[styles.moneyBox, big && styles.moneyBoxBig]}>
+            <Text style={[styles.rupee, big && { fontSize: 17 }]}>₹</Text>
+            <TextInput
+                placeholderTextColor={T.muted}
+                style={[styles.moneyInput, big && styles.moneyInputBig]}
+                {...props}
+            />
+        </View>
+    );
+
+    const recapRow = (k: string, v: any, color?: string) => (
+        <View style={styles.recapRow} key={k}>
+            <Text style={styles.recapKey}>{k}</Text>
+            <Text style={[styles.recapVal, color ? { color } : null]} numberOfLines={2}>
+                {v !== undefined && v !== null && String(v).trim() !== '' ? String(v) : '—'}
+            </Text>
+        </View>
+    );
+
+    const stepPill = (n: 1 | 2, text: string) => {
+        const active = step === n;
+        const done = n === 1 && step === 2;
+        return (
+            <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => { setStep(n); }}
+                style={[styles.stepPill, active && styles.stepPillOn, isPhone && !active && styles.stepPillDot]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Step ${n}: ${text}`}
+            >
+                <View style={[styles.stepDot, active && styles.stepDotActive, done && styles.stepDotDone]}>
+                    {done ? <Icon name="check" size={12} color="#fff" /> : <Text style={[styles.stepNum, (active || done) && { color: '#fff' }]}>{n}</Text>}
+                </View>
+                {!isPhone || active ? (
+                    <Text style={[styles.stepText, active && styles.stepTextOn]} numberOfLines={1}>{text}</Text>
+                ) : null}
+            </TouchableOpacity>
+        );
+    };
+
     return (
-        <>
-            <View style={styles.stepperContainer}>
-                <View style={styles.stepperInner}>
-                    {/* progress line background */}
-                    <View style={styles.progressTrack} />
-
-                    {/* animated progress fill */}
-                    <Animated.View
-                        style={[styles.progressFill, { width: progressWidth }]}
-                        pointerEvents="none"
-                    />
-
-                    {/* Step 1 */}
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => { setStep(1); }}
-                        style={[styles.stepWrap, { alignItems: 'flex-end' }]}
-                    >
-                        <View style={[styles.stepDot, step === 1 ? styles.stepDotActive : step === 2 ? styles.stepDotDone : null]}>
-                            {step === 2 ? <Icon name="check" size={12} color="#fff" /> : <Text style={styles.stepNum}>1</Text>}
-                        </View>
-                        {/* <Text style={[styles.stepLabelSmall, step === 1 && styles.stepLabelActive]}>Part 1</Text> */}
-                    </TouchableOpacity>
-
-                    {/* Step 2 */}
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => { setStep(2); }}
-                        style={[styles.stepWrap, { alignItems: 'flex-start' }]}
-                    >
-                        <View style={[styles.stepDot, step === 2 ? styles.stepDotActive : null]}>
-                            <Text style={styles.stepNum}>2</Text>
-                        </View>
-                        {/* <Text style={[styles.stepLabelSmall, step === 2 && styles.stepLabelActive]}>Finish</Text> */}
-                    </TouchableOpacity>
+        <View style={styles.screen}>
+            {/* ---------- Title + stepper ---------- */}
+            <View style={styles.topBar}>
+                <View style={[styles.topInner, { paddingHorizontal: gutter }]}>
+                    {onBack ? (
+                        <TouchableOpacity
+                            onPress={onBack}
+                            style={styles.backBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel="Back"
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                            <Icon name="arrow-back" size={18} color={T.nav} />
+                        </TouchableOpacity>
+                    ) : null}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.eyebrow} numberOfLines={1}>{isEdit ? 'EDIT COLLECTION' : 'ADD COLLECTION'}</Text>
+                        <Text style={styles.topTitle} numberOfLines={1}>{isEdit ? 'Edit cheque entry' : 'Cheque entry'}</Text>
+                    </View>
+                    <View style={styles.stepRow}>
+                        {stepPill(1, isPhone ? 'Details' : 'Payment details')}
+                        <View style={styles.stepLine} />
+                        {stepPill(2, isPhone ? 'Adjust' : 'Adjust bills')}
+                    </View>
+                </View>
+                <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: step === 2 ? '100%' : '50%' }]} />
                 </View>
             </View>
-            <ScrollView contentContainerStyle={styles.container} style={{ backgroundColor: '#fff' }} keyboardShouldPersistTaps="handled">
-                {/* <View style={styles.modeRow}>
-                {step === 1 && (<TouchableOpacity style={[styles.modeBtn, AdjType === 'ACC' && styles.modeBtnActive]} onPress={() => setMode('ACC')}>
-                    <Text style={[styles.modeText, AdjType === 'ACC' && styles.modeTextActive]}>On Account</Text>
-                </TouchableOpacity>)}
 
-                <TouchableOpacity style={[styles.modeBtn, AdjType === 'ADJ' && styles.modeBtnActive]} onPress={() => setMode('ADJ')}>
-                    <Text style={[styles.modeText, AdjType === 'ADJ' && styles.modeTextActive]}>Adjust</Text>
-                </TouchableOpacity>
-            </View> */}
-                {/* --- Stepper (place after ScrollView open) --- */}
+            <ScrollView
+                ref={scrollRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={[styles.container, { paddingHorizontal: gutter }]}
+                keyboardShouldPersistTaps="handled"
+            >
+                <View style={styles.inner}>
+                    {step === 1 && (
+                        <View style={twoCol ? styles.cols : styles.stack}>
+                            <View style={twoCol ? styles.colMain : styles.stack}>
+                                {/* ---- Party & date ---- */}
+                                <Card style={styles.block}>
+                                    <SectionHead title="Party & date" meta="Where and when the payment was collected" />
+                                    <View style={styles.formGrid}>
+                                        {/* Property */}
+                                        <View style={[styles.fieldFull, styles.field]}>
+                                            {label('Select Property', true)}
+                                            <SearchableDropdown
+                                                data={getPropertyData}
+                                                labelKey="LngName"
+                                                valueKey="PrpCode"
+                                                placeholder="Choose property..."
+                                                pageSize={10}
+                                                initialValue={selectedProperty ?? null}
+                                                onSelect={(item) => {
+                                                    setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
+                                                    setSelectedProperty(item);
+                                                }}
+                                                multiple={false}
+                                                emptyMessage="No properties available"
+                                                icon="business"
+                                                title="Select property"
+                                            />
+                                        </View>
 
+                                        {/* Collection Date */}
+                                        <View style={[half, styles.field]}>
+                                            {label('Collection Date')}
+                                            {Platform.OS === 'web' ? (
+                                                webDate(
+                                                    toISODate(form.EDate),
+                                                    (v) => setForm(prev => ({ ...prev, EDate: v })),
+                                                    'Collection date',
+                                                    toISODate(new Date()),
+                                                )
+                                            ) : (
+                                                <>
+                                                    {nativeDate(form.EDate, 'Select collection date', () => setCollectionDatePickerVisible(true))}
+                                                    <DateTimePickerModal
+                                                        isVisible={collectionDatePickerVisible}
+                                                        mode="date"
+                                                        onConfirm={(date) => {
+                                                            const selectedDate = new Date(date);
+                                                            selectedDate.setHours(12, 0, 0, 0); // 👈 noon prevents tz shift
+                                                            setForm(prev => ({ ...prev, EDate: toISODate(selectedDate) }));
+                                                            setCollectionDatePickerVisible(false);
+                                                        }}
+                                                        onCancel={() => setCollectionDatePickerVisible(false)}
+                                                        headerTextIOS="Pick Collection Date"
+                                                        locale="en_GB"
+                                                        maximumDate={new Date()}
+                                                    />
+                                                </>
+                                            )}
+                                        </View>
 
+                                        {/* Payment Type */}
+                                        <View style={[half, styles.field]}>
+                                            {label('Payment Type', true)}
+                                            <PartyDropdown
+                                                data={getPaymentData || []}
+                                                placeholder="Choose Payment..."
+                                                labelKey="paytype"
+                                                valueKey="paycode"
+                                                pageSize={12}
+                                                initialValue={selectedPayment ?? null}
+                                                selected={selectedpayment ?? null}
+                                                loading={Boolean(getPaymentLoading)}
+                                                type="payment"
+                                                onSelect={(item) => {
+                                                    setForm(prev => ({ ...prev, PayType: item.paycode }));
+                                                    setSelectedPayment?.(item);
+                                                    setSelectedpayment?.(item);
+                                                }}
+                                                setSelected={(val) => {
+                                                    if (!val) {
+                                                        setForm(prev => ({ ...prev, PayType: '' }));
+                                                        setSelectedPayment?.(null);
+                                                        setSelectedpayment?.(null);
+                                                    } else {
+                                                        setForm(prev => ({ ...prev, PayType: val.paycode }));
+                                                        setSelectedPayment?.(val as PaymentData);
+                                                        setSelectedpayment?.(val as PaymentData);
+                                                    }
+                                                }}
+                                            />
+                                        </View>
 
-                {step === 1 && (
-                    <View style={styles.card}>
-                        {/* Property */}
-                        <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
+                                        {/* Party - CONDITIONAL RENDERING */}
+                                        <View style={[styles.fieldFull, styles.field]}>
+                                            {label(isPLN ? 'Party Name' : 'Select Party', true)}
+                                            {isPLN ? (
+                                                // Show simple TextInput for PLN
+                                                <Field
+                                                    value={customPartyName}
+                                                    onChangeText={handleCustomPartyNameChange}
+                                                    placeholder="Enter party name..."
+                                                    autoCapitalize="words"
+                                                />
+                                            ) : (
+                                                // Show PartyDropdown for non-PLN
+                                                <PartyDropdown
+                                                    data={getPartyData}
+                                                    placeholder="Choose party..."
+                                                    labelKey={["accountname", "acccode"]}
+                                                    valueKey="acccode"
+                                                    pageSize={12}
+                                                    initialValue={selectedParty ?? null}
+                                                    selected={selected ?? null}
+                                                    loading={Boolean(getPartyLoading)}
+                                                    type="party"
+                                                    onSelect={(item) => {
+                                                        setForm(prev => ({
+                                                            ...prev,
+                                                            AccCode: item.acccode,
+                                                            AccName: item.accountname
+                                                        }));
+                                                        setSelectedParty(item);
+                                                        setSelected?.(item);
+                                                    }}
+                                                    setSelected={(val) => {
+                                                        if (!val) {
+                                                            setForm(prev => ({
+                                                                ...prev,
+                                                                AccCode: '',
+                                                                AccName: '',
+                                                                ParAdd: ''
+                                                            }));
+                                                            setSelectedParty(null);
+                                                            setSelected?.(null);
+                                                        } else {
+                                                            setForm(prev => ({
+                                                                ...prev,
+                                                                AccCode: val.acccode,
+                                                                AccName: val.accountname,
+                                                                ParAdd: val.Address
+                                                            }));
+                                                            setSelectedParty(val as PartyData);
+                                                            setSelected?.(val as PartyData);
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                        </View>
+                                    </View>
+                                </Card>
 
+                                {/* ---- Bank & cheque ---- */}
+                                <Card style={styles.block}>
+                                    <SectionHead
+                                        title="Bank & cheque"
+                                        meta={bankOptional ? 'Bank is optional for NEFT / RTGS' : 'Bank is required for cheque payments'}
+                                    />
+                                    <View style={styles.formGrid}>
+                                        <View style={[half, styles.field]}>
+                                            {label('Bank', true)}
+                                            <PartyDropdownType
+                                                data={getBankData || []}
+                                                placeholder="Choose Bank..."
+                                                labelKey="BankName"
+                                                valueKey="BankName"
+                                                pageSize={12}
+                                                initialValue={selectedBank ?? form.BankName ?? null}
+                                                selected={selectedbank ?? form.BankName ?? null}
+                                                loading={Boolean(getBankLoading)}
+                                                type="bank"
+                                                onSelect={(item) => {
+                                                    setForm(prev => ({ ...prev, BankName: item.BankName }));
+                                                    setSelectedBank?.(item);
+                                                    setSelectedbank?.(item);
+                                                }}
+                                                setSelected={(val) => {
+                                                    if (!val) setForm(prev => ({ ...prev, BankName: '' }));
+                                                    else setForm(prev => ({ ...prev, BankName: val.BankName }));
+                                                }}
+                                            />
+                                        </View>
+
+                                        <View style={[half, styles.field]}>
+                                            {label('Branch')}
+                                            <PartyDropdownType
+                                                data={getBranchData || []}
+                                                placeholder="Choose Branch..."
+                                                labelKey="BankBr"
+                                                valueKey="BankBr"
+                                                pageSize={12}
+                                                initialValue={selectedBranch ?? form.BankBr ?? null}
+                                                selected={selectedbranch ?? form.BankBr ?? null}
+                                                loading={Boolean(getBranchLoading)}
+                                                type="branch"
+                                                onSelect={(item) => {
+                                                    setForm(prev => ({ ...prev, BankBr: item.BankBr }));
+                                                    setSelectedBranch?.(item);
+                                                    setSelectedbranch?.(item);
+                                                }}
+                                                setSelected={(val) => {
+                                                    if (!val) setForm(prev => ({ ...prev, BankBr: '' }));
+                                                    else setForm(prev => ({ ...prev, BankBr: val.BankBr }));
+                                                }}
+                                            />
+                                        </View>
+
+                                        {/* Cheque No */}
+                                        <Field
+                                            style={half}
+                                            label="Cheque No"
+                                            value={form.ChqNo}
+                                            onChangeText={(t) => {
+                                                // Remove non-numeric characters
+                                                const numericValue = t.replace(/[^0-9]/g, '');
+                                                // Truncate to 6 digits
+                                                const truncatedValue = numericValue.slice(0, 6);
+                                                setForm(prev => ({ ...prev, ChqNo: truncatedValue }));
+                                            }}
+                                            keyboardType="numeric"
+                                            placeholder="e.g. 001234"
+                                            maxLength={6} // Optional: Prevents keyboard input beyond 6 chars
+                                            hint="Up to 6 digits"
+                                        />
+
+                                        {/* Cheque Date */}
+                                        <View style={[half, styles.field]}>
+                                            {label('Cheque Date')}
+                                            {Platform.OS === 'web' ? (
+                                                webDate(
+                                                    toISODate(form.ChqDate),
+                                                    (v) => setForm(prev => ({ ...prev, ChqDate: v })),
+                                                    'Cheque date',
+                                                )
+                                            ) : (
+                                                nativeDate(form.ChqDate, 'Select cheque date', () => setChequeDatePickerVisible(true))
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    {Platform.OS !== 'web' && (
+                                        <DateTimePickerModal
+                                            isVisible={chequeDatePickerVisible}
+                                            mode="date"
+                                            onConfirm={(date) => {
+                                                const selectedDate = new Date(date);
+                                                selectedDate.setHours(12, 0, 0, 0); // 👈 noon prevents tz shift
+                                                setForm(prev => ({ ...prev, ChqDate: toISODate(selectedDate) }));
+                                                setChequeDatePickerVisible(false);
+                                            }}
+                                            onCancel={() => setChequeDatePickerVisible(false)}
+                                            headerTextIOS="Pick Cheque Date"
+                                            locale="en_GB"
+                                            maximumDate={new Date(2099, 11, 31)}
+                                        />
+                                    )}
+                                </Card>
+                            </View>
+
+                            <View style={twoCol ? styles.colSide : styles.stack}>
+                                {/* ---- Amount ---- */}
+                                <Card style={styles.block}>
+                                    <SectionHead title="Amount" meta="TDS and discount cannot exceed the amount" />
+                                    <View style={styles.field}>
+                                        {label('Amount', true)}
+                                        {moneyBox({
+                                            value: form.Amount,
+                                            onChangeText: (t) => setForm(prev => ({ ...prev, Amount: t })),
+                                            keyboardType: 'numeric',
+                                            placeholder: '0.00',
+                                            accessibilityLabel: 'Amount',
+                                        }, true)}
+                                    </View>
+                                    <View style={styles.formGrid}>
+                                        {/* TDS Amount */}
+                                        <View style={[styles.fieldHalfTight, styles.field]}>
+                                            {label('TDS Amount')}
+                                            {moneyBox({
+                                                value: form.TDSAmt,
+                                                onChangeText: (t) => {
+                                                    // Remove all non-numeric characters except decimal point
+                                                    let numericValue = t.replace(/[^0-9.]/g, '');
+
+                                                    // Don't allow more than one decimal point
+                                                    const decimalCount = (numericValue.match(/\./g) || []).length;
+                                                    if (decimalCount > 1) {
+                                                        numericValue = numericValue.substring(0, numericValue.lastIndexOf('.'));
+                                                    }
+
+                                                    // Don't allow negative values
+                                                    if (numericValue.startsWith('-')) {
+                                                        numericValue = numericValue.substring(1);
+                                                    }
+
+                                                    // Split into integer and decimal parts
+                                                    const parts = numericValue.split('.');
+                                                    let integerPart = parts[0] || '';
+                                                    let decimalPart = parts[1] || '';
+
+                                                    // Limit integer part to 12 digits (14 total - 2 decimal)
+                                                    if (integerPart.length > 12) {
+                                                        integerPart = integerPart.slice(0, 12);
+                                                    }
+
+                                                    // Limit decimal part to 2 digits
+                                                    if (decimalPart.length > 2) {
+                                                        decimalPart = decimalPart.slice(0, 2);
+                                                    }
+
+                                                    // Combine parts
+                                                    const validatedValue = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+
+                                                    // Parse the validated value to a number
+                                                    const tdsValue = parseFloat(validatedValue) || 0;
+                                                    const amountValue = parseFloat(form.Amount) || 0;
+
+                                                    // Check if TDS Amount exceeds Amount or is negative
+                                                    if (tdsValue > amountValue || tdsValue < 0) {
+                                                        AppAlert.alert('Validation', 'TDS Amount cannot exceed Amount or be negative.');
+                                                        setForm(prev => ({ ...prev, TDSAmt: '0' }));
+                                                    } else {
+                                                        setForm(prev => ({ ...prev, TDSAmt: validatedValue }));
+                                                    }
+                                                },
+                                                keyboardType: 'numeric',
+                                                placeholder: '0.00',
+                                                maxLength: 16,
+                                                accessibilityLabel: 'TDS Amount',
+                                            })}
+                                        </View>
+
+                                        {/* Discount Amount */}
+                                        <View style={[styles.fieldHalfTight, styles.field]}>
+                                            {label('Discount Amount')}
+                                            {moneyBox({
+                                                value: form.DisAmt,
+                                                onChangeText: (t) => {
+                                                    // Remove all non-numeric characters except decimal point
+                                                    let numericValue = t.replace(/[^0-9.]/g, '');
+
+                                                    // Don't allow more than one decimal point
+                                                    const decimalCount = (numericValue.match(/\./g) || []).length;
+                                                    if (decimalCount > 1) {
+                                                        numericValue = numericValue.substring(0, numericValue.lastIndexOf('.'));
+                                                    }
+
+                                                    // Don't allow negative values
+                                                    if (numericValue.startsWith('-')) {
+                                                        numericValue = numericValue.substring(1);
+                                                    }
+
+                                                    // Split into integer and decimal parts
+                                                    const parts = numericValue.split('.');
+                                                    let integerPart = parts[0] || '';
+                                                    let decimalPart = parts[1] || '';
+
+                                                    // Limit integer part to 12 digits (14 total - 2 decimal)
+                                                    if (integerPart.length > 12) {
+                                                        integerPart = integerPart.slice(0, 12);
+                                                    }
+
+                                                    // Limit decimal part to 2 digits
+                                                    if (decimalPart.length > 2) {
+                                                        decimalPart = decimalPart.slice(0, 2);
+                                                    }
+
+                                                    // Combine parts
+                                                    const validatedValue = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+
+                                                    // Parse the validated value to a number
+                                                    const disValue = parseFloat(validatedValue) || 0;
+                                                    const amountValue = parseFloat(form.Amount) || 0;
+
+                                                    // Check if Discount Amount exceeds Amount or is negative
+                                                    if (disValue > amountValue || disValue < 0) {
+                                                        AppAlert.alert('Validation', 'Discount Amount cannot exceed Amount or be negative.');
+                                                        setForm(prev => ({ ...prev, DisAmt: '0' }));
+                                                    } else {
+                                                        setForm(prev => ({ ...prev, DisAmt: validatedValue }));
+                                                    }
+                                                },
+                                                keyboardType: 'numeric',
+                                                placeholder: '0.00',
+                                                maxLength: 16,
+                                                accessibilityLabel: 'Discount Amount',
+                                            })}
+                                        </View>
+                                    </View>
+
+                                    {/* readable totals */}
+                                    <View style={styles.totals}>
+                                        <View style={styles.totalRow}>
+                                            <Text style={styles.totalKey}>Cheque amount</Text>
+                                            <Text style={styles.totalBig} numberOfLines={1}>{inr(chequeAmt)}</Text>
+                                        </View>
+                                        <View style={styles.totalRow}>
+                                            <Text style={styles.totalKey}>TDS</Text>
+                                            <Text style={styles.totalVal} numberOfLines={1}>{inr(num(form.TDSAmt))}</Text>
+                                        </View>
+                                        <View style={styles.totalRow}>
+                                            <Text style={styles.totalKey}>Discount</Text>
+                                            <Text style={styles.totalVal} numberOfLines={1}>{inr(num(form.DisAmt))}</Text>
+                                        </View>
+                                    </View>
+                                </Card>
+
+                                {/* ---- Remarks & attachment ---- */}
+                                <Card style={styles.block}>
+                                    <SectionHead title="Remarks & attachment" />
+                                    {/* Notes */}
+                                    <Field
+                                        label="Notes"
+                                        value={form.Remark}
+                                        onChangeText={(t) => setForm(prev => ({ ...prev, Remark: t }))}
+                                        multiline
+                                        placeholder="Optional notes"
+                                    />
+
+                                    {/* Attachment */}
+                                    <View style={styles.field}>
+                                        {label('Attachment (single image)')}
+                                        {form.AttachImage ? (
+                                            <View style={styles.attachRow}>
+                                                <TouchableOpacity
+                                                    onPress={() => setPreviewVisible(true)}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel="Preview attachment"
+                                                >
+                                                    <Image
+                                                        source={{ uri: form.AttachImage }}
+                                                        style={styles.preview}
+                                                    />
+                                                </TouchableOpacity>
+
+                                                <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
+                                                    <View>
+                                                        <Text style={styles.attachTitle}>Image attached</Text>
+                                                        <Text style={styles.attachHint}>Tap the thumbnail to preview</Text>
+                                                    </View>
+                                                    <Btn
+                                                        kind="ghost"
+                                                        compact
+                                                        icon="delete-outline"
+                                                        label="Remove"
+                                                        onPress={removeAttachment}
+                                                        style={{ alignSelf: 'flex-start' }}
+                                                    />
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.dropZone}
+                                                onPress={pickFromGallery}
+                                                activeOpacity={0.85}
+                                                accessibilityRole="button"
+                                                accessibilityLabel="Gallery"
+                                            >
+                                                <View style={styles.dropIcon}>
+                                                    <Icon name="photo-library" size={20} color={T.copper} />
+                                                </View>
+                                                <View style={{ flex: 1, minWidth: 0 }}>
+                                                    <Text style={styles.dropTitle}>Choose from gallery</Text>
+                                                    <Text style={styles.attachHint}>Attach a photo of the cheque (optional)</Text>
+                                                </View>
+                                                <Icon name="chevron-right" size={20} color={T.muted} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </Card>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* STEP 2 */}
+                    {step === 2 && AdjType === 'ADJ' && (
+                        <View style={twoCol ? styles.cols : styles.stack}>
+                            <View style={twoCol ? styles.colMain : styles.stack}>
+                                <Card style={styles.block}>
+                                    <SectionHead
+                                        title="Adjust Account"
+                                        meta="Pick bills, then enter the amount received"
+                                    />
+
+                                    <View style={styles.adjSummary}>
+                                        <Metric label={isPhone ? 'Amount' : 'Cheque amount'} value={inr(chequeAmt, 0)} />
+                                        <Metric label="Adjusted" value={inr(adjustedSum, 0)} color={T.green} />
+                                        <Metric
+                                            label={overAdjusted ? 'Over by' : 'Unadjusted'}
+                                            value={inr(Math.abs(unadjusted), 0)}
+                                            color={overAdjusted ? T.red : T.pd}
+                                            align="right"
+                                        />
+                                    </View>
+                                    {overAdjusted ? (
+                                        <View style={styles.warn}>
+                                            <Icon name="error-outline" size={16} color={T.red} />
+                                            <Text style={styles.warnText}>
+                                                Adjusted total is more than the cheque amount — reduce the received amounts before saving.
+                                            </Text>
+                                        </View>
+                                    ) : null}
+
+                                    <PartyDropdownAdj
+                                        ref={dropdownAdjRef}
+                                        data={getAdjData || []}
+                                        placeholder="Choose Adjustment..."
+                                        labelKey={["BILLNO", "NVOUDATE", "NETAMT"]}
+                                        valueKey="UROWID"
+                                        pageSize={12}
+                                        initialValue={selectedAdj ?? []}
+                                        selected={selectedadj ?? []}
+                                        loading={Boolean(getAdjLoading)}
+                                        multiple={true}
+                                        formD1={Array.isArray(form.d1) ? form.d1 : []} // Only pass formD1, NOT formD2
+                                        formUId={form.UId ?? null}
+                                        onUpdateD1={(d1) => setForm(prev => ({ ...prev, d1: d1 || [] }))}
+                                        onSelect={(items) => {
+                                            const mappedItems = Array.isArray(items) ? items : [items];
+                                            setForm(prev => ({ ...prev, d2: mappedItems }));
+                                        }}
+                                    />
+                                </Card>
+                            </View>
+
+                            <View style={twoCol ? styles.colSide : styles.stack}>
+                                <Card style={styles.block}>
+                                    <SectionHead title="Collection summary" meta="From step 1 — go back to change" />
+                                    <View style={styles.recap}>
+                                        {recapRow('Property', propLabel)}
+                                        {recapRow('Collection date', formatDisplayDate(form.EDate))}
+                                        {recapRow('Party', partyLabel)}
+                                        {recapRow('Payment type', payLabel)}
+                                        {recapRow('Bank', form.BankName)}
+                                        {recapRow('Branch', form.BankBr)}
+                                        {recapRow('Cheque no', form.ChqNo)}
+                                        {recapRow('Cheque date', formatDisplayDate(form.ChqDate))}
+                                        {recapRow('TDS', inr(num(form.TDSAmt)))}
+                                        {recapRow('Discount', inr(num(form.DisAmt)))}
+                                        {recapRow('Notes', form.Remark)}
+                                    </View>
+                                    <View style={styles.recapTotal}>
+                                        <Text style={styles.totalKey}>Cheque amount</Text>
+                                        <Text style={styles.totalBig} numberOfLines={1}>{inr(chequeAmt)}</Text>
+                                    </View>
+                                </Card>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </ScrollView>
+
+            {/* ---------- Sticky action bar ---------- */}
+            {(step === 1 || (step === 2 && AdjType === 'ADJ')) ? (
+                <View style={styles.saveBar}>
+                    <View style={[styles.saveInner, { paddingHorizontal: gutter }]}>
+                        {step === 2 ? (
+                            <Btn
+                                kind="ghost"
+                                icon="arrow-back"
+                                label={isPhone ? '' : 'Previous'}
+                                onPress={goPrev}
+                                style={isPhone ? { width: 48, paddingHorizontal: 0 } : undefined}
+                            />
+                        ) : null}
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.saveTitle} numberOfLines={1}>
+                                {partyLabel || 'No party selected'}
+                            </Text>
+                            <Text style={styles.saveMeta} numberOfLines={1}>
+                                {step === 1
+                                    ? `${inr(chequeAmt)}${payLabel ? ` · ${payLabel}` : ''}`
+                                    : isPhone
+                                        ? `${inr(adjustedSum, 0)} adjusted`
+                                        : `${inr(adjustedSum, 0)} of ${inr(chequeAmt, 0)} adjusted`}
+                            </Text>
+                        </View>
+                        {step === 1 ? (
+                            <Btn
+                                label={AdjType === 'ACC' ? 'Save' : 'Next'}
+                                icon={AdjType === 'ACC' ? 'check' : 'arrow-forward'}
+                                onPress={goNext}
+                                style={isPhone ? { minWidth: 120 } : { minWidth: 200 }}
+                            />
+                        ) : (
+                            <Btn
+                                label={getSaveLoading ? 'Updating...' : 'Update'}
+                                icon="save"
+                                onPress={goNext}
+                                disabled={getSaveLoading}
+                                style={isPhone ? { minWidth: 120 } : { minWidth: 200 }}
+                            />
+                        )}
+                    </View>
+                </View>
+            ) : null}
+
+            {/* CAMERA MODAL (disabled in the original as well) */}
+
+            {/* PREVIEW MODAL */}
+            <Modal
+                visible={isPreviewVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPreviewVisible(false)}
+            >
+                <View style={styles.fullscreenOverlay}>
+                    <TouchableOpacity
+                        style={styles.closePreviewBtn}
+                        onPress={() => setPreviewVisible(false)}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Close preview"
+                    >
+                        <Icon name="close" size={24} color="#fff" />
+                    </TouchableOpacity>
+
+                    {form.AttachImage && (
+                        <Image
+                            source={{ uri: form.AttachImage }}
+                            style={styles.fullscreenImage}
+                        />
+                    )}
+                </View>
+            </Modal>
+
+            {/* ---------- INITIAL BLOCKING MODAL ---------- */}
+            <Modal
+                visible={initialModalVisible}
+                animationType="slide"
+                transparent={true}
+                // prevent hardware back from closing modal by providing no-op onRequestClose
+                onRequestClose={() => { /* intentionally do nothing (no cancel) */ }}
+            >
+                <View style={styles.initialModalBackdrop}>
+                    <View style={styles.initialModalCard}>
+                        <Text style={styles.eyebrow}>START A COLLECTION</Text>
+                        <Text style={styles.initialTitle}>Choose date & property</Text>
+
+                        <View style={[styles.field, { marginTop: 14 }]}>
+                            {label('Collection Date')}
+                            {Platform.OS === 'web' ? (
+                                webDate(
+                                    toISODate(form.EDate),
+                                    (v) => setForm(prev => ({ ...prev, EDate: v })),
+                                    'Collection date',
+                                    toISODate(new Date()),
+                                )
+                            ) : (
+                                <>
+                                    {nativeDate(form.EDate, 'Select collection date', () => setCollectionDatePickerVisible(true))}
+                                    <DateTimePickerModal
+                                        isVisible={collectionDatePickerVisible}
+                                        mode="date"
+                                        onConfirm={(date) => {
+                                            const selectedDate = new Date(date);
+                                            selectedDate.setHours(12, 0, 0, 0); // 👈 noon
+                                            setForm(prev => ({ ...prev, EDate: toISODate(selectedDate) }));
+                                            setCollectionDatePickerVisible(false);
+                                        }}
+                                        onCancel={() => setCollectionDatePickerVisible(false)}
+                                        headerTextIOS="Pick Collection Date"
+                                        locale="en_GB"
+                                        maximumDate={new Date()}
+                                    />
+                                </>
+                            )}
+                        </View>
+
+                        <View style={[styles.field, { marginTop: 12 }]}>
+                            {label('Select Property', true)}
                             <SearchableDropdown
                                 data={getPropertyData}
                                 labelKey="LngName"
@@ -717,894 +1505,247 @@ const ChequeForm: React.FC<Props> = ({
                                 }}
                                 multiple={false}
                                 emptyMessage="No properties available"
+                                icon="business"
+                                title="Select property"
                             />
                         </View>
-                        {/* Collection Date */}
-                        <View style={styles.twoColRow1}>
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>Collection Date</Text>
 
-                                {Platform.OS === 'web' ? (
-                                    <View style={[styles.dateTrigger, { position: 'relative' }]}>
-                                        {!form.EDate && (
-                                            <Text
-                                                pointerEvents="none"
-                                                style={[styles.dateTriggerText, styles.placeholderText, { position: 'absolute', left: 12, top: 12 }]}
-                                            >
-                                                Select collection date
-                                            </Text>
-                                        )}
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: toISODate(form.EDate),
-                                            max: toISODate(new Date()),
-                                            onChange: (e: any) => {
-                                                const v = e.target.value;
-                                                if (v) setForm(prev => ({ ...prev, EDate: v }));
-                                            },
-                                            style: {
-                                                width: '100%', border: 'none', outline: 'none',
-                                                background: 'transparent', color: theme.TEXT_PRIMARY,
-                                                fontSize: 14, fontWeight: 600, padding: 8,
-                                                cursor: 'pointer', fontFamily: 'inherit',
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    <>
-                                        <TouchableOpacity activeOpacity={0.85} style={styles.dateTrigger} onPress={() => setCollectionDatePickerVisible(true)}>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.dateTriggerText, !form.EDate && styles.placeholderText]}>
-                                                    {form.EDate ? formatDisplayDate(form.EDate) : 'Select collection date'}
-                                                </Text>
-                                            </View>
-                                            <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                        </TouchableOpacity>
-
-                                        <DateTimePickerModal
-                                            isVisible={collectionDatePickerVisible}
-                                            mode="date"
-                                            onConfirm={(date) => {
-                                                const selectedDate = new Date(date);
-                                                selectedDate.setHours(12, 0, 0, 0);  // 👈 noon
-                                                setForm(prev => ({ ...prev, EDate: toISODate(selectedDate) }));
-                                                setCollectionDatePickerVisible(false);
-                                            }}
-                                            onCancel={() => setCollectionDatePickerVisible(false)}
-                                            headerTextIOS="Pick Collection Date"
-                                            locale="en_GB"
-                                            maximumDate={new Date()}
-                                        />
-                                    </>
-                                )}
-                            </View>
-
-                            <View style={styles.col1} >
-                                <Text style={styles.label}>Select Payment Type <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <PartyDropdown
-                                    data={getPaymentData || []}
-                                    placeholder="Choose Payment..."
-                                    labelKey="paytype"
-                                    valueKey="paycode"
-                                    pageSize={12}
-                                    initialValue={selectedPayment ?? null}
-                                    selected={selectedpayment ?? null}
-                                    loading={Boolean(getPaymentLoading)}
-                                    type="payment"
-                                    // onSelect={(item) => {
-                                    //     setForm(prev => ({ ...prev, PayType: item.paycode }));
-                                    //     setSelectedPayment?.(item);
-                                    //     setSelectedpayment?.(item);
-                                    // }}
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, PayType: item.paycode }));
-                                        setSelectedPayment?.(item);
-                                        setSelectedpayment?.(item);
-                                    }}
-                                    // setSelected={(val) => {
-                                    //     if (!val) setForm(prev => ({ ...prev, PayType: '' }));
-                                    //     else setForm(prev => ({ ...prev, PayType: val.paycode }));
-                                    // }}
-                                    setSelected={(val) => {
-                                        if (!val) {
-                                            setForm(prev => ({ ...prev, PayType: '' }));
-                                            setSelectedPayment?.(null);
-                                            setSelectedpayment?.(null);
-                                        } else {
-                                            setForm(prev => ({ ...prev, PayType: val.paycode }));
-                                            setSelectedPayment?.(val as PaymentData);
-                                            setSelectedpayment?.(val as PaymentData);
-                                        }
-                                    }}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Party */}
-                        {/* <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}>Select Party <Text style={{ color: 'red' }}>*</Text></Text>
-
-                            <PartyDropdown
-                                data={getPartyData}
-                                placeholder="Choose party..."
-                                labelKey="accountname"
-                                valueKey="acccode"
-                                pageSize={12}
-                                initialValue={selectedParty ?? null}
-                                selected={selected ?? null}
-                                loading={Boolean(getPartyLoading)}
-                                type="party"
-                                onSelect={(item) => {
-                                    setForm(prev => ({ ...prev, AccCode: item.acccode, AccName: item.accountname }));
-                                    setSelectedParty(item);
-                                    setSelected?.(item);
-                                }}
-                                setSelected={(val) => {
-                                    if (!val) {
-                                        setForm(prev => ({ ...prev, AccCode: '' }));
-                                        setSelectedParty(null);
-                                        setSelected?.(null);
-                                    } else {
-                                        setForm(prev => ({ ...prev, AccCode: val.acccode }));
-                                        setSelectedParty(val as PartyData);
-                                        setSelected?.(val as PartyData);
-                                    }
-                                }}
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 }}>
+                            <Btn
+                                label="OK"
+                                icon="check"
+                                onPress={handleInitialOk}
+                                disabled={!form.PrpCode || !form.EDate}
+                                loading={initialLoading}
+                                style={{ minWidth: 140 }}
                             />
-                        </View> */}
-                        {/* Party - CONDITIONAL RENDERING */}
-                        <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}>
-                                {isPLN ? 'Party Name' : 'Select Party'} <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-
-                            {isPLN ? (
-                                // Show simple TextInput for PLN
-                                <TextInput
-                                    style={styles.input}
-                                    value={customPartyName}
-                                    onChangeText={handleCustomPartyNameChange}
-                                    placeholder="Enter party name..."
-                                    autoCapitalize="words"
-                                />
-                            ) : (
-                                // Show PartyDropdown for non-PLN
-                                <PartyDropdown
-                                    data={getPartyData}
-                                    placeholder="Choose party..."
-                                    labelKey={["accountname", "acccode"]}
-                                    valueKey="acccode"
-                                    pageSize={12}
-                                    initialValue={selectedParty ?? null}
-                                    selected={selected ?? null}
-                                    loading={Boolean(getPartyLoading)}
-                                    type="party"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            AccCode: item.acccode,
-                                            AccName: item.accountname
-                                        }));
-                                        setSelectedParty(item);
-                                        setSelected?.(item);
-                                    }}
-                                    setSelected={(val) => {
-                                        if (!val) {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                AccCode: '',
-                                                AccName: '',
-                                                ParAdd: ''
-                                            }));
-                                            setSelectedParty(null);
-                                            setSelected?.(null);
-                                        } else {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                AccCode: val.acccode,
-                                                AccName: val.accountname,
-                                                ParAdd: val.Address
-                                            }));
-                                            setSelectedParty(val as PartyData);
-                                            setSelected?.(val as PartyData);
-                                        }
-                                    }}
-                                />
-                            )}
-                        </View>
-                        {/* Bank + Branch */}
-                        <View style={styles.twoColRow}>
-                            <View style={styles.col} >
-                                <Text style={styles.label}>Bank <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <PartyDropdownType
-                                    data={getBankData || []}
-                                    placeholder="Choose Bank..."
-                                    labelKey="BankName"
-                                    valueKey="BankName"
-                                    pageSize={12}
-                                    initialValue={selectedBank ?? form.BankName ?? null}
-                                    selected={selectedbank ?? form.BankName ?? null}
-                                    loading={Boolean(getBankLoading)}
-                                    type="bank"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, BankName: item.BankName }));
-                                        setSelectedBank?.(item);
-                                        setSelectedbank?.(item);
-                                    }}
-                                    setSelected={(val) => {
-                                        if (!val) setForm(prev => ({ ...prev, BankName: '' }));
-                                        else setForm(prev => ({ ...prev, BankName: val.BankName }));
-                                    }}
-                                />
-                            </View>
-
-                            <View style={styles.col} >
-                                <Text style={styles.label}>Branch</Text>
-
-                                <PartyDropdownType
-                                    data={getBranchData || []}
-                                    placeholder="Choose Branch..."
-                                    labelKey="BankBr"
-                                    valueKey="BankBr"
-                                    pageSize={12}
-                                    initialValue={selectedBranch ?? form.BankBr ?? null}
-                                    selected={selectedbranch ?? form.BankBr ?? null}
-                                    loading={Boolean(getBranchLoading)}
-                                    type="branch"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, BankBr: item.BankBr }));
-                                        setSelectedBranch?.(item);
-                                        setSelectedbranch?.(item);
-                                    }}
-                                    setSelected={(val) => {
-                                        if (!val) setForm(prev => ({ ...prev, BankBr: '' }));
-                                        else setForm(prev => ({ ...prev, BankBr: val.BankBr }));
-                                    }}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Cheque No + Cheque Date */}
-                        <View style={styles.twoColRow1}>
-                            {/* <View style={styles.col1}>
-                                <Text style={styles.label}>Cheque No</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.ChqNo}
-                                    onChangeText={(t) => setForm(prev => ({ ...prev, ChqNo: t }))}
-                                    keyboardType="numeric"
-                                    placeholder="e.g. 001234"
-                                />
-                            </View> */}
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>Cheque No</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.ChqNo}
-                                    onChangeText={(t) => {
-                                        // Remove non-numeric characters
-                                        const numericValue = t.replace(/[^0-9]/g, '');
-                                        // Truncate to 6 digits
-                                        const truncatedValue = numericValue.slice(0, 6);
-                                        setForm(prev => ({ ...prev, ChqNo: truncatedValue }));
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="e.g. 001234"
-                                    maxLength={6} // Optional: Prevents keyboard input beyond 6 chars
-                                />
-                            </View>
-
-
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>Cheque Date</Text>
-
-                                {Platform.OS === 'web' ? (
-                                    <View style={[styles.dateTrigger, { position: 'relative' }]}>
-                                        {!form.ChqDate && (
-                                            <Text
-                                                pointerEvents="none"
-                                                style={[styles.dateTriggerText, styles.placeholderText, { position: 'absolute', left: 12, top: 12 }]}
-                                            >
-                                                Select cheque date
-                                            </Text>
-                                        )}
-                                        {React.createElement('input', {
-                                            type: 'date',
-                                            value: toISODate(form.ChqDate),
-                                            onChange: (e: any) => {
-                                                const v = e.target.value;
-                                                if (v) setForm(prev => ({ ...prev, ChqDate: v }));
-                                            },
-                                            style: {
-                                                width: '100%', border: 'none', outline: 'none',
-                                                background: 'transparent', color: theme.TEXT_PRIMARY,
-                                                fontSize: 14, fontWeight: 600, padding: 8,
-                                                cursor: 'pointer', fontFamily: 'inherit',
-                                            } as any,
-                                        })}
-                                    </View>
-                                ) : (
-                                    <TouchableOpacity activeOpacity={0.85} style={styles.dateTrigger} onPress={() => setChequeDatePickerVisible(true)}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.dateTriggerText, !form.ChqDate && styles.placeholderText]}>
-                                                {form.ChqDate ? formatDisplayDate(form.ChqDate) : 'Select cheque date'}
-                                            </Text>
-                                        </View>
-                                        <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-
-                        {/* Amount */}
-                        <Text style={styles.label}>Amount <Text style={{ color: 'red' }}>*</Text></Text>
-                        <TextInput
-                            style={styles.input}
-                            value={form.Amount}
-                            onChangeText={(t) => setForm(prev => ({ ...prev, Amount: t }))}
-                            keyboardType="numeric"
-                            placeholder="0.00"
-                        />
-
-                        <View style={styles.twoColRow1}>
-
-                            {/* TDS Amount */}
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>TDS Amount</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.TDSAmt}
-                                    onChangeText={(t) => {
-                                        // Remove all non-numeric characters except decimal point
-                                        let numericValue = t.replace(/[^0-9.]/g, '');
-
-                                        // Don't allow more than one decimal point
-                                        const decimalCount = (numericValue.match(/\./g) || []).length;
-                                        if (decimalCount > 1) {
-                                            numericValue = numericValue.substring(0, numericValue.lastIndexOf('.'));
-                                        }
-
-                                        // Don't allow negative values
-                                        if (numericValue.startsWith('-')) {
-                                            numericValue = numericValue.substring(1);
-                                        }
-
-                                        // Split into integer and decimal parts
-                                        const parts = numericValue.split('.');
-                                        let integerPart = parts[0] || '';
-                                        let decimalPart = parts[1] || '';
-
-                                        // Limit integer part to 12 digits (14 total - 2 decimal)
-                                        if (integerPart.length > 12) {
-                                            integerPart = integerPart.slice(0, 12);
-                                        }
-
-                                        // Limit decimal part to 2 digits
-                                        if (decimalPart.length > 2) {
-                                            decimalPart = decimalPart.slice(0, 2);
-                                        }
-
-                                        // Combine parts
-                                        const validatedValue = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
-
-                                        // Parse the validated value to a number
-                                        const tdsValue = parseFloat(validatedValue) || 0;
-                                        const amountValue = parseFloat(form.Amount) || 0;
-
-                                        // Check if TDS Amount exceeds Amount or is negative
-                                        if (tdsValue > amountValue || tdsValue < 0) {
-                                            AppAlert.alert('Validation', 'TDS Amount cannot exceed Amount or be negative.');
-                                            setForm(prev => ({ ...prev, TDSAmt: '0' }));
-                                        } else {
-                                            setForm(prev => ({ ...prev, TDSAmt: validatedValue }));
-                                        }
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                    maxLength={16}
-                                />
-                            </View>
-
-                            {/* Discount Amount */}
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>Discount Amount</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.DisAmt}
-                                    onChangeText={(t) => {
-                                        // Remove all non-numeric characters except decimal point
-                                        let numericValue = t.replace(/[^0-9.]/g, '');
-
-                                        // Don't allow more than one decimal point
-                                        const decimalCount = (numericValue.match(/\./g) || []).length;
-                                        if (decimalCount > 1) {
-                                            numericValue = numericValue.substring(0, numericValue.lastIndexOf('.'));
-                                        }
-
-                                        // Don't allow negative values
-                                        if (numericValue.startsWith('-')) {
-                                            numericValue = numericValue.substring(1);
-                                        }
-
-                                        // Split into integer and decimal parts
-                                        const parts = numericValue.split('.');
-                                        let integerPart = parts[0] || '';
-                                        let decimalPart = parts[1] || '';
-
-                                        // Limit integer part to 12 digits (14 total - 2 decimal)
-                                        if (integerPart.length > 12) {
-                                            integerPart = integerPart.slice(0, 12);
-                                        }
-
-                                        // Limit decimal part to 2 digits
-                                        if (decimalPart.length > 2) {
-                                            decimalPart = decimalPart.slice(0, 2);
-                                        }
-
-                                        // Combine parts
-                                        const validatedValue = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
-
-                                        // Parse the validated value to a number
-                                        const disValue = parseFloat(validatedValue) || 0;
-                                        const amountValue = parseFloat(form.Amount) || 0;
-
-                                        // Check if Discount Amount exceeds Amount or is negative
-                                        if (disValue > amountValue || disValue < 0) {
-                                            AppAlert.alert('Validation', 'Discount Amount cannot exceed Amount or be negative.');
-                                            setForm(prev => ({ ...prev, DisAmt: '0' }));
-                                        } else {
-                                            setForm(prev => ({ ...prev, DisAmt: validatedValue }));
-                                        }
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                    maxLength={16}
-                                />
-                            </View>
-                        </View>
-
-                        {Platform.OS !== 'web' && (
-                            <DateTimePickerModal
-                                isVisible={chequeDatePickerVisible}
-                                mode="date"
-                                onConfirm={(date) => {
-                                    const selectedDate = new Date(date);
-                                    selectedDate.setHours(12, 0, 0, 0);  // 👈 noon
-                                    setForm(prev => ({ ...prev, ChqDate: toISODate(selectedDate) }));
-                                    setChequeDatePickerVisible(false);
-                                }}
-                                onCancel={() => setChequeDatePickerVisible(false)}
-                                headerTextIOS="Pick Cheque Date"
-                                locale="en_GB"
-                                maximumDate={new Date(2099, 11, 31)}
-                            />
-                        )}
-
-
-
-                        {/* Notes */}
-                        <Text style={styles.label}>Notes</Text>
-                        <TextInput
-                            style={[styles.input, { minHeight: 80 }]}
-                            value={form.Remark}
-                            onChangeText={(t) => setForm(prev => ({ ...prev, Remark: t }))}
-                            multiline
-                            placeholder="Optional notes"
-                        />
-
-                        {/* Attachment */}
-                        <Text style={[styles.label, { marginTop: 6 }]}>Attachment (single image)</Text>
-                        <View style={styles.attachRow}>
-                            {form.AttachImage ? (
-                                <>
-                                    <TouchableOpacity onPress={() => setPreviewVisible(true)}>
-                                        <Image
-                                            source={{ uri: form.AttachImage }}
-                                            style={styles.preview}
-                                        />
-                                    </TouchableOpacity>
-
-                                    <View style={{ marginLeft: 12, flex: 1 }}>
-                                        {/* <TouchableOpacity style={styles.ghostBtn} onPress={() => setCameraModalVisible(true)}>
-                                            <Icon name="edit" size={18} color={theme.TEXT_SECONDARY} />
-                                            <Text style={styles.ghostText}>Replace</Text>
-                                        </TouchableOpacity> */}
-
-                                        <TouchableOpacity style={styles.ghostBtn} onPress={removeAttachment}>
-                                            <Icon name="delete" size={18} color={theme.TEXT_SECONDARY} />
-                                            <Text style={styles.ghostText}>Remove</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </>
-                            ) : (
-                                <>
-                                    <TouchableOpacity style={styles.primaryAttach} onPress={pickFromGallery}>
-                                        <Icon name="photo-library" size={18} color="#fff" />
-                                        <Text style={styles.attachText}>Gallery</Text>
-                                    </TouchableOpacity>
-
-                                    {/* <TouchableOpacity
-                                        style={[styles.primaryAttach, { marginLeft: 8 }]}
-                                        onPress={() => setCameraModalVisible(true)}
-                                    >
-                                        <Icon name="photo-camera" size={18} color="#fff" />
-                                        <Text style={styles.attachText}>Camera</Text>
-                                    </TouchableOpacity> */}
-                                </>
-                            )}
-
-                        </View>
-
-                        {/* Nav */}
-                        <View style={styles.navRow}>
-                            <View style={{ width: 12 }} />
-                            <View style={{ flex: 1 }} />
-                            <TouchableOpacity style={[styles.saveBtn, { minWidth: 120 }]} onPress={goNext}>
-                                <Text style={styles.saveText}>{AdjType === 'ACC' ? 'Save' : 'Next'}</Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
-                )}
-
-                {/* STEP 2 */}
-                {step === 2 && AdjType === 'ADJ' && (
-                    <View style={styles.card}>
-                        <Text style={styles.label}>Adjust Account</Text>
-                        {/* <Text style={styles.label}>{JSON.stringify(getAdjData)}</Text> */}
-                        {/* <View style={styles.col1} > */}
-                        {/* <Text style={styles.label}>Select Payment Type <Text style={{ color: 'red' }}>*</Text></Text> */}
-
-
-                        {/* <PartyDropdownAdj
-                            data={getAdjData || []}
-                            placeholder="Choose Adjustment..."
-                            labelKey={["BILLNO", "NVOUDATE", "NETAMT"]}
-                            valueKey="UROWID"
-                            pageSize={12}
-                            initialValue={selectedAdj ?? []}
-                            selected={selectedadj ?? []}
-                            loading={Boolean(getAdjLoading)}
-                            multiple={true}
-
-
-                            formD2={Array.isArray(form.d2) ? form.d2 : []}
-
-
-                            onSelect={(itemOrItems) => {
-                                // optional: keep selectedAdj state (first item) if you still want it
-                                const items = Array.isArray(itemOrItems) ? itemOrItems : (itemOrItems ? [itemOrItems] : []);
-                                setSelectedAdj?.(items.length ? items[0] : null);
-                                setSelectedadj?.(items.length ? items[0] : null);
-
-                                // map raw items to the shape you store in form.d2 (if necessary)
-                                const mapped = items.map((it: any) => ({
-                                    BILLNO: it.BILLNO,
-                                    NVOUDATE: it.NVOUDATE,
-                                    NETAMT: it.NETAMT,
-                                    UROWID: it.UROWID,
-                                    BILLFROM: it.BILLFROM,
-                                    TTYPE: it.TTYPE,
-                                    PARCODE: it.PARCODE,
-                                    ACCNAME: it.ACCNAME,
-                                    VOUNO: it.VOUNO,
-                                    NBILLDATE: it.NBILLDATE,
-                                    BILLQTY: it.BILLQTY,
-                                    BALAMT: it.BALAMT,
-                                    BALAMT1: it.BALAMT1,
-                                    ZUID: it.ZUID,
-                                    ZSRNO: it.ZSRNO,
-                                    CONTRANAME: it.CONTRANAME,
-                                    DueDay: it.DueDay,
-                                    NVOUDATE1: it.NVOUDATE1,
-                                    ORDERNO: it.ORDERNO,
-                                }));
-                                // write into form.d2 so the component (and rest of form) uses the latest
-                                setForm(prev => ({ ...prev, d2: mapped }));
-                            }}
-
-
-                            onUpdateD2={(d2) => {
-                                // ensure normalised array exists
-                                const normalized = Array.isArray(d2) ? d2 : [];
-                                setForm(prev => ({ ...prev, d2: normalized }));
-
-                                // keep single-selected states in sync (optional)
-                                setSelectedAdj?.(normalized.length ? normalized[0] : null);
-                                setSelectedadj?.(normalized.length ? normalized[0] : null);
-                            }}
-
-
-                            setSelected={(val) => {
-                                if (!val) {
-                                    setForm(prev => ({ ...prev, d2: [] }));
-                                } else {
-                                    const items = Array.isArray(val) ? val : [val];
-                                    const mapped = items.map((it: any) => ({
-                                        BILLNO: it.BILLNO,
-                                        NVOUDATE: it.NVOUDATE,
-                                        NETAMT: it.NETAMT,
-                                        UROWID: it.UROWID,
-                                        BILLFROM: it.BILLFROM,
-                                        TTYPE: it.TTYPE,
-                                        PARCODE: it.PARCODE,
-                                        ACCNAME: it.ACCNAME,
-                                        VOUNO: it.VOUNO,
-                                        NBILLDATE: it.NBILLDATE,
-                                        BILLQTY: it.BILLQTY,
-                                        BALAMT: it.BALAMT,
-                                        BALAMT1: it.BALAMT1,
-                                        ZUID: it.ZUID,
-                                        ZSRNO: it.ZSRNO,
-                                        CONTRANAME: it.CONTRANAME,
-                                        DueDay: it.DueDay,
-                                        NVOUDATE1: it.NVOUDATE1,
-                                        ORDERNO: it.ORDERNO,
-                                    }));
-                                    setForm(prev => ({ ...prev, d2: mapped }));
-                                }
-                            }}
-                        /> */}
-
-                        {/* <PartyDropdownAdj
-                            ref={dropdownAdjRef}
-                            data={getAdjData || []}
-                            placeholder="Choose Adjustment..."
-                            labelKey={["BILLNO", "NVOUDATE", "NETAMT"]}
-                            valueKey="UROWID"
-                            pageSize={12}
-                            initialValue={selectedAdj ?? []}
-                            selected={selectedadj ?? []}
-                            loading={Boolean(getAdjLoading)}
-                            multiple={true}
-                            formD2={Array.isArray(form.d2) ? form.d2 : []}
-                            formD1={Array.isArray(form.d1) ? form.d1 : []}
-                            formUId={form.UId ?? null}
-                            onUpdateD2={(d2) => setForm(prev => ({ ...prev, d2: d2 || [] }))}
-                            onUpdateD1={(d1) => setForm(prev => ({
-                                ...prev,
-                                d1: d1 || [],
-                                d2: (prev.d2 || []).map(item => ({
-                                    ...item,
-                                    __d1SrNo: d1?.find(d => d.BillNo === item.BILLNO)?.SrNo
-                                }))
-                            }))}
-                            onSelect={(items) => setForm(prev => ({ ...prev, d2: items || [] }))}
-                            setSelected={(val) => {
-                                if (!val) setForm(prev => ({ ...prev, d2: [] }));
-                                else {
-                                    const items = Array.isArray(val) ? val : [val];
-                                    const mapped = items.map((it, idx) => ({
-                                        ...it,
-                                        __d1SrNo: idx + 1
-                                    }));
-                                    setForm(prev => ({ ...prev, d2: mapped }));
-                                }
-                            }}
-                        /> */}
-                        <PartyDropdownAdj
-                            ref={dropdownAdjRef}
-                            data={getAdjData || []}
-                            placeholder="Choose Adjustment..."
-                            labelKey={["BILLNO", "NVOUDATE", "NETAMT"]}
-                            valueKey="UROWID"
-                            pageSize={12}
-                            initialValue={selectedAdj ?? []}
-                            selected={selectedadj ?? []}
-                            loading={Boolean(getAdjLoading)}
-                            multiple={true}
-                            formD1={Array.isArray(form.d1) ? form.d1 : []} // Only pass formD1, NOT formD2
-                            formUId={form.UId ?? null}
-                            onUpdateD1={(d1) => setForm(prev => ({ ...prev, d1: d1 || [] }))}
-                            onSelect={(items) => {
-                                const mappedItems = Array.isArray(items) ? items : [items];
-                                setForm(prev => ({ ...prev, d2: mappedItems }));
-                            }}
-                        />
-
-
-
-
-
-
-
-                        {/* </View> */}
-                        {/* <TextInput style={styles.input} value={''} onChangeText={() => { }} placeholder="Account name / code" /> */}
-
-                        {/* <Text style={styles.label}>Reason</Text> */}
-                        {/* <TextInput style={[styles.input, { minHeight: 100 }]} value={''} onChangeText={() => { }} multiline /> */}
-
-                        <View style={styles.navRow}>
-                            <TouchableOpacity style={styles.ghostBtn} onPress={goPrev}>
-                                <Icon name="arrow-back" size={18} color={theme.TEXT_SECONDARY} />
-                                <Text style={styles.ghostText}>Previous</Text>
-                            </TouchableOpacity>
-
-                            <View style={{ flex: 1 }} />
-
-
-
-                            <TouchableOpacity style={styles.saveBtn} onPress={goNext} disabled={getSaveLoading}>
-                                <Text style={styles.saveText}>{getSaveLoading ? 'Saving...' : 'Save'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* CAMERA MODAL */}
-
-                {/* <Modal visible={isCameraModalVisible} animationType="slide" onRequestClose={() => setCameraModalVisible(false)}>
-                    <CameraPage
-                        onCapture={(dataUrl) => {
-                            handleCameraCapture(dataUrl);
-                        }}
-                        onClose={() => setCameraModalVisible(false)}
-                        isConnected={true} // Pass your connection status here
-                    />
-                </Modal> */}
-
-                {/* PREVIEW MODAL */}
-                <Modal
-                    visible={isPreviewVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setPreviewVisible(false)}
-                >
-                    <View style={styles.fullscreenOverlay}>
-                        <TouchableOpacity style={styles.closePreviewBtn} onPress={() => setPreviewVisible(false)} activeOpacity={0.8}>
-                            <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>
-
-                        {form.AttachImage && (
-                            <Image
-                                source={{ uri: form.AttachImage }}
-                                style={styles.fullscreenImage}
-                            />
-                        )}
-                    </View>
-                </Modal>
-
-                {/* ---------- INITIAL BLOCKING MODAL ---------- */}
-                <Modal
-                    visible={initialModalVisible}
-                    animationType="slide"
-                    transparent={true}
-                    // prevent hardware back from closing modal by providing no-op onRequestClose
-                    onRequestClose={() => { /* intentionally do nothing (no cancel) */ }}
-                >
-                    <View style={styles.initialModalBackdrop}>
-                        <View style={styles.initialModalCard}>
-                            <Text style={[styles.label, { marginBottom: 8 }]}>Collection Date</Text>
-
-                            {Platform.OS === 'web' ? (
-                                <View style={[styles.dateTrigger, { position: 'relative' }]}>
-                                    {!form.EDate && (
-                                        <Text
-                                            pointerEvents="none"
-                                            style={[styles.dateTriggerText, styles.placeholderText, { position: 'absolute', left: 12, top: 12 }]}
-                                        >
-                                            Select collection date
-                                        </Text>
-                                    )}
-                                    {React.createElement('input', {
-                                        type: 'date',
-                                        value: toISODate(form.EDate),
-                                        max: toISODate(new Date()),
-                                        onChange: (e: any) => {
-                                            const v = e.target.value;
-                                            if (v) setForm(prev => ({ ...prev, EDate: v }));
-                                        },
-                                        style: {
-                                            width: '100%', border: 'none', outline: 'none',
-                                            background: 'transparent', color: theme.TEXT_PRIMARY,
-                                            fontSize: 14, fontWeight: 600, padding: 8,
-                                            cursor: 'pointer', fontFamily: 'inherit',
-                                        } as any,
-                                    })}
-                                </View>
-                            ) : (
-                                <>
-                                    <TouchableOpacity activeOpacity={0.85} style={styles.dateTrigger} onPress={() => setCollectionDatePickerVisible(true)}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.dateTriggerText, !form.EDate && styles.placeholderText]}>
-                                                {form.EDate ? formatDisplayDate(form.EDate) : 'Select collection date'}
-                                            </Text>
-                                        </View>
-                                        <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                    </TouchableOpacity>
-
-                                    <DateTimePickerModal
-                                        isVisible={collectionDatePickerVisible}
-                                        mode="date"
-                                        onConfirm={(date) => {
-                                            const selectedDate = new Date(date);
-                                            selectedDate.setHours(12, 0, 0, 0);  // 👈 noon
-                                            setForm(prev => ({ ...prev, EDate: toISODate(selectedDate) }));
-                                            setCollectionDatePickerVisible(false);
-                                        }}
-                                        onCancel={() => setCollectionDatePickerVisible(false)}
-                                        headerTextIOS="Pick Collection Date"
-                                        locale="en_GB"
-                                        maximumDate={new Date()}
-                                    />
-                                </>
-                            )}
-
-                            <View style={{ marginTop: 12 }}>
-                                <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
-                                <SearchableDropdown
-                                    data={getPropertyData}
-                                    labelKey="LngName"
-                                    valueKey="PrpCode"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    initialValue={selectedProperty ?? null}
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
-                                        setSelectedProperty(item);
-                                    }}
-                                    multiple={false}
-                                    emptyMessage="No properties available"
-                                />
-                            </View>
-
-                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 }}>
-                                <TouchableOpacity
-                                    style={[styles.saveBtn, { minWidth: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
-                                    onPress={handleInitialOk}
-                                    disabled={initialLoading || !form.PrpCode || !form.EDate}
-                                >
-                                    {initialLoading ? <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} /> : null}
-                                    <Text style={styles.saveText}>OK</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-                {/* ---------- END INITIAL BLOCKING MODAL ---------- */}
-            </ScrollView>
-
-        </>
+                </View>
+            </Modal>
+            {/* ---------- END INITIAL BLOCKING MODAL ---------- */}
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { padding: 16, paddingBottom: 48, marginTop: 0 },
-    modeRow: { flexDirection: 'row', marginBottom: 12 },
-    modeBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.04)', marginRight: 8 },
-    modeBtnActive: { backgroundColor: theme.BRAND_ACCENT },
-    modeText: { color: theme.TEXT_SECONDARY, fontWeight: '600' },
-    modeTextActive: { color: '#fff' },
+    screen: { flex: 1, backgroundColor: T.bg },
 
-    card: { backgroundColor: theme.SURFACE, borderRadius: 12, padding: 12, elevation: 2, shadowColor: theme.SHADOW, marginBottom: 12 },
+    // title + stepper bar
+    topBar: { backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border },
+    topInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 10,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+    },
+    backBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.alt,
+    },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    topTitle: { fontSize: 16, fontWeight: '900', color: T.nav, marginTop: 1 },
+    stepRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    stepLine: { width: 10, height: 2, borderRadius: 1, backgroundColor: T.border },
+    stepPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        height: 36,
+        paddingLeft: 4,
+        paddingRight: 10,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
+    },
+    stepPillDot: { paddingRight: 4 },
+    stepPillOn: { borderColor: `${T.nav}55`, backgroundColor: `${T.nav}0A` },
+    stepDot: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.alt,
+    },
+    stepDotActive: { backgroundColor: T.nav },
+    stepDotDone: { backgroundColor: T.green },
+    stepNum: { fontSize: 12, fontWeight: '900', color: T.muted },
+    stepText: { fontSize: 12, fontWeight: '700', color: T.muted },
+    stepTextOn: { color: T.nav, fontWeight: '800' },
+    progressTrack: { height: 3, backgroundColor: T.hair },
+    progressFill: { height: 3, backgroundColor: T.copper },
 
-    twoColRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    twoColRow1: { display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%' },
-    col: { flex: 1, marginRight: 8 },
-    col1: { width: '48%', marginRight: 8 },
-    label: { color: theme.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', marginBottom: 6 },
-    input: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, color: theme.BRAND_DARK },
-    dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
+    // content
+    container: { paddingTop: 14, paddingBottom: 28 },
+    inner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    cols: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+    colMain: { flex: 6, minWidth: 0, gap: 14 },
+    colSide: { flex: 5, minWidth: 0, gap: 14 },
+    stack: { gap: 12 },
+    block: { gap: 12 },
 
-    placeholderText: { color: theme.MUTED },
+    // form grid
+    formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    field: { gap: 6 },
+    fieldFull: { width: '100%' },
+    fieldHalf: { flexGrow: 1, flexBasis: '40%', minWidth: 220 },
+    fieldHalfTight: { flexGrow: 1, flexBasis: '40%', minWidth: 140 },
+    label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-    attachRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-    primaryAttach: { backgroundColor: theme.BRAND_PRIMARY, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
-    attachText: { color: '#fff', marginLeft: 8, fontWeight: '700' },
-    preview: { width: 96, height: 96, borderRadius: 8, resizeMode: 'cover' },
+    dateBox: {
+        height: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
+    },
+    dateText: { flex: 1, fontSize: 14, fontWeight: '700', color: T.ink },
+    placeholderText: { color: T.muted, fontWeight: '600' },
 
-    ghostBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-    ghostText: { marginLeft: 6, color: theme.TEXT_SECONDARY },
+    moneyBox: {
+        height: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
+    },
+    moneyBoxBig: { height: 52, borderColor: `${T.nav}55` },
+    rupee: { fontSize: 14, fontWeight: '800', color: T.copper },
+    moneyInput: {
+        flex: 1,
+        minWidth: 0,
+        paddingVertical: 0,
+        fontSize: 14,
+        fontWeight: '700',
+        color: T.ink,
+        ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null),
+    },
+    moneyInputBig: { fontSize: 20, fontWeight: '900', color: T.nav },
 
-    navRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
-    saveBtn: { backgroundColor: theme.BRAND_ACCENT, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    saveText: { color: '#fff', fontWeight: '800' },
+    totals: {
+        backgroundColor: `${T.copper}12`,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: `${T.copper}30`,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, gap: 10 },
+    totalKey: { fontSize: 12, fontWeight: '700', color: T.muted },
+    totalVal: { fontSize: 13.5, fontWeight: '800', color: T.ink },
+    totalBig: { fontSize: 17, fontWeight: '900', color: T.nav },
 
+    // attachment
+    attachRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    preview: { width: 88, height: 88, borderRadius: 10, borderWidth: 1, borderColor: T.border, resizeMode: 'cover' },
+    attachTitle: { fontSize: 13.5, fontWeight: '800', color: T.ink },
+    attachHint: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+    dropZone: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        minHeight: 60,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: `${T.copper}66`,
+        backgroundColor: `${T.copper}08`,
+    },
+    dropIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}16`,
+    },
+    dropTitle: { fontSize: 13.5, fontWeight: '800', color: T.nav },
+
+    // step 2
+    adjSummary: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    warn: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        padding: 10,
+        borderRadius: 10,
+        backgroundColor: `${T.red}0D`,
+        borderWidth: 1,
+        borderColor: `${T.red}33`,
+    },
+    warnText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700', color: T.red },
+    recap: { borderRadius: 10, borderWidth: 1, borderColor: T.hair, overflow: 'hidden' },
+    recapRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: T.hair,
+    },
+    recapKey: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase', paddingTop: 1 },
+    recapVal: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: T.ink, textAlign: 'right' },
+    recapTotal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: `${T.copper}12`,
+        borderWidth: 1,
+        borderColor: `${T.copper}30`,
+    },
+
+    // sticky save bar
+    saveBar: { backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border },
+    saveInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 10,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+    },
+    saveTitle: { fontSize: 13.5, fontWeight: '800', color: T.ink },
+    saveMeta: { fontSize: 11.5, fontWeight: '700', color: T.muted, marginTop: 1 },
+
+    // preview modal
     fullscreenOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.95)',
+        backgroundColor: 'rgba(13,27,42,0.96)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1615,109 +1756,36 @@ const styles = StyleSheet.create({
     },
     closePreviewBtn: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 50 : 30,
+        top: Platform.OS === 'ios' ? 50 : 24,
         right: 20,
         zIndex: 10,
-        padding: 6,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.16)',
     },
 
     /* initial modal styles */
     initialModalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.45)',
+        backgroundColor: 'rgba(13,27,42,0.5)',
         justifyContent: 'center',
+        alignItems: 'center',
         padding: 20,
     },
     initialModalCard: {
-        backgroundColor: theme.SURFACE,
-        borderRadius: 12,
-        padding: 16,
-        elevation: 4,
-    },
-    /* Stepper / progress small right aligned */
-    /* Stepper / progress full-width inside its area */
-    stepperContainer: {
-        height: 50,
         width: '100%',
-        paddingVertical: 6,
-        backgroundColor: '#F6F7FA',
-        // keep stepper inside normal layout flow
-    },
-    stepperInner: {
-        width: '100%',               // full width now
-        alignSelf: 'stretch',
-        height: 48,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'relative',
-        paddingHorizontal: 16,       // left/right padding for spacing
-    },
-    progressTrack: {
-        position: 'absolute',
-        left: 56,                    // leave space for left dot
-        right: 56,                   // leave space for right dot
-        height: 4,
-        borderRadius: 3,
-        backgroundColor: theme.BORDER || '#e6eef4',
-        top: 22,
-        zIndex: 0,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        position: 'absolute',
-        left: 56,                    // match track insets
-        right: 56,                   // match track insets
-        height: 4,
-        borderRadius: 3,
-        backgroundColor: theme.BRAND_ACCENT,
-        top: 22,
-        zIndex: 1,
-        // width is controlled by scaleX transform above
-    },
-    stepWrap: {
-        width: 56,                   // slightly smaller to match new insets
-        alignItems: 'center',
-        zIndex: 2,
-    },
-    stepDot: {
-        width: 32,
-        height: 32,
+        maxWidth: 460,
+        backgroundColor: T.surface,
         borderRadius: 16,
-        borderWidth: 1.5,
-        borderColor: theme.BORDER || '#d8e8f2',
-        backgroundColor: theme.SURFACE,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 2,
-        shadowColor: theme.SHADOW,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 18,
+        ...S.sheet,
     },
-    stepDotActive: {
-        backgroundColor: theme.BRAND_ACCENT,
-        borderColor: theme.BRAND_ACCENT,
-    },
-    stepDotDone: {
-        backgroundColor: theme.BRAND_PRIMARY || theme.BRAND_ACCENT,
-        borderColor: theme.BRAND_PRIMARY || theme.BRAND_ACCENT,
-    },
-    stepNum: {
-        fontSize: 12,
-        fontWeight: '900',
-        color: theme.TEXT_SECONDARY,
-    },
-    stepLabelSmall: {
-        marginTop: 6,
-        fontSize: 11,
-        fontWeight: '700',
-        color: theme.TEXT_SECONDARY,
-    },
-    stepLabelActive: {
-        color: theme.BRAND_DARK,
-        fontWeight: '900',
-    },
+    initialTitle: { fontSize: 17, fontWeight: '900', color: T.nav, marginTop: 2 },
 });
 
 export default ChequeForm;

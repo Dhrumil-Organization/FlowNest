@@ -1,5 +1,6 @@
 // EnquiryReportScreen.js
 // User-wise enquiry summary report, filterable by event.
+// NEW ERP UI: re-skinned (T tokens + erpUi kit); data loading logic unchanged.
 // Tapping a user card navigates to EnquiryReportDrilldownScreen.
 //
 // This screen requires internet (it's a report against server data, not an
@@ -22,11 +23,24 @@ import { getCurrentFinancialYear } from "../../common/commonfunction";
 // import { Picker } from '@react-native-picker/picker';
 import { API } from "@/common/API/dynamicAPI";
 import AsyncStorage from "@/common/utils/compatibleStorage";
-import theme from "@/components/theme";
-import { LinearGradient } from "expo-linear-gradient";
 import api from "./api";
 import { isOnline } from "./CardScanService";
 import EnquiryReportDrilldownScreen from "./EnquiryReportDrilldownScreen";
+import { S, T } from "@/src/theme";
+import {
+  CONTENT_MAX,
+  EmptyState,
+  IconBtn,
+  Kpi,
+  KpiGrid,
+  Metric,
+  PanelHeader,
+  PickField,
+  SectionHead,
+  Sheet,
+  cellWidth,
+  useSotLayout,
+} from "@/src/components/erpUi";
 
 // Configure your actual events here, or fetch from an /events endpoint
 // if you run many shows per year.
@@ -179,490 +193,306 @@ export default function EnquiryReportScreen({
     const parts = name.trim().split(" ");
     return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase();
   }
+  // ===== NEW ERP UI (presentation only) =====
+  const { isPhone, cols, gutter } = useSotLayout();
 
   function renderUserCard({ item }) {
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => {
-          // navigation.navigate('EnquiryReportDrilldown', {
-          //   userId: item.user_id,
-          //   userName: item.name,
-          //   userRole: item.role,
-          //   eventCode,
-          // })
-          // router.push({
-          //   pathname: "/EnquiryReportDrilldown",
-          //   params: {
-          //     userId: item.user_id,
-          //     userName: item.name,
-          //     userRole: item.role,
-          //     eventCode,
-          //   },
-          // });
-          setEnquiryReportDrilldownVisible(true);
-          setEnquiryReportDrilldownItem(item);
-          setEnquiryReporteventCode(eventCode);
-        }}
-      >
-        <View style={styles.cardHead}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(item.name)}</Text>
+      <View style={[cellWidth(cols), styles.gridCell]}>
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Open enquiries of ${item.name}`}
+          onPress={() => {
+            // navigation.navigate('EnquiryReportDrilldown', {
+            //   userId: item.user_id,
+            //   userName: item.name,
+            //   userRole: item.role,
+            //   eventCode,
+            // })
+            // router.push({
+            //   pathname: "/EnquiryReportDrilldown",
+            //   params: {
+            //     userId: item.user_id,
+            //     userName: item.name,
+            //     userRole: item.role,
+            //     eventCode,
+            //   },
+            // });
+            setEnquiryReportDrilldownVisible(true);
+            setEnquiryReportDrilldownItem(item);
+            setEnquiryReporteventCode(eventCode);
+          }}
+        >
+          <View style={styles.cardHead}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials(item.name)}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.uname} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.urole} numberOfLines={1}>{item.role}</Text>
+            </View>
+            <Icon name="chevron-right" size={22} color={T.muted} />
           </View>
-          <View>
-            <Text style={styles.uname}>{item.name}</Text>
-            <Text style={styles.urole}>{item.role}</Text>
+          <View style={styles.statRow}>
+            <Metric label="Enquiries" value={String(item.enquiry_count)} />
+            <Metric
+              label="Total qty (m)"
+              value={item.total_qty.toLocaleString()}
+              color={T.copper}
+              align="right"
+            />
           </View>
-        </View>
-        <View style={styles.statRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{item.enquiry_count}</Text>
-            <Text style={styles.statLbl}>Enquiries</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>
-              {item.total_qty.toLocaleString()}
-            </Text>
-            <Text style={styles.statLbl}>Total qty (m)</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
     );
   }
 
+  const header = (
+    <PanelHeader
+      onBack={() => {
+        showInqReport(false);
+      }}
+      crumbs={["Event"]}
+      title="Event Report"
+      subtitle="User-wise enquiry summary"
+    />
+  );
+
   if (offline) {
     return (
-      <View style={styles.centerScreen}>
-        <Text style={styles.offlineTitle}>Report needs internet</Text>
-        <Text style={styles.offlineSub}>
-          This report pulls live data from the server. Please reconnect and try
-          again.
-        </Text>
+      <View style={styles.screen}>
+        {header}
+        <View style={styles.centerScreen}>
+          <EmptyState
+            icon="wifi-off"
+            title="Report needs internet"
+            text="This report pulls live data from the server. Please reconnect and try again."
+          />
+        </View>
       </View>
     );
   }
 
   return (
     <>
-      {eventModalVisible && (
-        <View style={styles.detailOverlay123}>
-          <View style={styles.detailContainer}>
-            <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>{`Event Select`}</Text>
-              <TouchableOpacity onPress={() => setEventModalVisible(false)}>
-                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setEventModalVisible(false)}
-            >
-              <View style={styles.dropdownModal}>
-                <FlatList
-                  data={EVENTS}
-                  keyExtractor={(item) => String(item.EventId)}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setEventCode(item.EventId);
-                        setEventModalVisible(false);
-                        loadSummary(item.EventId, prpCode); // existing functionality
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>
-                        {item.EventName}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {prpModalVisible && (
-        <View style={styles.detailOverlay123}>
-          <View style={styles.detailContainer}>
-            <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>{`Property Select`}</Text>
-              <TouchableOpacity onPress={() => setPrpModalVisible(false)}>
-                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setPrpModalVisible(false)}
-            >
-              <View style={styles.dropdownModal}>
-                <FlatList
-                  data={PRPS}
-                  keyExtractor={(item) => String(item.code)}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setPrpCode(item.code);
-                        setPrpModalVisible(false);
-                        loadSummary(eventCode, item.code); // existing functionality
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{item.name}</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      <LinearGradient
-        colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-        style={styles.container1}
-      >
-        <View style={styles.breadcrumbChip}>
-          <View style={styles.breadcrumbRow}>
-            <TouchableOpacity
-              style={{ flexDirection: "row", alignItems: "center" }}
-              onPress={() => {
-                showInqReport(false);
-              }}
-            >
-              <Icon name="arrow-back" size={18} color="#fff" />
-              <Text style={styles.breadcrumbBackText}>Back</Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={styles.breadcrumbSeparator}>›</Text>
-              <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
-                {"Event Report"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
       <View style={styles.screen}>
-        <View style={styles.fieldGroup}>
-          <Text style={styles.dropdownLabel}>Event</Text>
+        {header}
 
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setEventModalVisible(true)}
-          >
-            <Text style={styles.dropdownText}>
-              {EVENTS.find((e) => e.EventId === eventCode)?.EventName ||
-                "Select Event"}
-            </Text>
-
-            <Text style={styles.dropdownArrow}>▼</Text>
-          </TouchableOpacity>
+        <View style={[styles.top, { paddingHorizontal: gutter }]}>
+          <View style={styles.topInner}>
+            <PickField
+              label="Event"
+              icon="event"
+              value={EVENTS.find((e) => e.EventId === eventCode)?.EventName || ""}
+              placeholder="Select Event"
+              onPress={() => setEventModalVisible(true)}
+              style={isPhone ? null : { width: 360 }}
+            />
+          </View>
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#c2622f" />
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color={T.copper} size="large" />
+            <Text style={styles.loadingText}>Loading report…</Text>
+          </View>
         ) : (
-          <>
-            <Text style={styles.totalsLine}>
-              {summary?.totals?.users} users · {summary?.totals?.enquiries}{" "}
-              enquiries · {summary?.totals?.qty.toLocaleString()} m total
-            </Text>
-
-            <FlatList
-              data={summary?.users}
-              keyExtractor={(item) => String(item?.user_id)}
-              renderItem={renderUserCard}
-              contentContainerStyle={{
-                paddingHorizontal: 16,
-                paddingBottom: 24,
-              }}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              }
-              ListEmptyComponent={
-                <Text style={styles.empty}>
-                  No enquiries recorded for this event yet.
-                </Text>
-              }
-            />
-          </>
+          <FlatList
+            key={`u-${cols}`}
+            data={summary?.users}
+            keyExtractor={(item) => String(item?.user_id)}
+            renderItem={renderUserCard}
+            numColumns={cols}
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.copper} colors={[T.copper]} />
+            }
+            ListHeaderComponent={
+              <View style={styles.listHead}>
+                <KpiGrid isPhone={isPhone}>
+                  <Kpi label="Users" value={String(summary?.totals?.users ?? 0)} icon="groups" accent={T.blue} />
+                  <Kpi label="Enquiries" value={String(summary?.totals?.enquiries ?? 0)} icon="assignment" accent={T.copper} />
+                  <Kpi
+                    label="Total qty"
+                    value={`${summary?.totals?.qty.toLocaleString()} m`}
+                    icon="straighten"
+                    accent={T.green}
+                  />
+                </KpiGrid>
+                <View style={{ marginTop: 10 }}>
+                  <SectionHead
+                    title="By user"
+                    meta={`${summary?.totals?.users} users · ${summary?.totals?.enquiries} enquiries · ${summary?.totals?.qty.toLocaleString()} m total`}
+                    right={<IconBtn icon="refresh" label="Refresh" onPress={onRefresh} loading={refreshing} />}
+                  />
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <EmptyState
+                icon="assignment"
+                title="No enquiries yet"
+                text="No enquiries recorded for this event yet."
+              />
+            }
+          />
         )}
       </View>
 
+      <Sheet
+        open={eventModalVisible}
+        onClose={() => setEventModalVisible(false)}
+        eyebrow="EVENT REPORT"
+        title="Event Select"
+        wideMax={460}
+      >
+        {EVENTS.map((item) => (
+          <TouchableOpacity
+            key={String(item.EventId)}
+            style={[styles.option, item.EventId === eventCode && styles.optionOn]}
+            onPress={() => {
+              setEventCode(item.EventId);
+              setEventModalVisible(false);
+              loadSummary(item.EventId, prpCode); // existing functionality
+            }}
+          >
+            <Icon name="event" size={17} color={item.EventId === eventCode ? T.nav : T.copper} />
+            <Text style={styles.optionText} numberOfLines={2}>
+              {item.EventName}
+            </Text>
+            {item.EventId === eventCode ? <Icon name="check" size={20} color={T.nav} /> : null}
+          </TouchableOpacity>
+        ))}
+      </Sheet>
+
+      <Sheet
+        open={prpModalVisible}
+        onClose={() => setPrpModalVisible(false)}
+        eyebrow="EVENT REPORT"
+        title="Property Select"
+        wideMax={460}
+      >
+        {PRPS.map((item) => (
+          <TouchableOpacity
+            key={String(item.code)}
+            style={[styles.option, item.code === prpCode && styles.optionOn]}
+            onPress={() => {
+              setPrpCode(item.code);
+              setPrpModalVisible(false);
+              loadSummary(eventCode, item.code); // existing functionality
+            }}
+          >
+            <Icon name="business" size={17} color={item.code === prpCode ? T.nav : T.copper} />
+            <Text style={styles.optionText} numberOfLines={2}>{item.name}</Text>
+            {item.code === prpCode ? <Icon name="check" size={20} color={T.nav} /> : null}
+          </TouchableOpacity>
+        ))}
+      </Sheet>
+
       {getEnquiryReportDrilldownVisible && (
         <View style={styles.detailOverlay456}>
-          <View style={styles.detailContainer456}>
-            <EnquiryReportDrilldownScreen
-              token={token}
-              username={username}
-              getEnquiryReportDrilldownItem={getEnquiryReportDrilldownItem}
-              setEnquiryReportDrilldownItem={setEnquiryReportDrilldownItem}
-              setEnquiryReportDrilldownVisible={
-                setEnquiryReportDrilldownVisible
-              }
-              getEnquiryReporteventCode={getEnquiryReporteventCode}
-              setEnquiryReporteventCode={setEnquiryReporteventCode}
-              showInqReport={showInqReport}
-            />
-          </View>
+          <EnquiryReportDrilldownScreen
+            token={token}
+            username={username}
+            getEnquiryReportDrilldownItem={getEnquiryReportDrilldownItem}
+            setEnquiryReportDrilldownItem={setEnquiryReportDrilldownItem}
+            setEnquiryReportDrilldownVisible={
+              setEnquiryReportDrilldownVisible
+            }
+            getEnquiryReporteventCode={getEnquiryReporteventCode}
+            setEnquiryReporteventCode={setEnquiryReporteventCode}
+            showInqReport={showInqReport}
+          />
         </View>
       )}
     </>
   );
 }
 
-const C = {
-  brand: "#B3552C",
-  brandSoft: "#FBEEE6",
-  ink: "#1F2937",
-  muted: "#6B7280",
-  faint: "#9CA3AF",
-  bg: "#FBFAF7",
-  surface: "#FFFFFF",
-  border: "#ECE9E2",
-};
-
-const shadowSoft = {
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 2,
-};
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: C.ink,
-    paddingHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
+  screen: { flex: 1, backgroundColor: T.bg },
+  top: {
+    backgroundColor: T.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingVertical: 10,
   },
-  pickerWrap: {
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 11,
-    backgroundColor: C.surface,
-    marginBottom: 8,
-    marginTop: 8,
-    overflow: "hidden",
+  topInner: { width: "100%", maxWidth: CONTENT_MAX, alignSelf: "center" },
+  listContent: {
+    width: "100%",
+    maxWidth: CONTENT_MAX,
+    alignSelf: "center",
+    paddingTop: 12,
+    paddingBottom: 28,
   },
-  totalsLine: {
-    fontSize: 12,
-    color: C.muted,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    fontWeight: "600",
-  },
+  listHead: { paddingHorizontal: 5, marginBottom: 4 },
+  gridCell: { padding: 5 },
   card: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T.border,
     borderRadius: 14,
-    backgroundColor: C.surface,
-    padding: 16,
-    marginBottom: 12,
-    ...shadowSoft,
+    backgroundColor: T.surface,
+    padding: 14,
+    gap: 12,
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
   },
-  cardHead: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  cardHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.brandSoft,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: T.nav,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
   },
-  avatarText: { color: C.brand, fontWeight: "800", fontSize: 14 },
-  uname: { fontSize: 15, fontWeight: "800", color: C.ink },
-  urole: { fontSize: 11.5, color: C.muted, marginTop: 1 },
+  avatarText: { color: "#fff", fontWeight: "900", fontSize: 15 },
+  uname: { fontSize: 15, fontWeight: "800", color: T.ink },
+  urole: { fontSize: 12, fontWeight: "600", color: T.muted, marginTop: 1 },
   statRow: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingTop: 14,
+    gap: 10,
+    backgroundColor: T.sub,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  stat: { flex: 1, alignItems: "center" },
-  statNum: { fontSize: 22, fontWeight: "800", color: C.ink },
-  statLbl: {
-    fontSize: 10,
-    color: C.faint,
-    marginTop: 3,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    fontWeight: "600",
-  },
-  empty: { textAlign: "center", color: C.muted, fontSize: 13, marginTop: 40 },
+  loadingBox: { alignItems: "center", paddingTop: 48, gap: 10 },
+  loadingText: { fontSize: 13, fontWeight: "700", color: T.muted },
   centerScreen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: C.bg,
+    backgroundColor: T.bg,
   },
-  offlineTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: C.ink,
-    marginBottom: 6,
-  },
-  offlineSub: {
-    fontSize: 13,
-    color: C.muted,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  fieldGroup: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 10,
-  },
-
-  dropdownLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: C.muted,
-    marginBottom: 6,
-  },
-
-  dropdown: {
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    paddingHorizontal: 15,
-    paddingVertical: 14,
+  option: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-  },
-
-  dropdownText: {
-    flex: 1,
-    fontSize: 14,
-    color: C.ink,
-  },
-
-  dropdownArrow: {
-    fontSize: 12,
-    color: C.muted,
-  },
-
-  dropdownModal: {
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
-    marginTop: 120,
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 12,
-    maxHeight: 320,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.surface,
   },
-
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-
-  dropdownItemText: {
-    fontSize: 15,
-    color: "#222",
-  },
-  detailOverlay123: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent black
-    zIndex: 300, // Higher than summary modal
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  optionOn: { borderColor: `${T.nav}66`, backgroundColor: T.sub },
+  optionText: { flex: 1, fontSize: 14, fontWeight: "700", color: T.ink },
   detailOverlay456: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent black
+    backgroundColor: T.bg,
     zIndex: 200, // Higher than summary modal
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  detailContainer456: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    width: "100%",
-    height: "100%",
-    elevation: 5, // Shadow for Android
-    shadowColor: "#000", // Shadow for iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-
-  // Detail Container
-  detailContainer: {
-    backgroundColor: "#fff",
-    // padding: 20,
-    paddingTop: 45,
-    borderRadius: 10,
-    width: "100%",
-    height: "100%",
-    elevation: 5, // Shadow for Android
-    shadowColor: "#000", // Shadow for iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  drawerHeader: {
-    height: 60,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-  drawerTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: theme.BRAND_GRADIENT_END,
-  },
-  breadcrumbChip: {
-    marginTop: 12,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    borderBlockColor: "rgba(255,255,255,0.15)",
-    borderTopWidth: 1,
-    paddingVertical: 6,
-    width: "100%",
-  },
-  breadcrumbRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  breadcrumbSeparator: {
-    color: "#fff",
-    marginHorizontal: 6,
-  },
-  breadcrumbBackText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "500",
-    opacity: 0.9,
-  },
-  breadcrumbCurrent: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-    flexShrink: 1,
-    textAlign: "right",
   },
 });

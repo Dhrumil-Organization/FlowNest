@@ -2,15 +2,24 @@ import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
-    TouchableOpacity,
     Modal,
     ActivityIndicator,
-    TextInput,
     FlatList,
     StyleSheet,
 } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { crlimtreq_styles } from '@/common/Style';
+// NEW ERP theme (presentation only)
+import { S, T } from '@/src/theme';
+import {
+    CONTENT_MAX,
+    EmptyState,
+    Metric,
+    PanelHeader,
+    SearchBox,
+    Segment,
+    cellWidth,
+    useSotLayout,
+} from '@/src/components/erpUi';
 
 interface PartyData {
     ParCode: string;
@@ -59,22 +68,30 @@ interface PartyHistoryModalProps {
     activeTab: 'party' | 'history';
     setActiveTab: (tab: 'party' | 'history') => void;
     getParname: string;
+    // The purchase-order screen passes the same values with a `YPO` suffix
+    // (partyListYPO, historyDataYPO, …); both spellings are accepted.
+    [k: string]: any;
 }
 
-const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
-    visible,
-    onClose,
-    partyList = [],
-    historyData = [],
-    // allhistoryData = [],
-    partyLoading = false,
-    historyLoading = false,
-    // allhistoryLoading = false,
-    // showAllHistoryOnly = false,
-    activeTab = '',
-    getParname = '',
-    setActiveTab = () => { },
-}) => {
+const PartyHistoryModal: React.FC<PartyHistoryModalProps> = (props) => {
+    // Bug fix: the parent passes `partyListYPO`, `historyDataYPO`, `prodorderLoadingYPO`,
+    // `historyLoadingYPO`, `activeTabYPO`, `setActiveTabYPO`, `getParnameYPO`, which the
+    // original destructuring ignored (modal always showed empty defaults).
+    const {
+        visible,
+        onClose,
+        partyList = props.partyListYPO ?? [],
+        historyData = props.historyDataYPO ?? [],
+        // allhistoryData = [],
+        partyLoading = props.prodorderLoadingYPO ?? false,
+        historyLoading = props.historyLoadingYPO ?? false,
+        // allhistoryLoading = false,
+        // showAllHistoryOnly = false,
+        activeTab = props.activeTabYPO ?? '',
+        getParname = props.getParnameYPO ?? '',
+        setActiveTab = props.setActiveTabYPO ?? ((_tab: 'party' | 'history') => { }),
+    } = props;
+    const { cols, gutter } = useSotLayout();
     // const [activeTab, setActiveTab] = useState<'party' | 'history' | 'allhistory'>('party');
     const [partySearchQuery, setPartySearchQuery] = useState('');
     const [historySearchQuery, setHistorySearchQuery] = useState('');
@@ -125,254 +142,193 @@ const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
         // }
     }, [activeTab]);
 
+    const historyTone = (isauth: string) =>
+        isauth === '1' ? T.green : isauth === '2' ? T.red : T.muted;
+
     const renderPartyItem = ({ item }: { item: PartyData }) => (
-        <View style={styles.card}>
-            <View style={styles.cardSubHeader}>
-                <Text style={styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={styles.cardContent}>
-                <View style={styles.fullWidthRow}>
-                    <Text style={styles.key}>Address:</Text>
+        <View style={[cellWidth(cols), styles.gridCell]}>
+            <View style={styles.card}>
+                <View style={styles.partyHead}>
+                    <View style={styles.partyIcon}>
+                        <Icon name="storefront" size={16} color={T.copper} />
+                    </View>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.ParName}</Text>
+                </View>
+                <View style={styles.box}>
+                    <Text style={styles.key}>Address</Text>
                     <Text style={styles.value}>{item.Address}</Text>
                 </View>
             </View>
         </View>
     );
 
-    const renderHistoryItem = ({ item }: { item: HistoryData }) => (
-        <View style={[
-            crlimtreq_styles.card,
-            item.isauth === '1' ? crlimtreq_styles.acceptedCard : item.isauth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {item.isauth && (
-                <View style={crlimtreq_styles.stampContainer}>
-                    <View style={[
-                        crlimtreq_styles.stamp,
-                        item.isauth === '1' ? crlimtreq_styles.stampAccepted : item.isauth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                    ]}>
-                        <Text style={crlimtreq_styles.stampText}>
-                            {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' ? 'REJECTED' : 'PENDING'}
-                        </Text>
+    const renderHistoryItem = ({ item }: { item: HistoryData }) => {
+        const tone = historyTone(item.isauth);
+        return (
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <View
+                    style={[
+                        styles.card,
+                        item.isauth === '1' ? styles.acceptedCard : item.isauth === '2' ? styles.rejectedCard : null,
+                    ]}
+                >
+                    <View style={styles.histHead}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.eyebrow} numberOfLines={1}>{item.prptypename}</Text>
+                            <View style={styles.dateRow}>
+                                <Icon name="event" size={12} color={T.muted} />
+                                <Text style={styles.dateText}>{item.date}</Text>
+                            </View>
+                        </View>
+                        {item.isauth ? (
+                            <View style={[styles.stamp, { backgroundColor: `${tone}14`, borderColor: `${tone}40` }]}>
+                                <View style={[styles.stampDot, { backgroundColor: tone }]} />
+                                <Text style={[styles.stampText, { color: tone }]}>
+                                    {item.isauth === '1' ? 'AUTHORISED' : item.isauth === '2' ? 'REJECTED' : 'PENDING'}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
-                </View>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.date}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.prptypename}</Text>
-                </View>
-            </View>
 
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Old Limit:</Text>
-                        <Text style={crlimtreq_styles.valuegreen}>{item.limit1}</Text>
+                    <View style={styles.box}>
+                        <View style={styles.row}>
+                            <Metric label="Old Limit" value={String(item.limit1 ?? '')} color={T.green} />
+                            <Metric label="Req. Limit" value={String(item.limit2 ?? '')} color={T.copper} align="right" />
+                        </View>
+                        <View style={styles.row}>
+                            <Metric label="Auth. Limit" value={String(item.limit3 ?? '')} color={T.blue} />
+                            <Metric label="Auth. Days" value={String(item.crday3 ?? '')} color={T.blue} align="right" />
+                        </View>
+                        <View style={styles.row}>
+                            <Metric label="Old Cr. Days" value={String(item.crday1 ?? '')} color={T.green} />
+                            <Metric label="Req. Cr. Days" value={String(item.crday2 ?? '')} color={T.copper} align="right" />
+                        </View>
+                        <View style={styles.row}>
+                            <Metric label="Authorised Date" value={item.adate || 'N/A'} />
+                            <Metric label="Authorised By" value={item.ausrname || 'N/A'} align="right" />
+                        </View>
+                        <View style={styles.row}>
+                            <Metric
+                                label="Status"
+                                value={String(item.status ?? '')}
+                                color={item.status === 'Authorised' ? T.green : item.status === 'Rejected' ? T.red : T.ink}
+                            />
+                            <Metric label="Revert Date" value={item.revertdate || 'N/A'} align="right" />
+                        </View>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Req. Limit:</Text>
-                        <Text style={crlimtreq_styles.editableValue1}>{item.limit2}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Limit:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>{item.limit3}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Days:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>{item.crday3}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Old Cr. Days:</Text>
-                        <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
-                        <Text style={crlimtreq_styles.editableValue1}>{item.crday2}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
 
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>{item.adate || 'N/A'}</Text>
+                    <View style={styles.kv}>
+                        <Text style={styles.key}>Remark</Text>
+                        <Text style={styles.value}>{item.remark}</Text>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Authorised By:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>{item.ausrname || 'N/A'}</Text>
+                    <View style={styles.kv}>
+                        <Text style={styles.key}>Broker</Text>
+                        <Text style={styles.value}>{item.BrkAccName}</Text>
                     </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        {item.status === 'Authorised' ? <Text style={crlimtreq_styles.valueAuthorised}>{item.status}</Text>
-                            : item.status === 'Rejected' ? <Text style={crlimtreq_styles.valueRejected}>{item.status}</Text>
-                                : item.status === 'Pending' ? <Text style={crlimtreq_styles.value}>{item.status}</Text>
-                                    : <Text style={crlimtreq_styles.value}>{item.status}</Text>}
-                        {/* <Text style={crlimtreq_styles.value}>{item.status}</Text> */}
+                    <View style={styles.kv}>
+                        <Text style={styles.key}>SExe</Text>
+                        <Text style={styles.value}>{item.sexename}</Text>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Revert Date:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
-                    </View>
-                </View>
-
-
-                <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>Remark:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.remark}</Text>
-                </View>
-                <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>Broker:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.BrkAccName}</Text>
-                </View>
-                <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>SExe:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
                 </View>
             </View>
-        </View>
-    );
+        );
+    };
+
+    const listStyle = [styles.list, { paddingHorizontal: gutter - 5 }];
 
     // Render the appropriate tab content
     const renderTabContent = () => {
         if (activeTab === 'party') {
             return (
                 <>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search Parties..."
-                        value={partySearchQuery}
-                        onChangeText={setPartySearchQuery}
-                    />
+                    <View style={[styles.searchWrap, { paddingHorizontal: gutter }]}>
+                        <SearchBox
+                            placeholder="Search Parties..."
+                            value={partySearchQuery}
+                            onChangeText={setPartySearchQuery}
+                        />
+                    </View>
                     {partyLoading ? (
-                        <ActivityIndicator size="large" color="#2196F3" style={styles.loader} />
+                        <ActivityIndicator size="large" color={T.copper} style={styles.loader} />
                     ) : filteredPartyList.length > 0 ? (
                         <FlatList
+                            key={`party-${cols}`}
                             data={filteredPartyList}
+                            numColumns={cols}
                             renderItem={renderPartyItem}
                             keyExtractor={(item) => item.ParCode}
-                            contentContainerStyle={styles.list}
+                            contentContainerStyle={listStyle}
                             ListEmptyComponent={
-                                <View style={styles.emptyContainer}>
-                                    <Text style={styles.emptyText}>No parties found!</Text>
-                                </View>
+                                <EmptyState icon="person-search" title="No parties found!" />
                             }
                         />
                     ) : (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>No parties found!</Text>
-                        </View>
+                        <EmptyState icon="person-search" title="No parties found!" />
                     )}
                 </>
             );
         } else if (activeTab === 'history') {
             return (
                 <>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search History..."
-                        value={historySearchQuery}
-                        onChangeText={setHistorySearchQuery}
-                    />
+                    <View style={[styles.searchWrap, { paddingHorizontal: gutter }]}>
+                        <SearchBox
+                            placeholder="Search History..."
+                            value={historySearchQuery}
+                            onChangeText={setHistorySearchQuery}
+                        />
+                    </View>
                     {historyLoading ? (<>
-                        <ActivityIndicator size="large" color="#2196F3" style={styles.loader} />
+                        <ActivityIndicator size="large" color={T.copper} style={styles.loader} />
                     </>
                     ) : filteredHistoryData.length > 0 ? (
                         <>
-                            <View style={crlimtreq_styles.cardSubHeaderhistory}>
-                                <Text style={crlimtreq_styles.cardSubHeaderTexthistory}>{getParname}</Text>
+                            <View style={[styles.partyBanner, { marginHorizontal: gutter }]}>
+                                <Icon name="person" size={15} color={T.copper} />
+                                <Text style={styles.partyBannerText} numberOfLines={1}>{getParname}</Text>
                             </View>
                             <FlatList
+                                key={`hist-${cols}`}
                                 data={filteredHistoryData}
+                                numColumns={cols}
                                 renderItem={renderHistoryItem}
                                 keyExtractor={(item) => item.uid}
-                                contentContainerStyle={styles.list}
+                                contentContainerStyle={listStyle}
                                 ListEmptyComponent={
-                                    <View style={styles.emptyContainer}>
-                                        <Text style={styles.emptyText}>No history found!</Text>
-                                    </View>
+                                    <EmptyState icon="history" title="No history found!" />
                                 }
                             />
                         </>
                     ) : (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>No history found!</Text>
-                        </View>
+                        <EmptyState icon="history" title="No history found!" />
                     )}
                 </>
             );
         }
-        // else { // allhistory tab
-        //     return (
-        //         <>
-        //             <TextInput
-        //                 style={styles.searchInput}
-        //                 placeholder="Search All History..."
-        //                 value={allhistorySearchQuery}
-        //                 onChangeText={setAllHistorySearchQuery}
-        //             />
-        //             {allhistoryLoading ? (
-        //                 <ActivityIndicator size="large" color="#2196F3" style={styles.loader} />
-        //             ) : filteredAllHistoryData.length > 0 ? (
-        //                 <FlatList
-        //                     data={filteredAllHistoryData}
-        //                     renderItem={renderHistoryItem}
-        //                     keyExtractor={(item) => item.uid}
-        //                     contentContainerStyle={styles.list}
-        //                     ListEmptyComponent={
-        //                         <View style={styles.emptyContainer}>
-        //                             <Text style={styles.emptyText}>No all history found!</Text>
-        //                         </View>
-        //                     }
-        //                 />
-        //             ) : (
-        //                 <View style={styles.emptyContainer}>
-        //                     <Text style={styles.emptyText}>No all history found!</Text>
-        //                 </View>
-        //             )}
-        //         </>
-        //     );
-        // }
+        // allhistory tab was commented out in the original (see git history)
+        return null;
     };
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
             <View style={styles.modalContainer}>
-                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                    <Icon name="close" size={25} color="#fff" />
-                </TouchableOpacity>
-                { }
+                <PanelHeader
+                    onBack={onClose}
+                    backLabel="Close"
+                    crumbs={['Purchase Order']}
+                    title={getParname || 'Party History'}
+                    subtitle="Parties & credit-limit history"
+                />
                 <View style={styles.tabContainer}>
-
-                    <>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'party' && styles.activeTab]}
-                            onPress={() => setActiveTab('party')}
-                        >
-                            <Text style={styles.tabText}>Parties ({partyList.length})</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'history' && styles.activeTab]}
-                            onPress={() => setActiveTab('history')}
-                        >
-                            <Text style={styles.tabText}>History ({historyData.length})</Text>
-                        </TouchableOpacity>
-                    </>
-
-                    {/* {(allhistoryData.length > 0 || showAllHistoryOnly) && (
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'allhistory' && styles.activeTab]}
-                            onPress={() => setActiveTab('allhistory')}
-                        >
-                            <Text style={styles.tabText}>All History ({allhistoryData.length})</Text>
-                        </TouchableOpacity>
-                    )} */}
+                    <View style={[styles.tabInner, { paddingHorizontal: gutter }]}>
+                        <Segment
+                            value={activeTab as any}
+                            onChange={(v) => setActiveTab(v as 'party' | 'history')}
+                            options={[
+                                { value: 'party', label: `Parties (${partyList.length})`, icon: 'groups' },
+                                { value: 'history', label: `History (${historyData.length})`, icon: 'history' },
+                            ]}
+                        />
+                    </View>
                 </View>
 
                 <View style={styles.listContainer}>
@@ -384,228 +340,84 @@ const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-    modalContainer: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        // paddingTop: 50,
-    },
-    closeButton: {
-        position: 'absolute',
-        backgroundColor: '#000',
-        // color: '#fff',
-        borderRadius: 50,
-        padding: 2,
-        top: 20,
-        right: 10,
-        zIndex: 1,
-    },
+    modalContainer: { flex: 1, backgroundColor: T.bg },
     tabContainer: {
-        flexDirection: 'row',
-        marginBottom: 10,
+        backgroundColor: T.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-        backgroundColor: '#fff',
+        borderBottomColor: T.border,
         paddingVertical: 10,
     },
-    tab: {
-        flex: 1,
-        padding: 12,
-        alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
-    },
-    activeTab: {
-        borderBottomColor: '#2196F3',
-    },
-    tabText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    searchInput: {
-        backgroundColor: '#fff',
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        marginHorizontal: 10,
-        marginBottom: 10,
-    },
-    listContainer: {
-        flex: 1,
-        paddingHorizontal: 10,
-    },
-    list: {
-        paddingBottom: 20,
-    },
+    tabInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    searchWrap: { paddingTop: 10, paddingBottom: 4, width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    listContainer: { flex: 1 },
+    list: { paddingTop: 6, paddingBottom: 24, width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    gridCell: { padding: 5 },
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        marginVertical: 8,
-        padding: 15,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        borderWidth: 2,
-        borderColor: 'rgb(229, 216, 255)',
-    },
-    acceptedCard: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        marginVertical: 8,
-        padding: 15,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        borderWidth: 2,
-        borderColor: 'rgb(164, 255, 167)',
-    },
-    rejectedCard: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        marginVertical: 8,
-        padding: 15,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        borderWidth: 2,
-        borderColor: 'rgb(255, 193, 193)',
-    },
-    pendingCard: {
-        borderColor: 'rgba(112, 112, 112, 0.3)',
-    },
-    dateContainer: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        backgroundColor: '#F5F5F5',
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#BDBDBD',
-        borderRadius: 15,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        zIndex: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 10,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
     },
-    dateText: {
-        fontSize: 12,
-        color: '#555',
-    },
-    cardHeaderContainer: {
-        backgroundColor: '#E3F2FD',
-        padding: 10,
-        borderTopLeftRadius: 9,
-        borderTopRightRadius: 9,
-        marginTop: -15,
-        marginHorizontal: -15,
-        marginBottom: 10,
-    },
-    cardHeader: {
-        width: '100%',
-    },
-    cardHeaderText: {
-        color: '#0D47A1',
-        fontSize: 16,
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
-    cardSubHeader: {
-        borderColor: '#B3E5FC',
-        borderWidth: 1,
-        padding: 10,
-        borderRadius: 5,
-        marginBottom: 10,
-        alignSelf: 'flex-start',
-        width: '100%',
-        maxWidth: '100%',
-    },
-    cardSubHeaderText: {
-        color: '#0D47A1',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    cardContent: {
-        marginTop: 10,
-    },
-    twoColumnRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 10,
-    },
-    keyValuePair: {
-        width: '48%',
-    },
-    fullWidthRow: {
-        marginBottom: 10,
-    },
-    key: {
-        fontWeight: '600',
-        fontSize: 13,
-        color: '#555',
-        marginBottom: 3,
-    },
-    value: {
-        fontSize: 14,
-        color: '#333',
-    },
-    stampContainer: {
-        position: 'absolute',
-        top: '80%',
-        left: '80%',
-        marginLeft: -50,
-        marginTop: -30,
-        zIndex: 2,
+    acceptedCard: { borderLeftWidth: 4, borderLeftColor: T.green },
+    rejectedCard: { borderLeftWidth: 4, borderLeftColor: T.red },
+    partyHead: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    partyIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 9,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
     },
+    cardTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: T.ink },
+    histHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2, textTransform: 'uppercase' },
+    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+    dateText: { fontSize: 12, fontWeight: '700', color: T.ink },
     stamp: {
-        width: 100,
-        height: 60,
-        borderRadius: 10,
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        transform: [{ rotate: '0deg' }],
+        gap: 5,
         borderWidth: 1,
-        borderColor: '#999',
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
     },
-    stampAccepted: {
-        backgroundColor: 'rgba(76, 175, 80, 0.7)',
-        borderColor: 'rgba(46, 125, 50, 0.9)',
+    stampDot: { width: 6, height: 6, borderRadius: 3 },
+    stampText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+    box: {
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
     },
-    stampRejected: {
-        backgroundColor: 'rgba(244, 67, 54, 0.7)',
-        borderColor: 'rgba(198, 40, 40, 0.9)',
-    },
-    stampPending: {
-        backgroundColor: 'rgba(173, 173, 173, 0.7)',
-        borderColor: 'rgba(140, 140, 140, 0.9)',
-    },
-    stampText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 12,
-        textAlign: 'center',
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    row: { flexDirection: 'row', gap: 10 },
+    kv: { gap: 2 },
+    key: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
+    value: { fontSize: 13, fontWeight: '600', color: T.ink },
+    partyBanner: {
+        flexDirection: 'row',
         alignItems: 'center',
-        padding: 20,
+        gap: 6,
+        marginTop: 6,
+        paddingHorizontal: 12,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: `${T.copper}12`,
+        borderWidth: 1,
+        borderColor: `${T.copper}40`,
+        alignSelf: 'stretch',
     },
-    emptyText: {
-        fontSize: 16,
-        color: '#666',
-    },
-    loader: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    partyBannerText: { flex: 1, fontSize: 13, fontWeight: '800', color: T.nav },
+    loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default PartyHistoryModal;

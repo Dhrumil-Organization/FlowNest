@@ -1,6 +1,7 @@
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import { SuccessModal } from '@/Shared/SuccessModal';
+// Local NEW ERP re-skin of '@/Shared/SuccessModal' (same props / callbacks)
+import { SuccessModal } from './SuccessModal';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -14,7 +15,10 @@ import {
     readPrptypeCache,
     saveLargeData
 } from '../../common/API/Functions';
-import HeaderBarwithBack from '../../components/HeaderNew';
+// HeaderNew (dark header band) removed: the NEW ERP AppHeader already shows the title;
+// its breadcrumb "Back" is kept in ChequeForm's title bar (same goBack logic below).
+import { T as ERP_T } from '@/src/theme';
+import { View } from 'react-native';
 import ChequeForm from './ChequeForm';
 
 // ========== INTERFACES ==========
@@ -979,15 +983,14 @@ const Collection: React.FC<Props> = ({
     };
 
     // ========== RENDER ==========
+    // Same behaviour as the removed HeaderNew breadcrumb "Back" button
+    const goBack = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/new/(tabs)');
+    };
+
     return (
-        <>
-            <HeaderBarwithBack
-                userName={username}
-                header={'Cheque Entry'}
-                subHeader={'Manage your cheque records'}
-                breadcrumb={"Add Collection"}
-                SearchBar={false}
-            />
+        <View style={{ flex: 1, backgroundColor: ERP_T.bg }}>
             <ChequeForm
                 token={token}
                 username={username}
@@ -1032,6 +1035,8 @@ const Collection: React.FC<Props> = ({
                 onSavePart1={''}
                 onSavePart2={handleSavePart2}
                 getSaveLoading={getSaveLoading}
+                onBack={goBack}
+                mode="add"
                 yearOptions={yearOptions}
             />
             <SuccessModal
@@ -1041,7 +1046,7 @@ const Collection: React.FC<Props> = ({
                 onClose={closeSuccessModal}
                 onView={viewDataAndClose}
             />
-        </>
+        </View>
     );
 };
 

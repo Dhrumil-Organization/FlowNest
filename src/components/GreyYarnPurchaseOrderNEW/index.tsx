@@ -6,34 +6,47 @@ import {
     ActivityIndicator,
     FlatList,
     LayoutAnimation,
-    Modal,
-    TextInput as RNTextInput,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    useWindowDimensions,
     View
 } from 'react-native';
 // import RNFS from 'react-native-fs';
 // import { Buffer } from 'buffer';
 // import Pdf from 'react-native-pdf';
-import { crlimtreq_styles } from '@/common/Style';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import HeaderBar from '../HeaderNew';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import { encode as btoa } from  'base-64';
 // import { urlSafeEncode } from './urlSafeEncode';
 // import { encodeData } from './encodingUtils';
 import { API } from '@/common/API/dynamicAPI';
-import theme from '@/components/theme';
-import { LinearGradient } from 'expo-linear-gradient';
 // import CriteriaForm from './CriteriaForm';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchAllStoredata } from '../../common/API/Functions';
 // import { useNavigation } from '@react-navigation/native';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
 import { useRouter } from 'expo-router';
+// NEW ERP UI (global AppHeader shows the title, so the old HeaderBar band is gone)
+import { S, T } from '@/src/theme';
+import {
+    ActionBtn,
+    AuthBadge,
+    Btn,
+    BusyOverlay,
+    CONTENT_MAX,
+    Chip,
+    EmptyState,
+    Field,
+    IconBtn,
+    Kpi,
+    KpiGrid,
+    Metric,
+    ModalCard,
+    SearchBox,
+    Segment,
+    cellWidth,
+    useSotLayout,
+} from './ui';
 interface CardData {
     [key: string]: string;
     isProcessed: boolean;
@@ -203,302 +216,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [ChartHelp, setChartHelpOpen] = useState(false);
     // 
 
-    // 1 col on phone, 2 on tablet, 3 on wide web
-    const { width } = useWindowDimensions();
-
-    const getColumns = () => {
-        if (width < 600) return 1;      // mobile
-        if (width < 1000) return 2;     // tablet
-        return 3;                       // web / large
-    };
-
-    const numColumns = getColumns();
-
-    // Explicit item width so the last row doesn't stretch weirdly
-    const GRID_PAD = 10;
-    const GRID_GAP = 10;
-    const gridItemWidth =
-        numColumns > 1
-            ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
-            : width;
-
-    const styles = StyleSheet.create({
-
-        card: {
-            backgroundColor: '#fff',
-            marginVertical: 8,
-            borderRadius: 12,
-            padding: 14,
-            elevation: 3,
-            marginHorizontal: 0,   // change from 12 → 0 (spacing handled by grid)
-            marginBottom: 12,
-        },
-
-        acceptedCard: {
-            borderLeftWidth: 4,
-            borderLeftColor: '#4CAF50'
-        },
-
-        rejectedCard: {
-            borderLeftWidth: 4,
-            borderLeftColor: '#F44336'
-        },
-
-        headerRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-        },
-
-        poNo: {
-            fontSize: 16,
-            fontWeight: 'bold',
-            color: '#333'
-        },
-
-        date: {
-            fontSize: 12,
-            color: '#777'
-        },
-
-        statusChip: {
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 20
-        },
-
-        party: {
-            marginTop: 6,
-            fontSize: 14,
-            fontWeight: '600',
-            color: '#444'
-        },
-
-        row: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 6
-        },
-
-        label: {
-            color: '#000',
-            fontSize: 12
-        },
-
-        value: {
-            color: '#222',
-            fontWeight: '500'
-        },
-
-        actionRow: {
-            flexDirection: 'row',
-            justifyContent: 'flex-end',
-            marginTop: 10
-        },
-
-        iconBtn: {
-            marginLeft: 8,
-            padding: 8,
-            borderRadius: 8,
-            justifyContent: 'center',
-            alignItems: 'center'
-        },
-
-        // chatIconBtn: {
-        //     position: 'absolute',
-        //     top: 8,
-        //     right: 8,
-        //     backgroundColor: '#4A90E2',
-        //     padding: 6,
-        //     borderRadius: 20,
-        //     elevation: 3, // android shadow
-        //     shadowColor: '#000',
-        //     shadowOpacity: 0.2,
-        //     shadowOffset: { width: 0, height: 2 },
-        //     shadowRadius: 3,
-        //     zIndex: 10
-        // },
-
-        chatIconBottom: {
-            marginTop: 10,
-            alignSelf: 'flex-end',  // right side niche
-            backgroundColor: '#2196F3',
-            padding: 8,
-            borderRadius: 20
-        },
-
-        expandHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 12,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderColor: '#eee'
-        },
-
-        expandText: {
-            fontSize: 14,
-            fontWeight: '600',
-            color: '#333'
-        },
-
-        itemContainer: {
-            marginTop: 8
-        },
-
-        itemCard: {
-            backgroundColor: '#fff',
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 12,
-            elevation: 3,
-        },
-
-        itemHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 10,
-        },
-
-        itemTitle: {
-            fontSize: 15,
-            color: '#222',
-            flex: 1,
-            paddingRight: 10,
-            fontWeight: 'bold',
-            marginBottom: 6,
-        },
-
-        chartBtn: {
-            backgroundColor: '#2196F3',
-            padding: 8,
-            borderRadius: 8,
-            elevation: 2,
-        },
-
-        itemGrid: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-        },
-
-        itemBox: {
-            width: '48%',
-            marginBottom: 10,
-        },
-
-        itemLabel: {
-            fontSize: 11,
-            color: '#888',
-        },
-
-        itemValue: {
-            fontSize: 13,
-            fontWeight: '500',
-            color: '#333',
-        },
-
-        // itemTitle: {
-        //     fontWeight: 'bold',
-        //     fontSize: 14,
-        //     marginBottom: 6,
-        //     color: '#222'
-        // },
-
-        itemRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 4
-        },
-
-        itemLabel: {
-            fontSize: 12,
-            color: '#888'
-        },
-
-        itemValue: {
-            fontSize: 13,
-            fontWeight: '500',
-            color: '#333'
-        },
-        stampContainer: {
-            position: 'absolute',
-            right: 35,      // right side se distance
-            top: 115,
-            // top: '80%',
-            left: '80%',
-            marginLeft: -50,
-            marginTop: 20,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        stampContainerPOS: {
-            position: 'absolute',
-            right: 20,
-            top: 120,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-
-        stampContainerYOS: {
-            position: 'absolute',
-            right: 20,
-            top: 120,
-            zIndex: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-
-        stamp: {
-            width: 100,
-            height: 60,
-            borderRadius: 10,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            transform: [{ rotate: '0deg' }],
-        },
-
-        stampAccepted: {
-            backgroundColor: 'rgba(76, 175, 80, 0.7)',
-            borderColor: 'rgba(46, 125, 50, 0.9)',
-        },
-
-        stampRejected: {
-            backgroundColor: 'rgba(244, 67, 54, 0.7)',
-            borderColor: 'rgba(198, 40, 40, 0.9)',
-        },
-
-        stampText: {
-            color: '#fff',
-            fontWeight: 'bold',
-            fontSize: 12,
-            textAlign: 'center',
-        },
-        prpCodeContainer: {
-            width: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-            backgroundColor: '#F5F7FA',
-            paddingVertical: 8,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: '#E0E0E0',
-        },
-
-        prpCodeText: {
-            fontSize: 16,
-            fontWeight: '700',
-            color: '#000',
-            textAlign: 'center',
-            letterSpacing: 1,
-        },
-    });
+    // NEW ERP UI: 1 col on phone, 2 on tablet, 3 on desktop (resize-aware)
+    const { isPhone, cols, gutter } = useSotLayout();
 
 
 
@@ -1344,181 +1063,139 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }
     };
 
+    // ---------------------------------------------------------------------
+    // NEW ERP UI render helpers (presentation only — every handler below is
+    // the original one, called with the original arguments).
+    // ---------------------------------------------------------------------
+    const isRayonsApi = API === "https://apiy.tms-webapp.com";
+    const dash = (v: any) => (v === undefined || v === null || String(v).trim() === '' ? '-' : String(v));
+    const money = (v: any) => (v === undefined || v === null || String(v).trim() === '' ? '-' : `₹ ${v}`);
+
+    const renderDetailRow = (label: string, value: any, color?: string) => (
+        <View style={styles.detailRow} key={label}>
+            <Text style={styles.detailLabel} numberOfLines={1}>{label}</Text>
+            <Text style={[styles.detailValue, color ? { color } : null]} numberOfLines={2}>{value}</Text>
+        </View>
+    );
+
+    const renderPoHead = (item: any, isApproved: boolean, isRejected: boolean) => (
+        <View style={styles.cardHead}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={styles.prpChip}>
+                    <Icon name="apartment" size={11} color={T.copper} />
+                    <Text style={styles.prpCodeText} numberOfLines={1}>{item.PrpCode}</Text>
+                </View>
+                <Text style={styles.poNo} numberOfLines={1}>{item.PONo}</Text>
+                <View style={styles.dateRow}>
+                    <Icon name="event" size={12} color={T.muted} />
+                    <Text style={styles.date}>{item.PODate}</Text>
+                </View>
+            </View>
+            {(isApproved || isRejected) && <AuthBadge kind={isApproved ? 'approved' : 'rejected'} />}
+        </View>
+    );
+
+    const renderPartyLine = (item: any) => (
+        <View style={styles.partyRow}>
+            <View style={styles.partyIcon}>
+                <Icon name="storefront" size={15} color={T.nav} />
+            </View>
+            <Text style={styles.party} numberOfLines={2}>{item.ParName}</Text>
+        </View>
+    );
+
+    // Items (d1) accordion — same toggle (toggleExpandHistory) and same
+    // ChartScreen route push as before, for every tab.
+    const renderItemsBlock = (item: any, logNav: boolean) => (
+        <>
+            <TouchableOpacity
+                style={styles.expandHeader}
+                onPress={() => toggleExpandHistory(item.UId)}
+                accessibilityRole="button"
+                accessibilityLabel={`Items (${item.d1?.length || 0})`}
+            >
+                <Icon name="inventory-2" size={16} color={T.copper} />
+                <Text style={styles.expandText}>
+                    Items ({item.d1?.length || 0})
+                </Text>
+                <Icon
+                    name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                    size={22}
+                    color={T.nav}
+                />
+            </TouchableOpacity>
+
+            {expandedHistoryCards[item.UId] && (
+                <View style={styles.itemContainer}>
+                    {item.d1?.map((d1Item, index) => (
+                        <View key={index} style={styles.itemCard}>
+                            <View style={styles.itemHeader}>
+                                <Text style={styles.itemTitle} numberOfLines={2}>
+                                    {d1Item.ItmName}
+                                </Text>
+                                <IconBtn
+                                    icon="bar-chart"
+                                    label={`Open chart for ${d1Item.ItmName}`}
+                                    tone="soft"
+                                    color={T.copper}
+                                    onPress={() => {
+                                        if (logNav) console.log("NAV TEST", navigation);
+
+                                        router.push({
+                                            pathname: '/ChartScreen',
+                                            params: {
+                                                item: JSON.stringify(item),
+                                                d1Item: JSON.stringify(d1Item),
+                                                token: token
+
+                                            }
+                                        });
+                                    }}
+                                />
+                            </View>
+                            <View style={styles.itemGrid}>
+                                <Metric label="Grade" value={dash(d1Item.GrdName)} style={styles.itemBox} />
+                                <Metric label="Shade" value={dash(d1Item.ShdName)} style={styles.itemBox} />
+                                <Metric label="Qty" value={dash(d1Item.Qty)} style={styles.itemBox} />
+                                <Metric label="Rate" value={dash(d1Item.UnitRate)} style={styles.itemBox} />
+                                <Metric label="Amount" value={dash(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </>
+    );
+
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
 
         const isApproved = item.IsAuth === '1';
         const isRejected = item.IsAuth === '2';
 
         return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[cellWidth(cols), styles.gridCell]}>
                 <View style={[
-                    crlimtreq_styles.card,
+                    styles.card,
                     isApproved ? styles.acceptedCard :
                         isRejected ? styles.rejectedCard : null
                 ]}>
-                    <View style={styles.headerRow}>
-                        <View style={styles.prpCodeContainer}>
-                            <Text style={styles.prpCodeText}>
-                                {item.PrpCode}
-                            </Text>
-                        </View>
+                    {renderPoHead(item, isApproved, isRejected)}
+                    {renderPartyLine(item)}
+
+                    <View style={styles.detailBox}>
+                        {renderDetailRow('Broker', item.BAccName || '-')}
+                        {renderDetailRow('Net Amount', money(item.NetAmt), T.pd)}
+                        {isRayonsApi && renderDetailRow('Store', item.StoreName || '-')}
+                        {renderDetailRow('Auth By', item.AuthorisedBy || '-')}
                     </View>
-
-                    {/* HEADER */}
-                    <View style={styles.headerRow}>
-                        <View>
-                            <Text style={styles.poNo}>{item.PONo}</Text>
-                            <Text style={styles.date}>{item.PODate}</Text>
-                        </View>
-
-                        {(isApproved || isRejected) && (
-                            <View style={[
-                                styles.statusChip,
-                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                            ]}>
-                                <Text style={{
-                                    color: isApproved ? '#2E7D32' : '#C62828',
-                                    fontWeight: '600'
-                                }}>
-                                    {isApproved ? 'Approved' : 'Rejected'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* PARTY */}
-                    <Text style={styles.party}>{item.ParName}</Text>
-
-                    {/* DETAILS */}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Broker</Text>
-                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                    </View>
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Net Amount</Text>
-                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                    </View>
-
-                    {API === "https://apiy.tms-webapp.com" && (
-                        < View style={styles.row}>
-                            <Text style={styles.label}>Store</Text>
-                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
-                        </View>
-                    )}
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Auth By</Text>
-                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
-                    </View>
-
-                    {/* ACTION ROW */}
-                    {(isApproved || isRejected) && (
-                        <View style={styles.actionRow}>
-
-                            <View style={[
-                                styles.iconBtn,
-                                { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
-                            ]}>
-                                <Icon
-                                    name={isApproved ? 'check' : 'close'}
-                                    size={20}
-                                    color="#fff"
-                                />
-                            </View>
-                        </View>
-                    )}
-
-                    {/* 🔽 EXPAND BUTTON */}
-                    <TouchableOpacity
-                        style={styles.expandHeader}
-                        onPress={() => toggleExpandHistory(item.UId)}
-                    >
-                        <Text style={styles.expandText}>
-                            Items ({item.d1?.length || 0})
-                        </Text>
-
-                        <Icon
-                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
-                        />
-                    </TouchableOpacity>
-
-                    {/* 🔽 EXPANDED ITEMS */}
-                    {expandedHistoryCards[item.UId] && (
-                        <View style={styles.itemContainer}>
-                            {item.d1?.map((d1Item, index) => (
-
-
-                                <View key={index} style={styles.itemCard}>
-
-                                    {/* TOP ROW (TITLE + ICON) */}
-                                    <View style={styles.itemHeader}>
-                                        <Text style={styles.itemTitle}>
-                                            {d1Item.ItmName}
-                                        </Text>
-
-                                        <TouchableOpacity
-                                            style={styles.chartBtn}
-                                            onPress={() => {
-                                                console.log("NAV TEST", navigation);
-
-                                                router.push({
-                                                    pathname: '/ChartScreen',
-                                                    params: {
-                                                        item: JSON.stringify(item),
-                                                        d1Item: JSON.stringify(d1Item),
-                                                        token: token
-
-                                                    }
-                                                });
-                                            }}
-                                        >
-                                            <Icon name="bar-chart" size={18} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* DETAILS GRID */}
-                                    < View style={styles.itemGrid} >
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Grade</Text>
-                                            <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Shade</Text>
-                                            <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Qty</Text>
-                                            <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Rate</Text>
-                                            <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                        </View>
-
-                                        <View style={styles.itemBox}>
-                                            <Text style={styles.itemLabel}>Amount</Text>
-                                            <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                        </View>
-
-                                    </View>
-
-                                </View>
-                            ))
-                            }
-                        </View >
-                    )}
 
                     {String(item.isauthedit) === '1' && (
-                        <View style={crlimtreq_styles.cardActions}>
-
-                            <TouchableOpacity
+                        <View style={styles.actionRow}>
+                            <ActionBtn
+                                label="Mark Pending"
+                                icon="check-circle"
+                                tone="red"
+                                outline
                                 onPress={() =>
                                     handleIconPress(
                                         {
@@ -1530,21 +1207,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     )
                                 }
                                 disabled={!isConnected || item.isProcessed}
-                            >
-                                <Icon
-                                    name="check-circle"
-                                    size={30}
-                                    color={
-                                        !isConnected || item.isProcessed
-                                            ? "#ccc"
-                                            : "#F44336"
-                                    }
-                                />
-                            </TouchableOpacity>
+                            />
                         </View>
                     )}
 
-                </View >
+                    {renderItemsBlock(item, true)}
+                </View>
             </View>
         );
     };
@@ -1553,108 +1221,64 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         const isApproved = item.IsAuth === '1';
         const isRejected = item.IsAuth === '2';
+        const actionsOff = !isConnected || item.isProcessed;
 
         return (
-            <View style={crlimtreq_styles.gridCardWrapper}>
+            <View style={[cellWidth(cols), styles.gridCell]}>
                 <View style={[
-                    crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-                    item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+                    styles.card, !isConnected && styles.disabledCard,
+                    item.actionType === 'accept' ? styles.acceptedCard : item.actionType === 'reject' ? styles.rejectedCard : null]}>
 
+                    {/* Display fix: a verify "pending" action (IsAuth 0) is shown as PENDING (amber), not REJECTED. */}
                     {item.isProcessed && (
-                        <View style={styles.stampContainerYOS}>
-                            <View
-                                style={[
-                                    styles.stamp,
-                                    item.actionType === 'accept'
-                                        ? styles.stampAccepted
-                                        : styles.stampRejected,
-                                ]}
-                            >
-                                <Text style={styles.stampText}>
-                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                                </Text>
-                            </View>
-                        </View>
-                    )}
-                    <View style={styles.headerRow}>
-                        <View style={styles.prpCodeContainer}>
-                            <Text style={styles.prpCodeText}>
-                                {item.PrpCode}
+                        <View style={[styles.stamp, item.actionType === 'accept' ? styles.stampAccepted : item.actionType === 'pending' ? styles.stampPending : styles.stampRejected]}>
+                            <Icon
+                                name={item.actionType === 'accept' ? 'verified' : item.actionType === 'pending' ? 'schedule' : 'block'}
+                                size={14}
+                                color={item.actionType === 'accept' ? T.green : item.actionType === 'pending' ? T.amber : T.red}
+                            />
+                            <Text style={[styles.stampText, { color: item.actionType === 'accept' ? T.green : item.actionType === 'pending' ? T.amber : T.red }]}>
+                                {item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'pending' ? 'PENDING' : 'REJECTED'}
                             </Text>
                         </View>
-                    </View>
-                    {/* HEADER */}
-                    <View style={styles.headerRow}>
-                        <View>
-                            <Text style={styles.poNo}>{item.PONo}</Text>
-                            <Text style={styles.date}>{item.PODate}</Text>
-                        </View>
-
-                        {(isApproved || isRejected) && (
-                            <View style={[
-                                styles.statusChip,
-                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                            ]}>
-                                <Text style={{
-                                    color: isApproved ? '#2E7D32' : '#C62828',
-                                    fontWeight: '600'
-                                }}>
-                                    {isApproved ? 'Approved' : 'Rejected'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* PARTY */}
-                    <Text style={styles.party}>{item.ParName}</Text>
-
-                    {/* DETAILS */}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Broker</Text>
-                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                    </View>
-
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Net Amount</Text>
-                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                    </View>
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Sales Exec.</Text>
-                        <Text style={styles.value}>{item.sexecname || '-'}</Text>
-                    </View>
-                    {API === "https://apiy.tms-webapp.com" && (
-                        < View style={styles.row}>
-                            <Text style={styles.label}>Store</Text>
-                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
-                        </View>
                     )}
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Auth By</Text>
-                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+
+                    {renderPoHead(item, isApproved, isRejected)}
+                    {renderPartyLine(item)}
+
+                    <View style={styles.detailBox}>
+                        {renderDetailRow('Broker', item.BAccName || '-')}
+                        {renderDetailRow('Net Amount', money(item.NetAmt), T.pd)}
+                        {renderDetailRow('Sales Exec.', item.sexecname || '-')}
+                        {isRayonsApi && renderDetailRow('Store', item.StoreName || '-')}
+                        {renderDetailRow('Auth By', item.AuthorisedBy || '-')}
                     </View>
 
-                    <View style={styles.row}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={styles.label}>Auth Remark:</Text>
-                            <RNTextInput
-                                style={crlimtreq_styles.editableValueBlack}
-                                value={editableValuesYPO[item.UId]?.ARemark || ''}
-                                onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                            />
-                        </View>
-                    </View>
+                    <Field
+                        label="Auth Remark"
+                        placeholder="Add authorisation remark…"
+                        value={editableValuesYPO[item.UId]?.ARemark || ''}
+                        onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                    />
 
-                    {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
                     {
                         type === 'verify' && (
                             <View style={styles.actionRow}>
-                                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                                    <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                                    <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                                </TouchableOpacity>
+                                <ActionBtn
+                                    label="Pending"
+                                    icon="check-circle"
+                                    tone="green"
+                                    onPress={() => handleIconPress(item, 'pending')}
+                                    disabled={actionsOff}
+                                />
+                                <ActionBtn
+                                    label="Reject"
+                                    icon="cancel"
+                                    tone="red"
+                                    outline
+                                    onPress={() => handleIconPress(item, 'verifyreject')}
+                                    disabled={actionsOff}
+                                />
                             </View>
                         )
                     }
@@ -1662,177 +1286,46 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     {
                         type === 'request' && (
                             <View style={styles.actionRow}>
-
-                                {/* ✅ ACCEPT */}
-                                <TouchableOpacity
+                                <ActionBtn
+                                    label="Approve"
+                                    icon="check-circle"
+                                    tone="green"
                                     onPress={() => handleIconPress(item, 'accept')}
                                     // disabled={!isConnected || item.IsAuth !== '0'}
-                                    disabled={!isConnected || item.isProcessed}
-                                >
-                                    <Icon
-                                        name="check-circle"
-                                        size={35}
-                                        color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
-                                    />
-                                </TouchableOpacity>
-
-                                {/* ❌ REJECT */}
-                                <TouchableOpacity
+                                    disabled={actionsOff}
+                                />
+                                <ActionBtn
+                                    label="Reject"
+                                    icon="cancel"
+                                    tone="red"
+                                    outline
                                     onPress={() => handleIconPress(item, 'reject')}
                                     // disabled={!isConnected || item.IsAuth !== '0'}
-                                    disabled={!isConnected || item.isProcessed}
-                                >
-                                    <Icon
-                                        name="cancel"
-                                        size={35}
-                                        color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
-                                    />
-                                </TouchableOpacity>
-
-                                {/* 📄 FILE */}
-                                <TouchableOpacity
+                                    disabled={actionsOff}
+                                />
+                                <ActionBtn
+                                    label="PDF"
+                                    icon="file-present"
+                                    tone="blue"
+                                    outline
                                     onPress={() => {
                                         if (isConnected && item.IsAuth === '0') {
                                             handleCallURL(item);
                                         }
                                     }}
+                                    loading={getLocationLoading === item.UId}
                                     disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
-                                >
-                                    {
-                                        getLocationLoading === item.UId ? (
-                                            <ActivityIndicator size={35} color="#2196F3" />
-                                        ) : (
-                                            <Icon
-                                                name="file-present"
-                                                size={35}
-                                                color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
-                                            />
-                                        )
-                                    }
-                                </TouchableOpacity>
-
+                                    style={styles.pdfBtn}
+                                />
                             </View>
                         )
                     }
 
-                    {/* 🔽 EXPAND */}
-                    <TouchableOpacity
-                        style={styles.expandHeader}
-                        onPress={() => toggleExpandHistory(item.UId)}
-                    >
-                        <Text style={styles.expandText}>
-                            Items ({item.d1?.length || 0})
-                        </Text>
-
-                        <Icon
-                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
-                        />
-                    </TouchableOpacity>
-
-                    {/* 🔽 ITEMS */}
-                    {
-                        expandedHistoryCards[item.UId] && (
-                            <View style={styles.itemContainer}>
-                                {item.d1?.map((d1Item, index) => (
-
-                                    <View key={index} style={styles.itemCard}>
-
-                                        <View style={styles.itemHeader}>
-                                            <Text style={styles.itemTitle}>
-                                                {d1Item.ItmName}
-                                            </Text>
-
-                                            {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
-                                            <TouchableOpacity
-                                                style={styles.chartBtn}
-                                                // onPress={() => navigation.navigate('ChartScreen', {
-                                                //     item,
-                                                //     d1Item,
-                                                //     token
-                                                // })}
-                                                onPress={() =>
-                                                    // console.log('Chart clicked', d1Item);
-                                                    // handleChartClick(item, d1Item);
-                                                    router.push({
-                                                        pathname: '/ChartScreen',
-                                                        params: {
-                                                            item: JSON.stringify(item),
-                                                            d1Item: JSON.stringify(d1Item),
-                                                            token: token
-
-                                                        }
-                                                    })
-                                                }
-                                            >
-                                                <Icon name="bar-chart" size={18} color="#fff" />
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        <View style={styles.itemGrid}>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Grade</Text>
-                                                <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Shade</Text>
-                                                <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Qty</Text>
-                                                <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Rate</Text>
-                                                <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                            </View>
-
-                                            <View style={styles.itemBox}>
-                                                <Text style={styles.itemLabel}>Amount</Text>
-                                                <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                            </View>
-
-                                        </View>
-
-                                    </View>
-                                ))}
-                            </View>
-                        )
-                    }
-                </View >
+                    {renderItemsBlock(item, false)}
+                </View>
             </View>
         );
     };
-
-    const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
-        <View style={crlimtreq_styles.tabContainer1}>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'requests' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('requests')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Request</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'history' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('history')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[crlimtreq_styles.tab1, activeTabYPO === 'verify' && crlimtreq_styles.activeTab1]}
-                onPress={() => setActiveTabYPO('verify')}
-            >
-                <Text style={crlimtreq_styles.tabText1}>Verify</Text>
-            </TouchableOpacity>
-        </View>
-    );
-
-
 
     const toggleExpandHistory = (uid: string, arr) => {
         console.log("--------arrr-----------", arr)
@@ -1861,170 +1354,154 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }));
     };
 
-    return (
-        <>
-            {activeTab1YPO === 'requests' ? (
-                <>
-                    <HeaderBar
-                        userName={username}
-                        onSearch={setSearchQueryYPO}
-                        placeholder="Search purchase order..."
-                    />
-                </>
+    // ---------------- NEW ERP UI: derived display values ----------------
+    const activeSearch =
+        activeTab1YPO === 'requests' ? searchQueryYPO : activeTab1YPO === 'history' ? searchhistoryQueryYPO : searchverifyQueryYPO;
+    const onActiveSearch =
+        activeTab1YPO === 'requests' ? setSearchQueryYPO : activeTab1YPO === 'history' ? setSearchhistoryQueryYPO : setSearchverifyQueryYPO;
+    const searchPlaceholder =
+        activeTab1YPO === 'requests' ? 'Search purchase order...' : activeTab1YPO === 'history' ? 'Search purchase history...' : 'Search purchase verify...';
+    const shownRows: any[] =
+        activeTab1YPO === 'requests' ? filteredDataSPO : activeTab1YPO === 'history' ? filteredhistoryDataSPO : filteredverifyDataSPO;
+    const num = (v: any) => {
+        const x = parseFloat(String(v ?? '').replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(x) ? x : 0;
+    };
+    const kpiNet = shownRows.reduce((s, r) => s + num(r?.NetAmt), 0);
+    const kpiItems = shownRows.reduce((s, r) => s + (Array.isArray(r?.d1) ? r.d1.length : 0), 0);
+    const kpiApproved = shownRows.filter((r) => r?.IsAuth === '1').length;
+    // Rejected = real rejects only (a verify "pending" action is not a reject).
+    const kpiRejected = shownRows.filter((r) => r?.IsAuth === '2' || r?.actionType === 'reject' || r?.actionType === 'verifyreject').length;
+    const kpiProcessed = shownRows.filter((r) => r?.isProcessed).length;
+    const noStore = typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '';
+    const tabLabel = activeTab1YPO === 'requests' ? 'Requests' : activeTab1YPO === 'history' ? 'History' : 'Verify';
+    const confirmTitle = selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : '';
+    const confirmTone = selectedActionYPO === 'accept' || selectedActionYPO === 'pending' ? 'green' : 'red';
+    const listContentStyle = [styles.list, { paddingHorizontal: gutter - 5 }];
 
-            ) : activeTab1YPO === 'history' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchhistoryQueryYPO}
-                    placeholder="Search purchase history..."
-                />
-            ) : activeTab1YPO === 'verify' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchverifyQueryYPO}
-                    placeholder="Search purchase verify..."
-                />
-            ) : null}
-            <View style={[crlimtreq_styles.container, { backgroundColor: '#F5F5F5', marginBottom: -50 }]}>
-                {isLoadingYPO && <FullScreenLoader message={"Loading..."} />}
-                <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
+    const renderListHeader = () => (
+        <View style={styles.listHeader}>
+            <KpiGrid isPhone={isPhone}>
+                <Kpi label="Orders" value={String(shownRows.length)} icon="receipt-long" accent={T.nav} sub={tabLabel} />
+                <Kpi label="Net Amount" value={`₹ ${kpiNet.toLocaleString('en-IN')}`} icon="currency-rupee" accent={T.copper} valueColor={T.pd} />
+                <Kpi label="Items" value={String(kpiItems)} icon="inventory-2" accent={T.blue} sub="Yarn lines" />
+                {activeTab1YPO === 'history' ? (
+                    <Kpi label="Approved" value={String(kpiApproved)} icon="verified" accent={T.green} sub={`${kpiRejected} rejected`} />
+                ) : (
+                    <Kpi label="Processed" value={String(kpiProcessed)} icon="task-alt" accent={T.green} sub="This session" />
+                )}
+            </KpiGrid>
+        </View>
+    );
+
+    const renderEmpty = (title: string) => (
+        <EmptyState
+            icon="receipt-long"
+            title={title}
+            text={activeSearch ? 'Nothing matches your search. Try another PO no., party or item.' : 'Purchase orders will appear here once available.'}
+            action={noStore ? <Chip label="No store Selected" icon="store" tone="red" /> : null}
+        />
+    );
+
+    return (
+        <View style={styles.root}>
+            {/* ───────────── Toolbar: search + tabs (replaces HeaderBar) ───────────── */}
+            <View style={styles.toolbar}>
+                <View style={[styles.toolbarInner, { paddingHorizontal: gutter }, !isPhone && styles.toolbarWide]}>
+                    <SearchBox
+                        value={activeSearch}
+                        onChangeText={onActiveSearch}
+                        placeholder={searchPlaceholder}
+                        style={isPhone ? null : { flex: 1 }}
+                    />
+                    <View style={isPhone ? null : styles.segWide}>
+                        <Segment
+                            value={activeTab1YPO}
+                            onChange={setActiveTab1YPO}
+                            options={[
+                                { value: 'requests', label: 'Request', icon: 'pending-actions' },
+                                { value: 'history', label: 'History', icon: 'history' },
+                                { value: 'verify', label: 'Verify', icon: 'fact-check' },
+                            ]}
+                        />
+                    </View>
+                </View>
+            </View>
+
+            <View style={styles.container}>
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
-                        key={`req-${numColumns}`}
+                        key={`req-${cols}`}
                         ref={flatListRefYPO}
                         data={filteredDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}   // 👈 kills black space
-                        // renderItem={renderCard}
+                        numColumns={cols}
+                        style={styles.flatList}
                         renderItem={({ item }) => renderCommonCard({ item, type: 'request' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        ListHeaderComponent={renderListHeader()}
+                        keyboardShouldPersistTaps="handled"
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
                         ListEmptyComponent={
-                            !isLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
+                            !isLoadingYPO ? renderEmpty('No request data found!') : null
                         }
                     />
                 ) : activeTab1YPO === 'history' ? (
                     <FlatList
-                        key={`hist-${numColumns}`}
+                        key={`hist-${cols}`}
                         ref={flatHistoryListRefYPO}
                         data={filteredhistoryDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        numColumns={cols}
+                        style={styles.flatList}
                         renderItem={({ item }) => (
                             <>
                                 {renderAllCardHistory({ item })}
                             </>
                         )}
-                        // renderItem={({ item }) => renderCommonCard({ item, type: 'history' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        ListHeaderComponent={renderListHeader()}
+                        keyboardShouldPersistTaps="handled"
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
                         ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
+                            !allhistoryLoadingYPO ? renderEmpty('No history data found!') : null
                         }
                     />
                 ) : activeTab1YPO === 'verify' ? (
                     <FlatList
-                        key={`ver-${numColumns}`}
+                        key={`ver-${cols}`}
                         ref={flatVerifyListRefYPO}
                         data={filteredverifyDataSPO}
-                        numColumns={numColumns}
-                        // columnWrapperStyle={
-                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        // }
-                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        numColumns={cols}
+                        style={styles.flatList}
                         renderItem={({ item }) => renderCommonCard({ item, type: 'verify' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={listContentStyle}
+                        ListHeaderComponent={renderListHeader()}
+                        keyboardShouldPersistTaps="handled"
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
                         ListEmptyComponent={
-                            !allhistoryLoadingYPO ? (
-                                <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
-                                    {
-                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
-                                            (
-                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
-                                            )
-                                            :
-                                            null
-                                    }
-                                </View>
-                            ) : null
+                            !allhistoryLoadingYPO ? renderEmpty('No verify data found!') : null
                         }
                     />
                 ) : null}
-                {activeTab1YPO === 'requests' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}
-                    </>
 
-                ) : activeTab1YPO === 'history' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollHistoryToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : activeTab1YPO === 'verify' ? (
-                    <>
-                        {showTopButtonYPO && (
-                            <TouchableOpacity
-                                style={crlimtreq_styles.topButton}
-                                onPress={scrollVerifyToTop}
-                            >
-                                <Icon name="arrow-upward" size={24} color="black" />
-                            </TouchableOpacity>
-                        )}</>
-                ) : null}
-
+                {showTopButtonYPO && (
+                    <TouchableOpacity
+                        style={styles.topButton}
+                        onPress={activeTab1YPO === 'requests' ? scrollToTop : activeTab1YPO === 'history' ? scrollHistoryToTop : scrollVerifyToTop}
+                        accessibilityRole="button"
+                        accessibilityLabel="Scroll to top"
+                    >
+                        <Icon name="arrow-upward" size={22} color="#fff" />
+                    </TouchableOpacity>
+                )}
 
                 <PartyHistoryModal
                     visible={showPartyHistoryModalYPO}
@@ -2044,171 +1521,114 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     // setParnameYPO={setParnameYPO}
                     getParnameYPO={getParnameYPO}
                 />
+
+                {/* ───────────── Confirm / result dialog (same two-state logic) ───────────── */}
                 {getSuccessYPO === true ? (
-                    <Modal
+                    <ModalCard
                         visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
                         onRequestClose={() => setShowOverlayYPO(false)}
+                        eyebrow="PURCHASE ORDER"
+                        title={confirmTitle}
+                        maxWidth={440}
                     >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Vouchar No.: {selectedItemYPO?.vouno}
-                                </Text>
-                                {responsemessageYPO === 'Loading...' ? (
-                                    <>
-                                        <Text style={crlimtreq_styles.loadingText}>
-                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} /> {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text style={crlimtreq_styles.responseText}>
-                                            {responsemessageYPO}
-                                        </Text>
-                                    </>
-                                )}
-                            </View>
-                        </View>
-                    </Modal>
-                ) : (
-                    <Modal
-                        visible={showOverlayYPO}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowOverlayYPO(false)}
-                    >
-                        <View style={crlimtreq_styles.overlayContainer}>
-                            <View style={crlimtreq_styles.overlay}>
-                                <Text style={crlimtreq_styles.overlayTitle}>
-                                    {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
-                                </Text>
-                                <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Party Name: {selectedItemYPO?.ParName}
-                                </Text>
-                                <View style={crlimtreq_styles.overlayButtons}>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#4CAF50' }]}
-                                        onPress={handleConfirmAction}
-                                    >
-                                        <Icon name="check" size={20} color="white" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[crlimtreq_styles.overlayButton, { backgroundColor: '#F44336' }]}
-                                        onPress={() => setShowOverlayYPO(false)}
-                                    >
-                                        <Icon name="close" size={20} color="white" />
-                                    </TouchableOpacity>
+                        <View style={styles.dialogBody}>
+                            <Text style={styles.dialogMeta}>
+                                Vouchar No.: {selectedItemYPO?.vouno}
+                            </Text>
+                            {responsemessageYPO === 'Loading...' ? (
+                                <View style={styles.dialogStatus}>
+                                    <ActivityIndicator size="small" color={T.copper} />
+                                    <Text style={styles.dialogStatusText}>{responsemessageYPO}</Text>
                                 </View>
-                            </View>
+                            ) : (
+                                <View style={[styles.dialogStatus, styles.dialogResult]}>
+                                    <Icon name="info-outline" size={18} color={T.nav} />
+                                    <Text style={styles.dialogStatusText}>
+                                        {responsemessageYPO}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
-                    </Modal>
+                    </ModalCard>
+                ) : (
+                    <ModalCard
+                        visible={showOverlayYPO}
+                        onRequestClose={() => setShowOverlayYPO(false)}
+                        eyebrow="PURCHASE ORDER"
+                        title={confirmTitle}
+                        maxWidth={440}
+                        footer={
+                            <>
+                                <Btn label="Cancel" icon="close" kind="ghost" onPress={() => setShowOverlayYPO(false)} style={{ flex: 1 }} />
+                                <ActionBtn label="Confirm" icon="check" tone={confirmTone} onPress={handleConfirmAction} style={styles.dialogConfirm} />
+                            </>
+                        }
+                    >
+                        <View style={styles.dialogBody}>
+                            <Text style={styles.dialogMeta}>
+                                Party Name: <Text style={styles.dialogStrong}>{selectedItemYPO?.ParName}</Text>
+                            </Text>
+                            {!!selectedItemYPO?.PONo && (
+                                <Text style={styles.dialogSub}>
+                                    PO {selectedItemYPO?.PONo}{selectedItemYPO?.NetAmt ? `  ·  ₹ ${selectedItemYPO?.NetAmt}` : ''}
+                                </Text>
+                            )}
+                        </View>
+                    </ModalCard>
                 )}
-                <Modal
+
+                {/* ───────────── Item details (d1) carousel ───────────── */}
+                <ModalCard
                     visible={showCarouselModal}
-                    transparent={true}
                     animationType="slide"
                     onRequestClose={() => {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         setShowCarouselModal(false);
                     }}
+                    onClose={() => {
+                        setShowCarouselModal(false);
+                        setSelectedD1Data([]); // Clear the data when closing
+                    }}
+                    eyebrow="ITEM DETAILS"
+                    title={getD1Party || 'Items'}
+                    maxWidth={720}
                 >
-                    <View style={crlimtreq_styles.carouselModalOverlay}>
-                        <View style={crlimtreq_styles.carouselModalContainer}>
-                            {/* Close Button */}
-                            <TouchableOpacity
-                                style={crlimtreq_styles.modalCloseButton}
-                                onPress={() => {
-                                    setShowCarouselModal(false);
-                                    setSelectedD1Data([]); // Clear the data when closing
-                                }}
-                            >
-                                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-                            </TouchableOpacity>
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        snapToInterval={300} // Increased for better spacing
+                        snapToAlignment="center"
+                        decelerationRate="fast"
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.carouselRow}
+                    >
+                        {selectedD1Data.map((d1Item, index) => (
+                            <View key={`${d1Item.SrNo || index}`} style={styles.carouselCard}>
+                                <Text style={styles.carouselParty} numberOfLines={1}>{getD1Party}</Text>
+                                <Text style={styles.carouselTitle} numberOfLines={2}>{d1Item.ItmName}</Text>
+                                <View style={styles.detailBox}>
+                                    {renderDetailRow('Item Name', dash(d1Item.ItmName))}
+                                    {renderDetailRow('Grade', dash(d1Item.GrdName))}
+                                    {renderDetailRow('Shade', dash(d1Item.ShdName))}
+                                    {renderDetailRow('Qty', dash(d1Item.Qty))}
+                                    {renderDetailRow('Rate', dash(d1Item.UnitRate))}
+                                    {renderDetailRow('Amount', dash(d1Item.Amount), T.pd)}
+                                    {renderDetailRow('Disc. %', dash(d1Item.DisPer))}
+                                    {activeTab1YPO === 'requests' && (
+                                        <>
+                                            {renderDetailRow('Current Stock', dash(d1Item.CurrentStock))}
+                                            {renderDetailRow('Last Party', dash(d1Item.LastParty))}
+                                            {renderDetailRow('Last Rate', dash(d1Item.LastRate))}
+                                            {renderDetailRow('Last Shade', dash(d1Item.LastShade))}
+                                        </>
+                                    )}
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+                </ModalCard>
 
-                            {/* Carousel Cards */}
-
-                            <ScrollView
-                                horizontal
-                                pagingEnabled
-                                snapToInterval={300} // Increased for better spacing
-                                snapToAlignment="center"
-                                decelerationRate="fast"
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={crlimtreq_styles.carouselCardContainer}
-                            >
-                                {selectedD1Data.map((d1Item, index) => (
-                                    <View
-                                        key={`${d1Item.SrNo || index}`}
-                                        style={[
-                                            crlimtreq_styles.carouselCard,
-                                            { marginHorizontal: 10 } // Add spacing between cards
-                                        ]}
-                                    >
-                                        <LinearGradient
-                                            colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                                            style={crlimtreq_styles.headerContainer}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}>
-
-                                            <View style={crlimtreq_styles.carouselCardContent}>
-                                                <Text style={crlimtreq_styles.carouselCardTitle}>
-                                                    {/* {d1Item.ItmName} */}
-                                                    {getD1Party}
-                                                </Text>
-                                                <View style={{ marginVertical: 10 }}>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Item Name: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ItmName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Grade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.GrdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ShdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Qty: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Qty}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.UnitRate}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Amount: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Amount}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Disc. %: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.DisPer}</Text>
-                                                    </Text>
-                                                    {activeTab1YPO === 'requests' && (
-                                                        <>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Current Stock: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.CurrentStock}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Party: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastParty}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastRate}</Text>
-                                                            </Text>
-                                                            <Text style={crlimtreq_styles.carouselCardKey}>
-                                                                Last Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.LastShade}</Text>
-                                                            </Text>
-                                                        </>
-                                                    )}
-
-                                                </View>
-                                            </View>
-                                        </LinearGradient>
-                                    </View>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    </View>
-                </Modal>
-
+                <BusyOverlay visible={isLoadingYPO} text="Loading..." />
             </View>
 
             {/* <ChartScreen
@@ -2219,17 +1639,20 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 onClose={() => setChartVisible(false)}
             /> */}
 
-            {/* ✅ CHART MODAL (YAHAN) */}
-            <Modal
+            {/* ✅ CHART MODAL */}
+            <ModalCard
                 visible={chartVisible}
                 animationType="slide"
-                transparent={true}
                 onRequestClose={() => setChartVisible(false)}
+                onClose={() => setChartVisible(false)}
+                eyebrow="CHART"
+                title="Rate & Qty"
+                maxWidth={720}
             >
-                <View style={{ flex: 1, padding: 12 }}>
+                <View style={styles.chartBody}>
 
                     {chartLoading && (
-                        <ActivityIndicator size="large" color="#2196F3" />
+                        <ActivityIndicator size="large" color={T.copper} />
                     )}
 
                     {!chartLoading && chartData?.labels?.length > 0 && (
@@ -2245,31 +1668,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     return (
                                         <View
                                             key={index}
-                                            style={{
-                                                marginHorizontal: 8,
-                                                alignItems: 'center'
-                                            }}
+                                            style={styles.chartCol}
                                         >
 
                                             {/* RATE BAR */}
-                                            <View style={{
-                                                height: rate / 2, // scale adjust karo
-                                                width: 20,
-                                                backgroundColor: '#4CAF50',
-                                                marginBottom: 4,
-                                                borderRadius: 4
-                                            }} />
+                                            <View style={[styles.chartBar, { height: rate / 2, backgroundColor: T.green, marginBottom: 4 }]} />
 
                                             {/* QTY BAR */}
-                                            <View style={{
-                                                height: qty / 2,
-                                                width: 20,
-                                                backgroundColor: '#2196F3',
-                                                borderRadius: 4
-                                            }} />
+                                            <View style={[styles.chartBar, { height: qty / 2, backgroundColor: T.blue }]} />
 
                                             {/* LABEL */}
-                                            <Text style={{ fontSize: 10, marginTop: 6 }}>
+                                            <Text style={styles.chartLabel}>
                                                 {label}
                                             </Text>
 
@@ -2282,74 +1691,67 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     )}
 
                     {!chartLoading && (!chartData || chartData.labels?.length === 0) && (
-                        <Text style={{ textAlign: 'center', marginTop: 20 }}>
-                            No chart data available
-                        </Text>
+                        <EmptyState icon="bar-chart" title="No chart data available" />
                     )}
 
                 </View>
-            </Modal>
+            </ModalCard>
 
-            <Modal visible={mailLogModal} animationType="slide" transparent>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
+            {/* ───────────── Mail sent log ───────────── */}
+            <ModalCard
+                visible={mailLogModal}
+                animationType="slide"
+                eyebrow="MAIL LOG"
+                title={`${mailLogData.length} Sent Log(s) found`}
+                maxWidth={600}
+                footer={
+                    <Btn label="Close" kind="primary" onPress={() => setMailLogModal(false)} style={{ flex: 1 }} />
+                }
+            >
+                <FlatList
+                    data={mailLogData}
+                    keyExtractor={(item, index) => index.toString()}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.logList}
+                    contentContainerStyle={styles.logListContent}
+                    renderItem={({ item }) => (
+                        <View style={styles.logCard}>
 
-                        <Text style={styles.modalTitle}>
-                            {mailLogData.length} Sent Log(s) found
-                        </Text>
+                            <View style={styles.logHeaderBox}>
+                                <Icon name="person" size={14} color={T.copper} />
+                                <Text style={styles.logHeader} numberOfLines={1}>
+                                    {item.usrname}
+                                </Text>
+                            </View>
 
-                        <FlatList
-                            data={mailLogData}
-                            keyExtractor={(item, index) => index.toString()}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 10 }}
-                            renderItem={({ item }) => (
-                                <View style={styles.logCard}>
-
-                                    <View style={styles.logHeaderBox}>
-                                        <Text style={styles.logHeader}>
-                                            {item.usrname}
-                                        </Text>
-                                    </View>
-
-                                    {[
-                                        { label: 'Sent Date', value: item.sentdt },
-                                        { label: 'From', value: item.from },
-                                        { label: 'To', value: item.to },
-                                        { label: 'Subject', value: item.subject },
-                                        { label: 'Remarks', value: item.remarks },
-                                        { label: 'Sent', value: item.mailsent }
-                                    ].map((row, index) => (
-                                        <View key={index} style={styles.rowBox}>
-                                            <Text style={styles.label}>{row.label}</Text>
-                                            <Text
-                                                style={[
-                                                    styles.value,
-                                                    row.label === 'Sent' && {
-                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
-                                                    }
-                                                ]}
-                                                numberOfLines={2} // 🔥 wrap control
-                                            >
-                                                {row.value}
-                                            </Text>
-                                        </View>
-                                    ))}
-
+                            {[
+                                { label: 'Sent Date', value: item.sentdt },
+                                { label: 'From', value: item.from },
+                                { label: 'To', value: item.to },
+                                { label: 'Subject', value: item.subject },
+                                { label: 'Remarks', value: item.remarks },
+                                { label: 'Sent', value: item.mailsent }
+                            ].map((row, index) => (
+                                <View key={index} style={styles.detailRow}>
+                                    <Text style={styles.detailLabel}>{row.label}</Text>
+                                    <Text
+                                        style={[
+                                            styles.detailValue,
+                                            row.label === 'Sent' && {
+                                                color: row.value === 'Yes' ? T.green : T.red
+                                            }
+                                        ]}
+                                        numberOfLines={2} // 🔥 wrap control
+                                    >
+                                        {row.value}
+                                    </Text>
                                 </View>
-                            )}
-                        />
+                            ))}
 
-                        <TouchableOpacity
-                            style={styles.closeBtn}
-                            onPress={() => setMailLogModal(false)}
-                        >
-                            <Text style={styles.closeText}>Close</Text>
-                        </TouchableOpacity>
-
-                    </View>
-                </View>
-            </Modal>
+                        </View>
+                    )}
+                />
+            </ModalCard>
 
             {/* <PdfViewerModal
                 visible={showPdfModal}
@@ -2382,7 +1784,213 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 fetchAllVerifyData={fetchAllVerifyData}
                 activeTab1YPO={activeTab1YPO}
             /> */}
-        </>
+        </View>
     );
 };
+
+// NEW ERP theme styles (tokens only — T / S from '@/src/theme').
+const styles = StyleSheet.create({
+    // ----- shell -----
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    flatList: { flex: 1, backgroundColor: T.bg },
+    list: {
+        paddingTop: 10,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, marginBottom: 4 },
+    gridCell: { padding: 5 },
+
+    // ----- toolbar -----
+    toolbar: {
+        backgroundColor: T.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingTop: 10,
+        paddingBottom: 10,
+    },
+    toolbarInner: {
+        gap: 8,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+    },
+    toolbarWide: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    segWide: { width: 380 },
+
+    // ----- PO card -----
+    card: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 12,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    disabledCard: { opacity: 0.6 },
+    acceptedCard: { borderLeftWidth: 4, borderLeftColor: T.green },
+    rejectedCard: { borderLeftWidth: 4, borderLeftColor: T.red },
+    stamp: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderRadius: 9,
+        borderWidth: 1,
+        paddingVertical: 6,
+    },
+    stampAccepted: { backgroundColor: `${T.green}12`, borderColor: `${T.green}40` },
+    stampRejected: { backgroundColor: `${T.red}10`, borderColor: `${T.red}40` },
+    stampPending: { backgroundColor: `${T.amber}14`, borderColor: `${T.amber}55` },
+    stampText: { fontSize: 11.5, fontWeight: '900', letterSpacing: 1.2 },
+    cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    prpChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 4,
+        backgroundColor: `${T.copper}14`,
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        marginBottom: 6,
+        maxWidth: '100%',
+    },
+    prpCodeText: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    poNo: { fontSize: 15, fontWeight: '800', color: T.ink },
+    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+    date: { fontSize: 11.5, fontWeight: '600', color: T.muted },
+    partyRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    partyIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 9,
+        backgroundColor: T.alt,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    party: { flex: 1, fontSize: 14, fontWeight: '700', color: T.ink, lineHeight: 19 },
+    detailBox: {
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+        paddingHorizontal: 11,
+        paddingVertical: 4,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: T.hair,
+    },
+    detailLabel: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
+    detailValue: { flex: 1, fontSize: 13, fontWeight: '700', color: T.ink, textAlign: 'right' },
+    actionRow: { flexDirection: 'row', gap: 8 },
+    pdfBtn: { flex: 0.8 },
+
+    // ----- items accordion -----
+    expandHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 40,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+    },
+    expandText: { flex: 1, fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' },
+    itemContainer: { gap: 8 },
+    itemCard: {
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 11,
+        gap: 8,
+    },
+    itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    itemTitle: { flex: 1, fontSize: 13.5, fontWeight: '800', color: T.ink },
+    itemGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
+    itemBox: { flex: 0, width: '33.33%', paddingRight: 6 },
+
+    // ----- scroll to top -----
+    topButton: {
+        position: 'absolute',
+        right: 16,
+        bottom: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: T.nav,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...S.card,
+    },
+
+    // ----- dialogs -----
+    dialogBody: { padding: 16, gap: 10 },
+    dialogMeta: { fontSize: 13.5, fontWeight: '600', color: T.muted },
+    dialogStrong: { color: T.ink, fontWeight: '800' },
+    dialogSub: { fontSize: 12, fontWeight: '700', color: T.copper },
+    dialogStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 12,
+    },
+    dialogResult: { backgroundColor: `${T.nav}08` },
+    dialogStatusText: { flex: 1, fontSize: 13.5, fontWeight: '700', color: T.nav },
+    dialogConfirm: { height: 44 },
+
+    // ----- carousel -----
+    carouselRow: { padding: 16, gap: 12 },
+    carouselCard: {
+        width: 280,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 8,
+    },
+    carouselParty: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2, textTransform: 'uppercase' },
+    carouselTitle: { fontSize: 14.5, fontWeight: '800', color: T.ink },
+
+    // ----- chart -----
+    chartBody: { padding: 16, minHeight: 160, justifyContent: 'center' },
+    chartCol: { marginHorizontal: 8, alignItems: 'center' },
+    chartBar: { width: 20, borderRadius: 4 },
+    chartLabel: { fontSize: 10, fontWeight: '700', color: T.muted, marginTop: 6 },
+
+    // ----- mail log -----
+    logList: { flexGrow: 0, flexShrink: 1 },
+    logListContent: { padding: 16, gap: 10 },
+    logCard: {
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.hair,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    logHeaderBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+    logHeader: { flex: 1, fontSize: 14, fontWeight: '800', color: T.nav },
+});
+
 export default YarnPurchaseOrder;

@@ -44,6 +44,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { fetchExpenseDashboardCard } from '@/src/services/Dashboard/expenseDashboardApi';
+import { API_BASE_URL } from '@/src/api/client';
 // ── Financial Year Helper ────────────────────────────────────────
 // calMonth: 0-indexed JS Date month (0=Jan ... 11=Dec)
 // April (3) onwards belongs to the NEW financial year
@@ -411,6 +412,51 @@ export function parseXlsxBase64(b64) {
 }
 
 // ── Main Hook ────────────────────────────────────────────────────
+const asNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const nearlyEqual = (a, b, tolerance = 0.01) =>
+  Math.abs(asNumber(a) - asNumber(b)) <= tolerance;
+
+const firstFinite = (...values) => {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+};
+
+const hasNumericValue = (value) =>
+  value !== null
+  && value !== undefined
+  && value !== ''
+  && Number.isFinite(Number(value));
+
+const ymdLabel = (ymd) => {
+  const s = String(ymd || '').padStart(8, '0');
+  if (!/^\d{8}$/.test(s)) return '';
+  const year = Number(s.slice(0, 4));
+  const month = Number(s.slice(4, 6));
+  const day = Number(s.slice(6, 8));
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return '';
+  const mon = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short' });
+  return `${String(day).padStart(2, '0')}-${mon}`;
+};
+
+const normalizeApiRoot = (apiBase) => {
+  const base = String(apiBase || API_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (!base) throw new Error('Expense API base URL is not available.');
+  return /\/api$/i.test(base) ? base : `${base}/api`;
+};
+
+const dailyEndpoint = (kind) => {
+  if (kind === 'maintenance') return 'expense-maintenance';
+  if (kind === 'other') return 'expense-other';
+  throw new Error('Unsupported daily expense type.');
+};
+
 export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt' }) {
   const MONTHS = buildSixMonths();
 
@@ -427,7 +473,7 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
 
   // ── Fire single month request ──
   const fetchMonth = useCallback(
-    async ({ yearno, monthno, key }) => {
+    async ({ yearno, monthno, key }, force = false) => {
       try {
         const userPtype = (await AsyncStorage.getItem('user_prptype')) || 'S';
         const payload = await fetchExpenseDashboardCard({
@@ -435,93 +481,397 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           prptype: userPtype,
           yearno,
           monthno,
+          refresh: force,
         });
 
         const r = payload.division?.rapier || {};
         const w = payload.division?.waterjet || {};
+        const section = payload.section_ab || {};
+        const sectionActive = section.active === true;
+        const sectionProduction = section.production || {};
+        const sectionElectricity = section.electricity || {};
+        const sectionSalary = section.salary || {};
+        const sectionStores = section.stores || {};
+        const sectionMaintenance = section.maintenance || {};
+        const sectionOther = section.other || {};
+        const sectionPicks = section.picks || {};
+
         const utilityRows = payload.utilities?.rate_rows || [];
         const util = Object.fromEntries(utilityRows.map(x => [x.key, x]));
-        const expenseDaily = payload.trends?.expense_daily || [];
-        const utilityDaily = payload.trends?.utility_daily || [];
-        const electricityDaily = payload.trends?.electricity_daily || [];
-        const prodDaily = payload.production?.daily_trend || [];
-        const byDate = Object.fromEntries(expenseDaily.map(x => [Number(x.date_ymd), x]));
+        const expenseDaily = Array.isArray(payload.trends?.expense_daily)
+          ? payload.trends.expense_daily
+          : [];
+        const utilityDaily = Array.isArray(payload.trends?.utility_daily)
+          ? payload.trends.utility_daily
+          : [];
+        const electricityDaily = Array.isArray(payload.trends?.electricity_daily)
+          ? payload.trends.electricity_daily
+          : [];
+        const prodDaily = Array.isArray(payload.production?.daily_trend)
+          ? payload.production.daily_trend
+          : [];
 
-        const daily = prodDaily.map(row => {
-          const t = byDate[Number(row.date_ymd)] || {};
-          const ymd = String(row.date_ymd || '');
-          const date = ymd.length === 8
-            ? `${ymd.slice(6,8)}-${new Date(Number(ymd.slice(0,4)), Number(ymd.slice(4,6))-1, 1).toLocaleString('en-US',{month:'short'})}`
-            : String(row.day || '');
+        const expenseByDate = Object.fromEntries(
+          expenseDaily.map(x => [Number(x.date_ymd), x])
+        );
+        const electricityByDate = Object.fromEntries(
+          electricityDaily.map(x => [Number(x.date_ymd), x])
+        );
+        const prodByDate = Object.fromEntries(
+          prodDaily.map(x => [Number(x.date_ymd), x])
+        );
+
+        // IMPORTANT: use the union date set. From 01-10-2026 management-entry-only
+        // dates (Maintenance / Other) must remain visible even when there is no
+        // checking production or ExpCosting row on that day.
+        const sectionMaintenanceDaily = Array.isArray(sectionMaintenance.daily)
+          ? sectionMaintenance.daily
+          : [];
+        const sectionOtherDaily = Array.isArray(sectionOther.daily)
+          ? sectionOther.daily
+          : [];
+
+        const dailyDates = Array.from(new Set([
+          ...expenseDaily.map(x => Number(x.date_ymd || 0)),
+          ...electricityDaily.map(x => Number(x.date_ymd || 0)),
+          ...prodDaily.map(x => Number(x.date_ymd || 0)),
+          ...sectionMaintenanceDaily.map(x => Number(x.date_ymd || x.entry_date || 0)),
+          ...sectionOtherDaily.map(x => Number(x.date_ymd || x.entry_date || 0)),
+        ].filter(Boolean))).sort((a, b) => a - b);
+
+        const daily = dailyDates.map(dateYmd => {
+          const t = expenseByDate[dateYmd] || {};
+          const e = electricityByDate[dateYmd] || {};
+          const p = prodByDate[dateYmd] || {};
+
           return {
-            date,
-            date_ymd: Number(row.date_ymd || 0),
-            mw_looms: 0, mw_luwa: 0, sd_looms: 0, sd_luwa: 0, wj_looms: 0, warping: 0, misc: 0,
-            total_kwh: 0,
-            sal_r: 0, sal_w: 0, sal_t: Number(t.salary || 0),
-            prod_mw: Number(row.mw_rapier_mtr || 0),
-            prod_sud: Number(row.sip_rapier_mtr || 0),
-            prod_wj: Number(row.waterjet_mtr || 0),
-            prod_tot: Number(row.combined_mtr || 0),
+            date: ymdLabel(dateYmd) || String(t.day || p.day || e.day || ''),
+            date_ymd: dateYmd,
+
+            // Daily electricity drill-down — now populated from the live API.
+            mw_looms: asNumber(e.mw_rapier_looms),
+            mw_luwa: asNumber(e.mw_rapier_luwa),
+            sd_looms: asNumber(e.sip_rapier_looms),
+            sd_luwa: asNumber(e.sip_rapier_luwa),
+            wj_looms: asNumber(e.sip_waterjet_looms),
+            warping: asNumber(e.warping_shared),
+            misc: asNumber(e.misc_shared),
+            total_kwh: asNumber(e.total_kwh),
+
+            // Existing manual Rapier / Waterjet salary source remains visible.
+            sal_r: asNumber(t.rapier_salary),
+            sal_w: asNumber(t.waterjet_salary),
+            sal_t: asNumber(t.salary),
+
+            // Production system feed.
+            prod_mw: asNumber(p.mw_rapier_mtr),
+            prod_sud: asNumber(p.sip_rapier_mtr),
+            prod_wj: asNumber(p.waterjet_mtr),
+            prod_tot: asNumber(p.combined_mtr || t.production_mtr),
+
+            // Section A/B day values used by the new Client Artifact UI.
+            section_a_mtr: asNumber(t.section_a_mtr),
+            section_b_mtr: asNumber(t.section_b_mtr),
+            section_a_avg_picks: asNumber(t.section_a_avg_picks),
+            section_b_avg_picks: asNumber(t.section_b_avg_picks),
+            section_a_electricity: asNumber(t.section_a_electricity),
+            section_b_electricity: asNumber(t.section_b_electricity),
+            section_a_salary: asNumber(t.section_a_salary),
+            section_b_salary: asNumber(t.section_b_salary),
+            section_a_stores: asNumber(t.section_a_stores_allocated),
+            section_b_stores: asNumber(t.section_b_stores_allocated),
+            section_a_maintenance: asNumber(t.section_a_maintenance),
+            section_b_maintenance: asNumber(t.section_b_maintenance),
+            maintenance_common: asNumber(t.maintenance_common),
+            section_a_other: asNumber(t.section_a_other),
+            section_b_other: asNumber(t.section_b_other),
+            other_common: asNumber(t.other_common),
+            section_a_total_cost: asNumber(t.section_a_total_cost),
+            section_b_total_cost: asNumber(t.section_b_total_cost),
+            total_cost_complete: t.total_cost_complete !== false,
+            total_cost_completeness: t.total_cost_completeness || null,
           };
         });
 
+        const sectionAProduction = asNumber(sectionProduction.section_a_mtr);
+        const sectionBProduction = asNumber(sectionProduction.section_b_mtr);
+        const sectionAAvgPicks = asNumber(sectionPicks.section_a_avg);
+        const sectionBAvgPicks = asNumber(sectionPicks.section_b_avg);
+
+        const sectionAElectricity = asNumber(sectionElectricity.section_a_amount);
+        const sectionBElectricity = asNumber(sectionElectricity.section_b_amount);
+        const sectionASalary = asNumber(sectionSalary.section_a_amount);
+        const sectionBSalary = asNumber(sectionSalary.section_b_amount);
+        const sectionAStores = asNumber(sectionStores.final_section_a_amount);
+        const sectionBStores = asNumber(sectionStores.final_section_b_amount);
+        const sectionAMaintenance = asNumber(sectionMaintenance.section_a_allocated);
+        const sectionBMaintenance = asNumber(sectionMaintenance.section_b_allocated);
+        const sectionAOther = asNumber(sectionOther.section_a_allocated);
+        const sectionBOther = asNumber(sectionOther.section_b_allocated);
+
+        /*
+         * SECTION A/B AUTHORITATIVE TOTALS
+         * -------------------------------
+         * From 01-10-2026, section_ab is the detailed accounting source for the
+         * five cost heads. Recompose the displayed totals from A+B so the UI
+         * cannot silently show a stale/older composition cache while the
+         * detailed A/B payload is already correct.
+         */
+        const sectionElectricityTotal = sectionAElectricity + sectionBElectricity;
+        const sectionSalaryTotal = sectionASalary + sectionBSalary;
+        const sectionStoresTotal = sectionAStores + sectionBStores;
+        const sectionMaintenanceTotal = sectionAMaintenance + sectionBMaintenance;
+        const sectionOtherTotal = sectionAOther + sectionBOther;
+
+        const effectiveElectricity = sectionActive
+          ? sectionElectricityTotal
+          : asNumber(payload.composition?.electricity);
+        const effectiveSalary = sectionActive
+          ? sectionSalaryTotal
+          : asNumber(payload.composition?.salary);
+        const storesFinalABAvailable =
+          hasNumericValue(sectionStores.final_section_a_amount)
+          && hasNumericValue(sectionStores.final_section_b_amount);
+
+        const effectiveStores = sectionActive
+          ? (
+              storesFinalABAvailable
+                ? sectionStoresTotal
+                : firstFinite(
+                    payload.composition?.stores,
+                    sectionStores.store_total,
+                    0
+                  )
+            )
+          : asNumber(payload.composition?.stores);
+        const effectiveMaintenance = sectionActive
+          ? sectionMaintenanceTotal
+          : asNumber(payload.composition?.maintenance);
+        const effectiveOther = sectionActive
+          ? sectionOtherTotal
+          : asNumber(payload.composition?.other);
+
+        const sectionATotal = sectionAElectricity + sectionASalary + sectionAStores
+          + sectionAMaintenance + sectionAOther;
+        const sectionBTotal = sectionBElectricity + sectionBSalary + sectionBStores
+          + sectionBMaintenance + sectionBOther;
+
+        const effectiveTotal = sectionActive
+          ? sectionATotal + sectionBTotal
+          : asNumber(payload.summary?.total_cost);
+
+        const backendCompositionTotal = asNumber(payload.composition?.total);
+        const backendSummaryTotal = asNumber(payload.summary?.total_cost);
+
+        const sectionACpp = sectionAProduction > 0 && sectionAAvgPicks > 0
+          ? sectionATotal / sectionAProduction / sectionAAvgPicks
+          : 0;
+        const sectionBCpp = sectionBProduction > 0 && sectionBAvgPicks > 0
+          ? sectionBTotal / sectionBProduction / sectionBAvgPicks
+          : 0;
+
+        const machineCounts = sectionSalary.machine_counts
+          || sectionStores.machine_counts
+          || sectionMaintenance.common?.machine_counts_as_of_upto
+          || sectionOther.common?.machine_counts_as_of_upto
+          || {};
+
+        const completenessKeys = ['electricity', 'salary', 'stores', 'maintenance', 'other', 'design_ppi'];
+        const aggregateCompleteness = Object.fromEntries(
+          completenessKeys.map(k => [k, sectionActive ? expenseDaily.length > 0 : true])
+        );
+        if (sectionActive) {
+          expenseDaily.forEach(row => {
+            const c = row?.total_cost_completeness || {};
+            completenessKeys.forEach(k => {
+              if (c[k] !== true) aggregateCompleteness[k] = false;
+            });
+          });
+        }
+        const totalCostComplete = !sectionActive
+          || (expenseDaily.length > 0 && expenseDaily.every(row => row?.total_cost_complete === true));
+
         const data = {
-          unit_rate: Number(payload.summary?.unit_rate || 0),
-          days: Number(payload.period?.working_days || 0),
-          total: Number(payload.summary?.total_cost || 0),
-          cpp_total: Number(payload.summary?.cost_per_pick || 0),
-          avg_pick_mw: Number(r.avg_picks || 0),
-          avg_pick_wjet: Number(w.avg_picks || 0),
-          avg_pick_tot: Number(payload.summary?.avg_picks || 0),
-          cpmc: Number(payload.summary?.cost_per_machine_day || 0),
+          label: payload.period?.label || payload.period?.month_name || '',
+          unit_rate: asNumber(payload.summary?.unit_rate),
+          days: asNumber(payload.period?.working_days),
+          total: effectiveTotal,
+          cpp_total: asNumber(payload.production?.total_mtr) > 0 && asNumber(payload.summary?.avg_picks) > 0
+            ? effectiveTotal / asNumber(payload.production?.total_mtr) / asNumber(payload.summary?.avg_picks)
+            : asNumber(payload.summary?.cost_per_pick),
+          avg_pick_mw: asNumber(r.avg_picks),
+          avg_pick_wjet: asNumber(w.avg_picks),
+          avg_pick_tot: asNumber(payload.summary?.avg_picks),
+          cpmc: asNumber(payload.summary?.cost_per_machine_day),
           cpmc_rapier: 0,
           cpmc_wjet: 0,
-          rapier_pct: payload.summary?.total_cost > 0 ? Number(r.total_cost || 0) / Number(payload.summary.total_cost) * 100 : 0,
-          wjet_pct: payload.summary?.total_cost > 0 ? Number(w.total_cost || 0) / Number(payload.summary.total_cost) * 100 : 0,
-          cpp_rapier: Number(r.cost_per_pick || 0),
-          cpp_wjet: Number(w.cost_per_pick || 0),
-          total_rapier: Number(r.total_cost || 0),
-          total_wjet: Number(w.total_cost || 0),
-          per_mtr: payload.summary?.production_mtr > 0 ? Number(payload.summary.total_cost || 0) / Number(payload.summary.production_mtr) : 0,
+          rapier_pct: !sectionActive && asNumber(payload.summary?.total_cost) > 0
+            ? asNumber(r.total_cost) / asNumber(payload.summary.total_cost) * 100
+            : 0,
+          wjet_pct: !sectionActive && asNumber(payload.summary?.total_cost) > 0
+            ? asNumber(w.total_cost) / asNumber(payload.summary.total_cost) * 100
+            : 0,
+          cpp_rapier: asNumber(r.cost_per_pick),
+          cpp_wjet: asNumber(w.cost_per_pick),
+          total_rapier: asNumber(r.total_cost),
+          total_wjet: asNumber(w.total_cost),
+          per_mtr: asNumber(payload.summary?.production_mtr) > 0
+            ? asNumber(payload.summary?.total_cost) / asNumber(payload.summary?.production_mtr)
+            : 0,
 
-          kwh_total: Number(payload.utilities?.total_kwh || payload.summary?.units || 0),
-          kwh_mw_looms: Number(util.mw_rapier_looms?.kwh || 0),
-          kwh_mw_luwa: Number(util.mw_rapier_luwa?.kwh || 0),
-          kwh_sd_looms: Number(util.sip_rapier_looms?.kwh || 0),
-          kwh_sd_luwa: Number(util.sip_rapier_luwa?.kwh || 0),
-          kwh_wj_looms: Number(util.sip_waterjet_looms?.kwh || 0),
-          kwh_warping: Number(util.warping_shared?.kwh || 0),
-          kwh_misc: Number(util.misc_shared?.kwh || 0),
+          kwh_total: asNumber(payload.utilities?.total_kwh || payload.summary?.units),
+          kwh_mw_looms: asNumber(util.mw_rapier_looms?.kwh),
+          kwh_mw_luwa: asNumber(util.mw_rapier_luwa?.kwh),
+          kwh_sd_looms: asNumber(util.sip_rapier_looms?.kwh),
+          kwh_sd_luwa: asNumber(util.sip_rapier_luwa?.kwh),
+          kwh_wj_looms: asNumber(util.sip_waterjet_looms?.kwh),
+          kwh_warping: asNumber(util.warping_shared?.kwh),
+          kwh_misc: asNumber(util.misc_shared?.kwh),
 
-          elec_total: Number(payload.composition?.electricity || 0),
-          elec_mw_looms: Number(util.mw_rapier_looms?.amount || 0),
-          elec_mw_luwa: Number(util.mw_rapier_luwa?.amount || 0),
-          elec_sd_looms: Number(util.sip_rapier_looms?.amount || 0),
-          elec_sd_luwa: Number(util.sip_rapier_luwa?.amount || 0),
-          elec_wj_looms: Number(util.sip_waterjet_looms?.amount || 0),
-          elec_warping: Number(util.warping_shared?.amount || 0),
-          elec_misc: Number(util.misc_shared?.amount || 0),
-          elec_rapier: Number(r.electricity || 0),
-          elec_wjet: Number(w.electricity || 0),
+          elec_total: effectiveElectricity,
+          elec_mw_looms: asNumber(util.mw_rapier_looms?.amount),
+          elec_mw_luwa: asNumber(util.mw_rapier_luwa?.amount),
+          elec_sd_looms: asNumber(util.sip_rapier_looms?.amount),
+          elec_sd_luwa: asNumber(util.sip_rapier_luwa?.amount),
+          elec_wj_looms: asNumber(util.sip_waterjet_looms?.amount),
+          elec_warping: asNumber(util.warping_shared?.amount),
+          elec_misc: asNumber(util.misc_shared?.amount),
+          elec_rapier: asNumber(r.electricity),
+          elec_wjet: asNumber(w.electricity),
 
-          sal_rapier: Number(r.salary || 0),
-          sal_wjet: Number(w.salary || 0),
-          sal_total: Number(payload.composition?.salary || 0),
-          store_total: Number(payload.composition?.stores || 0),
-          store_rapier: Number(r.stores || 0),
-          store_wjet: Number(w.stores || 0),
+          sal_rapier: asNumber(r.salary),
+          sal_wjet: asNumber(w.salary),
+          sal_total: effectiveSalary,
+          store_total: effectiveStores,
+          store_rapier: asNumber(r.stores),
+          store_wjet: asNumber(w.stores),
+          maintenance_total: effectiveMaintenance,
+          other_total: effectiveOther,
 
-          prod_mw: Number(payload.production?.mw_rapier_mtr || 0),
-          prod_sud: Number(payload.production?.sip_rapier_mtr || 0),
-          prod_rapier: Number(payload.production?.rapier_total_mtr || 0),
-          prod_wjet: Number(payload.production?.sip_waterjet_mtr || 0),
-          prod_total: Number(payload.production?.total_mtr || 0),
-          prod_total_L: Number(payload.production?.total_mtr || 0) / 1e5,
+          prod_mw: asNumber(payload.production?.mw_rapier_mtr),
+          prod_sud: asNumber(payload.production?.sip_rapier_mtr),
+          prod_rapier: asNumber(payload.production?.rapier_total_mtr),
+          prod_wjet: asNumber(payload.production?.sip_waterjet_mtr),
+          prod_total: asNumber(payload.production?.total_mtr),
+          prod_total_L: asNumber(payload.production?.total_mtr) / 1e5,
           utility_rates: utilityRows,
-          units_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.summary?.units || 0) / Number(payload.production.total_mtr) : 0,
-          sal_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.composition?.salary || 0) / Number(payload.production.total_mtr) : 0,
-          store_per_mtr: payload.production?.total_mtr > 0 ? Number(payload.composition?.stores || 0) / Number(payload.production.total_mtr) : 0,
+          units_per_mtr: asNumber(payload.production?.total_mtr) > 0
+            ? asNumber(payload.summary?.units) / asNumber(payload.production?.total_mtr)
+            : 0,
+          sal_per_mtr: asNumber(payload.production?.total_mtr) > 0
+            ? effectiveSalary / asNumber(payload.production?.total_mtr)
+            : 0,
+          store_per_mtr: asNumber(payload.production?.total_mtr) > 0
+            ? effectiveStores / asNumber(payload.production?.total_mtr)
+            : 0,
+
+          // Section A/B flattened view for the React Native report.
+          section_ab_active: sectionActive,
+          is_section_ab: sectionActive,
+          section_ab_effective_from_ymd: asNumber(section.effective_from_ymd),
+          section_a_mtr: sectionAProduction,
+          section_b_mtr: sectionBProduction,
+          section_a_electricity_kwh: asNumber(sectionElectricity.section_a_kwh),
+          section_b_electricity_kwh: asNumber(sectionElectricity.section_b_kwh),
+          section_a_electricity_amount: sectionAElectricity,
+          section_b_electricity_amount: sectionBElectricity,
+          section_ab_electricity_total_kwh: asNumber(sectionElectricity.total_kwh || payload.utilities?.total_kwh || payload.summary?.units),
+          section_ab_electricity_total_amount: asNumber(sectionElectricity.total_amount || payload.composition?.electricity),
+          section_machine_counts: {
+            total_section: asNumber(machineCounts.total_section),
+            section_a: asNumber(machineCounts.section_a),
+            section_b: asNumber(machineCounts.section_b),
+            waterjet: asNumber(machineCounts.waterjet),
+            total_rapier: asNumber(machineCounts.total_rapier),
+            mw_rapier: asNumber(machineCounts.mw_rapier),
+            sud_rapier: asNumber(machineCounts.sud_rapier),
+            sud_rapier_230: asNumber(machineCounts.sud_rapier_230),
+            rapier_190: asNumber(machineCounts.rapier_190),
+          },
+          section_groups: sectionProduction.groups || {},
+          section_a_prod: sectionAProduction,
+          section_b_prod: sectionBProduction,
+          section_a_avg_picks: sectionAAvgPicks,
+          section_b_avg_picks: sectionBAvgPicks,
+          section_a_elec: sectionAElectricity,
+          section_b_elec: sectionBElectricity,
+          section_a_salary: sectionASalary,
+          section_b_salary: sectionBSalary,
+          section_a_stores: sectionAStores,
+          section_b_stores: sectionBStores,
+          section_a_maintenance: sectionAMaintenance,
+          section_b_maintenance: sectionBMaintenance,
+          section_a_other: sectionAOther,
+          section_b_other: sectionBOther,
+          section_a_total: sectionATotal,
+          section_b_total: sectionBTotal,
+          section_a_cpp: sectionACpp,
+          section_b_cpp: sectionBCpp,
+          section_a_pct: effectiveTotal > 0
+            ? sectionATotal / effectiveTotal * 100
+            : 0,
+          section_b_pct: effectiveTotal > 0
+            ? sectionBTotal / effectiveTotal * 100
+            : 0,
+
+          maintenance_direct_a: asNumber(sectionMaintenance.section_a_direct),
+          maintenance_direct_b: asNumber(sectionMaintenance.section_b_direct),
+          maintenance_common: asNumber(sectionMaintenance.common?.source_amount),
+          maintenance_daily: sectionMaintenanceDaily,
+          maintenance_status: sectionMaintenance.status || null,
+          maintenance_reconciled: sectionMaintenance.reconciliation?.is_reconciled === true,
+
+          other_direct_a: asNumber(sectionOther.section_a_direct),
+          other_direct_b: asNumber(sectionOther.section_b_direct),
+          other_common: asNumber(sectionOther.common?.source_amount),
+          other_daily: sectionOtherDaily,
+          other_status: sectionOther.status || null,
+          other_reconciled: sectionOther.reconciliation?.is_reconciled === true,
+
+          stores_status: sectionStores.status || null,
+          stores_daily_allocation_ready: sectionStores.daily_allocation_ready === true,
+          salary_section_ready: sectionSalary.reconciliation?.is_reconciled === true,
+          salary_daily: Array.isArray(sectionSalary.daily) ? sectionSalary.daily : [],
+          electricity_section_ready: sectionElectricity.is_reconciled === true,
+          total_cost_complete: totalCostComplete,
+          total_cost_completeness: aggregateCompleteness,
+          section_readiness: section.readiness || {},
+
+          data_integrity: {
+            section_ab: sectionActive,
+            section_total: effectiveTotal,
+            backend_summary_total: backendSummaryTotal,
+            backend_composition_total: backendCompositionTotal,
+            summary_difference: sectionActive
+              ? Number((effectiveTotal - backendSummaryTotal).toFixed(2))
+              : 0,
+            composition_difference: sectionActive
+              ? Number((effectiveTotal - backendCompositionTotal).toFixed(2))
+              : 0,
+            production_difference: sectionActive
+              ? Number(((sectionAProduction + sectionBProduction) - asNumber(payload.production?.total_mtr)).toFixed(3))
+              : 0,
+            maintenance_difference: sectionActive
+              ? Number((effectiveMaintenance - asNumber(sectionMaintenance.total ?? sectionMaintenance.allocated_total)).toFixed(2))
+              : 0,
+            other_difference: sectionActive
+              ? Number((effectiveOther - asNumber(sectionOther.total ?? sectionOther.allocated_total)).toFixed(2))
+              : 0,
+            stores_difference: sectionActive
+              ? Number((effectiveStores - asNumber(sectionStores.store_total)).toFixed(2))
+              : 0,
+            is_reconciled: !sectionActive || (
+              nearlyEqual(sectionAProduction + sectionBProduction, asNumber(payload.production?.total_mtr), 0.01)
+              && nearlyEqual(effectiveMaintenance, asNumber(sectionMaintenance.total ?? sectionMaintenance.allocated_total), 0.01)
+              && nearlyEqual(effectiveOther, asNumber(sectionOther.total ?? sectionOther.allocated_total), 0.01)
+              && nearlyEqual(effectiveStores, asNumber(sectionStores.store_total), 0.01)
+              && (
+                nearlyEqual(effectiveTotal, backendSummaryTotal, 0.01)
+                || backendSummaryTotal === 0
+              )
+            ),
+          },
+
           daily,
           coverage_daily: daily,
           expense_daily_trend: expenseDaily,
@@ -530,19 +880,170 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           trend_meta: payload.trends || {},
           conversion_rates: payload.conversion_rates || null,
           coverage: payload.period,
+          raw_section_ab: section,
         };
 
+        /*
+         * DAILY ENTRY HYDRATION FALLBACK
+         * ------------------------------
+         * Normally Maintenance / Other editors use section_ab.*.daily directly.
+         * If an older cache/envelope omitted that array but expense_daily already
+         * contains the allocated values, reconstruct the direct A/B amounts by
+         * subtracting the Common machine-count share. This prevents an existing
+         * ERP entry from appearing as zero in the editor.
+         */
+        const countsA = asNumber(data.section_machine_counts?.section_a);
+        const countsB = asNumber(data.section_machine_counts?.section_b);
+        const countsT = asNumber(data.section_machine_counts?.total_section) || (countsA + countsB);
+        const commonShareA = countsT > 0 ? countsA / countsT : 0;
+
+        if (sectionActive && data.maintenance_daily.length === 0) {
+          data.maintenance_daily = daily
+            .filter(row =>
+              asNumber(row.section_a_maintenance) !== 0
+              || asNumber(row.section_b_maintenance) !== 0
+              || asNumber(row.maintenance_common) !== 0
+            )
+            .map(row => {
+              const common = asNumber(row.maintenance_common);
+              const commonA = Math.round(common * commonShareA * 100) / 100;
+              const commonB = Math.round((common - commonA) * 100) / 100;
+              return {
+                date_ymd: row.date_ymd,
+                section_a_amount: Math.round((asNumber(row.section_a_maintenance) - commonA) * 100) / 100,
+                section_b_amount: Math.round((asNumber(row.section_b_maintenance) - commonB) * 100) / 100,
+                common_amount: common,
+                machine_counts: {
+                  total_section: countsT,
+                  section_a: countsA,
+                  section_b: countsB,
+                },
+                section_a_allocated: asNumber(row.section_a_maintenance),
+                section_b_allocated: asNumber(row.section_b_maintenance),
+                allocated_total:
+                  asNumber(row.section_a_maintenance) + asNumber(row.section_b_maintenance),
+                hydration_source: 'expense_daily_fallback',
+              };
+            });
+        }
+
+        if (sectionActive && data.other_daily.length === 0) {
+          data.other_daily = daily
+            .filter(row =>
+              asNumber(row.section_a_other) !== 0
+              || asNumber(row.section_b_other) !== 0
+              || asNumber(row.other_common) !== 0
+            )
+            .map(row => {
+              const common = asNumber(row.other_common);
+              const commonA = Math.round(common * commonShareA * 100) / 100;
+              const commonB = Math.round((common - commonA) * 100) / 100;
+              return {
+                date_ymd: row.date_ymd,
+                section_a_amount: Math.round((asNumber(row.section_a_other) - commonA) * 100) / 100,
+                section_b_amount: Math.round((asNumber(row.section_b_other) - commonB) * 100) / 100,
+                common_amount: common,
+                machine_counts: {
+                  total_section: countsT,
+                  section_a: countsA,
+                  section_b: countsB,
+                },
+                section_a_allocated: asNumber(row.section_a_other),
+                section_b_allocated: asNumber(row.section_b_other),
+                allocated_total:
+                  asNumber(row.section_a_other) + asNumber(row.section_b_other),
+                hydration_source: 'expense_daily_fallback',
+              };
+            });
+        }
+
         setStates(prev => ({ ...prev, [key]: { status: 'done', data, error: null } }));
+        return data;
       } catch (err) {
         const msg = err?.message || 'Network error';
         setStates(prev => ({ ...prev, [key]: { status: 'error', data: null, error: msg } }));
+        return null;
       }
     },
     [token]
   );
 
+  const getRequestToken = useCallback(async () => {
+    return token || (await AsyncStorage.getItem('access_token')) || '';
+  }, [token]);
+
+  const saveDailySectionExpense = useCallback(async ({
+    kind,
+    entryDate,
+    sectionAAmount = 0,
+    sectionBAmount = 0,
+    commonAmount = 0,
+    remark = '',
+    existing = false,
+  }) => {
+    const endpoint = dailyEndpoint(kind);
+    const root = normalizeApiRoot(apiBase);
+    const authToken = await getRequestToken();
+    if (!authToken) throw new Error('Unauthenticated.');
+
+    const url = existing
+      ? `${root}/mobile-dashboard/${endpoint}/${Number(entryDate)}`
+      : `${root}/mobile-dashboard/${endpoint}`;
+
+    const body = {
+      entry_date: Number(entryDate),
+      section_a_amount: asNumber(sectionAAmount),
+      section_b_amount: asNumber(sectionBAmount),
+      common_amount: asNumber(commonAmount),
+      remark: remark == null ? '' : String(remark),
+    };
+
+    const config = {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'x-platform': 'mob',
+      },
+    };
+
+    const response = existing
+      ? await axios.put(url, body, config)
+      : await axios.post(url, body, config);
+
+    if (response?.data?.success !== true) {
+      throw new Error(response?.data?.message || 'Daily expense save failed.');
+    }
+
+    return response.data?.response?.data || null;
+  }, [apiBase, getRequestToken]);
+
+  const deleteDailySectionExpense = useCallback(async ({ kind, entryDate }) => {
+    const endpoint = dailyEndpoint(kind);
+    const root = normalizeApiRoot(apiBase);
+    const authToken = await getRequestToken();
+    if (!authToken) throw new Error('Unauthenticated.');
+
+    const response = await axios.delete(
+      `${root}/mobile-dashboard/${endpoint}/${Number(entryDate)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          Accept: 'application/json',
+          'x-platform': 'mob',
+        },
+      }
+    );
+
+    if (response?.data?.success !== true) {
+      throw new Error(response?.data?.message || 'Daily expense delete failed.');
+    }
+
+    return response.data?.response?.data || null;
+  }, [apiBase, getRequestToken]);
+
   // ── Fire all 6 in parallel ──
-  const fetchAll = useCallback(() => {
+  const fetchAll = useCallback((force = false) => {
     // Instantly show all as loading (user sees skeletons immediately)
     setStates(
       Object.fromEntries(
@@ -551,39 +1052,51 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
     );
 
     // All 6 fire simultaneously — each resolves independently
-    MONTHS.forEach((m) => fetchMonth(m));
+    MONTHS.forEach((m) => {
+      fetchMonth(m, force).catch(() => {});
+    });
   }, [fetchMonth]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-fetch on mount ──
   useEffect(() => {
     if (!hasFetched.current && token && apiBase) {
       hasFetched.current = true;
-      fetchAll();
+      fetchAll(false);
     }
   }, [fetchAll, token, apiBase]);
 
-  // ── Retry a single failed month ──
-  const retryMonth = useCallback(
-    (key) => {
+  const refreshMonth = useCallback(
+    async (key, force = true) => {
       const month = MONTHS.find((m) => m.key === key);
-      if (!month) return;
+      if (!month) return null;
       setStates((prev) => ({
         ...prev,
-        [key]: { status: 'loading', data: null, error: null },
+        [key]: { ...prev[key], status: 'loading', error: null },
       }));
-      fetchMonth(month);
+      return fetchMonth(month, force);
     },
     [fetchMonth]
   );
 
+  // ── Retry a single failed month ──
+  const retryMonth = useCallback(
+    (key) => refreshMonth(key, true),
+    [refreshMonth]
+  );
+
+  const refresh = useCallback(() => fetchAll(true), [fetchAll]);
+
   return {
-    months: MONTHS,          // array of month metadata
-    states,                        // { [key]: {status, data, error} }
-    loadedCount,                   // how many finished (for progress)
-    errorCount,                    // how many failed
-    total: MONTHS.length,   // always 6
+    months: MONTHS,
+    states,
+    loadedCount,
+    errorCount,
+    total: MONTHS.length,
     isAllDone: loadedCount + errorCount === MONTHS.length,
-    refresh: fetchAll,         // reload everything
-    retryMonth,                    // retry one month by key
+    refresh,
+    refreshMonth,
+    retryMonth,
+    saveDailySectionExpense,
+    deleteDailySectionExpense,
   };
 }

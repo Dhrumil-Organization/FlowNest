@@ -92,3 +92,27 @@ export const parseCartonQr = (raw: string): ParsedQr | null => {
     }
     return null;
 };
+
+/** Flag reader: design help API / browse can return isnewdesign in different casings or as number/bool. Returns '1' or '0'. */
+export const flagOf = (o: any, ...extra: any[]): '1' | '0' => {
+    const keys = ['isnewdesign', 'IsNewDesign', 'isNewDesign', 'ISNEWDESIGN'];
+    for (const src of [o, ...extra]) {
+        if (!src) continue;
+        for (const k of keys) {
+            const v = src[k];
+            if (v !== undefined && v !== null && v !== '') return (v === true || String(v) === '1' || String(v).toLowerCase() === 'true') ? '1' : '0';
+        }
+    }
+    return '0';
+};
+/** Browse line: type comes from ExpProdQtyType (line -> group -> issue). Returns '1' or '0'. */
+export const typeOf = (...srcs: any[]): '1' | '0' => {
+    for (const src of srcs) {
+        if (!src) continue;
+        for (const k of ['ExpProdQtyType', 'ExpQtyType']) {
+            const v = src[k];
+            if (v !== undefined && v !== null && v !== '') return String(v) === '1' || v === true ? '1' : '0';
+        }
+    }
+    return '0';
+};

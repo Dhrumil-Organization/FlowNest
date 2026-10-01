@@ -1,7 +1,9 @@
 import { API } from '@/common/API/dynamicAPI';
+import { isWeb } from '@/src/platform/runtime';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useMemo, useState } from 'react';
+import { WebView } from 'react-native-webview';
 import {
     ActivityIndicator,
     Modal,
@@ -19,6 +21,7 @@ type Props = {
     onClose: () => void;
     onApprove: () => void;
     onReject: () => void;
+    onViewCosting: (costingItem: any) => void;
 };
 
 const toNumber = (value: any): number => {
@@ -57,11 +60,17 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
     token,
     onClose,
     onApprove,
-    onReject
+    onReject,
+    onViewCosting
 }) => {
+    const [expandedLegacyCosting, setExpandedLegacyCosting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [detail, setDetail] = useState<any | null>(null);
+
+    useEffect(() => {
+        setExpandedLegacyCosting(false);
+    }, [visible, item?.uid]);
 
     useEffect(() => {
         if (!visible || !item?.uid) {
@@ -168,6 +177,39 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
             ? weightedSale - approvalCost
             : null;
 
+        // SO-based authorization must review the exact costing reference already
+        // attached to the Production Order. Never infer a cost from the sale rate.
+        const costingSource = String(first(
+            data.design_costing_source,
+            meta.design_costing_source,
+            main.design_costing_source,
+            item?.design_costing_source,
+            'LEGACY'
+        )).trim().toUpperCase();
+        const costingItem = {
+            ...item,
+            ...main,
+            prpcode: first(main.prpcode, main.PrpCode, item?.prpcode),
+            yearno: first(main.yearno, main.YearNo, item?.yearno),
+            dsncode: first(main.dsncode, main.DsnCode, item?.dsncode),
+            dsnname: first(main.dsnname, main.DsnName, item?.dsnname),
+            design_costing_source: costingSource,
+            md_id: first(data.md_id, meta.md_id, main.md_id, item?.md_id),
+            design_costing_id: first(
+                data.design_costing_id,
+                meta.design_costing_id,
+                main.design_costing_id,
+                item?.design_costing_id
+            ),
+            costuid: first(main.costuid, item?.costuid),
+            costdsncode: first(main.costdsncode, item?.costdsncode),
+            costdsnname: first(main.costdsnname, item?.costdsnname),
+            costdate: first(main.costdate, item?.costdate)
+        };
+        const costingAvailable = costingSource === 'NEW'
+            ? !!String(costingItem.md_id || '').trim() && !!String(costingItem.design_costing_id || '').trim()
+            : toNumber(costingItem.costuid) > 0;
+
         return {
             data,
             main,
@@ -188,7 +230,10 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
             finishedCost,
             approvalCost,
             margin,
-            belowCost: false
+            belowCost: false,
+            costingSource,
+            costingItem,
+            costingAvailable
         };
     }, [detail, item]);
 
@@ -391,11 +436,132 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                         <Chip label="APPROVAL SCOPE" value="Production only" />
                                     </View>
 
-                                    <View style={styles.soCostingPending}>
-                                        <Text style={styles.soCostingPendingText}>
-                                            The exact Production Order costing reference will be shown here once the Web ERP PO-to-costing link is completed. No cost or margin is inferred from the sale rate.
-                                        </Text>
+                                    <View style={styles.costingCard}>
+                                        <View style={styles.costingHeader}>
+                                            <View style={styles.costingHeaderText}>
+                                                <Text style={styles.costingEyebrow}>COSTING USED BY THIS PO</Text>
+                                                <Text style={styles.costingTitle}>
+                                                    {model.costingAvailable
+                                                        ? 'Saved costing reference'
+                                                        : 'Costing reference missing'}
+                                                </Text>
+                                            </View>
+                                            <View style={[
+                                                styles.costingTypeBadge,
+                                                model.costingSource === 'NEW' ? styles.costingTypeBadgeNew : styles.costingTypeBadgeLegacy
+                                            ]}>
+                                                <Text style={[
+                                                    styles.costingTypeBadgeText,
+                                                    model.costingSource === 'NEW' ? styles.costingTypeBadgeTextNew : styles.costingTypeBadgeTextLegacy
+                                                ]}>
+                                                    {model.costingSource === 'NEW' ? 'NEW COSTING' : 'LEGACY COSTING'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {model.costingAvailable ? (
+                                            <>
+                                                <View style={styles.costingFacts}>
+                                                    <View style={styles.costingFact}>
+                                                        <Text style={styles.costingFactLabel}>
+                                                            {model.costingSource === 'NEW' ? 'COSTING REF' : 'COST UID'}
+                                                        </Text>
+                                                        <Text style={styles.costingFactValue} numberOfLines={1}>
+                                                            {model.costingSource === 'NEW'
+                                                                ? String(model.costingItem.design_costing_id || '—')
+                                                                : String(model.costingItem.costuid || '—')}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={[styles.costingFact, styles.costingFactWide]}>
+                                                        <Text style={styles.costingFactLabel}>COSTING DESIGN</Text>
+                                                        <Text style={styles.costingFactValue} numberOfLines={1}>
+                                                            {first(model.costingItem.costdsnname, model.costingItem.dsnname, '—')}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.costingFact}>
+                                                        <Text style={styles.costingFactLabel}>COSTING DATE</Text>
+                                                        <Text style={styles.costingFactValue} numberOfLines={1}>
+                                                            {first(model.costingItem.costdate, '—')}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                <TouchableOpacity
+                                                    style={styles.costingReviewButton}
+                                                    onPress={() => {
+                                                        if (model.costingSource === 'LEGACY') {
+                                                            setExpandedLegacyCosting((current) => !current);
+                                                        } else {
+                                                            onViewCosting(model.costingItem);
+                                                        }
+                                                    }}
+                                                    activeOpacity={0.78}
+                                                >
+                                                    <Icon name="visibility" size={18} color="#17324A" />
+                                                    <Text style={styles.costingReviewButtonText}>
+                                                        {model.costingSource === 'LEGACY' && expandedLegacyCosting ? 'Hide costing' : 'Review costing'}
+                                                    </Text>
+                                                    <Icon
+                                                        name={model.costingSource === 'LEGACY' && expandedLegacyCosting ? 'expand-less' : 'expand-more'}
+                                                        size={19}
+                                                        color="#6B7280"
+                                                    />
+                                                </TouchableOpacity>
+                                            </>
+                                        ) : (
+                                            <View style={styles.costingMissing}>
+                                                <Icon name="error-outline" size={18} color="#B42318" />
+                                                <Text style={styles.costingMissingText}>
+                                                    The exact costing reference used by this Production Order is missing. Authorization is blocked until the PO costing link is available.
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
+
+                                    {model.costingAvailable && model.costingSource === 'LEGACY' && expandedLegacyCosting && (
+                                        <View style={styles.embeddedCostingSection}>
+                                            <View style={styles.embeddedCostingHeader}>
+                                                <View>
+                                                    <Text style={styles.embeddedCostingEyebrow}>COSTING DETAILS</Text>
+                                                    <Text style={styles.embeddedCostingTitle}>Estimated Fabric Cost</Text>
+                                                </View>
+                                                <TouchableOpacity
+                                                    style={styles.embeddedCostingClose}
+                                                    onPress={() => setExpandedLegacyCosting(false)}
+                                                    activeOpacity={0.75}
+                                                >
+                                                    <Icon name="keyboard-arrow-up" size={18} color="#475569" />
+                                                    <Text style={styles.embeddedCostingCloseText}>Collapse</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={styles.embeddedCostingFrame}>
+                                                {isWeb() ? (
+                                                    React.createElement('iframe', {
+                                                        title: 'Production Order Costing',
+                                                        src: `https://ind.tms-webapp.com/app-weavingtemplete/${model.costingItem.prpcode}/${model.costingItem.yearno}/${model.costingItem.costuid}/production_order_sudo`,
+                                                        style: {
+                                                            width: '100%',
+                                                            height: '900px',
+                                                            border: 'none',
+                                                            backgroundColor: '#ffffff'
+                                                        }
+                                                    })
+                                                ) : (
+                                                    <WebView
+                                                        source={{ uri: `https://ind.tms-webapp.com/app-weavingtemplete/${model.costingItem.prpcode}/${model.costingItem.yearno}/${model.costingItem.costuid}/production_order_sudo` }}
+                                                        style={styles.embeddedCostingWebView}
+                                                        startInLoadingState
+                                                        renderLoading={() => (
+                                                            <View style={styles.embeddedCostingLoading}>
+                                                                <ActivityIndicator size="large" color="#17324A" />
+                                                                <Text style={styles.loadingText}>Loading saved costing...</Text>
+                                                            </View>
+                                                        )}
+                                                    />
+                                                )}
+                                            </View>
+                                        </View>
+                                    )}
 
                                     {model.d1Commercial.length > 0 && (
                                         <View style={{ marginTop: 10 }}>
@@ -430,7 +596,11 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                 <Icon name="close" size={20} color="#B42318" />
                                 <Text style={styles.rejectText}>Reject</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.approveButton} onPress={onApprove}>
+                            <TouchableOpacity
+                                style={[styles.approveButton, (!model.isStockSell && !model.costingAvailable) && { opacity: 0.45 }]}
+                                onPress={onApprove}
+                                disabled={!model.isStockSell && !model.costingAvailable}
+                            >
                                 <Icon name="check" size={20} color="#FFFFFF" />
                                 <Text style={styles.approveText}>Approve order</Text>
                             </TouchableOpacity>
@@ -565,18 +735,110 @@ const styles = StyleSheet.create({
     soNo: { fontSize: 11.5, fontWeight: '800', color: '#172033' },
     soParty: { fontSize: 9.5, color: '#7B8492', marginTop: 1 },
     soValue: { fontSize: 10.5, fontWeight: '700', color: '#172033' },
-    soCostingPending: {
-        marginTop: 10,
+    costingCard: {
+        marginTop: 12,
         backgroundColor: '#F8FAFC',
-        borderRadius: 8,
-        padding: 9,
+        borderRadius: 11,
+        padding: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB'
+        borderColor: '#DDE3EA'
     },
-    soCostingPendingText: {
-        fontSize: 10.5,
+    costingHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12
+    },
+    costingHeaderText: { flex: 1, minWidth: 0 },
+    costingEyebrow: {
+        fontSize: 9,
+        fontWeight: '800',
         color: '#6B7280',
-        lineHeight: 15
+        letterSpacing: 0.45
+    },
+    costingTitle: {
+        marginTop: 3,
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#172033'
+    },
+    costingTypeBadge: {
+        borderRadius: 12,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderWidth: 1
+    },
+    costingTypeBadgeLegacy: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+    costingTypeBadgeNew: { backgroundColor: '#EEF7F1', borderColor: '#CFE5D6' },
+    costingTypeBadgeText: { fontSize: 8.5, fontWeight: '800', letterSpacing: 0.25 },
+    costingTypeBadgeTextLegacy: { color: '#B45309' },
+    costingTypeBadgeTextNew: { color: '#2A6044' },
+    costingFacts: {
+        marginTop: 11,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8
+    },
+    costingFact: {
+        flexGrow: 1,
+        flexBasis: 150,
+        minWidth: 130,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingHorizontal: 10,
+        paddingVertical: 9
+    },
+    costingFactWide: { flexGrow: 2, flexBasis: 220 },
+    costingFactLabel: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        color: '#8A93A0',
+        letterSpacing: 0.3
+    },
+    costingFactValue: {
+        marginTop: 3,
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#172033'
+    },
+    costingReviewButton: {
+        marginTop: 10,
+        minHeight: 40,
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+        paddingHorizontal: 13,
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        backgroundColor: '#FFFFFF'
+    },
+    costingReviewButtonText: {
+        color: '#17324A',
+        fontSize: 11.5,
+        fontWeight: '800'
+    },
+    costingMissing: {
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        borderRadius: 9,
+        padding: 10,
+        backgroundColor: '#FFF1F0',
+        borderWidth: 1,
+        borderColor: '#F3C7C3'
+    },
+    costingMissingText: {
+        flex: 1,
+        fontSize: 10.5,
+        lineHeight: 15,
+        fontWeight: '700',
+        color: '#B42318'
     },
     warning: { marginTop: 10, backgroundColor: '#FFF1F0', borderRadius: 8, padding: 9 },
     warningText: { fontSize: 10.5, fontWeight: '800', color: '#B42318' },
@@ -624,7 +886,71 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center'
     },
-    secondaryButtonText: { color: '#172033', fontSize: 12, fontWeight: '700' }
+    secondaryButtonText: { color: '#172033', fontSize: 12, fontWeight: '700' },
+
+    embeddedCostingSection: {
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#D7E0EA',
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden'
+    },
+    embeddedCostingHeader: {
+        minHeight: 58,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5EAF0',
+        backgroundColor: '#F8FAFC'
+    },
+    embeddedCostingEyebrow: {
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.55,
+        color: '#64748B'
+    },
+    embeddedCostingTitle: {
+        marginTop: 2,
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#17324A'
+    },
+    embeddedCostingClose: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF'
+    },
+    embeddedCostingCloseText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#475569'
+    },
+    embeddedCostingFrame: {
+        width: '100%',
+        minHeight: 900,
+        backgroundColor: '#F5F7FA'
+    },
+    embeddedCostingWebView: {
+        width: '100%',
+        height: 900,
+        backgroundColor: '#FFFFFF'
+    },
+    embeddedCostingLoading: {
+        height: 900,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10
+    },
 });
 
 export default ProductionOrderAuthorizationReviewModal;

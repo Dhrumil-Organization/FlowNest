@@ -1,23 +1,27 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
-    Platform
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 // import theme from '../../android/app/src/theme';
+import { API } from '@/common/API/dynamicAPI';
+import { yarnmanagementsystemstyle } from '@/common/Style';
+import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { yarnmanagementsystemstyle } from '@/common/Style';
-import { API, PRINTSTICKER, PRINTERSLISTAPI } from '@/common/API/dynamicAPI';
-import HeaderBarwithBack from '@/components/Header';
 // import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
 import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
+import CustomDrawer from './CustomDrawer';
 import WeftIssueItemDrawer from './WeftIssueItemDrawer';
 // import Snackbar from 'react-native-snackbar';
-import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
+import { showError } from '@/common/utils/snackbar';
 import WftIssueNew from '../WftIssueNew';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
@@ -358,7 +362,8 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
                 // txntype: 'creel_yarn_issue',
                 fromdate: FormState.values.fromdate,
                 todate: FormState.values.todate,
-                status: ''
+                status: '',
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("browse historyPayload:", payload);

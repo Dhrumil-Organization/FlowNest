@@ -14,15 +14,22 @@ import AppAlert from '@/common/utils/appAlert';
 //       PPI greige  = PPI(loom) + 2               (table pick)
 //       PPI finished= PPI greige ÷ (1 − finish shrink)
 // ═══════════════════════════════════════════════════════════════
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '@/common/API/client';
+import { T } from '@/common/utils/theme';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-    View, Text, ScrollView, FlatList, TextInput,
-    TouchableOpacity, StyleSheet, Alert, RefreshControl,
-    ActivityIndicator, Modal,
+    ActivityIndicator,
+    FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { T } from '@/common/utils/theme';
-import client, { DesignAPI, type Design, type SubDesign, type YarnMaster, ItemAPI, type GetItem } from '@/common/API/client';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;

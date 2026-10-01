@@ -1,13 +1,30 @@
 import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { API } from '@/common/API/dynamicAPI';
-import theme from '@/components/theme';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
-import HeaderBar from '../../components/HeaderNew';
+import {
+    Avatar,
+    Btn,
+    BusyOverlay,
+    cellWidth,
+    CONTENT_MAX,
+    EmptyState,
+    Kpi,
+    KpiGrid,
+    Metric,
+    PanelHeader,
+    pct,
+    ProgressBar,
+    SearchBox,
+    SectionHead,
+    Toolbar,
+    useSotLayout,
+} from '@/src/components/erpUi';
 import CustomDrawer from './CustomDrawer';
 // already imported
 // import data from './data.json';
@@ -17,8 +34,56 @@ import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../..
 import { CardPayload, DesignData, ExeData, ItemData, ItemStatus, POTData } from './Modal';
 // import { get } from 'lodash';
 
-const { width } = Dimensions.get('window');
-const isTablet = width >= 600;
+// ---------------------------------------------------------------------------
+// NEW ERP UI presentation helpers (no business logic)
+// ---------------------------------------------------------------------------
+
+/** Keys the legacy card never listed (shown elsewhere or intentionally hidden). */
+const CARD_HIDDEN_KEYS = ['prpname', 'strname', 'party', 'pono', 'prpcode', 'parcode'];
+
+/** Same label rule the legacy card used, with friendlier names for known keys. */
+const legacyLabel = (key: string) =>
+    key.replace(/([A-Z])/g, ' $1').trim() == 'bqty'
+        ? 'Balance Qty'
+        : key.replace(/([A-Z])/g, ' $1').trim() == 'recordcount'
+            ? 'Number of Records'
+            : key.replace(/([A-Z])/g, ' $1').trim();
+
+const NICE_LABELS: Record<string, string> = {
+    qty: 'Total Qty',
+    bqty: 'Balance Qty',
+    pqty: 'Received Qty',
+    unitrate: 'Unit Rate',
+    amount: 'Amount',
+    recordcount: 'Number of Records',
+    itmname: 'Item Name',
+    itmcode: 'Item Code',
+    podate: 'PO Date',
+};
+const cardLabel = (key: string) => NICE_LABELS[key] || legacyLabel(key);
+
+const AMOUNT_KEYS = ['amount', 'unitrate', 'netamt', 'pendingamt'];
+const QTY_KEYS = ['qty', 'bqty', 'pqty', 'recordcount', 'totmtr', 'pendingmtr'];
+
+const isNumeric = (v: any) => typeof v === 'number' || /^\s*-?\d*\.?\d+\s*$/.test(String(v ?? ''));
+const toNum = (v: any) => {
+    const x = parseFloat(String(v ?? '').replace(/,/g, ''));
+    return Number.isFinite(x) ? x : 0;
+};
+const fmtQty = (v: any) =>
+    isNumeric(v) ? toNum(v).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : String(v ?? '—') || '—';
+const fmtAmt = (v: any) =>
+    isNumeric(v) ? `₹ ${toNum(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : String(v ?? '—') || '—';
+const fmtCell = (key: string, v: any) => {
+    if (AMOUNT_KEYS.includes(key)) return fmtAmt(v);
+    if (QTY_KEYS.includes(key)) return fmtQty(v);
+    if (v === null || v === undefined || v === '') return '—';
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+};
+/** Compact KPI quantity (whole units). */
+const fmtQtyKpi = (v: number) => Math.round(v).toLocaleString('en-IN');
+const hasKey = (rows: any[], key: string) => rows.some((r) => r && r[key] !== undefined && r[key] !== null && r[key] !== '');
+const sumKey = (rows: any[], key: string) => rows.reduce((a, r) => a + toNum(r?.[key]), 0);
 
 interface Party {
     parcode: string;
@@ -425,7 +490,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
 
     const renderFooter = () => {
         if (!loading) return null;
-        return <ActivityIndicator style={styles.loadingIndicator} size="large" color={theme.BRAND_GRADIENT_END} />;
+        return <ActivityIndicator style={styles.loadingIndicator} size="small" color={T.copper} />;
     };
 
     const CARD_COLORS = [
@@ -497,14 +562,310 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
     ];
 
 
+    // =======================================================================
+    // NEW ERP UI (presentation only — every handler below is the original one,
+    // called with the original arguments).
+    // =======================================================================
+    const { isPhone, cols, gutter, width: winWidth } = useSotLayout();
+    // UI-only busy flag for the card tap (the request itself is unchanged).
+    const [cardBusy, setCardBusy] = useState(false);
+
+    const onPartyCardPress = (item: any) => {
+        setCardBusy(true);
+        Promise.resolve(handleConfirmActionCard(item, getpayload)).finally(() => setCardBusy(false));
+    };
+
+    const listData: any[] = searchQueryPOT.trim() ? filteredData : salessumdata;
+    const hasLoadedOnce = !Array.isArray(getpayload) && Object.keys(getpayload || {}).length > 0;
+    const activeFilterCount = (selectedProperty ? 1 : 0) + (selectedParty?.length ? 1 : 0);
+
+    const filterChips: { icon: string; text: string }[] = [
+        { icon: 'apartment', text: selectedProperty?.PrpOfFull || selectedProperty?.PrpOf || 'Property group: not set' },
+        { icon: 'calendar-today', text: `FY ${selectedYear}` },
+        { icon: 'date-range', text: `${formatDate(fromDate)} → ${formatDate(toDate)}` },
+        ...(selectedParty?.length
+            ? [{ icon: 'person', text: `${selectedParty.length} part${selectedParty.length === 1 ? 'y' : 'ies'}` }]
+            : []),
+    ];
+
+    // KPI totals over the loaded party summary rows (only for keys the API returned).
+    const sumRows: any[] = salessumdata as any[];
+    const kQty = hasKey(sumRows, 'qty');
+    const kBqty = hasKey(sumRows, 'bqty');
+    const kAmt = hasKey(sumRows, 'amount');
+    const kRec = hasKey(sumRows, 'recordcount');
+    const totQty = sumKey(sumRows, 'qty');
+    const totBqty = sumKey(sumRows, 'bqty');
+
+    const listContentStyle = [styles.listContent, { paddingHorizontal: gutter - 5 }];
+
+    const renderPartyCard = ({ item }: { item: any }) => {
+        const showProgress = isNumeric(item?.qty) && isNumeric(item?.bqty) && toNum(item?.qty) > 0;
+        const receivedPct = showProgress ? 100 - pct(item.bqty, item.qty) : 0;
+        const showRec = kRec && item?.recordcount !== undefined;
+        // recordcount is shown as the header badge, so it is not repeated in the grid.
+        const entries = Object.entries(item || {}).filter(
+            ([key]) => !CARD_HIDDEN_KEYS.includes(key) && !(showRec && key === 'recordcount'),
+        );
+        return (
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <TouchableOpacity
+                    style={styles.partyCard}
+                    activeOpacity={0.85}
+                    onPress={() => onPartyCardPress(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open purchase orders for ${item?.party}`}
+                >
+                    <View style={styles.partyHeader}>
+                        <Avatar name={item?.party} size={40} />
+                        <View style={styles.partyInfo}>
+                            <Text style={styles.partyName} numberOfLines={2}>{item?.party || '—'}</Text>
+                            <View style={styles.partyMetaRow}>
+                                {!!item?.parcode && <Text style={styles.partyCode}>#{item.parcode}</Text>}
+                                {showRec ? (
+                                    <View style={styles.partyOrdersContainer}>
+                                        <Icon name="receipt-long" size={11} color={T.blue} />
+                                        <Text style={styles.partyOrdersText}>{fmtQty(item.recordcount)} records</Text>
+                                    </View>
+                                ) : null}
+                            </View>
+                        </View>
+                        <Icon name="chevron-right" size={22} color={T.muted} />
+                    </View>
+
+                    {showProgress ? (
+                        <View style={styles.progressRow}>
+                            <View style={{ flex: 1 }}>
+                                <ProgressBar value={receivedPct} color={T.green} />
+                            </View>
+                            <Text style={styles.progressText}>{Math.round(receivedPct)}% received</Text>
+                        </View>
+                    ) : null}
+
+                    {entries.length ? (
+                        <View style={styles.partyValues}>
+                            {entries.map(([key, value]) => (
+                                <Metric
+                                    key={key}
+                                    label={cardLabel(key)}
+                                    value={fmtCell(key, value)}
+                                    color={key === 'bqty' ? T.copper : key === 'amount' ? T.pd : undefined}
+                                    style={styles.valueCell}
+                                />
+                            ))}
+                        </View>
+                    ) : null}
+
+                    <View style={styles.cardCta}>
+                        <Text style={styles.cardCtaText}>View PO details</Text>
+                        <Icon name="arrow-forward" size={14} color={T.copper} />
+                    </View>
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    // ----- PO details (modal) -----
+    const modalRows: any[] = getModalTableData.filter((item) =>
+        Object.keys(fixedLabels).some((key) =>
+            String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    );
+    const modalGroups = groupDataByParty(modalRows);
+    const showTable = winWidth >= 1180;
+    const poCols = isPhone ? 1 : 2;
+
+    const renderTableHeader = () => (
+        <View style={[md.tr, md.thead]}>
+            {tableColumns.map((col) => (
+                <Text
+                    key={col.key}
+                    style={[
+                        md.th,
+                        col.key === 'itmname' ? md.flexCol : { width: col.width },
+                        { textAlign: col.align as any },
+                    ]}
+                    numberOfLines={1}
+                >
+                    {col.label}
+                </Text>
+            ))}
+        </View>
+    );
+
+    const renderTableGroup = ({ item: group }: { item: any }) => (
+        <View>
+            {/* Party sub-header */}
+            <View style={md.groupRow}>
+                <Icon name="storefront" size={14} color={T.copper} />
+                <Text style={md.groupText} numberOfLines={1}>{group.party}</Text>
+                <Text style={md.groupMeta}>{group.items.length} line{group.items.length === 1 ? '' : 's'}</Text>
+            </View>
+            {group.items.map((row: any, rowIndex: number) => (
+                <View key={rowIndex} style={[md.tr, rowIndex % 2 === 1 && { backgroundColor: T.sub }]}>
+                    {tableColumns
+                        .filter((col) => col.key !== 'party') // Remove 'party' column from rows
+                        .map((col) => (
+                            <Text
+                                key={col.key}
+                                style={[
+                                    md.td,
+                                    col.key === 'itmname' ? md.flexCol : { width: col.width },
+                                    { textAlign: col.align as any },
+                                    col.key === 'bqty' && { color: T.copper, fontWeight: '800' },
+                                    col.key === 'pqty' && { color: T.green },
+                                    col.key === 'amount' && { fontWeight: '800' },
+                                    col.key === 'pono' && { color: T.nav, fontWeight: '800' },
+                                ]}
+                                numberOfLines={col.key === 'itmname' ? 2 : 1}
+                            >
+                                {fmtCell(col.key, row[col.key])}
+                            </Text>
+                        ))}
+                </View>
+            ))}
+        </View>
+    );
+
+    const renderTableTotals = () =>
+        modalRows.length ? (
+            <View style={[md.tr, md.totals]}>
+                {tableColumns.map((col) => {
+                    const sumable = ['qty', 'bqty', 'pqty', 'amount'].includes(col.key);
+                    return (
+                        <Text
+                            key={col.key}
+                            style={[
+                                md.td,
+                                md.totalText,
+                                col.key === 'itmname' ? md.flexCol : { width: col.width },
+                                { textAlign: col.align as any },
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {col.key === 'prpcode'
+                                ? 'TOTAL'
+                                : sumable
+                                    ? fmtCell(col.key, String(sumKey(modalRows, col.key)))
+                                    : ''}
+                        </Text>
+                    );
+                })}
+            </View>
+        ) : null;
+
+    const renderPoCard = (row: any, i: number) => {
+        const show = isNumeric(row?.qty) && toNum(row?.qty) > 0 && isNumeric(row?.bqty);
+        const recvPct = show ? 100 - pct(row.bqty, row.qty) : 0;
+        return (
+            <View key={i} style={[cellWidth(poCols), styles.gridCell]}>
+                <View style={md.poCard}>
+                    <View style={md.poHead}>
+                        <View style={md.poIcon}>
+                            <Icon name="receipt-long" size={17} color={T.copper} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={md.poNo} numberOfLines={1}>{row?.pono || '—'}</Text>
+                            <Text style={md.poDate} numberOfLines={1}>PO date · {row?.podate || '—'}</Text>
+                        </View>
+                        {!!row?.prpcode && (
+                            <View style={md.prpChip}>
+                                <Text style={md.prpChipText} numberOfLines={1}>{row.prpcode}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={{ gap: 2 }}>
+                        <Text style={md.itemLabel}>Item Name</Text>
+                        <Text style={md.itemName} numberOfLines={2}>{row?.itmname || '—'}</Text>
+                    </View>
+                    {show ? (
+                        <View style={styles.progressRow}>
+                            <View style={{ flex: 1 }}>
+                                <ProgressBar value={recvPct} color={T.green} />
+                            </View>
+                            <Text style={styles.progressText}>{Math.round(recvPct)}% received</Text>
+                        </View>
+                    ) : null}
+                    <View style={md.poMetrics}>
+                        <View style={md.poMetricRow}>
+                            <Metric label="Total Qty" value={fmtCell('qty', row?.qty)} />
+                            <Metric label="Received Qty" value={fmtCell('pqty', row?.pqty)} color={T.green} />
+                            <Metric label="Balance Qty" value={fmtCell('bqty', row?.bqty)} color={T.copper} align="right" />
+                        </View>
+                        <View style={md.poMetricRow}>
+                            <Metric label="Unit Rate" value={fmtCell('unitrate', row?.unitrate)} />
+                            <Metric label="Amount" value={fmtCell('amount', row?.amount)} color={T.pd} align="right" />
+                        </View>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const renderCardGroup = ({ item: group }: { item: any }) => (
+        <View style={md.cardGroup}>
+            <View style={md.cardGroupHead}>
+                <SectionHead
+                    title={group.party}
+                    meta={`${group.items.length} PO line${group.items.length === 1 ? '' : 's'}`}
+                />
+            </View>
+            <View style={md.cardGrid}>{group.items.map((row: any, i: number) => renderPoCard(row, i))}</View>
+        </View>
+    );
+
+    const modalKpis = (
+        <KpiGrid isPhone={isPhone}>
+            <Kpi
+                label="Total Qty"
+                icon="inventory-2"
+                accent={T.nav}
+                value={fmtQtyKpi(sumKey(modalRows, 'qty'))}
+                sub={`${modalRows.length} PO line${modalRows.length === 1 ? '' : 's'}`}
+            />
+            <Kpi
+                label="Received Qty"
+                icon="move-to-inbox"
+                accent={T.green}
+                valueColor={T.green}
+                value={fmtQtyKpi(sumKey(modalRows, 'pqty'))}
+            />
+            <Kpi
+                label="Balance Qty"
+                icon="pending-actions"
+                accent={T.copper}
+                valueColor={T.copper}
+                value={fmtQtyKpi(sumKey(modalRows, 'bqty'))}
+                sub={
+                    sumKey(modalRows, 'qty') > 0
+                        ? `${Math.round(pct(sumKey(modalRows, 'bqty'), sumKey(modalRows, 'qty')))}% of total`
+                        : undefined
+                }
+            />
+            <Kpi
+                label="Amount"
+                icon="account-balance-wallet"
+                accent={T.pd}
+                valueColor={T.pd}
+                value={`₹ ${formatValue(String(sumKey(modalRows, 'amount')))}`}
+            />
+        </KpiGrid>
+    );
 
     return (
         <>
-            <View style={{ flex: 1, backgroundColor: '#fff' }}>
-                <HeaderBar userName={username} placeholder="Search purchase order..." onSearch={setSearchQueryPOT} />
-                <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
-                    <Icon name="list" size={24} color="white" />
-                </TouchableOpacity>
+            <View style={styles.root}>
+                {/* ───────────── Toolbar: search + filters ───────────── */}
+                <Toolbar
+                    search={searchQueryPOT}
+                    onSearch={setSearchQueryPOT}
+                    placeholder={isPhone ? 'Search purchase order...' : 'Search party, code, item, rate or qty...'}
+                    onFilters={openDrawer}
+                    filterCount={activeFilterCount}
+                    chips={filterChips}
+                    onChipPress={openDrawer}
+                />
+
                 <CustomDrawer
                     isVisible={isDrawerVisible}
                     onClose={closeDrawer}
@@ -542,507 +903,373 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
                 />
 
                 <View
-                    style={{ flex: 1, backgroundColor: '#fff' }}
+                    style={styles.container}
                     onLayout={(e) => {
                         const w = e.nativeEvent.layout.width;
                         if (Math.abs(w - containerWidth) > 1) setContainerWidth(w);
                     }}
                 >
-
-                    <ScrollView
-                        contentContainerStyle={{
-                            paddingTop: 20,
-                            paddingBottom: 20,
-                            paddingHorizontal: gridConfig.scrollPadding,
-                            backgroundColor: '#fff',
-                        }}
-                        style={{ flex: 1 }}            // 👈 '100vh' hata do (web pe buggy)
-                        showsVerticalScrollIndicator
-                    >
-                        {Array.from({
-                            length: Math.ceil(
-                                (searchQueryPOT.trim() ? filteredData : salessumdata).length /
-                                gridConfig.numColumns
-                            ),
-                        }).map((_, rowIndex) => {
-                            const rowItems = (searchQueryPOT.trim() ? filteredData : salessumdata).slice(
-                                rowIndex * gridConfig.numColumns,
-                                (rowIndex + 1) * gridConfig.numColumns
-                            );
-
-                            return (
-                                <View
-                                    key={rowIndex}
-                                    style={{
-                                        flexDirection: 'row',
-                                        marginBottom: 12,
-                                        // 🔥 Last row me extra cards left align rahenge
-                                        justifyContent: 'flex-start',
-                                    }}
-                                >
-                                    {rowItems.map((item, index) => {
-                                        const colors =
-                                            CARD_COLORS[
-                                            (rowIndex * gridConfig.numColumns + index) % CARD_COLORS.length
-                                            ];
-                                        return (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={{
-                                                    width: gridConfig.cardWidth,        // 👈 fixed
-                                                    height: 150,
-                                                    marginHorizontal: gridConfig.cardMarginH,
-                                                    borderRadius: 12,
-                                                    overflow: 'hidden',
-                                                    elevation: 4,
-                                                }}
-                                                onPress={() => handleConfirmActionCard(item, getpayload)}>
-                                                <LinearGradient
-                                                    colors={colors}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 1 }}
-                                                    style={{
-                                                        padding: 16,
-                                                        height: '100%',
-                                                    }}
-                                                >
-                                                    {/* Header */}
-                                                    <View style={{ alignItems: 'center', marginBottom: 10 }}>
-                                                        {/* <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: 16,
-                                                    fontWeight: "700",
-                                                }}>
-                                                    {item.prpname}
-                                                </Text> */}
-                                                        {/* <Text style={{
-                                                    color: "rgba(255,255,255,0.8)",
-                                                    fontSize: 12,
-                                                    fontWeight: "500",
-                                                }}>
-                                                    {item.strname}
-                                                </Text> */}
-                                                    </View>
-
-                                                    {/* Party and PO Number */}
-                                                    <View style={{
-                                                        flexDirection: 'row',
-                                                        justifyContent: 'space-between',
-                                                        marginBottom: 12,
-                                                    }}>
-                                                        <Text style={{
-                                                            color: "rgba(255,255,255,0.9)",
-                                                            fontSize: 12,
-                                                            fontWeight: "600",
-                                                        }}>
-                                                            {item.party}
-                                                        </Text>
-                                                        {/* <Text style={{
-                                                    color: "rgba(255,255,255,0.9)",
-                                                    fontSize: 12,
-                                                    fontWeight: "600",
-                                                }}>
-                                                    PO: {item.pono}
-                                                </Text> */}
-                                                    </View>
-
-                                                    {/* All Key-Value Pairs (Right-Aligned) */}
-                                                    {Object.entries(item).map(([key, value]) => {
-                                                        if (['prpname', 'strname', 'party', 'pono', 'prpcode', 'parcode'].includes(key)) return null;
-                                                        return (
-                                                            <View key={key} style={{
-                                                                flexDirection: 'row',
-                                                                justifyContent: 'space-between',
-                                                                marginBottom: 6,
-                                                            }}>
-                                                                <Text style={{
-                                                                    color: "rgba(255,255,255,0.7)",
-                                                                    fontSize: 11,
-                                                                }}>
-                                                                    {key.replace(/([A-Z])/g, ' $1').trim() == 'bqty' ? 'Balance Qty' : key.replace(/([A-Z])/g, ' $1').trim() == 'recordcount' ? 'Number of Records' : key.replace(/([A-Z])/g, ' $1').trim()}
-                                                                </Text>
-                                                                <Text style={{
-                                                                    color: "#fff",
-                                                                    fontSize: 12,
-                                                                    fontWeight: "600",
-                                                                    textAlign: 'right',
-                                                                }}>
-                                                                    {value}
-                                                                </Text>
-                                                            </View>
-                                                        );
-                                                    })}
-                                                </LinearGradient>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
+                    {salessumdata.length > 0 ? (
+                        <FlatList
+                            key={`pot-party-${cols}`}
+                            style={styles.container}
+                            data={listData}
+                            numColumns={cols}
+                            renderItem={renderPartyCard}
+                            keyExtractor={(item: any, index) => `${item?.parcode ?? 'p'}-${index}`}
+                            contentContainerStyle={listContentStyle}
+                            keyboardShouldPersistTaps="handled"
+                            ListFooterComponent={renderFooter}
+                            ListHeaderComponent={
+                                <View style={styles.listHeader}>
+                                    <KpiGrid isPhone={isPhone}>
+                                        <Kpi
+                                            label="Parties"
+                                            icon="groups"
+                                            accent={T.blue}
+                                            value={String(salesdataTotal ?? salessumdata.length)}
+                                            sub={kRec ? `${fmtQty(String(sumKey(sumRows, 'recordcount')))} records` : `FY ${selectedYear}`}
+                                        />
+                                        {kQty ? (
+                                            <Kpi
+                                                label="Total Qty"
+                                                icon="inventory-2"
+                                                accent={T.nav}
+                                                value={fmtQtyKpi(totQty)}
+                                            />
+                                        ) : null}
+                                        {kBqty ? (
+                                            <Kpi
+                                                label="Balance Qty"
+                                                icon="pending-actions"
+                                                accent={T.copper}
+                                                valueColor={T.copper}
+                                                value={fmtQtyKpi(totBqty)}
+                                                sub={kQty && totQty > 0 ? `${Math.round(pct(totBqty, totQty))}% of total` : undefined}
+                                            />
+                                        ) : null}
+                                        {kAmt ? (
+                                            <Kpi
+                                                label="Amount"
+                                                icon="account-balance-wallet"
+                                                accent={T.pd}
+                                                valueColor={T.pd}
+                                                value={`₹ ${formatValue(String(sumKey(sumRows, 'amount')))}`}
+                                            />
+                                        ) : null}
+                                    </KpiGrid>
+                                    <SectionHead
+                                        title="Parties"
+                                        meta={`${listData.length} shown · ${salesdataTotal ?? salessumdata.length} total · tap a party for PO details`}
+                                    />
                                 </View>
-                            );
-                        })}
-                    </ScrollView>
+                            }
+                            ListEmptyComponent={
+                                <EmptyState
+                                    icon="search-off"
+                                    title="No matching parties"
+                                    text="Try another party name, code, item, rate or quantity."
+                                />
+                            }
+                        />
+                    ) : (
+                        <ScrollView style={styles.container} contentContainerStyle={listContentStyle}>
+                            <View style={styles.emptyCard}>
+                                <EmptyState
+                                    icon={hasLoadedOnce ? 'inbox' : 'local-shipping'}
+                                    title={hasLoadedOnce ? 'No data found!' : 'Track your purchase orders'}
+                                    text={
+                                        hasLoadedOnce
+                                            ? 'Nothing matched these filters. Change the filters and load again.'
+                                            : 'Choose the property group, date range and parties, then tap Load to see party-wise purchase order summary.'
+                                    }
+                                    action={<Btn label="Open filters" icon="tune" onPress={openDrawer} />}
+                                />
+                            </View>
+                        </ScrollView>
+                    )}
                 </View>
+
+                {/* ───────────── Purchase order details ───────────── */}
                 <Modal
                     visible={modalVisible}
                     animationType="slide"
                     transparent={false}
                     onRequestClose={() => setModalVisible(false)}
                 >
-                    <View style={modalStyles.modalContainer}>
-                        {/* Header */}
-                        <View style={modalStyles.modalHeader}>
-                            <Text style={modalStyles.modalTitle}>Purchase Order Details</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Icon name="close" size={24} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Search Bar */}
-                        <TextInput
-                            placeholder="Search..."
-                            style={modalStyles.searchInput}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
+                    <SafeAreaView edges={['top', 'bottom']} style={md.root}>
+                        <PanelHeader
+                            onBack={() => setModalVisible(false)}
+                            backLabel="Close"
+                            crumbs={['Purchase Order Tracking', (selectedItem as any)?.party || '']}
+                            title="Purchase Order Details"
+                            subtitle={`${modalRows.length} PO line${modalRows.length === 1 ? '' : 's'} · ${modalGroups.length} part${modalGroups.length === 1 ? 'y' : 'ies'}`}
                         />
-
-                        {/* Table Container */}
-                        <View style={modalStyles.tableWrapper}>
-                            <ScrollView
-                                horizontal={true}
-                                showsHorizontalScrollIndicator={true}
-                                nestedScrollEnabled={true}
-                            >
-                                <View style={{ minWidth: 1200 }}>
-                                    {/* Table Header (First Row) */}
-                                    <View style={[modalStyles.tableRow, { backgroundColor: theme.BRAND_GRADIENT_END }]}>
-                                        {tableColumns.map(col => (
-                                            <Text key={col.key} style={[modalStyles.tableHeaderText, { width: col.width, textAlign: col.align }]}>
-                                                {col.label}
-                                            </Text>
-                                        ))}
-                                    </View>
-
-                                    {/* Table Body (Scrollable) */}
-                                    {/* <FlatList
-                                    data={getModalTableData.filter((item) =>
-                                        Object.keys(fixedLabels).some((key) =>
-                                            String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
-                                        )
-                                    )}
-                                    renderItem={({ item }) => (
-                                        <View style={modalStyles.tableRow}>
-                                            {tableColumns.map(col => (
-                                                <Text key={col.key} style={[modalStyles.tableCell, { width: col.width, textAlign: col.align }]}>
-                                                    {item[col.key]}
-                                                </Text>
-                                            ))}
-                                        </View>
-                                    )}
-                                    keyExtractor={(item, index) => index.toString()}
-                                    initialNumToRender={10}
-                                    maxToRenderPerBatch={10}
-                                    windowSize={5}
-                                    removeClippedSubviews={true}
-                                    showsVerticalScrollIndicator={true}
-                                    style={{ maxHeight: 400 }}
-                                /> */}
-                                    <FlatList
-                                        data={groupDataByParty(getModalTableData.filter((item) =>
-                                            Object.keys(fixedLabels).some((key) =>
-                                                String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
-                                            )
-                                        ))}
-                                        renderItem={({ item: group }) => (
-                                            <>
-                                                {/* Party Sub-Header */}
-                                                <View style={[modalStyles.tableRow, { backgroundColor: '#f0f0f0' }]}>
-                                                    <Text style={[modalStyles.tableHeaderText, { width: '100%', textAlign: 'left', fontWeight: 'bold', color: 'black' }]}>
-                                                        {group.party}
-                                                    </Text>
-                                                </View>
-
-                                                {/* Table Rows for this Party */}
-                                                {group.items.map((row, rowIndex) => (
-                                                    <View key={rowIndex} style={modalStyles.tableRow}>
-                                                        {tableColumns
-                                                            .filter(col => col.key !== 'party') // Remove 'party' column from rows
-                                                            .map(col => (
-                                                                <Text key={col.key} style={[modalStyles.tableCell, { width: col.width, textAlign: col.align }]}>
-                                                                    {row[col.key]}
-                                                                </Text>
-                                                            ))}
-                                                    </View>
-                                                ))}
-                                            </>
-                                        )}
-                                        keyExtractor={(item, index) => index.toString()}
-                                        initialNumToRender={10}
-                                        maxToRenderPerBatch={10}
-                                        windowSize={5}
-                                        removeClippedSubviews={true}
-                                        showsVerticalScrollIndicator={true}
-                                        style={{ maxHeight: 400 }}
-                                    />
-
-                                </View>
-                            </ScrollView>
+                        <View style={[md.searchBar, { paddingHorizontal: gutter }]}>
+                            <View style={md.searchInner}>
+                                <SearchBox
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    placeholder="Search..."
+                                />
+                            </View>
                         </View>
-                    </View>
+
+                        {showTable ? (
+                            <FlatList
+                                style={md.flex}
+                                data={modalGroups}
+                                renderItem={renderTableGroup}
+                                keyExtractor={(item, index) => index.toString()}
+                                initialNumToRender={10}
+                                maxToRenderPerBatch={10}
+                                windowSize={5}
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={[md.content, { paddingHorizontal: gutter }]}
+                                ListHeaderComponent={
+                                    <View style={{ gap: 12 }}>
+                                        {modalKpis}
+                                        <View style={md.tableTop}>{renderTableHeader()}</View>
+                                    </View>
+                                }
+                                ListFooterComponent={<View style={md.tableBottom}>{renderTableTotals()}</View>}
+                                ListEmptyComponent={
+                                    <View style={md.tableEmpty}>
+                                        <EmptyState icon="search-off" title="No purchase orders match" text="Try another PO number, date or item." />
+                                    </View>
+                                }
+                            />
+                        ) : (
+                            <FlatList
+                                key={`pot-po-${poCols}`}
+                                style={md.flex}
+                                data={modalGroups}
+                                renderItem={renderCardGroup}
+                                keyExtractor={(item, index) => index.toString()}
+                                initialNumToRender={10}
+                                maxToRenderPerBatch={10}
+                                windowSize={5}
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={[md.content, { paddingHorizontal: gutter - 5 }]}
+                                ListHeaderComponent={<View style={{ paddingHorizontal: 5 }}>{modalKpis}</View>}
+                                ListEmptyComponent={
+                                    <EmptyState icon="search-off" title="No purchase orders match" text="Try another PO number, date or item." />
+                                }
+                            />
+                        )}
+                    </SafeAreaView>
                 </Modal>
 
-
-
-
-
-
-
-
+                <BusyOverlay visible={cardBusy} text="Loading purchase orders…" />
             </View>
-
-
-
         </>
     );
 };
 
 const styles = StyleSheet.create({
-    listIconContainer: {
-        position: 'absolute',
-        top: 130,
-        right: 20,
-        zIndex: 1,
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        borderRadius: 3,
-        padding: 4,
-    },
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        padding: isTablet ? 20 : 10,
-    },
-    summaryContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    summaryBox: {
-        flex: 1,
-        marginHorizontal: 5,
-        padding: 15,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    summaryLabel: {
-        fontSize: isTablet ? 14 : 12,
-        color: '#555',
-        alignSelf: 'flex-end',
-    },
-    summaryValue: {
-        fontSize: isTablet ? 14 : 12,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 5,
-        alignSelf: 'flex-end',
-    },
-    sectionTitle: {
-        fontSize: isTablet ? 18 : 14,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    partyCard: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    partyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    partyAvatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    partyAvatarText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    partyInfo: {
-        flex: 1,
-    },
-    partyName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    partyOrdersContainer: {
-        marginTop: 4,
-    },
-    partyOrdersText: {
-        fontSize: 12,
-        color: '#666',
-    },
-    chevronIcon: {
-        marginLeft: 'auto',
-    },
-    partyValues: {
-        marginTop: 8,
-    },
-    valueRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 6,
-    },
-    valueItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    valueLabel: {
-        fontSize: 12,
-        color: '#666',
-        marginRight: 4,
-    },
-    valueText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    recentlyViewedCard: {
-        borderWidth: 2,
-        borderColor: theme.BRAND_GRADIENT_END,
-    },
-    recentlyViewedBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        padding: 4,
-        borderRadius: 4,
-    },
-    recentlyViewedText: {
-        color: 'white',
-        fontSize: 10,
-    },
-    loadingIndicator: {
-        padding: 20,
-    },
+    // ----- shell -----
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
     listContent: {
-        paddingBottom: 20,
-    },
-    cardSubHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingTop: 10
-    },
-    cardHeader: {
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingTop: 10,
+        paddingBottom: 28,
         width: '100%',
-        backgroundColor: '#E3F2FD', // Light blue (optional: change to light purple)
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+    gridCell: { padding: 5 },
+    loadingIndicator: { marginVertical: 16 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+
+    // ----- party card -----
+    partyCard: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 12,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    partyHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+    partyInfo: { flex: 1, minWidth: 0 },
+    partyName: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    partyMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+    partyCode: { fontSize: 11, fontWeight: '700', color: T.muted },
+    partyOrdersContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: `${T.blue}12`,
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    partyOrdersText: { fontSize: 10.5, fontWeight: '800', color: T.blue },
+    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    progressText: { fontSize: 10.5, fontWeight: '800', color: T.green, minWidth: 34, textAlign: 'right' },
+    partyValues: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        rowGap: 10,
+        columnGap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
         padding: 10,
-        borderTopLeftRadius: 9,
-        borderTopRightRadius: 9,
-        marginTop: -15,
-        marginHorizontal: -15,
-        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
     },
-    cardHeaderText: {
-        textAlign: 'center',
-        color: theme.BRAND_GRADIENT_END, // Purple theme
-        fontSize: 14,
-        fontWeight: '600',
+    valueCell: { flexGrow: 1, flexBasis: '40%', minWidth: 110 },
+    cardCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 4,
+        marginTop: 'auto',
     },
-    cardSubHeaderText: {
-        textAlign: 'center',
-        color: theme.BRAND_GRADIENT_END, // Purple theme
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    cardContainer: {
-        backgroundColor: '#fff',
-        marginHorizontal: 12,
-        marginVertical: 8,
-        padding: 15,
-        borderRadius: 12,
-
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 5,
-
-        elevation: 4
-    },
-    twoColumnRow: {
-        flexDirection: 'column',
-        // justifyContent: 'space-between',
-        marginBottom: 10,
-        justifyContent: 'flex-end'
-    }
+    cardCtaText: { fontSize: 11.5, fontWeight: '800', color: T.copper },
 });
 
-const modalStyles = StyleSheet.create({
-    modalContainer: {
-        flex: 1,
-        backgroundColor: '#fff',
-        marginTop: 50
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        padding: 15,
-    },
-    modalTitle: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    searchInput: {
-        backgroundColor: '#fff',
-        padding: 10,
-        borderRadius: 5,
-        margin: 10,
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    tableWrapper: {
-        flex: 1,
-        margin: 10,
-    },
-    tableRow: {
-        flexDirection: 'row',
+const md = StyleSheet.create({
+    root: { flex: 1, backgroundColor: T.bg },
+    flex: { flex: 1 },
+    searchBar: {
+        backgroundColor: T.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        padding: 10,
-        backgroundColor: '#fff',
+        borderBottomColor: T.border,
+        paddingVertical: 8,
     },
-    tableHeaderText: {
+    searchInner: { width: '100%', maxWidth: CONTENT_MAX - 32, alignSelf: 'center' },
+    content: {
+        paddingTop: 12,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+
+    // ----- table (wide screens) -----
+    tableTop: {
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderBottomWidth: 0,
+        borderColor: T.border,
+    },
+    tableBottom: {
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderColor: T.border,
+        backgroundColor: T.surface,
+        minHeight: 12,
+    },
+    tableEmpty: {
+        backgroundColor: T.surface,
+        borderLeftWidth: 1,
+        borderRightWidth: 1,
+        borderColor: T.border,
+    },
+    tr: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 40,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: T.hair,
+        backgroundColor: T.surface,
+    },
+    thead: { backgroundColor: T.nav, borderBottomWidth: 0, minHeight: 38 },
+    th: {
         color: '#fff',
-        fontWeight: 'bold',
-        padding: 5,
-        textAlign: 'center',
-        fontSize: 12,
+        fontSize: 10.5,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
+        paddingHorizontal: 6,
     },
-    tableCell: {
-        color: '#333',
-        padding: 5,
-        textAlign: 'center',
-        fontSize: 12,
+    td: { color: T.ink, fontSize: 12.5, fontWeight: '600', paddingHorizontal: 6, paddingVertical: 8 },
+    flexCol: { flex: 1, minWidth: 160 },
+    groupRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 14,
+        minHeight: 36,
+        backgroundColor: T.alt,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        borderLeftWidth: 1,
+        borderRightWidth: 1,
+        borderLeftColor: T.border,
+        borderRightColor: T.border,
     },
+    groupText: { flex: 1, fontSize: 12.5, fontWeight: '900', color: T.nav, letterSpacing: 0.3 },
+    groupMeta: { fontSize: 11, fontWeight: '700', color: T.muted },
+    totals: { backgroundColor: `${T.copper}12`, borderBottomWidth: 0 },
+    totalText: { fontWeight: '900', color: T.pd },
+
+    // ----- cards (phone / tablet) -----
+    cardGroup: { marginBottom: 6 },
+    cardGroupHead: { paddingHorizontal: 5, paddingTop: 12, paddingBottom: 4 },
+    cardGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    poCard: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    poHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    poIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
+    },
+    poNo: { fontSize: 14, fontWeight: '800', color: T.ink },
+    poDate: { fontSize: 11, fontWeight: '700', color: T.muted, marginTop: 2 },
+    prpChip: {
+        backgroundColor: `${T.blue}12`,
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        maxWidth: 120,
+    },
+    prpChipText: { fontSize: 10.5, fontWeight: '800', color: T.blue },
+    itemLabel: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
+    itemName: { fontSize: 13, fontWeight: '700', color: T.ink, lineHeight: 18 },
+    poMetrics: {
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.hair,
+    },
+    poMetricRow: { flexDirection: 'row', gap: 10 },
 });
 
 

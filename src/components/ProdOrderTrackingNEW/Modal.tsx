@@ -32,6 +32,8 @@ export interface POTDataProps {
     getpayload: CardPayload[]
     token: string
     parentDesignData: any[];
+    // NEW ERP UI: optional — lets the empty state open the Filters sheet
+    onOpenFilters?: () => void;
 }
 
 export interface ExeData {

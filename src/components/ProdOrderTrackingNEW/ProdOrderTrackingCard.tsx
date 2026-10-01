@@ -1,23 +1,20 @@
 import AppAlert from '@/common/utils/appAlert';
 
-import { crlimtreq_styles } from '@/common/Style';
+import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
-    Modal,
-    SafeAreaView,
-    ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     useWindowDimensions,
     View
 } from 'react-native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { API } from '../../common/API/dynamicAPI';
+import { Btn, CONTENT_MAX, EmptyState, Kpi, KpiGrid, SectionHead, Sheet, cellWidth, useSotLayout } from '../erpUi';
 import { CardPayload, LabelMap, POTDataProps, StageData } from './Modal';
 
 const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
@@ -25,7 +22,8 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     searchQueryPOT,
     getpayload,
     token,
-    parentDesignData
+    parentDesignData,
+    onOpenFilters
 }) => {
     const [filteredData, setFilteredData] = useState(gePOTData || []);
     const [getStageData, setStageData] = useState<StageData[]>([]);
@@ -205,7 +203,7 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
                             cx={size / 2}
                             cy={size / 2}
                             r={radius}
-                            stroke="#f0f0f0"
+                            stroke={T.alt}
                             strokeWidth={strokeWidth}
                             fill="none"
                         />
@@ -213,7 +211,7 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
                             cx={size / 2}
                             cy={size / 2}
                             r={radius}
-                            stroke={pendingPercent > 50 ? '#ff6b6b' : '#4ECDC4'}
+                            stroke={pendingPercent > 50 ? T.red : T.green}
                             strokeWidth={strokeWidth}
                             strokeDasharray={circumference}
                             strokeDashoffset={strokeDashoffset}
@@ -227,8 +225,10 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
         );
     };
 
+    // Production pie (same maths as before): green = completed share,
+    // copper = still pending. Drawn as a donut with the % in the middle.
     const PieProgress = ({ pendingPercent }) => {
-        const size = 65;
+        const size = 66;
         const radius = size / 2;
 
         // Handle all cases
@@ -271,64 +271,25 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
             `;
         }
 
+        const done = showFullGreen || greenPercent >= 100;
         return (
-            <View style={styles.pieContainer}>
+            <View style={[styles.pieContainer, { width: size, height: size }]}>
                 <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                    <G rotation="-90" origin={`${radius}, ${radius}`}>
-                        {/* Case 1: Full green for negative pending */}
-                        {showFullGreen && <Circle cx={radius} cy={radius} r={radius} fill="rgb(37, 138, 30)" />}
-
-                        {/* Case 2: Full red for 100% pending */}
-                        {!showFullGreen && greenPercent === 0 && <Circle cx={radius} cy={radius} r={radius} fill="rgb(193, 51, 51)" />}
-
-                        {/* Case 3: Normal pie chart */}
-                        {!showFullGreen && greenPercent > 0 && <Path d={greenPath} fill="rgb(37, 138, 30)" />}
-                        {!showFullGreen && redPercent > 0 && greenPercent !== 100 && <Path d={redPath} fill="rgb(193, 51, 51)" />}
-                    </G>
-                    <Text style={styles.pieText}>{displayPercent.toFixed(0)}%</Text>
+                    {/* track = pending colour */}
+                    <Circle cx={radius} cy={radius} r={radius} fill={T.copper} />
+                    {/* Full green: negative pending or nothing pending */}
+                    {done && <Circle cx={radius} cy={radius} r={radius} fill={T.green} />}
+                    {/* Normal pie */}
+                    {!done && greenPercent > 0 && <Path d={greenPath} fill={T.green} />}
+                    {!done && redPercent > 0 && greenPercent !== 100 && <Path d={redPath} fill={T.copper} />}
                 </Svg>
+                <View style={styles.pieHole}>
+                    <Text style={styles.pieText}>{displayPercent.toFixed(0)}%</Text>
+                    <Text style={styles.pieSub}>done</Text>
+                </View>
             </View>
         );
     };
-
-    // const PieProgress = ({ pendingPercent  }) => {
-    //     const size = 75;
-    //     const radius = size / 2;
-    //     // Ensure pendingPercent is treated as 100% if negative or invalid
-    //     const safePendingPercent = pendingPercent < 0 ? 0 : pendingPercent > 100 ? 100 : pendingPercent;
-    //     const greenPercent = 100 - safePendingPercent;
-    //     const redPercent = safePendingPercent;
-
-    //     // Calculate the path for the green segment
-    //     const greenPath = `
-    //       M${radius},${radius}
-    //       L${radius},0
-    //       A${radius},${radius} 0 ${greenPercent > 50 ? 1 : 0},1 ${radius + radius * Math.sin(2 * Math.PI * (greenPercent / 100))},${radius - radius * Math.cos(2 * Math.PI * (greenPercent / 100))}
-    //       Z
-    //     `;
-
-    //     // Calculate the path for the red segment
-    //     const redPath = `
-    //       M${radius},${radius}
-    //       L${radius + radius * Math.sin(2 * Math.PI * (greenPercent / 100))},${radius - radius * Math.cos(2 * Math.PI * (greenPercent / 100))}
-    //       A${radius},${radius} 0 ${redPercent > 50 ? 1 : 0},1 ${radius},0
-    //       Z
-    //     `;
-
-    //     return (
-    //         <View style={styles.pieContainer}>
-    //             <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-    //                 <G rotation="-90" origin={`${radius}, ${radius}`}>
-    //                     <Path d={greenPath} fill="#A8E6CF" />  {/* Light professional green */}
-    //                     <Path d={redPath} fill="#FFB3B3" />      {/* Light professional red */}
-    //                 </G>
-    //                 <Text style={styles.pieText}>{parseFloat(greenPercent).toFixed(0)}%</Text>
-    //             </Svg>
-    //         </View>
-    //     );
-    // };
-
-
 
     const renderQuantityGraph = (item: any) => {
         const totalQty = parseFloat(item.totqty) || 1;
@@ -341,37 +302,35 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
         return (
             <View style={styles.graphContainer}>
                 <View style={styles.graphHeader}>
-                    <Text style={styles.graphHeaderText}>Production Status:</Text>
                     <PieProgress pendingPercent={pendingPercent} />
-                    {/* <CircularProgress pendingPercent={pendingPercent} /> */}
+                    <View style={styles.graphLabels}>
+                        <Text style={styles.graphHeaderText}>Production Status</Text>
+                        <View style={styles.graphLabelRow}>
+                            <View style={styles.graphLabelPair}>
+                                <Text style={styles.graphLabel}>Total</Text>
+                                <Text style={styles.graphValue} numberOfLines={1}>{totalQty.toFixed(2)}</Text>
+                            </View>
+                            <View style={styles.graphLabelPair}>
+                                <Text style={styles.graphLabel}>Produced</Text>
+                                <Text style={[styles.graphValue, { color: T.green }]} numberOfLines={1}>{producedQty.toFixed(2)}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.graphLabelRow}>
+                            <View style={styles.graphLabelPair}>
+                                <Text style={styles.graphLabel}>Remaining</Text>
+                                <Text style={[styles.graphValue, { color: T.copper }]} numberOfLines={1}>{remainingQty.toFixed(2)}</Text>
+                            </View>
+                            <View style={styles.graphLabelPair}>
+                                <Text style={styles.graphLabel}>Pending</Text>
+                                <Text style={[styles.graphValue, { color: T.pd }]} numberOfLines={1}>{pendingPercent.toFixed(2)}%</Text>
+                            </View>
+                        </View>
+                    </View>
                 </View>
-                {/* <View style={styles.linearGraphContainer}>
-                    <View style={styles.linearGraphBackground}>
-                        <View style={[styles.linearGraphProduced, { width: `${producedWidth}%` }]} />
-                        <View style={[styles.linearGraphRemaining, { width: `${remainingWidth}%` }]} />
-                    </View>
-                </View> */}
-                <View style={styles.graphLabels}>
-                    <View style={styles.graphLabelRow}>
-                        <View style={styles.graphLabelPair}>
-                            <Text style={styles.graphLabel}>Total:</Text>
-                            <Text style={styles.graphValue}>{totalQty.toFixed(2)}</Text>
-                        </View>
-                        <View style={styles.graphLabelPair}>
-                            <Text style={styles.graphLabel}>Produced:</Text>
-                            <Text style={styles.graphValue}>{producedQty.toFixed(2)}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.graphLabelRow}>
-                        <View style={styles.graphLabelPair}>
-                            <Text style={styles.graphLabel}>Remaining:</Text>
-                            <Text style={styles.graphValue}>{remainingQty.toFixed(2)}</Text>
-                        </View>
-                        <View style={styles.graphLabelPair}>
-                            <Text style={styles.graphLabel}>Pending:</Text>
-                            <Text style={styles.graphValue}>{pendingPercent.toFixed(2)}%</Text>
-                        </View>
-                    </View>
+                {/* Produced vs remaining split of the total quantity */}
+                <View style={styles.linearGraphBackground}>
+                    <View style={[styles.linearGraphProduced, { width: `${Math.max(0, Math.min(100, producedWidth))}%` }]} />
+                    <View style={[styles.linearGraphRemaining, { width: `${Math.max(0, Math.min(100 - Math.max(0, Math.min(100, producedWidth)), remainingWidth))}%` }]} />
                 </View>
             </View>
         );
@@ -380,16 +339,9 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     const renderStageTableHeader = () => (
         <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, { flex: 2 }]}>Stage</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1 }]}>Qty</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Qty</Text>
         </View>
     );
-
-    // const renderStageTableRow = ({ item }: { item: StageData }) => (
-    //     <View style={styles.tableRow}>
-    //         <Text style={[styles.tableCell, { flex: 2 }]}>{item.stage}</Text>
-    //         <Text style={[styles.tableCell, { flex: 1 }]}>{item.qty}</Text>
-    //     </View>
-    // );
 
     // Load more data on scroll
     const loadMoreData = () => {
@@ -406,161 +358,291 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     };
 
 
-    const renderCard = ({ item }: { item: any }) => (
-        <View style={crlimtreq_styles.gridCardWrapper}>
-            <TouchableOpacity style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>{item.dsnname}</Text>
-                    <TouchableOpacity onPress={() => handleCardPress(item)}>
-                        {isStageLoading && selectedCardId === item.uid ? (
-                            <ActivityIndicator size={21} color="rgb(86, 156, 214)" />
-                        ) : (
-                            <Icon name="info" size={20} color="rgb(86, 156, 214)" />
-                        )}
-                    </TouchableOpacity>
-                </View>
-                <View style={styles.cardBody}>
-                    {Object.entries(labelMap).map(([key, config]) => {
-                        if (config.hide) return null;
-                        return (
-                            <View key={key} style={styles.cardRow}>
-                                <Text style={styles.cardLabel}>{config.label}:</Text>
-                                <Text style={styles.cardValue}>{item[key]}</Text>
-                            </View>
-                        );
-                    })}
+    // ---------------------------------------------------------------------
+    // NEW ERP UI (presentation only).
+    // ---------------------------------------------------------------------
+    const { isPhone, cols, gutter } = useSotLayout();
+    const num = (v: any) => {
+        const x = parseFloat(String(v ?? ''));
+        return Number.isFinite(x) ? x : 0;
+    };
+    const fmt = (v: number) => v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const sumOf = (key: string) => filteredData.reduce((acc: number, r: any) => acc + num(r[key]), 0);
+    const totTotal = sumOf('totqty');
+    const totProduced = sumOf('producedqty');
+    const totPending = sumOf('prodpending');
+    const selectedCard: any =
+        (filteredData || []).find((r: any) => r.uid === selectedCardId) ||
+        (gePOTData || []).find((r: any) => r.uid === selectedCardId);
+    const stageMax = getStageData.reduce((m, s) => {
+        const isNum = s.qty !== '' && s.qty !== null && s.qty !== undefined && !isNaN(s.qty as any);
+        return isNum ? Math.max(m, num(s.qty)) : m;
+    }, 0);
+
+    const renderCard = ({ item }: { item: any }) => {
+        const loadingThis = isStageLoading && selectedCardId === item.uid;
+        return (
+            <View style={[cellWidth(cols), styles.gridCell]}>
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <View style={styles.cardIcon}>
+                            <Icon name="precision-manufacturing" size={18} color={T.copper} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.cardTitle} numberOfLines={2}>{item.dsnname}</Text>
+                            <Text style={styles.cardSub} numberOfLines={1}>
+                                {item.vouno}{item.voudate ? `  ·  ${item.voudate}` : ''}
+                            </Text>
+                        </View>
+                        <Btn
+                            label="Stages"
+                            icon="info"
+                            kind="soft"
+                            compact
+                            loading={loadingThis}
+                            onPress={() => handleCardPress(item)}
+                            style={styles.stageBtn}
+                        />
+                    </View>
+                    <View style={styles.cardBody}>
+                        {Object.entries(labelMap).map(([key, config]) => {
+                            if (config.hide) return null;
+                            return (
+                                <View key={key} style={styles.cardRow}>
+                                    <Text style={styles.cardLabel} numberOfLines={1}>{config.label}</Text>
+                                    <Text style={styles.cardValue} numberOfLines={2}>{item[key] || '—'}</Text>
+                                </View>
+                            );
+                        })}
+                    </View>
                     {renderQuantityGraph(item)}
                 </View>
-            </TouchableOpacity>
-        </View>
-    );
+            </View>
+        );
+    };
+
+    const listHeader =
+        filteredData.length > 0 ? (
+            <View style={styles.listHeader}>
+                <KpiGrid isPhone={isPhone}>
+                    <Kpi label="Orders" icon="receipt-long" accent={T.blue} value={String(filteredData.length)} />
+                    <Kpi label="Total Qty" icon="straighten" accent={T.nav} value={fmt(totTotal)} />
+                    <Kpi
+                        label="Produced"
+                        icon="check-circle"
+                        accent={T.green}
+                        valueColor={T.green}
+                        value={fmt(totProduced)}
+                        sub={totTotal > 0 ? `${Math.round((totProduced / totTotal) * 100)}% of total` : undefined}
+                    />
+                    <Kpi
+                        label="Remaining"
+                        icon="pending-actions"
+                        accent={T.copper}
+                        valueColor={T.copper}
+                        value={fmt(totPending)}
+                        sub={totTotal > 0 ? `${Math.round((totPending / totTotal) * 100)}% of total` : undefined}
+                    />
+                </KpiGrid>
+                <SectionHead
+                    title="Production Orders"
+                    meta={`${allData.length} shown · ${filteredData.length} total`}
+                />
+            </View>
+        ) : null;
 
     return (
         <View style={styles.container}>
             <FlatList
-                key={`pot-grid-${numColumns}`}
+                key={`pot-grid-${cols}`}
                 data={allData}
-                numColumns={numColumns}
+                numColumns={cols}
                 style={{ flex: 1 }}
                 renderItem={({ item }) => renderCard({ item })}
                 keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={crlimtreq_styles.list}
+                contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
                 onEndReached={loadMoreData}
                 onEndReachedThreshold={0.3}
+                ListHeaderComponent={listHeader}
+                ListFooterComponent={
+                    isLoadingMore ? <ActivityIndicator size="small" color={T.copper} style={styles.footerSpinner} /> : null
+                }
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No data found!</Text>
+                    <View style={styles.emptyCard}>
+                        {(gePOTData || []).length > 0 && searchQueryPOT.trim() ? (
+                            <EmptyState
+                                icon="search-off"
+                                title="No data found!"
+                                text={`No production order matches “${searchQueryPOT.trim()}”. Try a design, parent design, item or voucher no.`}
+                            />
+                        ) : (
+                            <EmptyState
+                                icon="precision-manufacturing"
+                                title="No data found!"
+                                text="Open Filters, choose the date range, year and filters, then tap Load to track production orders."
+                                action={
+                                    onOpenFilters ? (
+                                        <Btn label="Open Filters" icon="tune" onPress={onOpenFilters} compact />
+                                    ) : undefined
+                                }
+                            />
+                        )}
                     </View>
                 }
             />
 
-            <Modal
-                animationType="slide"
-                transparent={false}
-                visible={modalVisible}
-                onRequestClose={() => {
+            {/* Stage info (was a full-screen white modal) */}
+            <Sheet
+                open={modalVisible}
+                onClose={() => {
                     setModalVisible(!modalVisible);
                 }}
+                eyebrow="PRODUCTION ORDER TRACKING"
+                title="Production Stages"
+                wideMax={560}
+                footer={
+                    <Btn label="Close" kind="ghost" onPress={() => setModalVisible(!modalVisible)} style={{ flex: 1 }} />
+                }
             >
-                <SafeAreaView style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalHeaderText}>Production Stages</Text>
-                        <TouchableOpacity onPress={() => setModalVisible(!modalVisible)}>
-                            <Icon name="close" size={24} color="rgb(86, 156, 214)" />
-                        </TouchableOpacity>
+                {selectedCard ? (
+                    <View style={styles.stageSummary}>
+                        <View style={styles.cardIcon}>
+                            <Icon name="precision-manufacturing" size={18} color={T.copper} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.cardTitle} numberOfLines={2}>{selectedCard.dsnname}</Text>
+                            <Text style={styles.cardSub} numberOfLines={1}>
+                                {[selectedCard.vouno, selectedCard.voudate, selectedCard.itmname].filter(Boolean).join('  ·  ')}
+                            </Text>
+                        </View>
                     </View>
-                    <View style={styles.tableContainer}>
-                        {renderStageTableHeader()}
-                        <ScrollView style={styles.tableBody}>
-                            {getStageData.map((item, index) => (
-                                <View style={styles.tableRow} key={index}>
+                ) : null}
+                <View style={styles.tableContainer}>
+                    {renderStageTableHeader()}
+                    {getStageData.map((item, index) => {
+                        const isNum = item.qty !== '' && item.qty !== null && item.qty !== undefined && !isNaN(item.qty as any);
+                        const w = isNum && stageMax > 0 ? Math.max(2, Math.min(100, (num(item.qty) / stageMax) * 100)) : 0;
+                        return (
+                            <View style={[styles.tableRow, index % 2 === 1 && styles.tableRowAlt]} key={index}>
+                                <View style={styles.tableRowTop}>
                                     <Text style={[styles.tableCellKey, { flex: 2 }]}>{item.stage}</Text>
-                                    <Text style={[styles.tableCell, { flex: 1 }]}>{item.qty}</Text>
+                                    <Text style={[styles.tableCell, { flex: 1 }, isNum && styles.tableCellNum]}>{item.qty}</Text>
                                 </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </SafeAreaView>
-            </Modal>
+                                {isNum ? (
+                                    <View style={styles.stageTrack}>
+                                        <View style={[styles.stageFill, { width: `${w}%` }]} />
+                                    </View>
+                                ) : null}
+                            </View>
+                        );
+                    })}
+                    {!getStageData.length ? <Text style={styles.noStage}>No stage data available.</Text> : null}
+                </View>
+            </Sheet>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    // container: {
-    //     // flex: 1,
-    //     backgroundColor: '#f5f5f5',
-    //     marginBottom: -50,
-    //     // padding: 10,
-    // },
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
-        marginBottom: -50,
+        backgroundColor: T.bg,
     },
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        padding: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 28,
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
+    },
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+    gridCell: { padding: 5 },
+    footerSpinner: { marginVertical: 16 },
+    emptyCard: {
+        margin: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.04)',
+        borderColor: T.border,
+    },
+
+    // ----- card -----
+    card: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
     },
     cardHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        paddingBottom: 10,
+        gap: 10,
     },
-    cardTitle: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
+    cardIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
     },
+    cardTitle: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    cardSub: { fontSize: 11.5, fontWeight: '700', color: T.muted, marginTop: 2 },
+    stageBtn: { height: 36, paddingHorizontal: 10 },
     cardBody: {
-        flexDirection: 'column',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        rowGap: 9,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        paddingTop: 10,
     },
     cardRow: {
-        flexDirection: 'row',
-        marginBottom: 5,
-        paddingBottom: 5,
+        width: '50%',
+        paddingRight: 8,
     },
     cardLabel: {
-        color: 'rgb(206, 145, 120)',
-        marginRight: 10,
-        minWidth: 100,
-        fontSize: 12,
+        fontSize: 10,
+        fontWeight: '700',
+        color: T.muted,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
     },
     cardValue: {
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
-        flex: 1,
-        fontSize: 12,
-        flexWrap: 'wrap',
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: T.ink,
+        marginTop: 2,
     },
+
+    // ----- production graph -----
     graphContainer: {
-        marginTop: 10,
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
         padding: 10,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.hair,
     },
     graphHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        gap: 12,
     },
     graphHeaderText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
+        fontSize: 10,
+        fontWeight: '800',
+        color: T.copper,
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        marginBottom: 2,
     },
     circularProgressContainer: {
         justifyContent: 'center',
@@ -571,128 +653,133 @@ const styles = StyleSheet.create({
         position: 'absolute',
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#333',
-    },
-    linearGraphContainer: {
-        marginVertical: 10,
+        color: T.ink,
     },
     linearGraphBackground: {
-        height: 10,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 5,
+        height: 6,
+        borderRadius: 6,
+        backgroundColor: T.alt,
         overflow: 'hidden',
+        flexDirection: 'row',
     },
     linearGraphProduced: {
         height: '100%',
-        backgroundColor: 'rgb(157, 255, 150)',
+        backgroundColor: T.green,
     },
     linearGraphRemaining: {
         height: '100%',
-        backgroundColor: 'rgb(255, 145, 145)',
-        position: 'absolute',
-        right: 0,
+        backgroundColor: T.copper,
     },
     graphLabels: {
-        flexDirection: 'column',
+        flex: 1,
+        minWidth: 0,
+        gap: 6,
     },
     graphLabelRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 3,
+        gap: 8,
     },
     graphLabelPair: {
         flex: 1,
-        marginHorizontal: 5,
+        minWidth: 0,
     },
     graphLabel: {
-        fontSize: 12,
-        color: 'rgb(206, 145, 120)',
+        fontSize: 10,
+        fontWeight: '700',
+        color: T.muted,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
     },
     graphValue: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
-        flexWrap: 'wrap',
-    },
-    listContent: {
-        // paddingBottom: 20,
-    },
-    emptyContainer: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    emptyText: {
-        color: '#666',
-        fontSize: 16,
-    },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: '#fff',
-        padding: 20,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        paddingBottom: 10,
-        paddingHorizontal: 15
-    },
-    modalHeaderText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
-    },
-    tableContainer: {
-        flex: 1,
-    },
-    tableHeader: {
-        flexDirection: 'row',
-        backgroundColor: '#f9f9f9',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    tableHeaderText: {
-        fontWeight: 'bold',
-        color: 'rgb(86, 156, 214)',
-        paddingHorizontal: 10,
-    },
-    tableBody: {
-        flex: 1,
-    },
-    tableRow: {
-        flexDirection: 'row',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    tableCell: {
-        paddingHorizontal: 10,
-        textAlign: 'right',
-        color: 'rgb(113, 113, 113)',
-    },
-    tableCellKey: {
-        paddingHorizontal: 10,
-        color: 'rgb(113, 113, 113)',
+        fontSize: 13.5,
+        fontWeight: '800',
+        color: T.ink,
+        marginTop: 1,
     },
     pieContainer: {
         justifyContent: 'center',
         alignItems: 'center',
     },
-    pieText: {
+    pieHole: {
         position: 'absolute',
-        fontSize: 11,
-        fontWeight: 'bold',
-        // color: '#333',
-        color: 'white',
+        top: 11,
+        left: 11,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: T.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pieText: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: T.ink,
         textAlign: 'center',
-        top: '40%',
-        left: '40%',
+    },
+    pieSub: {
+        fontSize: 8.5,
+        fontWeight: '800',
+        color: T.muted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
     },
 
+    // ----- stage sheet -----
+    stageSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.hair,
+        padding: 10,
+    },
+    tableContainer: {
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: 'hidden',
+        backgroundColor: T.surface,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        backgroundColor: T.nav,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    tableHeaderText: {
+        fontSize: 10.5,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+    },
+    tableRow: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        gap: 6,
+    },
+    tableRowAlt: { backgroundColor: T.sub },
+    tableRowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    tableCell: {
+        textAlign: 'right',
+        fontSize: 13,
+        fontWeight: '700',
+        color: T.ink,
+    },
+    tableCellNum: { fontWeight: '800', color: T.nav },
+    tableCellKey: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: T.muted,
+    },
+    stageTrack: { height: 5, borderRadius: 5, backgroundColor: T.alt, overflow: 'hidden' },
+    stageFill: { height: 5, borderRadius: 5, backgroundColor: T.copper },
+    noStage: { textAlign: 'center', color: T.muted, fontSize: 12.5, paddingVertical: 16 },
 });
 
 export default ProdOrderTrackingCard;

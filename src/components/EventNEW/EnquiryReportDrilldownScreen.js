@@ -1,10 +1,9 @@
+// NEW ERP UI: re-skinned (T tokens + erpUi kit); data loading / edit / delete logic unchanged.
 import { API } from "@/common/API/dynamicAPI";
 import AppAlert from "@/common/utils/appAlert";
 import AsyncStorage from "@/common/utils/compatibleStorage";
-import theme from "@/components/theme";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -16,11 +15,25 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { getCurrentFinancialYear } from "../../common/commonfunction";
 import api from "./api";
 import { deleteEnquiries } from "./syncService";
+import { S, T } from "@/src/theme";
+import {
+  CONTENT_MAX,
+  EmptyState,
+  IconBtn,
+  Kpi,
+  KpiGrid,
+  Metric,
+  PanelHeader,
+  cellWidth,
+  useSotLayout,
+} from "@/src/components/erpUi";
+import { ModalPanel } from "./ui";
 
 export default function EnquiryReportDrilldownScreen({
   token,
@@ -131,59 +144,78 @@ export default function EnquiryReportDrilldownScreen({
     }
   };
 
+  // ===== NEW ERP UI (presentation only) =====
+  const { isPhone, cols, gutter } = useSotLayout();
+  const { width: winW } = useWindowDimensions();
+  const detailTwoCol = winW >= 720;
+
+  const prpLabel = (p) =>
+    p === "S"
+      ? "WEAVING"
+      : p === "K"
+      ? "KNITTING"
+      : p === "V"
+      ? "VENTURE"
+      : p === "R"
+      ? "YARN"
+      : "" || "No prptype";
+
+  const totalQty = enquiries.reduce((n, e) => n + (Number(e?.qty_required) || 0), 0);
+  const totalItems = enquiries.reduce((n, e) => n + (Array.isArray(e?.items) ? e.items.length : 0), 0);
+
   // Render each row in the FlatList
   const renderRow = ({ item }) => (
-    <TouchableOpacity style={styles.row} onPress={() => setSelected(item)}>
-      <View style={styles.rowLeft}>
-        <Text style={styles.party}>{item.party_name}</Text>
-        <Text style={styles.sub}>
-          {item.contact_name || "No contact name"} ·{" "}
-          {formatDate(item.created_at)}
-        </Text>
-        <Text style={styles.sub}>
-          {"Property: " +
-            (item.prptype === "S"
-              ? "WEAVING"
-              : item.prptype === "K"
-              ? "KNITTING"
-              : item.prptype === "V"
-              ? "VENTURE"
-              : item.prptype === "R"
-              ? "YARN"
-              : "" || "No prptype")}
-        </Text>
-        {Array.isArray(item.items) && item.items.length > 0 && (
-          <View style={styles.itemsBadge}>
-            <Icon name="inventory-2" color="#B3552C" size={12} />
-            <Text style={styles.itemsBadgeText}>
-              {item.items.length} item{item.items.length > 1 ? "s" : ""}
+    <View style={[cellWidth(cols), styles.gridCell]}>
+      <TouchableOpacity
+        style={styles.row}
+        activeOpacity={0.85}
+        onPress={() => setSelected(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`Open enquiry ${item.party_name}`}
+      >
+        <View style={styles.rowHead}>
+          <View style={styles.rowIcon}>
+            <Icon name="storefront" size={18} color={T.copper} />
+          </View>
+          <View style={styles.rowLeft}>
+            <Text style={styles.party} numberOfLines={2}>{item.party_name}</Text>
+            <Text style={styles.sub} numberOfLines={2}>
+              {item.contact_name || "No contact name"} ·{" "}
+              {formatDate(item.created_at)}
             </Text>
           </View>
-        )}
-      </View>
-      <View style={styles.rowRight}>
-        <Text style={styles.qty}>
-          <Text style={styles.qtyNum}>
-            {Number(item.qty_required || 0).toLocaleString()}
-          </Text>{" "}
-          m
-        </Text>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => handleEdit(item)}
-          >
-            <Icon name="edit" color="#2196F3" size={20} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item)}
-          >
-            <Icon name="delete" color="#F44336" size={20} />
-          </TouchableOpacity>
+          <View style={styles.qtyBox}>
+            <Text style={styles.qtyNum} numberOfLines={1}>
+              {Number(item.qty_required || 0).toLocaleString()}
+            </Text>
+            <Text style={styles.qtyUnit}>m</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+
+        <View style={styles.rowFoot}>
+          <View style={styles.chips}>
+            <View style={styles.prpChip}>
+              <Icon name="business" color={T.nav} size={12} />
+              <Text style={styles.prpChipText} numberOfLines={1}>
+                {"Property: " + prpLabel(item.prptype)}
+              </Text>
+            </View>
+            {Array.isArray(item.items) && item.items.length > 0 && (
+              <View style={styles.itemsBadge}>
+                <Icon name="inventory-2" color={T.copper} size={12} />
+                <Text style={styles.itemsBadgeText}>
+                  {item.items.length} item{item.items.length > 1 ? "s" : ""}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.buttonContainer}>
+            <IconBtn icon="edit" color={T.blue} label="Edit enquiry" onPress={() => handleEdit(item)} />
+            <IconBtn icon="delete" color={T.red} tone="danger" label="Delete enquiry" onPress={() => handleDelete(item)} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 
   // Format date
@@ -203,19 +235,19 @@ export default function EnquiryReportDrilldownScreen({
     loadEnquiries();
   };
 
-  // Render header with refresh button
+  // Header (Back + breadcrumb + user + refresh) — Back runs the original close statements.
   const renderHeader = () => (
-    <View style={styles.header}>
-      <Text style={styles.headerName}>{userName}</Text>
-      <View style={styles.headerRow}>
-        <Text style={styles.headerSub}>
-          {userRole} · {enquiries.length} enquiries
-        </Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
-          <Icon name="refresh" color="#6b7280" size={20} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <PanelHeader
+      onBack={() => {
+        setEnquiryReportDrilldownVisible(false);
+        setEnquiryReporteventCode("");
+        setEnquiryReportDrilldownItem({});
+      }}
+      crumbs={["Event Report", "Event Report Details"]}
+      title={userName || "Event Report Details"}
+      subtitle={`${userRole || ""} · ${enquiries.length} enquiries`}
+      right={<IconBtn icon="refresh" label="Refresh" onPress={onRefresh} loading={refreshing} />}
+    />
   );
 
   // Small helper — some API payloads have keys with stray trailing spaces
@@ -246,16 +278,16 @@ export default function EnquiryReportDrilldownScreen({
         <View style={styles.designsTable}>
           <View style={styles.designsTableHeaderRow}>
             <Text style={[styles.designsHeaderCell, { width: 70 }]}>Code</Text>
-            <Text style={[styles.designsHeaderCell, { width: 160 }]}>
+            <Text style={[styles.designsHeaderCell, { width: 170 }]}>
               Design Name
             </Text>
-            <Text style={[styles.designsHeaderCell, { width: 65 }]}>Qty</Text>
-            <Text style={[styles.designsHeaderCell, { width: 55 }]}>Unit</Text>
-            <Text style={[styles.designsHeaderCell, { width: 70 }]}>Rate</Text>
-            <Text style={[styles.designsHeaderCell, { width: 100 }]}>
+            <Text style={[styles.designsHeaderCell, styles.num, { width: 70 }]}>Qty</Text>
+            <Text style={[styles.designsHeaderCell, { width: 60 }]}>Unit</Text>
+            <Text style={[styles.designsHeaderCell, styles.num, { width: 75 }]}>Rate</Text>
+            <Text style={[styles.designsHeaderCell, { width: 130 }]}>
               Remark
             </Text>
-            <Text style={[styles.designsHeaderCell, { width: 70 }]}>
+            <Text style={[styles.designsHeaderCell, { width: 84 }]}>
               Status
             </Text>
           </View>
@@ -270,31 +302,31 @@ export default function EnquiryReportDrilldownScreen({
                   dIdx % 2 === 1 && styles.designsRowAlt,
                 ]}
               >
-                <Text style={[styles.designsCell, { width: 70 }]}>
+                <Text style={[styles.designsCell, styles.codeCell, { width: 70 }]}>
                   {d.dsn_code || "—"}
                 </Text>
                 <Text
-                  style={[styles.designsCell, { width: 160 }]}
+                  style={[styles.designsCell, { width: 170, fontWeight: "800" }]}
                   numberOfLines={2}
                 >
                   {d.dsn_name || "—"}
                 </Text>
-                <Text style={[styles.designsCell, { width: 65 }]}>
+                <Text style={[styles.designsCell, styles.num, { width: 70 }]}>
                   {formatNum(d.dsn_qty)}
                 </Text>
-                <Text style={[styles.designsCell, { width: 55 }]}>
+                <Text style={[styles.designsCell, { width: 60 }]}>
                   {d.unit || "—"}
                 </Text>
-                <Text style={[styles.designsCell, { width: 70 }]}>
+                <Text style={[styles.designsCell, styles.num, { width: 75 }]}>
                   {formatNum(d.dsn_rate)}
                 </Text>
                 <Text
-                  style={[styles.designsCell, { width: 100 }]}
+                  style={[styles.designsCell, { width: 130 }]}
                   numberOfLines={2}
                 >
                   {d.remark || "—"}
                 </Text>
-                <View style={{ width: 70 }}>
+                <View style={{ width: 84, paddingHorizontal: 8 }}>
                   {isNew ? (
                     <View style={styles.newBadge}>
                       <Text style={styles.newBadgeText}>NEW</Text>
@@ -363,7 +395,10 @@ export default function EnquiryReportDrilldownScreen({
               style={styles.itemCard}
             >
               <View style={styles.itemCardHeader}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
+                <View style={styles.itemNo}>
+                  <Text style={styles.itemNoText}>{idx + 1}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <Text style={styles.itemCardTitle} numberOfLines={2}>
                     {it.item_name || "—"}
                   </Text>
@@ -382,22 +417,9 @@ export default function EnquiryReportDrilldownScreen({
               {/* {hasItemInfo && getUserPrptype !== 'S' && ( */}
               {hasItemInfo && prptype !== "S" && (
                 <View style={styles.itemInfoRow}>
-                  <View style={styles.itemInfoCell}>
-                    <Text style={styles.itemInfoLabel}>Rate</Text>
-                    <Text style={styles.itemInfoValue}>
-                      {formatNum(itemRate)}
-                    </Text>
-                  </View>
-                  <View style={styles.itemInfoCell}>
-                    <Text style={styles.itemInfoLabel}>Qty</Text>
-                    <Text style={styles.itemInfoValue}>
-                      {formatNum(itemQty)}
-                    </Text>
-                  </View>
-                  <View style={styles.itemInfoCell}>
-                    <Text style={styles.itemInfoLabel}>Unit</Text>
-                    <Text style={styles.itemInfoValue}>{itemUnit || "—"}</Text>
-                  </View>
+                  <Metric label="Rate" value={formatNum(itemRate)} />
+                  <Metric label="Qty" value={formatNum(itemQty)} color={T.copper} />
+                  <Metric label="Unit" value={itemUnit || "—"} />
                   <View style={[styles.itemInfoCell, { flex: 1.4 }]}>
                     <Text style={styles.itemInfoLabel}>Remark</Text>
                     <Text style={styles.itemInfoValue} numberOfLines={2}>
@@ -421,8 +443,12 @@ export default function EnquiryReportDrilldownScreen({
   // Loading indicator
   if (loading && !refreshing) {
     return (
-      <View style={styles.centerScreen}>
-        <ActivityIndicator color="#c2622f" size="large" />
+      <View style={styles.screen}>
+        {renderHeader()}
+        <View style={styles.centerScreen}>
+          <ActivityIndicator color={T.copper} size="large" />
+          <Text style={styles.loadingText}>Loading enquiries…</Text>
+        </View>
       </View>
     );
   }
@@ -435,370 +461,330 @@ export default function EnquiryReportDrilldownScreen({
         breadcrumb={"Event Report Details"}
         SearchBar={false}
       /> */}
-      <LinearGradient
-        colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-        style={styles.container1}
-      >
-        <View style={styles.breadcrumbChip}>
-          <View style={styles.breadcrumbRow}>
-            <TouchableOpacity
-              style={{ flexDirection: "row", alignItems: "center" }}
-              onPress={() => {
-                setEnquiryReportDrilldownVisible(false);
-                setEnquiryReporteventCode("");
-                setEnquiryReportDrilldownItem({});
-              }}
-            >
-              <Icon name="arrow-back" size={18} color="#fff" />
-              <Text style={styles.breadcrumbBackText}>Back</Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={styles.breadcrumbSeparator}>›</Text>
-              <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
-                {"Event Report Details"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
       <View style={styles.screen}>
+        {renderHeader()}
         <FlatList
+          key={`e-${cols}`}
           data={enquiries}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderRow}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No enquiries from this user yet.</Text>
+          numColumns={cols}
+          style={{ flex: 1 }}
+          ListHeaderComponent={
+            enquiries.length > 0 ? (
+              <View style={styles.listHead}>
+                <KpiGrid isPhone={isPhone}>
+                  <Kpi label="Enquiries" value={String(enquiries.length)} icon="assignment" accent={T.copper} />
+                  <Kpi label="Total qty" value={`${totalQty.toLocaleString()} m`} icon="straighten" accent={T.green} />
+                  <Kpi label="Items" value={String(totalItems)} icon="inventory-2" accent={T.blue} />
+                </KpiGrid>
+              </View>
+            ) : null
           }
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          ListEmptyComponent={
+            <EmptyState icon="assignment" title="No enquiries from this user yet." />
+          }
+          contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.copper} colors={[T.copper]} />
           }
         />
 
-        {/* Full-screen Detail Modal */}
-        <Modal
-          visible={!!selected}
-          animationType="slide"
-          presentationStyle="fullScreen"
-          onRequestClose={() => setSelected(null)}
-        >
-          <View style={styles.fullModalContainer}>
-            {/* Modal header */}
-            <View style={styles.fullModalHeader}>
-              <TouchableOpacity
-                style={styles.fullModalBackBtn}
-                onPress={() => setSelected(null)}
-              >
-                <Icon name="arrow-back" color={C.ink} size={22} />
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fullModalHeaderTitle} numberOfLines={1}>
-                  {selected ? selected.party_name : ""}
-                </Text>
-                {selected && (
-                  <Text style={styles.fullModalHeaderSub}>
-                    Enquiry #{selected.id} · {formatDate(selected.created_at)}
-                  </Text>
-                )}
+        {/* Detail panel (bottom sheet on phone, side panel on wide screens) */}
+        <ModalPanel
+          open={!!selected}
+          onClose={() => setSelected(null)}
+          side
+          wideMax={780}
+          eyebrow={selected ? `ENQUIRY #${selected.id}` : "ENQUIRY"}
+          title={selected ? selected.party_name : ""}
+          subtitle={selected ? formatDate(selected.created_at) : ""}
+          right={
+            selected ? (
+              <View style={styles.fullModalHeaderActions}>
+                <IconBtn icon="edit" color={T.blue} label="Edit enquiry" onPress={() => handleEdit(selected)} />
+                <IconBtn icon="delete" color={T.red} tone="danger" label="Delete enquiry" onPress={() => handleDelete(selected)} />
               </View>
-              {selected && (
-                <View style={styles.fullModalHeaderActions}>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => handleEdit(selected)}
-                  >
-                    <Icon name="edit" color="#2196F3" size={20} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDelete(selected)}
-                  >
-                    <Icon name="delete" color="#F44336" size={20} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            {selected && (
-              <ScrollView
-                style={styles.fullModalScroll}
-                contentContainerStyle={styles.fullModalContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {/* Party / contact info */}
-                <View style={styles.sectionCard}>
-                  <Text style={styles.sectionTitle}>Party Details</Text>
+            ) : null
+          }
+        >
+          {selected && (
+            <ScrollView
+              style={styles.fullModalScroll}
+              contentContainerStyle={styles.fullModalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Party / contact info */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Party Details</Text>
+                <View style={styles.detailGrid}>
                   <DetailRow
                     label="Contact name"
                     value={selected.contact_name}
+                    half={detailTwoCol}
                   />
-                  <DetailRow label="Designation" value={selected.designation} />
-                  <DetailRow label="Mobile" value={selected.mobile} />
-                  <DetailRow label="Email" value={selected.email} />
+                  <DetailRow label="Designation" value={selected.designation} half={detailTwoCol} />
+                  <DetailRow label="Mobile" value={selected.mobile} half={detailTwoCol} />
+                  <DetailRow label="Email" value={selected.email} half={detailTwoCol} />
                   <DetailRow label="Address" value={selected.address} />
-                  <DetailRow label="GST No." value={selected.gst_no} />
+                  <DetailRow label="GST No." value={selected.gst_no} half={detailTwoCol} />
                   <DetailRow
                     label="Property"
-                    value={
-                      selected.prptype === "S"
-                        ? "WEAVING"
-                        : selected.prptype === "K"
-                        ? "KNITTING"
-                        : selected.prptype === "V"
-                        ? "VENTURE"
-                        : selected.prptype === "R"
-                        ? "YARN"
-                        : "" || "No prptype"
-                    }
+                    value={prpLabel(selected.prptype)}
+                    half={detailTwoCol}
                   />
                 </View>
+              </View>
 
-                {/* Requirement info */}
-                {/* <View style={styles.sectionCard}>
-                  <Text style={styles.sectionTitle}>Requirement</Text>
-                  <DetailRow
-                    label="Design requirement"
-                    value={selected.design_requirement}
-                  />
-                  <DetailRow
-                    label="Colour requirement"
-                    value={selected.colour_requirement}
-                  />
-                  <DetailRow
-                    label="Qty required"
-                    value={
-                      selected.qty_required
-                        ? `${Number(selected.qty_required).toLocaleString()} m`
-                        : null
-                    }
-                  />
-                  <DetailRow
-                    label="Price"
-                    value={selected.price ? `₹${selected.price}/m` : null}
-                  />
-                </View> */}
+              {/* Requirement info */}
+              {/* <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Requirement</Text>
+                <DetailRow
+                  label="Design requirement"
+                  value={selected.design_requirement}
+                />
+                <DetailRow
+                  label="Colour requirement"
+                  value={selected.colour_requirement}
+                />
+                <DetailRow
+                  label="Qty required"
+                  value={
+                    selected.qty_required
+                      ? `${Number(selected.qty_required).toLocaleString()} m`
+                      : null
+                  }
+                />
+                <DetailRow
+                  label="Price"
+                  value={selected.price ? `₹${selected.price}/m` : null}
+                />
+              </View> */}
 
-                {/* Dynamic items + full design detail tables */}
-                {renderItemsTable(selected.items, selected.prptype)}
-              </ScrollView>
-            )}
-          </View>
-        </Modal>
+              {/* Dynamic items + full design detail tables */}
+              {renderItemsTable(selected.items, selected.prptype)}
+            </ScrollView>
+          )}
+        </ModalPanel>
       </View>
     </>
   );
 }
 
 // Detail Row Component
-function DetailRow({ label, value }) {
+function DetailRow({ label, value, half = false }) {
   return (
-    <View style={styles.detailRow}>
+    <View style={[styles.detailRow, half ? styles.detailHalf : styles.detailFull]}>
       <Text style={styles.detailKey}>{label}</Text>
       <Text style={styles.detailVal}>{value || "—"}</Text>
     </View>
   );
 }
 
-// Styles
-const C = {
-  brand: "#B3552C",
-  ink: "#1F2937",
-  body: "#374151",
-  muted: "#6B7280",
-  bg: "#FBFAF7",
-  surface: "#FFFFFF",
-  border: "#ECE9E2",
-  editBg: "#E8F0FE",
-  deleteBg: "#FDECEA",
-  headerBg: "#F5F1EA",
-};
-
-const shadowSoft = {
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 2,
-};
-
+// Styles (NEW ERP tokens)
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  screen: { flex: 1, backgroundColor: T.bg },
+  listContent: {
+    width: "100%",
+    maxWidth: CONTENT_MAX,
+    alignSelf: "center",
+    paddingTop: 12,
+    paddingBottom: 28,
   },
-  headerName: { fontSize: 18, fontWeight: "800", color: C.ink },
-  headerSub: { fontSize: 12, color: C.muted, marginTop: 2 },
-  refreshBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
+  listHead: { paddingHorizontal: 5, marginBottom: 6 },
+  gridCell: { padding: 5 },
   row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    backgroundColor: C.surface,
-    padding: 14,
-    marginBottom: 10,
-    ...shadowSoft,
+    borderColor: T.border,
+    borderRadius: 14,
+    backgroundColor: T.surface,
+    padding: 13,
+    gap: 12,
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
   },
-  rowLeft: { flex: 1 },
-  party: { fontSize: 14, fontWeight: "800", color: C.ink },
-  sub: { fontSize: 11.5, color: C.muted, marginTop: 2 },
+  rowHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${T.copper}14`,
+  },
+  rowLeft: { flex: 1, minWidth: 0 },
+  party: { fontSize: 14.5, fontWeight: "800", color: T.ink },
+  sub: { fontSize: 11.5, fontWeight: "600", color: T.muted, marginTop: 2 },
+  qtyBox: {
+    alignItems: "flex-end",
+    backgroundColor: T.sub,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  qtyNum: { fontSize: 15, fontWeight: "900", color: T.pd },
+  qtyUnit: { fontSize: 10, fontWeight: "800", color: T.muted, letterSpacing: 0.4 },
+  rowFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: T.hair,
+    paddingTop: 10,
+  },
+  chips: { flex: 1, minWidth: 0, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  prpChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: T.alt,
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  prpChipText: { fontSize: 10.5, color: T.nav, fontWeight: "800" },
   itemsBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: C.headerBg,
-    borderRadius: 6,
-    paddingHorizontal: 6,
+    backgroundColor: `${T.copper}14`,
+    borderRadius: 7,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    marginTop: 6,
     gap: 4,
   },
-  itemsBadgeText: { fontSize: 10.5, color: C.brand, fontWeight: "700" },
-  rowRight: { alignItems: "flex-end", flexDirection: "row", gap: 8 },
-  qty: { fontSize: 13, color: C.body },
-  qtyNum: { fontWeight: "800" },
+  itemsBadgeText: { fontSize: 10.5, color: T.copper, fontWeight: "800" },
   buttonContainer: { flexDirection: "row", gap: 8 },
-  editBtn: { padding: 8, backgroundColor: C.editBg, borderRadius: 9 },
-  deleteBtn: { padding: 8, backgroundColor: C.deleteBg, borderRadius: 9 },
-  empty: { textAlign: "center", color: C.muted, fontSize: 13, marginTop: 40 },
   centerScreen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: C.bg,
-  },
-
-  // Full-screen modal
-  fullModalContainer: { flex: 1, backgroundColor: C.bg },
-  fullModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    paddingTop: 16,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    backgroundColor: T.bg,
     gap: 10,
-    marginTop: 50,
-    ...shadowSoft,
   },
-  fullModalBackBtn: { padding: 6 },
-  fullModalHeaderTitle: { fontSize: 16, fontWeight: "800", color: C.ink },
-  fullModalHeaderSub: { fontSize: 11, color: C.muted, marginTop: 1 },
+  loadingText: { fontSize: 13, fontWeight: "700", color: T.muted },
+
+  // Detail panel
   fullModalHeaderActions: { flexDirection: "row", gap: 8 },
   fullModalScroll: { flex: 1 },
-  fullModalContent: { padding: 16, paddingBottom: 40 },
+  fullModalContent: { padding: 14, paddingBottom: 40, gap: 12 },
 
   sectionCard: {
-    backgroundColor: C.surface,
+    backgroundColor: T.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
-    padding: 16,
-    marginBottom: 14,
-    ...shadowSoft,
+    borderColor: T.border,
+    padding: 14,
+    gap: 10,
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: "800",
-    color: C.brand,
-    marginBottom: 10,
+    fontWeight: "900",
+    color: T.nav,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
 
+  detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    backgroundColor: T.sub,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.hair,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
-  detailKey: { fontSize: 13, color: C.muted },
+  detailFull: { width: "100%" },
+  detailHalf: { flexGrow: 1, flexBasis: "40%", minWidth: 0 },
+  detailKey: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: T.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   detailVal: {
-    fontSize: 13,
-    color: C.ink,
-    fontWeight: "600",
-    textAlign: "right",
-    maxWidth: "60%",
+    fontSize: 13.5,
+    color: T.ink,
+    fontWeight: "700",
+    marginTop: 2,
   },
 
   // Item card (one per item, contains its own design table)
   itemCard: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T.border,
     borderRadius: 12,
-    marginBottom: 12,
     overflow: "hidden",
-    backgroundColor: C.surface,
+    backgroundColor: T.surface,
   },
   itemCardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: C.headerBg,
+    backgroundColor: T.sub,
+    borderBottomWidth: 1,
+    borderBottomColor: T.hair,
   },
-  itemCardTitle: { fontSize: 13, fontWeight: "800", color: C.ink },
+  itemNo: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: T.nav,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemNoText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  itemCardTitle: { fontSize: 13.5, fontWeight: "800", color: T.ink },
   itemCardMeta: {
-    fontSize: 10.5,
-    color: C.muted,
+    fontSize: 11,
+    color: T.muted,
     marginTop: 2,
     fontWeight: "600",
   },
-  itemCardBody: { paddingVertical: 8, paddingHorizontal: 4 },
+  itemCardBody: { padding: 10 },
 
   // Item-level info strip (item_rate / item_qty / item_unit / item_remark)
   itemInfoRow: {
     flexDirection: "row",
+    gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    backgroundColor: "#FCFBF8",
+    paddingVertical: 10,
   },
-  itemInfoCell: { flex: 1, paddingRight: 6 },
+  itemInfoCell: { flex: 1, minWidth: 0 },
   itemInfoLabel: {
-    fontSize: 9.5,
-    color: C.muted,
-    fontWeight: "800",
+    fontSize: 10,
+    color: T.muted,
+    fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.3,
-    marginBottom: 2,
   },
-  itemInfoValue: { fontSize: 12, color: C.ink, fontWeight: "700" },
+  itemInfoValue: { fontSize: 13, color: T.ink, fontWeight: "700", marginTop: 2 },
 
   // Designs table (horizontally scrollable — full dsn_* detail)
   designsTable: {
     borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 8,
+    borderColor: T.border,
+    borderRadius: 10,
     overflow: "hidden",
-    marginHorizontal: 8,
   },
   designsTableHeaderRow: {
     flexDirection: "row",
-    backgroundColor: "#F0EBE1",
+    backgroundColor: T.nav,
   },
   designsHeaderCell: {
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontWeight: "800",
-    color: C.muted,
-    paddingVertical: 8,
+    color: "#fff",
+    paddingVertical: 9,
     paddingHorizontal: 8,
     textTransform: "uppercase",
     letterSpacing: 0.3,
@@ -806,78 +792,52 @@ const styles = StyleSheet.create({
   designsRow: {
     flexDirection: "row",
     borderTopWidth: 1,
-    borderTopColor: C.border,
-    backgroundColor: C.surface,
+    borderTopColor: T.hair,
+    backgroundColor: T.surface,
     alignItems: "center",
   },
-  designsRowAlt: { backgroundColor: "#FCFBF8" },
+  designsRowAlt: { backgroundColor: T.sub },
   designsCell: {
-    fontSize: 11.5,
-    color: C.ink,
-    paddingVertical: 8,
+    fontSize: 12,
+    color: T.ink,
+    paddingVertical: 9,
     paddingHorizontal: 8,
     fontWeight: "600",
   },
+  codeCell: { color: T.muted, fontWeight: "700" },
+  num: { textAlign: "right" },
   newBadge: {
-    backgroundColor: "#DCFCE7",
+    backgroundColor: `${T.green}18`,
+    borderWidth: 1,
+    borderColor: `${T.green}40`,
     paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
     alignSelf: "flex-start",
   },
-  newBadgeText: { fontSize: 9.5, fontWeight: "800", color: "#15803D" },
+  newBadgeText: { fontSize: 9.5, fontWeight: "800", color: T.green, letterSpacing: 0.4 },
   existingBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: T.alt,
+    borderWidth: 1,
+    borderColor: T.border,
     paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
     alignSelf: "flex-start",
   },
-  existingBadgeText: { fontSize: 9.5, fontWeight: "700", color: "#475569" },
+  existingBadgeText: { fontSize: 9.5, fontWeight: "800", color: T.muted, letterSpacing: 0.4 },
 
   noDesignText: {
-    fontSize: 11.5,
-    color: C.muted,
+    fontSize: 12,
+    color: T.muted,
     fontStyle: "italic",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   noItemsText: {
     fontSize: 12.5,
-    color: C.muted,
+    color: T.muted,
     fontStyle: "italic",
     paddingVertical: 4,
-  },
-  breadcrumbChip: {
-    marginTop: 12,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    borderBlockColor: "rgba(255,255,255,0.15)",
-    borderTopWidth: 1,
-    paddingVertical: 6,
-    width: "100%",
-  },
-  breadcrumbRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  breadcrumbSeparator: {
-    color: "#fff",
-    marginHorizontal: 6,
-  },
-  breadcrumbBackText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "500",
-    opacity: 0.9,
-  },
-  breadcrumbCurrent: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-    flexShrink: 1,
-    textAlign: "right",
   },
 });

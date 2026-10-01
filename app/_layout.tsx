@@ -303,6 +303,7 @@ import { SalesOrderProvider } from '@/components/YarnSalesOrder/SalesOrderContex
 import { getFCMToken } from '@/hooks/NotificationService';
 import { initNewErpAPI } from '@/src/api/client';
 import { AppCoreProvider } from '@/src/core/AppCoreProvider';
+import AppUpdateGate from '@/src/core/appUpdate/AppUpdateGate';
 import { getLoginSource, isWeb } from '@/src/platform/runtime';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import * as Device from 'expo-device';
@@ -498,6 +499,8 @@ export default function RootLayout() {
               )}
             </Stack>
             {isWeb() && <AppAlertHost />}
+            {/* New build (web) / new store version (Android, iOS) notice */}
+            <AppUpdateGate />
             <View style={styles.snackbarHost} pointerEvents="box-none">
               <Snackbar
                 visible={snackbar.visible}

@@ -187,6 +187,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     const [issues, setIssues] = useState<any[]>([]);
     const [issuesLoading, setIssuesLoading] = useState(false);
     const [browseSearch, setBrowseSearch] = useState('');
+    const [showNewDesign, setShowNewDesign] = useState(false); // browse API root flag isnewdesign === 1 -> show the New Design chip
     const [browseIsNewDesign, setBrowseIsNewDesign] = useState(false); // checkbox: checked -> browse API gets ExpProdQtyType 1, else 0
 
     /* ---------------- edit ---------------- */
@@ -306,6 +307,26 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         setScanErr('');
     }, [activePrpCode, activeYearNo, clearCarton]);
 
+    /* Tab change: wipe everything of the tab being left, so coming back always starts fresh. */
+    const changeTab = (next: 'issue' | 'beams') => {
+        if (next === tab) return;
+        if (tab === 'issue') {
+            clearCarton();            // carton, its lines, "issued now", progress start balance
+            entryBus.set(0);
+            setScanErr('');
+            setScannerOpen(false);
+            setLoadingCarton(false);
+            setMode('scan');
+        } else {
+            setIssues([]);            // browse list reloads when Beams is opened again
+            setBrowseSearch('');
+            setBrowseIsNewDesign(false);
+            setShowNewDesign(false);
+        }
+        setEditLine(null);
+        setTab(next);
+    };
+
     // After a successful save: update the balance and the "issued now" list locally (no extra API call).
     const handleSaved = useCallback((e: SavedEntry, message: string) => {
         setSuccessNotice({ title: 'Saved Successfully', message: message || 'Issue saved successfully.' });
@@ -405,11 +426,15 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             yearno: activeYearNo,
             fromdate: toYmd(fromDate),
             todate: toYmd(toDate),
-            ExpprodQty: 1,
+            // ExpprodQty: 1,
             ExpProdQtyType: browseIsNewDesign ? 1 : 0,
         });
         setIssuesLoading(false);
         setIssues(r.ok ? api.listOf({ data: r.payload?.data }) : []);
+        if (r.ok) {
+            const flag = r.payload?.isnewdesign ?? r.payload?.IsNewDesign;
+            setShowNewDesign(flag === 1 || flag === '1' || flag === true);
+        }
     }, [fromDate, toDate, token, activePrpCode, activeYearNo, browseIsNewDesign]);
 
     useEffect(() => { if (tab === 'beams') loadIssues(); }, [tab, loadIssues]);
@@ -586,9 +611,9 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             <SafeAreaView style={s.screen} />
             <HeaderBarwithBack
                 userName={''}
-                header={'Weft Issue'}
+                header={'Weft Carton Issue'}
                 subHeader={'Issue and manage weft yarn for production'}
-                breadcrumb={'Weft Issue'}
+                breadcrumb={'Weft Carton Issue'}
                 SearchBar={false}
             />
 
@@ -649,6 +674,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                                     </TouchableOpacity>
                                 )}
                             </View>
+                            {(showNewDesign || browseIsNewDesign) && (
                             <View style={s.filterRow}>
                                 <TouchableOpacity
                                     activeOpacity={0.7}
@@ -665,6 +691,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                                     <Text style={[s.filterText, browseIsNewDesign && s.filterTextOn]}>New Design</Text>
                                 </TouchableOpacity>
                             </View>
+                            )}
                             {!!browseSearch && (
                                 <Text style={s.searchHint}>
                                     {filteredIssues.length} record{filteredIssues.length === 1 ? '' : 's'} found. Searches all API fields, including groups and lines.
@@ -696,11 +723,11 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             </KeyboardAvoidingView>
 
             <View style={s.tabs}>
-                <TouchableOpacity style={[s.tab, tab === 'issue' && s.tabOn]} onPress={() => setTab('issue')}>
+                <TouchableOpacity style={[s.tab, tab === 'issue' && s.tabOn]} onPress={() => changeTab('issue')}>
                     <Icon name="qr-code-scanner" size={22} color={tab === 'issue' ? C.indigo : C.ink2} />
                     <Text style={[s.tabText, tab === 'issue' && s.tabTextOn]}>Issue</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.tab, tab === 'beams' && s.tabOn]} onPress={() => setTab('beams')}>
+                <TouchableOpacity style={[s.tab, tab === 'beams' && s.tabOn]} onPress={() => changeTab('beams')}>
                     <Icon name="view-agenda" size={22} color={tab === 'beams' ? C.indigo : C.ink2} />
                     <Text style={[s.tabText, tab === 'beams' && s.tabTextOn]}>Beams</Text>
                 </TouchableOpacity>

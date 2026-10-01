@@ -1,20 +1,17 @@
-import theme from '@/components/theme';
+import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
     Dimensions,
-    Modal,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
-import { PlatformDatePicker } from '../../common/PlatformDatePicker';
+import { Btn, DateField, PickField, SearchBox, Segment, Sheet, useSotLayout } from '../erpUi';
 import { CustomDrawerProps, DesignData, ItemData, ItemStatus } from './Modal';
 
 const { height } = Dimensions.get('window');
@@ -219,626 +216,466 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     };
 
 
+    // ---------------------------------------------------------------------
+    // NEW ERP UI (presentation only — every handler is the original one).
+    // ---------------------------------------------------------------------
+    const { isPhone } = useSotLayout();
+
+    // Fires the original "load more" handler when a list is scrolled near its end.
+    const nearEnd = (fn: () => void) => ({ nativeEvent }: any) => {
+        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+        const paddingToBottom = 20;
+        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+            fn();
+        }
+    };
+
     return (
-        <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
-            <View style={styles.modalOverlay}>
-                <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
-                    <LinearGradient
-                        colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                        style={styles.gradientBackground}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        {/* Close Button */}
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>
-
-                        {/* Scrollable Form Container */}
-                        <ScrollView
-                            style={styles.scrollableFormContainer}
-                            contentContainerStyle={styles.scrollableFormContent}
-                            nestedScrollEnabled={true}
-                        >
-                            {/* From Date */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>From Date</Text>
-                                <PlatformDatePicker
-                                    value={fromDate}
-                                    onChange={onFromDateChange}
-                                    style={styles.dateInput}
-                                    textStyle={styles.dateText}
-                                />
-                            </View>
-
-                            {/* To Date */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>To Date</Text>
-                                <PlatformDatePicker
-                                    value={toDate}
-                                    onChange={onToDateChange}
-                                    style={styles.dateInput}
-                                    textStyle={styles.dateText}
-                                />
-                            </View>
-
-                            {/* Financial Year Dropdown */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Financial Year</Text>
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedYear}</Text>
-                                </TouchableOpacity>
-                                {isYearDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            {yearOptions.map((year) => (
-                                                <TouchableOpacity
-                                                    key={year}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedYear === year && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onYearChange(year);
-                                                        setIsYearDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{year}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Sales Executive Dropdown */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Sales Executive</Text>
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedExe}</Text>
-                                </TouchableOpacity>
-                                {isExeDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            <TouchableOpacity
-                                                style={styles.dropdownOption}
-                                                onPress={() => {
-                                                    onExeChange(null); // Send empty value
-                                                    setIsExeDropdownOpen(false);
-                                                }}
-                                            >
-                                                <Text style={styles.dropdownOptionText}>Select Executive</Text>
-                                            </TouchableOpacity>
-                                            {exeData.map((exe) => (
-                                                <TouchableOpacity
-                                                    key={exe.Code}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedExe === exe.SalesExecutive && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onExeChange(exe);
-                                                        setIsExeDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{exe.SalesExecutive}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                            </View>
-
-                            {/* Accordion for Design Selection */}
-                            <TouchableOpacity
-                                style={styles.accordionHeader}
-                                onPress={toggleDesignAccordion}
-                            >
-                                <Text style={styles.accordionHeaderText}>
-                                    {isDesignAccordionOpen ? `Hide Designs: (${selectedDesigns.length})` : `Select Designs: (${selectedDesigns.length})`}
-                                </Text>
-                                <Icon
-                                    name={isDesignAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                    size={24}
-                                    color="#fff"
-                                />
-                            </TouchableOpacity>
-
-                            {isDesignAccordionOpen && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Designs..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQuery}
-                                            onChangeText={setSearchQuery}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-                                    {/* Select All & Remove All Buttons */}
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered = designData.filter(
-                                                    (design) =>
-                                                        design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                        design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
-                                                );
-                                                setSelectedDesigns(filtered);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedDesigns.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelected}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Selected Designs (Chips) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedDesigns.map((design) => (
-                                            <View key={design.DsnCode} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {design.DsnName} ({design.DsnCode})
-                                                </Text>
-                                            </View>
-                                        ))}
-
-                                    </ScrollView>
-
-                                    {/* Design List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRef}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreDesigns();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedDesigns.map((design) => (
-                                            <TouchableOpacity
-                                                key={design.DsnCode}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedDesigns.some((d) => d.DsnCode === design.DsnCode) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleDesignSelection(design)}
-                                            >
-                                                <Text style={styles.designName}>{design.DsnName}</Text>
-                                                <Text style={styles.designCode}>{design.DsnCode}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMore && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-
-                                </>
-                            )}
-                            <TouchableOpacity
-                                style={styles.accordionHeader}
-                                onPress={toggleDesignAccordionItem}
-                            >
-                                <Text style={styles.accordionHeaderText}>
-                                    {isDesignAccordionOpenItem ? `Hide Items: (${selectedItems.length})` : `Select Items: (${selectedItems.length})`}
-                                </Text>
-                                <Icon
-                                    name={isDesignAccordionOpenItem ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                    size={24}
-                                    color="#fff"
-                                />
-                            </TouchableOpacity>
-                            {isDesignAccordionOpenItem && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Items..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQueryItem}
-                                            onChangeText={setSearchQueryItem}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-                                    {/* Select All & Remove All Buttons */}
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered = itemData.filter(
-                                                    (item) =>
-                                                        item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
-                                                        item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
-                                                );
-                                                setSelectedItems(filtered);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedItems.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelectedItems}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Selected Designs (Chips) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedItems.map((item) => (
-                                            <View key={item.ItmCode} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {item.ItmName} ({item.ItmCode})
-                                                </Text>
-                                            </View>
-                                        ))}
-
-                                    </ScrollView>
-
-                                    {/* Design List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRefItem}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreItems();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedItems.map((item) => (
-                                            <TouchableOpacity
-                                                key={item.ItmCode}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedItems.some((i) => i.ItmCode === item.ItmCode) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleItemSelection(item)}
-                                            >
-                                                <Text style={styles.designName}>{item.ItmName}</Text>
-                                                <Text style={styles.designCode}>{item.ItmCode}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMoreItem && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-
-                                </>
-                            )}
-                            <View style={styles.radioGroup}>
-                                {(['All', 'Open', 'Closed'] as ItemStatus[]).map((status) => (
-                                    <TouchableOpacity
-                                        key={status}
-                                        style={styles.radioButton}
-                                        onPress={() => handleStatusChange(status)}
-                                    >
-                                        <View style={styles.radioCircle}>
-                                            {localItemStatus === status && <View style={styles.radioInnerCircle} />}
-                                        </View>
-                                        <Text style={styles.radioLabel}>{status}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </ScrollView>
-
-                        {/* Load Button (Fixed at Bottom) */}
-                        <View style={styles.loadButtonContainer}>
-                            <TouchableOpacity style={styles.loadButton} onPress={handleLoadPress}>
-                                {isLoading ? (
-                                    <ActivityIndicator size={24} color={theme.BRAND_GRADIENT_START} />
-                                ) : (
-                                    <Icon name="refresh" size={24} color={theme.BRAND_GRADIENT_START} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-                </Animated.View>
+        <Sheet
+            open={isVisible}
+            onClose={onClose}
+            eyebrow="PRODUCTION ORDER TRACKING"
+            title="Filters"
+            side
+            wideMax={460}
+            footer={
+                <>
+                    <Btn label="Cancel" kind="ghost" onPress={onClose} style={{ flex: 1 }} />
+                    <Btn
+                        label={isLoading ? 'Loading…' : 'Load'}
+                        icon="refresh"
+                        onPress={handleLoadPress}
+                        loading={isLoading}
+                        style={{ flex: 2 }}
+                    />
+                </>
+            }
+        >
+            {/* From / To date */}
+            <View style={[styles.dateRow, isPhone && { gap: 8 }]}>
+                <View style={styles.dateCol}>
+                    <Text style={styles.label}>From Date</Text>
+                    <DateField value={fromDate} onChange={onFromDateChange} />
+                </View>
+                <View style={styles.dateCol}>
+                    <Text style={styles.label}>To Date</Text>
+                    <DateField value={toDate} onChange={onToDateChange} />
+                </View>
             </View>
-        </Modal>
+
+            {/* Financial year */}
+            <View style={styles.group}>
+                <Text style={styles.label}>Financial Year</Text>
+                <View style={styles.yearWrap}>
+                    {yearOptions.map((year) => {
+                        const on = selectedYear === year;
+                        return (
+                            <TouchableOpacity
+                                key={year}
+                                style={[styles.yearChip, on && styles.yearChipOn]}
+                                onPress={() => {
+                                    onYearChange(year);
+                                    setIsYearDropdownOpen(false);
+                                }}
+                                accessibilityState={{ selected: on }}
+                            >
+                                {on ? <Icon name="check" size={14} color="#fff" /> : null}
+                                <Text style={[styles.yearChipText, on && { color: '#fff' }]}>{year}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* Sales executive (single select) */}
+            <View style={styles.group}>
+                <PickField
+                    label="Sales Executive"
+                    icon="badge"
+                    value={selectedExe === 'Select Executive' ? '' : selectedExe}
+                    placeholder="Select Executive"
+                    onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
+                />
+                {isExeDropdownOpen && (
+                    <ScrollView style={styles.optList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                        <TouchableOpacity
+                            style={[styles.optRow, selectedExe === 'Select Executive' && styles.optRowOn]}
+                            onPress={() => {
+                                onExeChange(null); // Send empty value
+                                setIsExeDropdownOpen(false);
+                            }}
+                        >
+                            <Icon
+                                name={selectedExe === 'Select Executive' ? 'radio-button-checked' : 'radio-button-unchecked'}
+                                size={19}
+                                color={selectedExe === 'Select Executive' ? T.nav : T.muted}
+                            />
+                            <Text style={[styles.optLabel, { color: T.muted }]}>Select Executive</Text>
+                        </TouchableOpacity>
+                        {exeData.map((exe) => {
+                            const on = selectedExe === exe.SalesExecutive;
+                            return (
+                                <TouchableOpacity
+                                    key={exe.Code}
+                                    style={[styles.optRow, on && styles.optRowOn]}
+                                    onPress={() => {
+                                        onExeChange(exe);
+                                        setIsExeDropdownOpen(false);
+                                    }}
+                                    accessibilityState={{ selected: on }}
+                                >
+                                    <Icon
+                                        name={on ? 'radio-button-checked' : 'radio-button-unchecked'}
+                                        size={19}
+                                        color={on ? T.nav : T.muted}
+                                    />
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text style={styles.optLabel} numberOfLines={1}>{exe.SalesExecutive}</Text>
+                                        <Text style={styles.optCode} numberOfLines={1}>{exe.Code}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+            </View>
+
+            {/* Order status */}
+            <Segment
+                label="Order Status"
+                value={localItemStatus}
+                options={[
+                    { value: 'All', label: 'All' },
+                    { value: 'Open', label: 'Open' },
+                    { value: 'Closed', label: 'Closed' },
+                ]}
+                onChange={(status: ItemStatus) => handleStatusChange(status)}
+            />
+
+            {/* Designs */}
+            <MultiSection
+                title="Designs"
+                icon="style"
+                open={isDesignAccordionOpen}
+                onToggle={toggleDesignAccordion}
+                count={selectedDesigns.length}
+                search={searchQuery}
+                onSearch={setSearchQuery}
+                searchPlaceholder="Search Designs..."
+                onSelectAll={() => {
+                    const filtered = designData.filter(
+                        (design) =>
+                            design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    setSelectedDesigns(filtered);
+                }}
+                onClear={removeAllSelected}
+                selected={selectedDesigns.map((design) => ({
+                    key: String(design.DsnCode),
+                    label: design.DsnName,
+                    code: design.DsnCode,
+                    onRemove: () => toggleDesignSelection(design),
+                }))}
+                options={displayedDesigns.map((design) => ({
+                    key: String(design.DsnCode),
+                    label: design.DsnName,
+                    code: design.DsnCode,
+                    on: selectedDesigns.some((d) => d.DsnCode === design.DsnCode),
+                    onPress: () => toggleDesignSelection(design),
+                }))}
+                listRef={scrollViewRef}
+                onScroll={nearEnd(loadMoreDesigns)}
+                loadingMore={isLoadingMore}
+                hasMore={hasMore}
+                onLoadMore={loadMoreDesigns}
+            />
+
+            {/* Items */}
+            <MultiSection
+                title="Items"
+                icon="category"
+                open={isDesignAccordionOpenItem}
+                onToggle={toggleDesignAccordionItem}
+                count={selectedItems.length}
+                search={searchQueryItem}
+                onSearch={setSearchQueryItem}
+                searchPlaceholder="Search Items..."
+                onSelectAll={() => {
+                    const filtered = itemData.filter(
+                        (item) =>
+                            item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
+                            item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
+                    );
+                    setSelectedItems(filtered);
+                }}
+                onClear={removeAllSelectedItems}
+                selected={selectedItems.map((item) => ({
+                    key: String(item.ItmCode),
+                    label: item.ItmName,
+                    code: item.ItmCode,
+                    onRemove: () => toggleItemSelection(item),
+                }))}
+                options={displayedItems.map((item) => ({
+                    key: String(item.ItmCode),
+                    label: item.ItmName,
+                    code: item.ItmCode,
+                    on: selectedItems.some((i) => i.ItmCode === item.ItmCode),
+                    onPress: () => toggleItemSelection(item),
+                }))}
+                listRef={scrollViewRefItem}
+                onScroll={nearEnd(loadMoreItems)}
+                loadingMore={isLoadingMoreItem}
+                hasMore={hasMoreItem}
+                onLoadMore={loadMoreItems}
+            />
+        </Sheet>
     );
 };
 
+/* ---------------------------------------------------------------------- */
+/* Collapsible multi-select used for Designs / Items                        */
+/* ---------------------------------------------------------------------- */
+
+type MultiOpt = { key: string; label: string; code?: string; on: boolean; onPress: () => void };
+type MultiSel = { key: string; label: string; code?: string; onRemove: () => void };
+
+function MultiSection({
+    title,
+    icon,
+    open,
+    onToggle,
+    count,
+    search,
+    onSearch,
+    searchPlaceholder,
+    onSelectAll,
+    onClear,
+    selected,
+    options,
+    listRef,
+    onScroll,
+    loadingMore,
+    hasMore,
+    onLoadMore,
+}: {
+    title: string;
+    icon: string;
+    open: boolean;
+    onToggle: () => void;
+    count: number;
+    search: string;
+    onSearch: (t: string) => void;
+    searchPlaceholder: string;
+    onSelectAll: () => void;
+    onClear: () => void;
+    selected: MultiSel[];
+    options: MultiOpt[];
+    listRef?: any;
+    onScroll: (e: any) => void;
+    loadingMore: boolean;
+    hasMore: boolean;
+    onLoadMore: () => void;
+}) {
+    return (
+        <View style={[styles.multi, open && styles.multiOpen]}>
+            <TouchableOpacity
+                style={styles.multiHead}
+                onPress={onToggle}
+                accessibilityRole="button"
+                accessibilityLabel={`${open ? 'Hide' : 'Select'} ${title}: (${count})`}
+            >
+                <View style={styles.multiIcon}>
+                    <Icon name={icon as any} size={17} color={T.copper} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.multiTitle}>
+                        {open ? 'Hide' : 'Select'} {title}
+                    </Text>
+                    <Text style={styles.multiSub} numberOfLines={1}>
+                        {count > 0
+                            ? selected.slice(0, 2).map((s) => s.label).join(', ') + (count > 2 ? ` +${count - 2} more` : '')
+                            : 'All (no filter)'}
+                    </Text>
+                </View>
+                <View style={[styles.countBadge, count === 0 && styles.countBadgeOff]}>
+                    <Text style={[styles.countBadgeText, count === 0 && { color: T.muted }]}>{count}</Text>
+                </View>
+                <Icon name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color={T.muted} />
+            </TouchableOpacity>
+
+            {open && (
+                <View style={styles.multiBody}>
+                    <SearchBox value={search} onChangeText={onSearch} placeholder={searchPlaceholder} />
+
+                    <View style={styles.multiActions}>
+                        <TouchableOpacity style={styles.linkBtn} onPress={onSelectAll}>
+                            <Icon name="done-all" size={15} color={T.blue} />
+                            <Text style={styles.linkBtnText}>Select All</Text>
+                        </TouchableOpacity>
+                        {count > 0 ? (
+                            <TouchableOpacity style={styles.linkBtn} onPress={onClear}>
+                                <Icon name="clear-all" size={15} color={T.red} />
+                                <Text style={[styles.linkBtnText, { color: T.red }]}>Clear ({count})</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+
+                    {selected.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selRow}>
+                            {selected.map((s, i) => (
+                                <TouchableOpacity key={`${s.key}-${i}`} style={styles.selChip} onPress={s.onRemove}>
+                                    <Text style={styles.selChipText} numberOfLines={1}>
+                                        {s.label}
+                                        {s.code ? ` (${s.code})` : ''}
+                                    </Text>
+                                    <Icon name="close" size={13} color="#fff" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    ) : null}
+
+                    <ScrollView
+                        ref={listRef}
+                        style={styles.optList}
+                        nestedScrollEnabled
+                        keyboardShouldPersistTaps="handled"
+                        onScroll={onScroll}
+                        scrollEventThrottle={16}
+                    >
+                        {options.map((o, i) => (
+                            <TouchableOpacity
+                                key={`${o.key}-${i}`}
+                                style={[styles.optRow, o.on && styles.optRowOn]}
+                                onPress={o.onPress}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: o.on }}
+                            >
+                                <Icon
+                                    name={o.on ? 'check-box' : 'check-box-outline-blank'}
+                                    size={20}
+                                    color={o.on ? T.nav : T.muted}
+                                />
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={styles.optLabel} numberOfLines={1}>{o.label}</Text>
+                                    {o.code ? <Text style={styles.optCode} numberOfLines={1}>{o.code}</Text> : null}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                        {!options.length ? <Text style={styles.noOpt}>No matches</Text> : null}
+                        {loadingMore ? (
+                            <ActivityIndicator size="small" color={T.copper} style={{ marginVertical: 10 }} />
+                        ) : hasMore ? (
+                            <TouchableOpacity style={styles.moreBtn} onPress={onLoadMore}>
+                                <Text style={styles.moreBtnText}>Show more</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </ScrollView>
+                </View>
+            )}
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
+    group: { gap: 6 },
+    label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+
+    dateRow: { flexDirection: 'row', gap: 10 },
+    dateCol: { flex: 1, minWidth: 0, gap: 6 },
+
+    yearWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    yearChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        height: 34,
+        paddingHorizontal: 12,
+        borderRadius: 17,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
     },
-    drawerContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+    yearChipOn: { backgroundColor: T.nav, borderColor: T.nav },
+    yearChipText: { fontSize: 12.5, fontWeight: '700', color: T.nav },
+
+    multi: {
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 12,
+        backgroundColor: T.surface,
         overflow: 'hidden',
     },
-    gradientBackground: {
-        flex: 1,
-        padding: 20,
-    },
-    closeButton: {
-        alignSelf: 'flex-end',
-        padding: 10,
-    },
-    stepIndicator: {
+    multiOpen: { borderColor: `${T.nav}55` },
+    multiHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, minHeight: 56 },
+    multiIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 9,
         alignItems: 'center',
-        marginBottom: 20,
-    },
-    stepText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    formContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    inputGroup: {
-        marginBottom: 15,
-        zIndex: 10,
-    },
-    label: {
-        fontSize: 16,
-        marginBottom: 5,
-        color: '#fff',
-    },
-    dateInput: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dateText: {
-        color: '#fff',
-    },
-    dropdownButton: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    dropdownText: {
-        color: '#fff',
-    },
-    dropdownOptionsContainer: {
-        position: 'relative',
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        zIndex: 100,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        maxHeight: 200,
-    },
-    dropdownOption: {
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    dropdownOptionText: {
-        color: '#333',
-    },
-    selectedOption: {
-        backgroundColor: '#e0e0e0',
-    },
-    navigationContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 10,
-        marginTop: 'auto',
-    },
-    navButton: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: 10,
-        borderRadius: 5,
-    },
-    loadButton: {
-        backgroundColor: 'rgb(255, 255, 255)',
-        borderRadius: 5,
-        alignItems: 'center',
-        // flex: 1,
-        padding: 10,
-    },
-    loadButtonText: {
-        color: 'rgb(103, 9, 210)',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    // 
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        marginBottom: 10,
-    },
-    searchInput: {
-        flex: 1,
-        padding: 10,
-        color: '#fff',
-    },
-    searchIcon: {
-        marginLeft: 10,
-    },
-    selectedDesignsContainer: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    selectedDesignChip: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-        marginRight: 5,
-    },
-    selectedDesignText: {
-        color: '#fff',
-        fontSize: 12,
-    },
-
-    designListContainer: {
-        maxHeight: 300, // Fixed height for the design list
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    designListContent: {
-        paddingBottom: 20,
-    },
-    designItem: {
-        padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-    },
-    selectedDesignItem: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    designName: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    designCode: {
-        color: '#ccc',
-        fontSize: 12,
-    },
-    loadingIndicator: {
-        padding: 10,
-    },
-    accordionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 15,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    accordionHeaderText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    scrollableFormContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    scrollableFormContent: {
-        paddingBottom: 80, // Extra space for the Load button
-    },
-    loadButtonContainer: {
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        right: 20,
-        alignItems: 'center',
-    },
-    radioGroup: {
-        flexDirection: 'row',
-        marginBottom: 10,
-    },
-    radioButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 20,
-    },
-    radioCircle: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#fff',
         justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
+    },
+    multiTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+    multiSub: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+    countBadge: {
+        minWidth: 22,
+        height: 22,
+        borderRadius: 11,
+        paddingHorizontal: 6,
         alignItems: 'center',
-        marginRight: 5,
+        justifyContent: 'center',
+        backgroundColor: T.copper,
     },
-    radioInnerCircle: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#fff',
+    countBadgeOff: { backgroundColor: T.alt },
+    countBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+    multiBody: {
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        gap: 10,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+        paddingTop: 12,
+        backgroundColor: T.sub,
     },
-    radioLabel: {
-        color: '#fff',
-        fontSize: 14,
-    },
-    selectAllContainer: {
+    multiActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
+    linkBtnText: { fontSize: 12.5, fontWeight: '800', color: T.blue },
+    selRow: { gap: 6 },
+    selChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        gap: 5,
+        height: 28,
+        paddingHorizontal: 10,
+        borderRadius: 14,
+        backgroundColor: T.nav,
+        maxWidth: 240,
     },
-    selectAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 10,
-        borderRadius: 8,
-        marginRight: 10,
+    selChipText: { fontSize: 11.5, fontWeight: '700', color: '#fff', flexShrink: 1 },
+    optList: {
+        maxHeight: 260,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.surface,
+    },
+    optRow: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        minHeight: 44,
+        borderBottomWidth: 1,
+        borderBottomColor: T.hair,
     },
-    selectAllButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    removeAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        padding: 8,
-        borderRadius: 12,
-    },
+    optRowOn: { backgroundColor: `${T.nav}0D` },
+    optLabel: { fontSize: 13.5, fontWeight: '700', color: T.ink },
+    optCode: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
+    noOpt: { textAlign: 'center', color: T.muted, fontSize: 12.5, paddingVertical: 16 },
+    moreBtn: { alignItems: 'center', paddingVertical: 10 },
+    moreBtnText: { fontSize: 12.5, fontWeight: '800', color: T.copper },
 });
 
 export default CustomDrawer;

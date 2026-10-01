@@ -1,27 +1,47 @@
-import { crlimtreq_styles } from '@/common/Style';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
     ScrollView, StyleSheet,
     Text,
-    TextInput, TouchableOpacity,
+    TouchableOpacity,
     useWindowDimensions,
     View
 } from 'react-native';
 // import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import theme from '@/components/theme';
+import {
+    Avatar,
+    BusyOverlay,
+    Btn,
+    CONTENT_MAX,
+    EmptyState as ErpEmptyState,
+    Kpi,
+    KpiGrid,
+    Metric,
+    PanelHeader,
+    SearchBox,
+    SectionHead,
+    Segment,
+    Toolbar,
+    cellWidth,
+    useSotLayout,
+} from '@/src/components/erpUi';
+import { S, T } from '@/src/theme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/FunctionsNEW';
-import HeaderBar from '../../components/HeaderNew';
 import CustomDrawer from './CustomDrawer';
 // import Footer from '../Footer/Footer';
 import { API } from '@/common/API/dynamicAPI';
+
+// NEW ERP UI: Indian-format money for display only.
+const inr = (v: any) =>
+    `₹ ${Number(parseFloat(String(v ?? '0')) || 0).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
 
 interface CardData {
     [key: string]: string;
@@ -557,6 +577,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
         return str;
     };
 
+
     // cards detail
     const AllKeysCardsView = ({ data, searchQuery, getDetailsDataSetting }) => {
         // Lazy loading configuration
@@ -703,6 +724,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
 
         const { width: screenWidth, height: screenHeight } = useWindowDimensions();
         const isCardLocked = lockedCardId !== null;
+        const { cols: akvCols, gutter: akvGutter } = useSotLayout(); // NEW ERP UI layout
 
         const toggleCardLock = useCallback((cardId: string) => {
             setLockedCardId(prevId => prevId === cardId ? null : cardId);
@@ -819,7 +841,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
         const toggleGroup = useCallback((groupKey) => {
             setExpandedGroups(prev => ({
                 ...prev,
-                [groupKey]: !prev[groupKey]
+                // FIX: groups start expanded (undefined), so the first tap must collapse.
+                [groupKey]: prev[groupKey] === false
             }));
         }, []);
 
@@ -851,206 +874,142 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             }
         }, [groupedData, loadedItems, isLoadingMore]);
 
-        // Color palette
-        const CARD_COLORS = [
-            ["#4A6FA5", "#5C85D1"], ["#2E5BBA", "#4A7CC5"],
-            ["#3A7BD5", "#5A9BD5"], ["#00ABC5", "#00D4FF"],
-            ["#4CAF50", "#6BC96B"], ["#FF9800", "#FFB74D"],
-            ["#9C27B0", "#BA68C8"], ["#607D8B", "#90A4AE"],
-        ];
+        // NEW ERP UI: money columns are lifted into the metric box of each card.
+        const metricCols = ["tranamt", "clramt"];
+        const listCols = useMemo(
+            () => visibleColumns.filter((col) => !metricCols.includes(String(col).toLowerCase())),
+            [visibleColumns]
+        );
+        const shownMetricCols = useMemo(
+            () => visibleColumns.filter((col) => metricCols.includes(String(col).toLowerCase())),
+            [visibleColumns]
+        );
 
         // Render group header
         const renderGroupHeader = useCallback((groupKey, index, itemCount) => {
-            const colors = CARD_COLORS[index % CARD_COLORS.length];
             const isExpanded = expandedGroups[groupKey] !== false;
 
             return (
                 <TouchableOpacity
                     key={`header-${groupKey}`}
                     onPress={() => toggleGroup(groupKey)}
-                    activeOpacity={0.7}
-                    style={{
-                        marginBottom: 8,
-                        marginHorizontal: gridConfig.containerPadding,
-                        borderRadius: 10,
-                        overflow: 'hidden',
-                        elevation: 2,
-                    }}
+                    activeOpacity={0.8}
+                    style={styles.groupHead}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: isExpanded }}
                 >
-                    <LinearGradient
-                        colors={colors}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={{
-                            padding: 12,
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                        }}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                            {shouldGroup && (
-                                <Icon
-                                    name={isExpanded ? "expand-less" : "expand-more"}
-                                    size={20}
-                                    color="#fff"
-                                    style={{ marginRight: 8 }}
-                                />
-                            )}
-                            <Text
-                                numberOfLines={1}
-                                style={{
-                                    color: "#fff",
-                                    fontWeight: "600",
-                                    fontSize: screenWidth <= 400 ? 13 : 14,
-                                    flex: 1,
-                                }}
-                            >
-                                {groupKey}
-                            </Text>
+                    {shouldGroup && (
+                        <View style={styles.groupChevron}>
+                            <Icon
+                                name={isExpanded ? "expand-less" : "expand-more"}
+                                size={18}
+                                color={T.nav}
+                            />
                         </View>
-                        <View style={{
-                            backgroundColor: 'rgba(255,255,255,0.2)',
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 12,
-                            marginLeft: 8
-                        }}>
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: 11,
-                                fontWeight: "500",
-                            }}>
-                                {itemCount}
-                            </Text>
-                        </View>
-                    </LinearGradient>
+                    )}
+                    <Text numberOfLines={1} style={styles.groupTitle}>
+                        {groupKey}
+                    </Text>
+                    <View style={styles.countPill}>
+                        <Text style={styles.countPillText}>{itemCount}</Text>
+                    </View>
                 </TouchableOpacity>
             );
-        }, [CARD_COLORS, expandedGroups, shouldGroup, toggleGroup, gridConfig.containerPadding, screenWidth]);
+        }, [expandedGroups, shouldGroup, toggleGroup]);
 
         const renderCard = useCallback((item, index, groupKey) => {
 
-            const colors = CARD_COLORS[index % CARD_COLORS.length];
+            const valueOf = (col) => {
+                const colIndex = columns.indexOf(col);
+                const isNumeric = filterDataTypes[colIndex] === 'N';
+                const value = item[col];
+                return value !== undefined && value !== null
+                    ? (isNumeric ? formatValue(value, col) : String(value))
+                    : '-';
+            };
 
             return (
                 <TouchableOpacity
-                    activeOpacity={0.95}
-                    // onPress={() => {
-                    //     setSelectedPartyName(item.AccName || item.grpname || "");
-                    //     handleCardLongPress(item, colors);
-                    //     handlecardpress(item);   // 🔥 API CALL
-                    // }}
+                    activeOpacity={0.85}
                     onPress={() => {
                         setSelectedPartyName(item.AccName || item.grpname || "");
                         setSelectedSexeCard(item);
-                        handleCardLongPress(item, colors);
+                        handleCardLongPress(item, null); // colours were only used by the old gradient
                         handlecardpress(item); // API
                     }}
-                    // onLongPress={() => {
-                    //     handleCardLongPress(item, colors);
-                    //     handlecardpress(item);   // 🔥 API CALL
-                    // }}
                     delayLongPress={400}
-                    style={{
-                        width: gridConfig.cardWidth,
-                        minHeight: 265,
-                        maxHeight: 350,
-                        borderRadius: 12,
-                        overflow: "hidden",
-                        elevation: 4,
-                    }}
+                    style={styles.rowCard}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open details${item.AccName ? ` for ${item.AccName}` : ''}`}
                 >
-                    <LinearGradient
-                        colors={colors}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{
-                            flex: 1,
-                            padding: 12,
-                        }}
-                    >
-                        {/* TITLE */}
-                        {(item.AccName) && (
-                            <Text
-                                numberOfLines={1}
-                                style={{
-                                    color: "#fff",
-                                    fontSize: 15,
-                                    fontWeight: "700",
-                                    marginBottom: 10,
-                                }}
-                            >
-                                {item.AccName}
-                            </Text>
-                        )}
+                    {/* TITLE */}
+                    <View style={styles.rowCardHead}>
+                        <View style={styles.rowCardIcon}>
+                            <Icon name="receipt-long" size={17} color={T.copper} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            {(item.AccName) ? (
+                                <Text numberOfLines={2} style={styles.cardTitle}>
+                                    {item.AccName}
+                                </Text>
+                            ) : (
+                                <Text numberOfLines={1} style={styles.cardTitle}>
+                                    Entry {index + 1}
+                                </Text>
+                            )}
+                        </View>
+                        <Icon name="chevron-right" size={22} color={T.muted} />
+                    </View>
 
-                        {/* CONTENT */}
-                        <ScrollView
-                            nestedScrollEnabled
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 8 }}
-                        >
-                            {visibleColumns.map((col) => {
+                    {/* MONEY */}
+                    {shownMetricCols.length > 0 && (
+                        <View style={styles.metricBox}>
+                            {shownMetricCols.map((col, i) => (
+                                <Metric
+                                    key={col}
+                                    label={labelMap[col] || col}
+                                    value={valueOf(col)}
+                                    color={String(col).toLowerCase() === 'clramt' ? T.green : T.nav}
+                                    align={i === 0 ? 'left' : 'right'}
+                                />
+                            ))}
+                        </View>
+                    )}
 
-                                const colIndex = columns.indexOf(col);
-                                const isNumeric = filterDataTypes[colIndex] === 'N';
-                                const value = item[col];
-                                const label = labelMap[col] || col;
+                    {/* CONTENT */}
+                    <View style={styles.kvList}>
+                        {listCols.map((col) => {
 
-                                const displayValue =
-                                    value !== undefined && value !== null
-                                        ? (isNumeric ? formatValue(value, col) : String(value))
-                                        : '-';
+                            const colIndex = columns.indexOf(col);
+                            const isNumeric = filterDataTypes[colIndex] === 'N';
+                            const label = labelMap[col] || col;
 
-                                return (
-                                    <View
-                                        key={col}
-                                        style={{
-                                            flexDirection: 'row',
-                                            justifyContent: 'space-between',
-                                            marginBottom: 6,   // 👈 compact spacing
-                                        }}
+                            return (
+                                <View key={col} style={styles.kvRow}>
+                                    <Text numberOfLines={1} style={styles.kvLabel}>
+                                        {label}
+                                    </Text>
+                                    <Text
+                                        numberOfLines={1}
+                                        style={[styles.kvValue, isNumeric && { fontWeight: '800' }]}
                                     >
-                                        <Text
-                                            numberOfLines={1}
-                                            style={{
-                                                color: "rgba(255,255,255,0.75)",
-                                                fontSize: 11,
-                                                width: '48%',
-                                            }}
-                                        >
-                                            {label}
-                                        </Text>
-
-                                        <Text
-                                            numberOfLines={1}
-                                            style={{
-                                                color: "#fff",
-                                                fontSize: 12,
-                                                fontWeight: isNumeric ? "700" : "500",
-                                                textAlign: 'right',
-                                                width: '50%',
-                                            }}
-                                        >
-                                            {displayValue}
-                                        </Text>
-                                    </View>
-                                );
-                            })}
-                        </ScrollView>
-
-                    </LinearGradient>
+                                        {valueOf(col)}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
                 </TouchableOpacity>
             );
 
         }, [
             visibleColumns,
+            listCols,
+            shownMetricCols,
             columns,
             filterDataTypes,
             labelMap,
             formatValue,
-            gridConfig.cardWidth
         ]);
 
         const CardDetailModal = useCallback(() => {
@@ -1060,52 +1019,20 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
 
                 if (!Array.isArray(cardDetailData) || cardDetailData.length === 0) {
                     return (
-                        <Text style={{
-                            textAlign: "center",
-                            marginTop: 30,
-                            fontSize: 16,
-                            color: "#666"
-                        }}>
-                            No data found
-                        </Text>
+                        <ErpEmptyState icon="search-off" title="No data found" text="No voucher details were returned for this entry." />
                     );
                 }
 
-                const rows = [];
+                return (
+                    <View style={styles.gridWrap}>
+                        {cardDetailData.map((row, index) => (
 
-                for (let i = 0; i < cardDetailData.length; i += 2) {
-
-                    const rowItems = cardDetailData.slice(i, i + 2);
-
-                    rows.push(
-                        <View
-                            key={`row-${i}`}
-                            style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                marginBottom: 12
-                            }}
-                        >
-
-                            {rowItems.map((row, index) => (
-
-                                <LinearGradient
-                                    key={index}
-                                    colors={selectedCardColors || ["#4A6FA5", "#5C85D1"]}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{
-                                        width: "48%",
-                                        borderRadius: 12,
-                                        padding: 12,
-                                        minHeight: 150,
-                                        elevation: 4
-                                    }}
-                                >
+                            <View key={`row-${index}`} style={[cellWidth(akvCols), styles.gridCell]}>
+                                <View style={styles.detailCard}>
 
                                     {Object.keys(row)
                                         .filter((key) => key !== "PrpCode")
-                                        .map((key) => {
+                                        .map((key, kIndex) => {
 
                                             let value = row[key];
                                             let caption = key;
@@ -1133,49 +1060,31 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
                                             return (
                                                 <View
                                                     key={key}
-                                                    style={{
-                                                        flexDirection: "row",
-                                                        justifyContent: "space-between",
-                                                        marginBottom: 6
-                                                    }}
+                                                    style={[styles.kvRow, kIndex === 0 && { borderTopWidth: 0 }]}
                                                 >
-
-                                                    <Text
-                                                        style={{
-                                                            color: "rgba(255,255,255,0.75)",
-                                                            fontSize: 11,
-                                                            width: "48%"
-                                                        }}
-                                                    >
+                                                    <Text style={styles.kvLabel} numberOfLines={1}>
                                                         {caption}
                                                     </Text>
-
                                                     <Text
-                                                        style={{
-                                                            color: "#fff",
-                                                            fontSize: 12,
-                                                            fontWeight: "700",
-                                                            textAlign: "right",
-                                                            width: "50%"
-                                                        }}
+                                                        style={[
+                                                            styles.kvValue,
+                                                            key === "SetAmt" && { color: T.nav, fontWeight: '900', fontSize: 14 },
+                                                        ]}
+                                                        numberOfLines={2}
                                                     >
                                                         {value}
                                                     </Text>
-
                                                 </View>
                                             );
 
                                         })}
 
-                                </LinearGradient>
+                                </View>
+                            </View>
 
-                            ))}
-
-                        </View>
-                    );
-                }
-
-                return rows;
+                        ))}
+                    </View>
+                );
             };
 
 
@@ -1183,69 +1092,26 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
                 <>
 
                     {detailModalVisible && (
-                        <View style={styles.detailOverlay101112}>
-                            <View style={styles.detailContainerLast}>
+                        <View style={[styles.panel, { zIndex: 500, elevation: 25 }]}>
 
-                                <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+                            {/* HEADER */}
+                            <PanelHeader
+                                onBack={closeModal}
+                                crumbs={['Daily Collection', getSelectedSexeName ? String(getSelectedSexeName) : 'Details']}
+                                title={`Details - ${selectedPartyName}`}
+                                subtitle={`${Array.isArray(cardDetailData) ? cardDetailData.length : 0} voucher${Array.isArray(cardDetailData) && cardDetailData.length === 1 ? '' : 's'}`}
+                            />
 
-                                    {/* HEADER */}
+                            {/* CONTENT */}
+                            <ScrollView
+                                style={{ flex: 1 }}
+                                contentContainerStyle={[styles.listContent, { paddingHorizontal: akvGutter - 5 }]}
+                            >
 
-                                    <LinearGradient
-                                        colors={selectedCardColors || ["#4A6FA5", "#5C85D1"]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={{
-                                            flexDirection: "row",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            paddingTop: screenHeight > 800 ? 50 : 40,
-                                            paddingBottom: 20,
-                                            paddingHorizontal: 20,
-                                            borderBottomLeftRadius: 20,
-                                            borderBottomRightRadius: 20,
-                                            elevation: 5
-                                        }}
-                                    >
+                                {renderRows()}
 
-                                        <Text
-                                            style={{
-                                                color: "#fff",
-                                                fontSize: screenWidth <= 400 ? 18 : 20,
-                                                fontWeight: "bold",
-                                                flex: 1
-                                            }}
-                                        >
-                                            Details - {selectedPartyName}
-                                        </Text>
+                            </ScrollView>
 
-                                        <TouchableOpacity
-                                            onPress={closeModal}
-                                            style={{
-                                                backgroundColor: "rgba(255,255,255,0.3)",
-                                                borderRadius: 20,
-                                                padding: 8
-                                            }}
-                                        >
-                                            <Icon name="close" size={24} color="#fff" />
-                                        </TouchableOpacity>
-
-                                    </LinearGradient>
-
-
-                                    {/* CONTENT */}
-
-                                    <ScrollView
-                                        style={{ flex: 1 }}
-                                        contentContainerStyle={{ padding: 20 }}
-                                    >
-
-                                        {renderRows()}
-
-                                    </ScrollView>
-
-                                </View>
-
-                            </View>
                         </View>
                     )}
                 </>
@@ -1255,8 +1121,30 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             detailModalVisible,
             selectedCard,
             selectedCardColors,
-            cardDetailData
+            cardDetailData,
+            akvCols,
+            akvGutter,
         ]);
+
+        // "Show more" fallback for a group: same batch step as the scroll-based lazy load
+        // (used when the list is too short to scroll on large screens).
+        const loadMoreGroup = useCallback((groupKey) => {
+            const totalCount = groupedData[groupKey]?.length || 0;
+            const currentLoaded = loadedItems[groupKey] || 0;
+            if (currentLoaded < totalCount && !isLoadingMore[groupKey]) {
+                setIsLoadingMore(prev => ({ ...prev, [groupKey]: true }));
+                setTimeout(() => {
+                    setLoadedItems(prev => ({
+                        ...prev,
+                        [groupKey]: Math.min(
+                            currentLoaded + LAZY_LOAD_CONFIG.SUBSEQUENT_BATCH,
+                            totalCount
+                        )
+                    }));
+                    setIsLoadingMore(prev => ({ ...prev, [groupKey]: false }));
+                }, 100);
+            }
+        }, [groupedData, loadedItems, isLoadingMore]);
 
         const renderGroupContent = useCallback((items, groupKey) => {
             const loadedCount = loadedItems[groupKey] || Math.min(LAZY_LOAD_CONFIG.INITIAL_BATCH, items.length);
@@ -1265,226 +1153,102 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
 
             const rows = [];
 
-            for (let i = 0; i < displayedItems.length; i += gridConfig.numColumns) {
-                const rowItems = displayedItems.slice(i, i + gridConfig.numColumns);
-                const isLastRow = i + gridConfig.numColumns >= displayedItems.length;
-
-                rows.push(
-                    <View
-                        key={`${groupKey}-row-${i}`}
-                        style={{
-                            flexDirection: 'row',
-                            justifyContent: 'flex-start',
-                            marginHorizontal: gridConfig.containerPadding,
-                            marginBottom: isLastRow ? 0 : 16,
-                        }}
-                    >
-                        {rowItems.map((item, index) => {
-                            const actualIndex = i + index;
-                            return (
-                                <View
-                                    key={`${groupKey}-${actualIndex}`}
-                                    style={{
-                                        width: gridConfig.cardWidth,
-                                        marginRight: index < rowItems.length - 1 ? gridConfig.gap : 0,
-                                    }}
-                                >
-                                    {renderCard(item, actualIndex, groupKey)}
-                                </View>
-                            );
-                        })}
-                    </View>
-                );
-            }
+            rows.push(
+                <View key={`${groupKey}-grid`} style={styles.gridWrap}>
+                    {displayedItems.map((item, index) => (
+                        <View key={`${groupKey}-${index}`} style={[cellWidth(gridConfig.numColumns), styles.gridCell]}>
+                            {renderCard(item, index, groupKey)}
+                        </View>
+                    ))}
+                </View>
+            );
 
             // Loading indicator
             if (hasMore && isLoadingMore[groupKey]) {
                 rows.push(
-                    <View key={`${groupKey}-loading`} style={{
-                        marginHorizontal: gridConfig.containerPadding,
-                        marginTop: 8,
-                        marginBottom: 16,
-                        padding: 12,
-                        alignItems: 'center',
-                        backgroundColor: '#f0f0f0',
-                        borderRadius: 8,
-                    }}>
-                        <ActivityIndicator size="small" color="#4A6FA5" />
-                        <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
+                    <View key={`${groupKey}-loading`} style={styles.loadingMore}>
+                        <ActivityIndicator size="small" color={T.copper} />
+                        <Text style={styles.loadingMoreText}>
                             Loading more...
                         </Text>
                     </View>
                 );
+            } else if (hasMore) {
+                rows.push(
+                    <TouchableOpacity
+                        key={`${groupKey}-more`}
+                        style={styles.loadingMore}
+                        onPress={() => loadMoreGroup(groupKey)}
+                        accessibilityRole="button"
+                    >
+                        <Icon name="expand-more" size={18} color={T.copper} />
+                        <Text style={[styles.loadingMoreText, { color: T.copper }]}>
+                            Show more ({items.length - loadedCount} left)
+                        </Text>
+                    </TouchableOpacity>
+                );
             }
 
             return rows;
-        }, [gridConfig, renderCard, loadedItems, isLoadingMore]);
+        }, [gridConfig, renderCard, loadedItems, isLoadingMore, loadMoreGroup]);
 
-        // Footer
-        // const Footer = useCallback(() => {
-        //     if (Object.keys(totals).length === 0) return null;
-
-        //     return (
-        //         <LinearGradient
-        //             // colors={['#4A6FA5', '#5C85D1']}
-        //             colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-        //             style={{
-        //                 position: "absolute",
-        //                 bottom: 0,
-        //                 left: 0,
-        //                 right: 0,
-        //                 padding: screenWidth <= 400 ? 12 : 16,
-        //                 borderTopLeftRadius: 16,
-        //                 borderTopRightRadius: 16,
-        //                 elevation: 10,
-        //                 shadowColor: "#000",
-        //                 shadowOffset: { width: 0, height: -3 },
-        //                 shadowOpacity: 0.2,
-        //                 shadowRadius: 6,
-        //                 zIndex: 1000,
-        //             }}
-        //         >
-        //             <Text style={{
-        //                 color: "#fff",
-        //                 fontSize: screenWidth <= 400 ? 13 : 14,
-        //                 fontWeight: "700",
-        //                 marginBottom: 10,
-        //             }}>
-        //                 Totals
-        //             </Text>
-
-        //             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        //                 <View style={{ flexDirection: 'row', paddingRight: 20 }}>
-        //                     {Object.entries(totals).map(([col, value]) => (
-        //                         <View key={col} style={{
-        //                             marginLeft: 16,
-        //                             backgroundColor: 'rgba(255,255,255,0.15)',
-        //                             paddingHorizontal: 12,
-        //                             paddingVertical: 6,
-        //                             borderRadius: 20,
-        //                         }}>
-        //                             <Text style={{
-        //                                 color: "rgba(255,255,255,0.9)",
-        //                                 fontSize: screenWidth <= 400 ? 11 : 12,
-        //                                 fontWeight: "600",
-        //                             }}>
-        //                                 {labelMap[col]}: {formatValue(value, col)}
-        //                             </Text>
-        //                         </View>
-        //                     ))}
-        //                 </View>
-        //             </ScrollView>
-        //         </LinearGradient>
-        //     );
-        // }, [totals, labelMap, formatValue, screenWidth]);
-
+        // Footer (sticky totals bar)
         const Footer = useCallback(() => {
             if (Object.keys(totals).length === 0) return null;
 
             return (
-                <LinearGradient
-                    colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-                    style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        padding: screenWidth <= 400 ? 12 : 16,
-                        borderTopLeftRadius: 16,
-                        borderTopRightRadius: 16,
-                        elevation: 10,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: -3 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 6,
-                        zIndex: 1000,
-                    }}
-                >
-                    <Text style={{
-                        color: "#fff",
-                        fontSize: screenWidth <= 400 ? 13 : 14,
-                        fontWeight: "700",
-                        marginBottom: 10,
-                    }}>
-                        Totals
-                    </Text>
-
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={{ flexDirection: 'row', paddingRight: 20 }}>
-                            {Object.entries(totals).map(([col, value]) => (
-                                <View
+                <View style={styles.totalsBar}>
+                    <View style={styles.totalsInner}>
+                        <Text style={styles.totalsEyebrow}>TOTALS</Text>
+                        <View style={styles.totalsRow}>
+                            {Object.entries(totals).map(([col, value], i) => (
+                                <Metric
                                     key={col}
-                                    style={{
-                                        marginLeft: 16,
-                                        backgroundColor: 'rgba(255,255,255,0.15)',
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 6,
-                                        borderRadius: 20,
-                                    }}
-                                >
-                                    <Text style={{
-                                        color: "rgba(255,255,255,0.9)",
-                                        fontSize: screenWidth <= 400 ? 11 : 12,
-                                        fontWeight: "600",
-                                    }}>
-                                        {labelMap[col] || col}: ₹ {value.toLocaleString('en-IN', {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2
-                                        })}
-                                    </Text>
-                                </View>
+                                    label={labelMap[col] || col}
+                                    value={`₹ ${value.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    })}`}
+                                    color={col === 'clramt' ? T.green : T.nav}
+                                    align={i === 0 ? 'left' : 'right'}
+                                />
                             ))}
                         </View>
-                    </ScrollView>
-                </LinearGradient>
+                    </View>
+                </View>
             );
-        }, [totals, labelMap, screenWidth]);
+        }, [totals, labelMap]);
         // Empty state
         const EmptyState = useCallback(() => (
-            <View style={{
-                flex: 1,
-                justifyContent: "center",
-                alignItems: "center",
-                padding: 40,
-                marginTop: 60
-            }}>
-                <Icon name="search-off" size={48} color="#ccc" />
-                <Text style={{
-                    color: "#666",
-                    fontSize: 16,
-                    marginTop: 12,
-                    textAlign: 'center'
-                }}>
-                    No records found
-                </Text>
-            </View>
+            <ErpEmptyState icon="search-off" title="No records found" text="Try a different search term." />
         ), []);
 
         // Main render
         return (
             <>
                 <View
-                    style={{ flex: 1, backgroundColor: '#f8f9fa' }}
+                    style={{ flex: 1, backgroundColor: T.bg }}
                     pointerEvents="box-none"
                 >
                     {/* MAIN SCROLLVIEW (Disabled if card is locked or modal is open) */}
                     <ScrollView
                         ref={mainScrollRef}
-                        contentContainerStyle={{ paddingBottom: 120 }}
+                        style={{ flex: 1 }}
+                        contentContainerStyle={[styles.listContent, { paddingHorizontal: akvGutter - 5 }]}
                         showsVerticalScrollIndicator
                         scrollEnabled={!isCardLocked && !isModalOpen}
                         onScroll={handleScroll}
                         scrollEventThrottle={16}
                     >
-                        {Object.entries(groupedData).length > 0 ? (
+                        {Object.entries(groupedData).length > 0 && filteredData.length > 0 ? (
                             Object.entries(groupedData).map(([groupKey, items], index) => {
                                 const isExpanded = shouldGroup ? (expandedGroups[groupKey] !== false) : true;
 
                                 return (
-                                    <View key={groupKey} style={{ marginBottom: 16 }}>
+                                    <View key={groupKey} style={styles.groupBlock}>
                                         {renderGroupHeader(groupKey, index, items.length)}
                                         {(shouldGroup ? isExpanded : true) && items.length > 0 && (
-                                            <View style={{ marginTop: 8 }}>
+                                            <View style={{ marginTop: 4 }}>
                                                 {renderGroupContent(items, groupKey)}
                                             </View>
                                         )}
@@ -1519,19 +1283,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
 
     // cards detail over
 
-    const DASHBOARD_COLORS = [
-        ['#1A1A2E', '#2D1B69'], // Dark Purple
-        ['#0F3460', '#1E5A8A'], // Deep Ocean
-        ['#1B5E20', '#2E7D32'], // Forest Green
-        ['#333333', '#4F4F4F'], // Charcoal
-        ['#5D1049', '#8A235C'], // Dark Magenta
-        ['#8B4513', '#A0522D'], // Saddle Brown
-        ['#2F4F4F', '#556B2F'], // Dark Slate Gray
-        ['#483D8B', '#6A5ACD'], // Slate Blue (not pure blue)
-        ['#800020', '#B22222'], // Dark Red
-        ['#228B22', '#32CD32'], // Dark Green
-    ];
-
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTo({
@@ -1540,7 +1291,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             });
         }
     }, [activeCard, isLoadingSummary]);
-
 
     //main cards detail Start
 
@@ -1564,7 +1314,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             CrInBankAccCollection: "Credit in Bank"
         };
 
-        const { width: screenWidth } = useWindowDimensions();
+        const { isPhone, cols, gutter } = useSotLayout();
 
         const filteredData = useMemo(() => {
 
@@ -1597,29 +1347,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
 
         }, [filteredData]);
 
-        const DASHBOARD_COLORS = [
-            ['#1A1A2E', '#2D1B69'], ['#0F3460', '#1E5A8A'],
-            ['#1B5E20', '#2E7D32'], ['#333333', '#4F4F4F'],
-            ['#5D1049', '#8A235C'], ['#8B4513', '#A0522D'],
-            ['#2F4F4F', '#556B2F'], ['#483D8B', '#6A5ACD']
-        ];
-
-        const getGridConfig = () => {
-
-            if (screenWidth <= 400) {
-                return { numColumns: 2, cardWidth: (screenWidth - 48) / 2, margin: 12, gutter: 12 };
-            } else if (screenWidth <= 600) {
-                return { numColumns: 2, cardWidth: (screenWidth - 48) / 2, margin: 12, gutter: 12 };
-            } else if (screenWidth <= 900) {
-                return { numColumns: 3, cardWidth: (screenWidth - 64) / 3, margin: 12, gutter: 12 };
-            } else {
-                return { numColumns: 4, cardWidth: (screenWidth - 80) / 4, margin: 12, gutter: 12 };
-            }
-
-        };
-
-        const gridConfig = getGridConfig();
-
         const formatValue = (value, col) => {
 
             if (value === undefined || value === null) return "-";
@@ -1636,234 +1363,109 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             return String(value);
         };
 
-        const renderCard = (item, index, tabType) => {
-            const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
+        const renderCard = (item, index, tabType?) => {
             const isActive = activeSlab === item.PrpCode;
-            const cardHeight = Math.max(140, visibleColumns.length * 45 + 50);
             return (
-                <TouchableOpacity
-                    key={`${item.PrpCode}-${index}`}
-                    style={{
-                        width: gridConfig.cardWidth,
-                        height: cardHeight,
-                        borderRadius: 8,
-                        marginBottom: gridConfig.gutter,
-                        overflow: "hidden",
-                        elevation: 3,
-                    }}
-                    activeOpacity={0.9}
-                    disabled={isLoadingSummary}
-                    onPress={() => onCardPress && onCardPress(item)}
-                >
-                    <LinearGradient
-                        colors={isActive
-                            ? [theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]
-                            : colors}
-                        style={{
-                            flex: 1,
-                            padding: 12,
-                        }}
+                <View key={`${item.PrpCode}-${index}`} style={[cellWidth(cols), styles.gridCell]}>
+                    <TouchableOpacity
+                        style={[styles.card, isActive && styles.cardActive, isLoadingSummary && { opacity: 0.6 }]}
+                        activeOpacity={0.85}
+                        disabled={isLoadingSummary}
+                        onPress={() => onCardPress && onCardPress(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${item.PrpName || 'property'} collection`}
                     >
-                        <View style={{ flex: 1 }}>
-                            {visibleColumns.map((col) => (
-                                <View
-                                    key={col}
-                                    style={{
-                                        marginBottom: 8,
-                                        alignItems: 'flex-end',
-                                        width: '100%',
-                                    }}
-                                >
-                                    <Text style={{
-                                        color: "rgba(255,255,255,0.6)",
-                                        fontSize: screenWidth <= 400 ? 10 : 11,
-                                        marginBottom: 2
-                                    }}>
-                                        {labelMap[col]}
-                                    </Text>
-                                    <Text style={{
-                                        color: "#fff",
-                                        fontSize: screenWidth <= 400 ? 11 : 12,
-                                        fontWeight: "700"
-                                    }}>
-                                        {formatValue(item[col], col)}
-                                    </Text>
+                        <View style={styles.cardHead}>
+                            <View style={styles.cardIcon}>
+                                <Icon name="account-balance" size={18} color={T.copper} />
+                            </View>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={styles.cardTitle} numberOfLines={2}>{item[visibleColumns[0]] || '-'}</Text>
+                                {!!item.PrpCode && <Text style={styles.cardMeta} numberOfLines={1}>#{item.PrpCode}</Text>}
+                            </View>
+                            {isActive ? (
+                                <View style={styles.activeBadge}>
+                                    <Icon name="history" size={11} color={T.copper} />
+                                    <Text style={styles.activeBadgeText}>Last opened</Text>
                                 </View>
-                            ))}
+                            ) : (
+                                <Icon name="chevron-right" size={22} color={T.muted} />
+                            )}
                         </View>
-                    </LinearGradient>
-                </TouchableOpacity>
+                        <View style={styles.metricBox}>
+                            <Metric
+                                label={labelMap.ToDaysCollection}
+                                value={formatValue(item.ToDaysCollection, "ToDaysCollection")}
+                                color={T.nav}
+                            />
+                            <Metric
+                                label={labelMap.CrInBankAccCollection}
+                                value={formatValue(item.CrInBankAccCollection, "CrInBankAccCollection")}
+                                color={T.green}
+                                align="right"
+                            />
+                        </View>
+                    </TouchableOpacity>
+                </View>
             );
         };
 
-        const renderItemsInGrid = () => {
-            const rows = [];
-            for (let i = 0; i < filteredData.length; i += gridConfig.numColumns) {
-                const rowItems = filteredData.slice(i, i + gridConfig.numColumns);
-                rows.push(
-                    <View
-                        key={`row-${i}`}
-                        style={{
-                            flexDirection: 'row',
-                            justifyContent: 'flex-start',
-                            marginHorizontal: gridConfig.margin,
-                            gap: gridConfig.gutter,
-                        }}
-                    >
-
-                        {rowItems.map((item, index) =>
-                            renderCard(item, i + index)
-                        )}
-
-                        {rowItems.length < gridConfig.numColumns &&
-                            Array(gridConfig.numColumns - rowItems.length)
-                                .fill(null)
-                                .map((_, index) => (
-                                    <View
-                                        key={`empty-${index}`}
-                                        style={{ width: gridConfig.cardWidth }}
-                                    />
-                                ))
-                        }
-
-                    </View>
-
-                );
-            }
-
-            return rows;
-        };
-
-        // ✅ Footer totals
-        const Footer = () => {
-
-            if (!filteredData.length) return null;
-
-            return (
-
-                <LinearGradient
-                    colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
-                    style={{
-                        position: "absolute",
-                        bottom: 65,
-                        left: 0,
-                        right: 0,
-                        padding: screenWidth <= 400 ? 10 : 12,
-                        // borderTopLeftRadius: 12,
-                        // borderTopRightRadius: 12,
-                        borderRadius: 12,
-                        elevation: 8,
-                        shadowColor: "#000",
-                        shadowOpacity: 0.2,
-                        shadowRadius: 6,
-                        shadowOffset: { width: 0, height: -2 },
-                    }}
-                >
-
-                    <Text style={{
-                        color: "#fff",
-                        fontSize: screenWidth <= 400 ? 11 : 12,
-                        fontWeight: "600",
-                        marginBottom: 8,
-                    }}>
-                        Totals
-                    </Text>
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                            <Text style={{
-                                color: "rgba(255,255,255,0.9)",
-                                fontSize: screenWidth <= 400 ? 10 : 11,
-                                fontWeight: "500",
-                                marginRight: 8,
-                            }}>
-                                Collection:
-                            </Text>
-
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: screenWidth <= 400 ? 10 : 11,
-                                fontWeight: "600",
-                            }}>
-                                ₹{totals.ToDaysCollection.toLocaleString('en-IN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                })}
-                            </Text>
-
-                        </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                            <Text style={{
-                                color: "rgba(255,255,255,0.9)",
-                                fontSize: screenWidth <= 400 ? 10 : 11,
-                                fontWeight: "500",
-                                marginRight: 8,
-                            }}>
-                                Credit in Bank:
-                            </Text>
-
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: screenWidth <= 400 ? 10 : 11,
-                                fontWeight: "600",
-                            }}>
-                                ₹{totals.CrInBankAccCollection.toLocaleString('en-IN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                })}
-                            </Text>
-
-                        </View>
-
-                    </View>
-
-                </LinearGradient>
-
-            );
-        };
+        const renderItemsInGrid = () => (
+            <View style={styles.gridWrap}>
+                {filteredData.map((item, index) => renderCard(item, index))}
+            </View>
+        );
 
         return (
 
-            <View style={[styles.container, { backgroundColor: '#f8f9fa' }]}>
+            <View style={styles.container}>
 
                 <ScrollView
-                    contentContainerStyle={{
-                        paddingTop: 12,
-                        paddingBottom: 100
-                    }}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter - 5 }]}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
+                    {/* Totals (were the fixed footer) */}
+                    <View style={styles.listHeader}>
+                        <KpiGrid isPhone={isPhone}>
+                            <Kpi
+                                label="Collection"
+                                icon="payments"
+                                accent={T.nav}
+                                value={`₹${totals.ToDaysCollection.toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                })}`}
+                                sub="Shown properties"
+                            />
+                            <Kpi
+                                label="Credit in Bank"
+                                icon="account-balance-wallet"
+                                accent={T.green}
+                                valueColor={T.green}
+                                value={`₹${totals.CrInBankAccCollection.toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                })}`}
+                                sub="Cleared in bank"
+                            />
+                        </KpiGrid>
+                        <SectionHead
+                            title="Properties"
+                            meta={`${filteredData.length} shown · ${Array.isArray(data) ? data.length : 0} total · tap a card for party / executive split`}
+                        />
+                    </View>
 
                     {filteredData.length > 0 ? (
                         renderItemsInGrid()
                     ) : (
-                        <View style={{
-                            flex: 1,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            padding: 40,
-                            marginTop: 60
-                        }}>
-                            <Icon name="search-off" size={48} color="#ccc" />
-                            <Text style={{
-                                color: "#666",
-                                fontSize: 16,
-                                marginTop: 12,
-                                textAlign: 'center'
-                            }}>
-                                No records found
-                            </Text>
+                        <View style={styles.emptyCard}>
+                            <ErpEmptyState icon="search-off" title="No records found" text="No property matches this search." />
                         </View>
                     )}
 
                 </ScrollView>
-
-
-                <Footer />
             </View>
 
         );
@@ -1904,38 +1506,71 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
         );
     }, [filterpartyData, partySearchQuery]);
 
-    // Dark colors for cards
-    const CARD_COLORS = [
-        ["#1A1A2E", "#2D1B69"], // Dark Purple
-        ["#0F3460", "#1E5A8A"], // Deep Ocean
-        ["#1B5E20", "#2E7D32"], // Forest Green
-        ["#333333", "#4F4F4F"], // Charcoal
-        ["#5D1049", "#8A235C"], // Dark Magenta
-        ["#8B4513", "#A0522D"], // Saddle Brown
-        ["#2F4F4F", "#556B2F"], // Dark Slate Gray
-        ["#483D8B", "#6A5ACD"], // Slate Blue
-    ];
 
-    // Responsive grid configuration
-    const { width: screenWidth } = useWindowDimensions();
-    const getGridConfig = () => {
-        if (screenWidth <= 600) return { numColumns: 2, cardWidth: (screenWidth - 48) / 2, margin: 12, gutter: 12 };
-        else if (screenWidth <= 900) return { numColumns: 3, cardWidth: (screenWidth - 64) / 3, margin: 12, gutter: 12 };
-        else return { numColumns: 4, cardWidth: (screenWidth - 80) / 4, margin: 12, gutter: 12 };
-    };
-    const gridConfig = getGridConfig();
-    const getGridConfig123 = () => {
-        // if (screenWidth <= 500) return { numColumns: 1, cardWidth: (screenWidth - 48) / 1, margin: 12, gutter: 12 };
-        if (screenWidth <= 600) return { numColumns: 2, cardWidth: (screenWidth - 48) / 2, margin: 12, gutter: 12 };
-        else if (screenWidth <= 900) return { numColumns: 3, cardWidth: (screenWidth - 64) / 3, margin: 12, gutter: 12 };
-        else return { numColumns: 4, cardWidth: (screenWidth - 80) / 4, margin: 12, gutter: 12 };
-    };
-    const gridConfig123 = getGridConfig123();
+    // NEW ERP UI: responsive layout (replaces the old Dimensions/grid maths)
+    const { isPhone, cols, gutter } = useSotLayout();
+    const listContentStyle = [styles.listContent, { paddingHorizontal: gutter - 5 }];
+
+    // Shared body of the Party Wise / Sales Executive Wise cards.
+    const renderSplitCard = (item, index, isAllCard, totalToDaysCollection, totalCrInBankAccCollection, formatAmount, onPress) => (
+        <View key={item.Code || `${item.SExe || item.acccode || 'row'}-${index}`} style={[cellWidth(cols), styles.gridCell]}>
+            <TouchableOpacity
+                style={[isAllCard ? styles.allCard : styles.card, getSexeLoading && { opacity: 0.55 }]}
+                activeOpacity={0.85}
+                onPress={onPress}
+                disabled={getSexeLoading}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.SalesExecutive || ''} details`}
+            >
+                <View style={styles.cardHead}>
+                    {isAllCard ? (
+                        <View style={styles.allIcon}>
+                            <Icon name="functions" size={18} color={T.copper} />
+                        </View>
+                    ) : (
+                        <Avatar name={item.SalesExecutive} size={36} />
+                    )}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={isAllCard ? styles.allTitle : styles.cardTitle} numberOfLines={2}>
+                            {item.SalesExecutive}
+                        </Text>
+                        {/* Code (skip for "ALL") */}
+                        {!isAllCard ? (
+                            <Text style={styles.cardMeta} numberOfLines={1}>
+                                Code: {item.SExe || item.acccode || '-'}
+                            </Text>
+                        ) : (
+                            <Text style={styles.allMeta} numberOfLines={1}>Combined total of all rows shown</Text>
+                        )}
+                    </View>
+                    <Icon name="chevron-right" size={22} color={isAllCard ? '#fff' : T.muted} />
+                </View>
+                <View style={isAllCard ? styles.allMetricBox : styles.metricBox}>
+                    <Metric
+                        label="Collection"
+                        value={`₹${isAllCard
+                            ? formatAmount(totalToDaysCollection)
+                            : formatAmount(item.ToDaysCollection)
+                            }`}
+                        color={T.nav}
+                    />
+                    <Metric
+                        label="Credit in Bank"
+                        value={`₹${isAllCard
+                            ? formatAmount(totalCrInBankAccCollection)
+                            : formatAmount(item.CrInBankAccCollection)
+                            }`}
+                        color={T.green}
+                        align="right"
+                    />
+                </View>
+            </TouchableOpacity>
+        </View>
+    );
 
     // Render Party Wise And Excutive vise card display
-    const renderCard = (item, index) => {
+    const renderCard = (item, index, tabType?) => {
         // console.log("filterpartyData ::::", filterpartyData)
-        const colors = getSexeLoading ? ["#C0C0C0", "#C0C0C0"] : CARD_COLORS[index % CARD_COLORS.length];
         const isAllCard = item.SalesExecutive === "ALL";
 
         // Calculate totals for "ALL" card
@@ -1955,166 +1590,42 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             });
         };
 
-        return (
-            <TouchableOpacity
-                key={item.Code || index}
-                style={{
-                    width: gridConfig123.cardWidth,
-                    minHeight: isAllCard ? 160 : 120, // Taller card for "ALL"
-                    borderRadius: 8,
-                    marginBottom: gridConfig123.gutter,
-                    overflow: "hidden",
-                    elevation: 3,
-                    backgroundColor: "#121212",
-                    borderWidth: isAllCard ? 1 : 0,
-                    borderColor: isAllCard ? theme.BRAND_GRADIENT_END : "transparent",
-                }}
-                activeOpacity={0.9}
-                // onPress={() => {
-                //     if (!getSexeLoading) {
-                //         setLoadingStates({ [item.Code || "ALL"]: true });
-                //         setSelectedSexeName(item.SalesExecutive);
-                //         handleLoadPressSEXE(item);
-                //     }
-                // }}
-
-                onPress={async () => {
-                    if (modalTab === "SalesExecutiveWise") {
-                        setLoadingStates({ [item.Code || "ALL"]: true });
-                        setSelectedSexeName(item.SalesExecutive);
-                        await handlesalesexcutivefetch(item.PrpCode, item);
-                    } else {
-                        if (getSexeLoading) return;
-                        setLoadingStates({ [item.Code || "ALL"]: true });
-                        setSelectedSexeName(item.SalesExecutive);
-                        handleLoadPressSEXE(item);
-                    }
-                }}
-                disabled={getSexeLoading}
-            >
-                <LinearGradient
-                    colors={colors}
-                    style={{ flex: 1, padding: 12 }}
-                >
-                    <View style={{ alignItems: 'flex-end', flex: 1 }}>
-                        {/* Sales Executive Name */}
-                        <Text
-                            style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 16 : 14,
-                                fontWeight: isAllCard ? "bold" : "bold",
-                                textAlign: 'right',
-                                marginBottom: 4,
-                            }}
-                        >
-                            {item.SalesExecutive}
-                        </Text>
-
-                        {/* Code (skip for "ALL") */}
-                        {!isAllCard && (
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                                marginBottom: 8,
-                            }}>
-                                Code: {item.SExe}
-                            </Text>
-                        )}
-
-                        {/* Today's Collection */}
-                        <View style={{ marginBottom: 6 }}>
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                            }}>
-                                Collection:
-                            </Text>
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 14 : 12,
-                                fontWeight: "bold",
-                                textAlign: 'right',
-                            }}>
-                                {/* ₹{isAllCard
-                                    ? totalToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.ToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    }) */}
-                                ₹{isAllCard
-                                    ? formatAmount(totalToDaysCollection)
-                                    : formatAmount(item.ToDaysCollection)
-                                }
-                            </Text>
-                        </View>
-
-                        {/* Credit in Bank */}
-                        <View>
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                            }}>
-                                Credit in Bank:
-                            </Text>
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 14 : 12,
-                                fontWeight: "bold",
-                                textAlign: 'right',
-                            }}>
-                                {/* ₹{isAllCard
-                                    ? totalCrInBankAccCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.CrInBankAccCollection} */}
-                                ₹{isAllCard
-                                    ? formatAmount(totalCrInBankAccCollection)
-                                    : formatAmount(item.CrInBankAccCollection)
-                                }
-                            </Text>
-                        </View>
-                    </View>
-                </LinearGradient>
-            </TouchableOpacity>
+        return renderSplitCard(
+            item,
+            index,
+            isAllCard,
+            totalToDaysCollection,
+            totalCrInBankAccCollection,
+            formatAmount,
+            async () => {
+                if (modalTab === "SalesExecutiveWise") {
+                    setLoadingStates({ [item.Code || "ALL"]: true });
+                    setSelectedSexeName(item.SalesExecutive);
+                    await handlesalesexcutivefetch(item.PrpCode, item);
+                } else {
+                    if (getSexeLoading) return;
+                    setLoadingStates({ [item.Code || "ALL"]: true });
+                    setSelectedSexeName(item.SalesExecutive);
+                    handleLoadPressSEXE(item);
+                }
+            }
         );
     };
 
     const renderItemsInGrid = (data, tabType) => {
         if (!data || data.length === 0) return null;
-        const rows = [];
-        for (let i = 0; i < data.length; i += gridConfig123.numColumns) {
-            const rowItems = data.slice(i, i + gridConfig123.numColumns);
-            rows.push(
-                <View
-                    key={`row-${i}`}
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'flex-start',
-                        marginHorizontal: gridConfig123.margin,
-                        gap: gridConfig123.gutter,
-                    }}
-                >
-                    {rowItems.map((item, index) =>
-                        renderCard(item, i + index, tabType)   // 👈 tabType pass
-                    )}
-                </View>
-            );
-        }
-
-        return rows;
+        return (
+            <View style={styles.gridWrap}>
+                {data.map((item, index) =>
+                    renderCard(item, index, tabType)   // 👈 tabType pass
+                )}
+            </View>
+        );
     };
 
 
 
     const renderPartyCard = (item, index) => {
-        const colors = getSexeLoading ? ["#C0C0C0", "#C0C0C0"] : CARD_COLORS[index % CARD_COLORS.length];
         const isAllCard = item.SalesExecutive === "ALL";
         const totalToDaysCollection = filteredPartyData.reduce(
             (sum, dataItem) => sum + parseFloat(dataItem.ToDaysCollection || '0'),
@@ -2132,143 +1643,31 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
             });
         };
 
-        return (
-            <TouchableOpacity
-                key={item.Code || index}
-                style={{
-                    width: gridConfig123.cardWidth,
-                    minHeight: isAllCard ? 160 : 120, // Taller card for "ALL"
-                    borderRadius: 8,
-                    marginBottom: gridConfig123.gutter,
-                    overflow: "hidden",
-                    elevation: 3,
-                    backgroundColor: "#121212",
-                    borderWidth: isAllCard ? 1 : 0,
-                    borderColor: isAllCard ? theme.BRAND_GRADIENT_END : "transparent",
-                }}
-                activeOpacity={0.9}
-                onPress={async () => {
-                    if (getSexeLoading) return;
-                    setLoadingStates({ [item.Code || "ALL"]: true });
-                    setSelectedSexeName(item.SalesExecutive);
-                    handleLoadPressSEXE(item);
-                }}
-                disabled={getSexeLoading}
-            >
-                <LinearGradient
-                    colors={colors}
-                    style={{ flex: 1, padding: 12 }}
-                >
-                    <View style={{ alignItems: 'flex-end', flex: 1 }}>
-                        {/* Sales Executive Name */}
-                        <Text
-                            style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 16 : 14,
-                                fontWeight: isAllCard ? "bold" : "bold",
-                                textAlign: 'right',
-                                marginBottom: 4,
-                            }}
-                        >
-                            {item.SalesExecutive}
-                        </Text>
-
-                        {/* Code (skip for "ALL") */}
-                        {!isAllCard && (
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                                marginBottom: 8,
-                            }}>
-                                Code: {item.SExe}
-                            </Text>
-                        )}
-
-                        {/* Today's Collection */}
-                        <View style={{ marginBottom: 6 }}>
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                            }}>
-                                Collection:
-                            </Text>
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 14 : 12,
-                                fontWeight: "bold",
-                                textAlign: 'right',
-                            }}>
-                                {/* ₹{isAllCard
-                                    ? totalToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.ToDaysCollection} */}
-                                ₹{isAllCard
-                                    ? formatAmount(totalToDaysCollection)
-                                    : formatAmount(item.ToDaysCollection)
-                                }
-                            </Text>
-                        </View>
-
-                        {/* Credit in Bank */}
-                        <View>
-                            <Text style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: 11,
-                                textAlign: 'right',
-                            }}>
-                                Credit in Bank:
-                            </Text>
-                            <Text style={{
-                                color: "#fff",
-                                fontSize: isAllCard ? 14 : 12,
-                                fontWeight: "bold",
-                                textAlign: 'right',
-                            }}>
-                                {/* ₹{isAllCard
-                                    ? totalCrInBankAccCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.CrInBankAccCollection} */}
-                                ₹{isAllCard
-                                    ? formatAmount(totalCrInBankAccCollection)
-                                    : formatAmount(item.CrInBankAccCollection)
-                                }
-                            </Text>
-                        </View>
-                    </View>
-                </LinearGradient>
-            </TouchableOpacity>
+        return renderSplitCard(
+            item,
+            index,
+            isAllCard,
+            totalToDaysCollection,
+            totalCrInBankAccCollection,
+            formatAmount,
+            async () => {
+                if (getSexeLoading) return;
+                setLoadingStates({ [item.Code || "ALL"]: true });
+                setSelectedSexeName(item.SalesExecutive);
+                handleLoadPressSEXE(item);
+            }
         );
     };
 
     const renderPartyItemsInGrid = (data) => {
         if (!data || data.length === 0) return null;
-        const rows = [];
-        for (let i = 0; i < data.length; i += gridConfig123.numColumns) {
-            const rowItems = data.slice(i, i + gridConfig123.numColumns);
-            rows.push(
-                <View
-                    key={`row-${i}`}
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'flex-start',
-                        marginHorizontal: gridConfig123.margin,
-                        gap: gridConfig123.gutter,
-                    }}
-                >
-                    {rowItems.map((item, index) =>
-                        renderPartyCard(item, i + index)   // 👈 tabType pass
-                    )}
-                </View>
-            );
-        }
-
-        return rows;
+        return (
+            <View style={styles.gridWrap}>
+                {data.map((item, index) =>
+                    renderPartyCard(item, index)   // 👈 tabType pass
+                )}
+            </View>
+        );
     };
 
     // Render Party Wise And Excutive vise card display over
@@ -2606,41 +2005,108 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
         return renderItemsInGrid(filteredData12, "PartyWise");
     }
 
+    // ---------- NEW ERP UI: toolbar chips + panel context (display only) ----------
+    const activeFilterCount =
+        (selectedPropertyGroup ? 1 : 0) +
+        (Array.isArray(selectedProperty) && selectedProperty.length ? 1 : 0) +
+        (Array.isArray(SelectedSexe) && SelectedSexe.length ? 1 : 0);
+    const filterChips: { icon?: string; text: string }[] = [
+        { icon: 'date-range', text: `${formatDate(form.fromdate)} → ${formatDate(form.todate)}` },
+        ...(selectedInternal && (selectedInternal as InternalDropdown).lable
+            ? [{ icon: 'swap-horiz', text: (selectedInternal as InternalDropdown).lable }]
+            : []),
+        ...(selectedPropertyGroup?.PrpOfFull ? [{ icon: 'domain', text: selectedPropertyGroup.PrpOfFull }] : []),
+        ...(Array.isArray(selectedProperty) && selectedProperty.length
+            ? [{ icon: 'business', text: `${selectedProperty.length} propert${selectedProperty.length === 1 ? 'y' : 'ies'}` }]
+            : []),
+        ...(Array.isArray(SelectedSexe) && SelectedSexe.length
+            ? [{ icon: 'badge', text: `${SelectedSexe.length} sales exe.` }]
+            : []),
+    ];
+    const activePropName = (gePOTData.find((p: any) => p.PrpCode === activeCard) as any)?.PrpName || '';
+    const sumOf = (rows: any[], key: string) =>
+        rows.reduce((sum, item) => sum + parseFloat(item[key] || '0'), 0);
+
+    // Sticky totals bar used by the drill-down panels (was the absolute footer).
+    const renderTotalsBar = (collectionLabel: string, rows: any[]) => (
+        <View style={styles.totalsBar}>
+            <View style={styles.totalsInner}>
+                <Text style={styles.totalsEyebrow}>TOTALS</Text>
+                <View style={styles.totalsRow}>
+                    <Metric
+                        label={collectionLabel}
+                        value={`₹${parseFloat(sumOf(rows, 'ToDaysCollection')).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        })}`}
+                        color={T.nav}
+                    />
+                    <Metric
+                        label="Credit in Bank"
+                        value={`₹${parseFloat(sumOf(rows, 'CrInBankAccCollection')).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        })}`}
+                        color={T.green}
+                        align="right"
+                    />
+                </View>
+            </View>
+        </View>
+    );
+
+    const renderPanelEmpty = (loading: boolean) =>
+        loading ? (
+            <View style={styles.panelLoading}>
+                <ActivityIndicator size="small" color={T.copper} />
+                <Text style={styles.loadingMoreText}>Loading…</Text>
+            </View>
+        ) : (
+            <View style={styles.emptyCard}>
+                <ErpEmptyState icon="search-off" title="No records found" text="Try another name or clear the search." />
+            </View>
+        );
+
     return (
         <>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <HeaderBar
-                    userName={username}
+            <GestureHandlerRootView style={styles.root}>
+                {/* ───────────── Toolbar: search + filters ───────────── */}
+                <Toolbar
+                    search={searchQueryPOT}
                     onSearch={setSearchQueryPOT}
-                    placeholder="Search reports..."
+                    placeholder={isPhone ? 'Search reports...' : 'Search property, collection or bank amount...'}
+                    onFilters={openDrawer}
+                    filterCount={activeFilterCount}
+                    chips={filterChips}
+                    onChipPress={openDrawer}
                 />
-                <View style={crlimtreq_styles.container_list123}>
-                    {isLoading ? <FullScreenLoader message="Loading..." /> : (<><View style={crlimtreq_styles.container}>
-                        <TouchableOpacity style={crlimtreq_styles.listIconContainer} onPress={openDrawer}>
-                            <Icon name="list" size={24} color="white" />
-                        </TouchableOpacity>
-                        {gePOTData.length > 0 ? (
-                            <>
-                                <DetailCardGrid
-                                    data={gePOTData}
-                                    searchQuery={searchQueryPOT}
-                                    onCardPress={onDashboardCardPress}
-                                    activeSlab={activeCard}
-                                    isLoadingSummary={isLoadingSummary}
-                                    getSummaryData={getSummaryData}
+
+                <View style={styles.container}>
+                    {gePOTData.length > 0 ? (
+                        <>
+                            <DetailCardGrid
+                                data={gePOTData}
+                                searchQuery={searchQueryPOT}
+                                onCardPress={onDashboardCardPress}
+                                activeSlab={activeCard}
+                                isLoadingSummary={isLoadingSummary}
+                                getSummaryData={getSummaryData}
+                            />
+
+                        </>
+
+                    ) : (
+                        <ScrollView style={styles.container} contentContainerStyle={listContentStyle}>
+                            <View style={styles.emptyCard}>
+                                <ErpEmptyState
+                                    icon={isLoading ? 'hourglass-empty' : 'account-balance-wallet'}
+                                    title={isLoading ? 'Loading…' : 'No data available'}
+                                    text="Choose the property group, properties, date range and sales executives, then tap Load to see the day's collection."
+                                    action={<Btn label="Open filters" icon="tune" onPress={openDrawer} />}
                                 />
-
-                            </>
-
-                        ) : (
-                            <>
-                                <View style={crlimtreq_styles.noDataContainer}>
-                                    <Text style={crlimtreq_styles.noDataText}>No data available</Text>
-                                </View>
-                            </>
-                        )}
-
-                    </View></>)}
+                            </View>
+                        </ScrollView>
+                    )}
                 </View>
 
                 <CustomDrawer
@@ -2687,721 +2153,386 @@ const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, 
                 // selectedItemStatus={selectedItemStatus}
                 // onItemStatusChange={handleItemStatusChange}
                 />
-                {modalVisible && (
-                    <View style={styles.detailOverlay789}>
-                        <View style={styles.detailContainer}>
-                            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)" }}>
-                                <View style={{ flex: 1, backgroundColor: "#fff", borderRadius: 10 }}>
-                                    {/* Header */}
-                                    <View
-                                        style={{
-                                            flexDirection: "row",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            padding: 12,
-                                            borderBottomWidth: 1,
-                                            borderBottomColor: "#eee",
-                                            backgroundColor: theme.BRAND_GRADIENT_END,
-                                            borderTopLeftRadius: 10,
-                                            borderTopRightRadius: 10,
-                                        }}
-                                    >
-                                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                            Details - ({getSelectedSexeName})
-                                        </Text>
-                                        <TouchableOpacity onPress={() => {
-                                            setModalVisible(false);
-                                            setSelectedSexeName(null);
-                                        }
-                                        }>
-                                            <Icon name="close" size={24} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
 
-                                    {/* Search */}
-                                    <TextInput
-                                        placeholder="Search..."
-                                        value={searchQueryPOT}
-                                        onChangeText={setSearchQueryPOT}
-                                        style={{
-                                            padding: 5,
-                                            borderWidth: 1,
-                                            borderColor: "#ddd",
-                                            borderRadius: 5,
-                                            margin: 10,
-                                            fontSize: 11,
-                                            color: "#000",
-                                        }}
-                                    />
-
-                                    {/* All Keys Cards View */}
-                                    <AllKeysCardsView
-                                        data={getDetailsData}
-                                        searchQuery={searchQueryPOT}
-                                        getDetailsDataSetting={getDetailsDataSetting}
-
-                                    // onCardPress={handleAllKeysCardPress} 
-                                    />
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
+                {/* ───────────── Drill-down 1: Party wise / Sales executive wise ───────────── */}
                 {sexeModalVisible && (
-                    <View style={styles.detailOverlay123}>
-                        <View style={styles.detailContainer}>
-                            <View style={{ flex: 1 }}>
+                    <View style={[styles.panel, { zIndex: 100 }]}>
+                        <PanelHeader
+                            onBack={() => setSexeModalVisible(false)}
+                            backLabel="Close"
+                            crumbs={['Daily Collection', activePropName]}
+                            title={selectedSexeCard?.SalesExecutive || 'Sales Executive Details'}
+                            subtitle={`${formatDate(form.fromdate)} → ${formatDate(form.todate)}`}
+                        />
 
-                                <View style={{
-                                    flex: 1,
-                                    backgroundColor: "rgb(255, 255, 255)",
-                                    margin: 10,
-                                }}>
-
-                                    {/* Header */}
-
-                                    <View style={{
-                                        flexDirection: "row",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        padding: 12,
-                                        borderBottomWidth: 1,
-                                        borderBottomColor: "#333",
-                                        backgroundColor: theme.BRAND_GRADIENT_END,
-                                        borderTopLeftRadius: 10,
-                                        borderTopRightRadius: 10,
-                                    }}>
-                                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                            {selectedSexeCard?.SalesExecutive || 'Sales Executive Details'}
-                                        </Text>
-
-                                        <TouchableOpacity onPress={() => setSexeModalVisible(false)}>
-                                            <Icon name="close" size={24} color="#fff" />
-                                        </TouchableOpacity>
-
-                                    </View>
-
-
-                                    {/* Tabs */}
-
-                                    <View style={{
-                                        flexDirection: "row",
-                                        backgroundColor: "#f2f2f2",
-                                        borderBottomWidth: 1,
-                                        borderColor: "#ddd"
-                                    }}>
-
-                                        <TouchableOpacity
-                                            style={{
-                                                flex: 1,
-                                                padding: 12,
-                                                alignItems: "center",
-                                                borderBottomWidth: modalTab === "PartyWise" ? 3 : 0,
-                                                borderBottomColor: theme.BRAND_GRADIENT_END
+                        {/* Tabs + search */}
+                        <View style={[styles.panelSearch, { paddingHorizontal: gutter }]}>
+                            <View style={styles.panelSearchInner}>
+                                <View style={styles.panelTools}>
+                                    <View style={isPhone ? { width: '100%' } : { width: 380 }}>
+                                        <Segment
+                                            value={modalTab as any}
+                                            options={[
+                                                { value: 'PartyWise', label: 'Party Wise', icon: 'groups' },
+                                                { value: 'SalesExecutiveWise', label: isPhone ? 'Sales Exe. Wise' : 'Sales Executive Wise', icon: 'badge' },
+                                            ]}
+                                            onChange={(tab: any) => {
+                                                if (tab === 'PartyWise') {
+                                                    setModalTab("PartyWise");
+                                                } else {
+                                                    if (isLoadingSummary) return;
+                                                    setModalTab("SalesExecutiveWise");
+                                                }
                                             }}
-                                            onPress={() => setModalTab("PartyWise")}
-                                        >
-
-                                            <Text style={{
-                                                fontWeight: "600",
-                                                color: modalTab === "PartyWise"
-                                                    ? theme.BRAND_GRADIENT_END
-                                                    : "#666"
-                                            }}>
-                                                Party Wise
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={{
-                                                flex: 1,
-                                                padding: 12,
-                                                alignItems: "center",
-                                                borderBottomWidth: modalTab === "SalesExecutiveWise" ? 3 : 0,
-                                                borderBottomColor: theme.BRAND_GRADIENT_END
-                                            }}
-                                            onPress={() => {
-                                                if (isLoadingSummary) return;
-                                                setModalTab("SalesExecutiveWise");
-                                            }}
-                                        >
-
-                                            <Text style={{
-                                                fontWeight: "600",
-                                                color: modalTab === "SalesExecutiveWise"
-                                                    ? theme.BRAND_GRADIENT_END
-                                                    : "#666"
-                                            }}>
-                                                Sales Executive Wise
-                                            </Text>
-
-                                        </TouchableOpacity>
-                                    </View>
-                                    {/* Search */}
-                                    {getSexeLoading ? (
-                                        <View style={{
-                                            padding: 12,
-                                            borderWidth: 1,
-                                            borderColor: "rgba(0,0,0,0.1)",
-                                            borderRadius: 5,
-                                            margin: 10,
-                                            backgroundColor: "#fff"
-                                        }}>
-                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
-                                        </View>
-                                    ) : (
-                                        <TextInput
-                                            placeholder="Search..."
-                                            value={sexeSearchQuery}
-                                            onChangeText={setSexeSearchQuery}
-                                            style={{
-                                                padding: 10,
-                                                borderWidth: 1,
-                                                borderColor: "rgba(0,0,0,0.1)",
-                                                borderRadius: 5,
-                                                margin: 10,
-                                                fontSize: 11,
-                                                color: "#000",
-                                                backgroundColor: "#fff",
-                                            }}
-                                            placeholderTextColor="#999"
                                         />
-
-                                    )}
-                                    <ScrollView
-                                        contentContainerStyle={{ paddingBottom: 120 }}
-                                        showsVerticalScrollIndicator={false}
-                                        keyboardShouldPersistTaps="handled"
-                                    >
-
-                                        {filteredData12.length > 0 ? (
-                                            renderModalContent()
-                                        ) : (
-                                            <View style={{
-                                                flex: 1,
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                                padding: 40,
-                                                marginTop: 60
-                                            }}>
-
-                                                <Icon name="search-off" size={48} color="#666" />
-
-                                                <Text style={{
-                                                    color: "#666",
-                                                    fontSize: 16,
-                                                    marginTop: 12,
-                                                    textAlign: 'center'
-                                                }}>
-                                                    No records found
-                                                </Text>
-
-                                            </View>
-
-                                        )}
-
-                                    </ScrollView>
-                                    {/* Totals Footer */}
-
-                                    <View style={{
-                                        position: "absolute",
-                                        bottom: 0,
-                                        left: 0,
-                                        right: 0,
-                                        padding: screenWidth <= 400 ? 10 : 12,
-                                        borderTopLeftRadius: 12,
-                                        borderTopRightRadius: 12,
-                                        elevation: 8,
-                                        shadowColor: "#000",
-                                        shadowOpacity: 0.2,
-                                        shadowRadius: 6,
-                                        shadowOffset: { width: 0, height: -2 },
-                                        backgroundColor: theme.BRAND_GRADIENT_END,
-                                        zIndex: 1000,
-                                    }}>
-
-                                        <Text style={{
-                                            color: "#fff",
-                                            fontSize: screenWidth <= 400 ? 11 : 12,
-                                            fontWeight: "600",
-                                            marginBottom: 8,
-                                        }}>
-                                            Totals
-                                        </Text>
-
-
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
-
-
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                                <Text style={{
-                                                    color: "rgba(255,255,255,0.9)",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "500",
-                                                    marginRight: 8,
-                                                }}>
-                                                    Collection:
-                                                </Text>
-
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "600",
-                                                }}>
-                                                    ₹{parseFloat(
-                                                        filteredData12.reduce((sum, item) =>
-                                                            sum + parseFloat(item.ToDaysCollection || '0'), 0)
-                                                    ).toLocaleString('en-IN', {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2
-                                                    })}
-                                                </Text>
-
-                                            </View>
-
-
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                                <Text style={{
-                                                    color: "rgba(255,255,255,0.9)",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "500",
-                                                    marginRight: 8,
-                                                }}>
-                                                    Credit in Bank:
-                                                </Text>
-
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "600",
-                                                }}>
-                                                    ₹{parseFloat(
-                                                        filteredData12.reduce((sum, item) =>
-                                                            sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
-                                                    ).toLocaleString('en-IN', {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2
-                                                    })}
-                                                </Text>
-                                            </View>
-                                        </View>
                                     </View>
+                                    <SearchBox
+                                        value={sexeSearchQuery}
+                                        onChangeText={setSexeSearchQuery}
+                                        placeholder="Search..."
+                                        loading={getSexeLoading}
+                                        style={isPhone ? { width: '100%' } : { flex: 1, minWidth: 220 }}
+                                    />
                                 </View>
                             </View>
                         </View>
+
+                        <ScrollView
+                            style={styles.container}
+                            contentContainerStyle={listContentStyle}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View style={styles.listHeader}>
+                                <SectionHead
+                                    title={modalTab === 'PartyWise' ? 'Party Wise' : 'Sales Executive Wise'}
+                                    meta={
+                                        modalTab === 'PartyWise'
+                                            ? 'Tap a party to see its collection entries'
+                                            : 'Tap an executive to see their parties'
+                                    }
+                                />
+                            </View>
+                            {filteredData12.length > 0 ? (
+                                renderModalContent()
+                            ) : (
+                                renderPanelEmpty(getSexeLoading)
+                            )}
+
+                        </ScrollView>
+                        {/* Totals Footer */}
+                        {renderTotalsBar('Collection', filteredData12)}
                     </View>
                 )}
 
+                {/* ───────────── Drill-down 2: parties of one sales executive ───────────── */}
                 {partyWiseModalVisible && (
-                    <View style={styles.detailOverlay456}>
-                        <View style={styles.detailContainer}>
-                            {/* <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)" }}> */}
-                            <View style={{ flex: 1 }}>
-                                <View style={{
-                                    flex: 1,
-                                    // backgroundColor: "#121212", // Dark modal background
-                                    backgroundColor: "rgb(255, 255, 255)", // Dark modal background
-                                    margin: 10,
-                                    // borderRadius: 10,
-                                    // borderWidth: 1,
-                                    // borderColor: "#333",
-                                }}>
-                                    {/* Header */}
-                                    <View style={{
-                                        flexDirection: "row",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        padding: 12,
-                                        borderBottomWidth: 1,
-                                        borderBottomColor: "#333",
-                                        backgroundColor: theme.BRAND_GRADIENT_END,
-                                        borderTopLeftRadius: 10,
-                                        borderTopRightRadius: 10,
-                                    }}>
-                                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                            {selectedSexeCard?.SalesExecutive || 'Party Wise Detail'}
-                                        </Text>
-                                        <TouchableOpacity onPress={() => setPartyWiseModalVisible(false)}>
-                                            <Icon name="close" size={24} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
+                    <View style={[styles.panel, { zIndex: 200 }]}>
+                        <PanelHeader
+                            onBack={() => setPartyWiseModalVisible(false)}
+                            backLabel="Close"
+                            crumbs={['Daily Collection', activePropName, getSelectedSexeName ? String(getSelectedSexeName) : '']}
+                            title={selectedSexeCard?.SalesExecutive || 'Party Wise Detail'}
+                            subtitle={`${filteredPartyData.filter((p: any) => p.SalesExecutive !== 'ALL').length} parties`}
+                        />
 
-                                    {/* Search */}
-                                    {getSexeLoading ? (
-                                        <View style={{
-                                            padding: 12,
-                                            borderWidth: 1,
-                                            borderColor: "rgba(0, 0, 0, 0.1)",
-                                            borderRadius: 5,
-                                            margin: 10,
-                                            // fontSize: 11,
-                                            // color: "#000",
-                                            backgroundColor: "#fff",
-                                            display: "flex",
-                                        }}>
-                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
-                                            {/* <Text>Loading...</Text> */}
-                                        </View>
-                                    ) : (
-                                        <TextInput
-                                            placeholder="Search..."
-                                            value={partySearchQuery}
-                                            onChangeText={setPartySearchQuery}
-                                            style={{
-                                                padding: 10,
-                                                borderWidth: 1,
-                                                borderColor: "rgba(0, 0, 0, 0.1)",
-                                                borderRadius: 5,
-                                                margin: 10,
-                                                fontSize: 11,
-                                                color: "#000",
-                                                backgroundColor: "#fff",
-                                            }}
-                                            placeholderTextColor="#999"
-                                        />
-                                    )}
-
-
-
-                                    {/* Content */}
-                                    <ScrollView
-                                        contentContainerStyle={{ paddingBottom: 20 }}
-                                        showsVerticalScrollIndicator={false}
-                                        keyboardShouldPersistTaps="handled" // Fix search rerender focus issue
-                                    >
-                                        {filteredPartyData.length > 0 ? (
-                                            // renderPartyItemsInGrid()
-                                            renderPartyItemsInGrid(filteredPartyData)
-                                        ) : (
-                                            <View style={{
-                                                flex: 1,
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                                padding: 40,
-                                                marginTop: 60
-                                            }}>
-                                                <Icon name="search-off" size={48} color="#666" />
-                                                <Text style={{
-                                                    color: "#666",
-                                                    fontSize: 16,
-                                                    marginTop: 12,
-                                                    textAlign: 'center'
-                                                }}>
-                                                    No records found
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </ScrollView>
-                                    <View style={{
-                                        position: "absolute",
-                                        bottom: 0,
-                                        left: 0,
-                                        right: 0,
-                                        padding: screenWidth <= 400 ? 10 : 12,
-                                        borderTopLeftRadius: 12,
-                                        borderTopRightRadius: 12,
-                                        elevation: 8,
-                                        shadowColor: "#000",
-                                        shadowOpacity: 0.2,
-                                        shadowRadius: 6,
-                                        shadowOffset: { width: 0, height: -2 },
-                                        backgroundColor: theme.BRAND_GRADIENT_END,
-                                        zIndex: 1000,
-                                    }}>
-                                        <Text style={{
-                                            color: "#fff",
-                                            fontSize: screenWidth <= 400 ? 11 : 12,
-                                            fontWeight: "600",
-                                            marginBottom: 8,
-                                        }}>
-                                            Totals
-                                        </Text>
-
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
-                                            {/* ToDaysCollection Total */}
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={{
-                                                    color: "rgba(255,255,255,0.9)",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "500",
-                                                    marginRight: 8,
-                                                }}>
-                                                    Today's Collection:
-                                                </Text>
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "600",
-                                                }}>
-                                                    ₹{parseFloat(
-                                                        filteredPartyData.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
-                                                    ).toLocaleString('en-IN', {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2
-                                                    })}
-                                                </Text>
-                                            </View>
-
-                                            {/* CrInBankAccCollection Total */}
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={{
-                                                    color: "rgba(255,255,255,0.9)",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "500",
-                                                    marginRight: 8,
-                                                }}>
-                                                    Credit in Bank:
-                                                </Text>
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 10 : 11,
-                                                    fontWeight: "600",
-                                                }}>
-                                                    ₹{parseFloat(
-                                                        filteredPartyData.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
-                                                    ).toLocaleString('en-IN', {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2
-                                                    })}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                </View>
+                        {/* Search */}
+                        <View style={[styles.panelSearch, { paddingHorizontal: gutter }]}>
+                            <View style={styles.panelSearchInner}>
+                                <SearchBox
+                                    value={partySearchQuery}
+                                    onChangeText={setPartySearchQuery}
+                                    placeholder="Search..."
+                                    loading={getSexeLoading}
+                                />
                             </View>
                         </View>
+
+                        {/* Content */}
+                        <ScrollView
+                            style={styles.container}
+                            contentContainerStyle={listContentStyle}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled" // Fix search rerender focus issue
+                        >
+                            {filteredPartyData.length > 0 ? (
+                                // renderPartyItemsInGrid()
+                                renderPartyItemsInGrid(filteredPartyData)
+                            ) : (
+                                renderPanelEmpty(getSexeLoading)
+                            )}
+                        </ScrollView>
+                        {renderTotalsBar("Today's Collection", filteredPartyData)}
                     </View>
                 )}
+
+                {/* ───────────── Drill-down 3: collection entries ───────────── */}
+                {modalVisible && (
+                    <View style={[styles.panel, { zIndex: 300 }]}>
+                        {/* Header */}
+                        <PanelHeader
+                            onBack={() => {
+                                setModalVisible(false);
+                                setSelectedSexeName(null);
+                            }}
+                            backLabel="Close"
+                            crumbs={['Daily Collection', activePropName]}
+                            title={`Details - (${getSelectedSexeName})`}
+                            subtitle={`${Array.isArray(getDetailsData) ? getDetailsData.length : 0} entr${Array.isArray(getDetailsData) && getDetailsData.length === 1 ? 'y' : 'ies'}`}
+                        />
+
+                        {/* Search */}
+                        <View style={[styles.panelSearch, { paddingHorizontal: gutter }]}>
+                            <View style={styles.panelSearchInner}>
+                                <SearchBox
+                                    value={searchQueryPOT}
+                                    onChangeText={setSearchQueryPOT}
+                                    placeholder="Search..."
+                                />
+                            </View>
+                        </View>
+
+                        {/* All Keys Cards View */}
+                        <AllKeysCardsView
+                            data={getDetailsData}
+                            searchQuery={searchQueryPOT}
+                            getDetailsDataSetting={getDetailsDataSetting}
+
+                        // onCardPress={handleAllKeysCardPress} 
+                        />
+                    </View>
+                )}
+
+                <BusyOverlay visible={isLoading && !isDrawerVisible} text="Loading collection…" />
+                <BusyOverlay visible={detailLoading} text="Loading details…" />
             </GestureHandlerRootView>
         </>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#F8F9FA",
-    },
-    columnWrapper: {
-        justifyContent: "space-between",
-        marginBottom: 12,
-        paddingHorizontal: 12,
-    },
-    contentContainer: {
-        paddingBottom: 80,
-    },
-    dashboardCard: {
-        flex: 1,
-        minHeight: 165,
-        borderRadius: 8,
-        margin: 4,
-        overflow: "hidden",
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-    },
-    dashboardCardInner: {
-        flex: 1,
-        padding: 12,
-        justifyContent: "space-between",
-    },
-    dashboardCaption: {
-        fontSize: 13,
-        color: "white",
-        fontWeight: "600",
-        textAlign: "center",
-        marginBottom: 8,
-    },
-    cardDetails: {
-        flex: 1,
-        padding: 8,
-        backgroundColor: "rgba(255, 255, 255, 0.1)",
-        borderRadius: 4,
-    },
-    detailRowContainer: {
-        marginBottom: 8,
+    // ----- shell -----
+    root: { flex: 1, backgroundColor: T.bg },
+    container: { flex: 1, backgroundColor: T.bg },
+    listContent: {
+        paddingTop: 10,
+        paddingBottom: 28,
         width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        flexGrow: 1,
     },
-    cardDetailLabel: {
-        color: "rgba(255, 255, 255, 0.8)",
-        fontSize: 10,
-        fontWeight: "500",
-        textAlign: 'right',
-        marginBottom: 2,
-    },
-    cardDetailValue: {
-        color: "white",
-        fontSize: 11,
-        fontWeight: "600",
-        textAlign: 'right',
-    },
-    footerContainer: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: "transparent",
-        elevation: 6,
-        zIndex: 1000,
-    },
-    footerInner: {
-        padding: 12,
-        borderRadius: 8,
-    },
-    footerInnerDetails: {
-        padding: 12,
-        // borderRadius: 8,
-    },
-    footerRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 4,
-        width: '100%',
-    },
-    footerLabel: {
-        color: "rgba(255, 255, 255, 0.9)",
-        fontSize: 11,
-        fontWeight: "500",
-    },
-    footerValue: {
-        color: "white",
-        fontSize: 11,
-        fontWeight: "600",
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-    },
-    emptyText: {
-        color: "#666",
-        fontSize: 16,
-    },
-    detailOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 100, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    detailOverlay123: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 100, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    detailOverlay456: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 200, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    detailOverlay789: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 300, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    detailOverlay101112: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 500, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    // Detail Container
-    detailContainer: {
-        backgroundColor: '#fff',
-        // padding: 20,
-        paddingTop: 45,
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-        elevation: 5, // Shadow for Android
-        shadowColor: '#000', // Shadow for iOS
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-    },
-    detailContainerLast: {
-        backgroundColor: '#fff',
-        // padding: 20,
-        // paddingTop: 45,
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-        elevation: 5, // Shadow for Android
-        shadowColor: '#000', // Shadow for iOS
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-    },
-});
-
-
-const modalStyles = StyleSheet.create({
-    modalContainer: {
-        flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-    },
-    modalContent: {
-        flex: 1,
-        backgroundColor: "#fff",
+    listHeader: { paddingHorizontal: 5, gap: 10, marginBottom: 6 },
+    gridWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+    gridCell: { padding: 5 },
+    emptyCard: {
         margin: 5,
-        borderRadius: 5,
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
     },
-    modalHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-        backgroundColor: theme.BRAND_GRADIENT_END,
+
+    // ----- cards -----
+    card: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 11,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
     },
-    modalTitle: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#fff",
+    cardActive: { borderColor: T.copper, borderWidth: 1.5, backgroundColor: '#FFFCF8' },
+    cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    cardIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
     },
-    searchInput: {
+    cardTitle: { fontSize: 14.5, fontWeight: '800', color: T.ink, lineHeight: 19 },
+    cardMeta: { fontSize: 11, fontWeight: '700', color: T.muted, marginTop: 2 },
+    activeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: `${T.copper}16`,
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    activeBadgeText: { fontSize: 10.5, fontWeight: '800', color: T.copper },
+    metricBox: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: T.sub,
+        borderRadius: 10,
         padding: 10,
         borderWidth: 1,
-        borderColor: "#ddd",
-        borderRadius: 5,
-        margin: 10,
-        fontSize: 11,
+        borderColor: T.hair,
+    },
+
+    // "ALL" summary card
+    allCard: {
+        backgroundColor: T.nav,
+        borderRadius: 14,
+        padding: 13,
+        gap: 11,
+        flex: 1,
+    },
+    allIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF14',
+    },
+    allTitle: { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.6 },
+    allMeta: { fontSize: 11, fontWeight: '700', color: T.copper, marginTop: 2 },
+    allMetricBox: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: T.surface,
+        borderRadius: 10,
+        padding: 10,
+    },
+
+    // ----- entries (AllKeysCardsView) -----
+    groupBlock: { marginBottom: 10 },
+    groupHead: {
+        marginHorizontal: 5,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: T.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderLeftWidth: 3,
+        borderLeftColor: T.copper,
+    },
+    groupChevron: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.alt,
+    },
+    groupTitle: { flex: 1, fontSize: 13.5, fontWeight: '900', color: T.nav },
+    countPill: {
+        minWidth: 26,
+        height: 22,
+        borderRadius: 11,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}16`,
+    },
+    countPillText: { fontSize: 11, fontWeight: '900', color: T.copper },
+    rowCard: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 13,
+        gap: 10,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    rowCardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    rowCardIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${T.copper}14`,
+    },
+    kvList: { gap: 0 },
+    kvRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 6,
+        borderTopWidth: 1,
+        borderTopColor: T.hair,
+    },
+    kvLabel: { flexShrink: 0, maxWidth: '48%', fontSize: 11.5, fontWeight: '700', color: T.muted },
+    kvValue: { flex: 1, fontSize: 12.5, fontWeight: '600', color: T.ink, textAlign: 'right' },
+    detailCard: {
+        backgroundColor: T.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        paddingHorizontal: 13,
+        paddingVertical: 7,
+        flex: 1,
+        ...S.card,
+        shadowOpacity: 0.04,
+        elevation: 1,
+    },
+    loadingMore: {
+        marginHorizontal: 5,
+        marginTop: 6,
+        padding: 12,
+        alignItems: 'center',
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        gap: 4,
+    },
+    loadingMoreText: { color: T.muted, fontSize: 12, fontWeight: '700' },
+    panelLoading: { alignItems: 'center', paddingVertical: 40, gap: 8 },
+
+    // ----- drill-down panels -----
+    panel: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: T.bg,
+    },
+    panelSearch: {
+        backgroundColor: T.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingVertical: 8,
+    },
+    panelSearchInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center' },
+    panelTools: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+
+    // sticky totals bar
+    totalsBar: {
+        backgroundColor: T.surface,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+        paddingVertical: 10,
+    },
+    totalsInner: {
+        width: '100%',
+        maxWidth: CONTENT_MAX,
+        alignSelf: 'center',
+        paddingHorizontal: 16,
+        gap: 6,
+    },
+    totalsEyebrow: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 1.2 },
+    totalsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        backgroundColor: `${T.copper}12`,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
     },
 });
 

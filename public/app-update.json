@@ -1,12 +1,12 @@
 {
   "android": {
-    "latestVersion": "1.0.53",
+    "latestVersion": "1.0.54",
     "minVersion": "",
     "storeUrl": "https://play.google.com/store/apps/details?id=com.anonymous.FlowNest",
     "message": ""
   },
   "ios": {
-    "latestVersion": "1.0.53",
+    "latestVersion": "1.0.54",
     "minVersion": "",
     "storeUrl": "https://apps.apple.com/in/app/flownest-2905/id6766820910",
     "message": ""

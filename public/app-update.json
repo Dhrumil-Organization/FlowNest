@@ -1,14 +1,15 @@
 {
   "android": {
     "latestVersion": "1.0.53",
-    "minVersion": "1.0.53",
+    "minVersion": "",
     "storeUrl": "",
     "message": ""
   },
   "ios": {
     "latestVersion": "1.0.53",
-    "minVersion": "1.0.53",
+    "minVersion": "",
     "storeUrl": "",
     "message": ""
-  }
+  },
+  "updatedAt": "2026-10-02T04:05:18.702Z"
 }

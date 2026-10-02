@@ -106,7 +106,6 @@ const IssueEntry = ({
                 BeamUId: line.beam.UId, BeamNo: line.beam.BeamNo || '', DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
                 IssDsnCode: line.dsn.IssDsnCode || 0, IssDsnName: line.dsn.IssDsnName || '',
                 ExpProdQty: exp, ExpQty: exp, ExpProdQtyType: isNewDesign ? '1' : '0', ExpQtyType: isNewDesign ? '1' : '0',
-                // ExpProdQty: '0',
                 Chees: ch, Wt: w, ClientRefId: clientRef.current,
                 CartNo: carton.CartNo, TranType: carton.TranType, PUId: carton.PUId, PSrNo: carton.PSrNo, PSubSr: carton.PSubSr,
                 ItmCode: carton.ItmCode, MerCode: carton.MerCode, GrdCode: carton.GrdCode, ShdCode: carton.ShdCode, Denier: carton.Denier,

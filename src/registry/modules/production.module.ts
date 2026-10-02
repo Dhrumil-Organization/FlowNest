@@ -643,7 +643,7 @@ registerUiNodes([
     title: 'Receivables',
     permission: 'production.receivables',
     action: 'view',
-    route: 'Receivables-Screen',
+    route: 'receivables-screen',
     icon: 'assignment',
     order: 110,
   },

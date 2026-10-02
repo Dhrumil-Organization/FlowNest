@@ -670,11 +670,28 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           ? sectionBTotal / sectionBProduction / sectionBAvgPicks
           : 0;
 
-        const machineCounts = sectionSalary.machine_counts
+        const machineCounts = section.machine_counts
+          || sectionElectricity.machine_counts_as_of_upto
+          || sectionSalary.machine_counts
           || sectionStores.machine_counts
           || sectionMaintenance.common?.machine_counts_as_of_upto
           || sectionOther.common?.machine_counts_as_of_upto
           || {};
+
+        const machineCountsReady = section.machine_counts?.ready === true
+          || sectionSalary.classification_integrity?.ready === true;
+
+        // Backward-compatible derived SUD 190 count for a temporarily cached
+        // backend response that predates the explicit sud_rapier_190 field.
+        // The authoritative value remains the effective-dated machine map.
+        const hasSudRapier190 = machineCounts.sud_rapier_190 !== undefined
+          && machineCounts.sud_rapier_190 !== null;
+        const derivedSudRapier190 = hasSudRapier190
+          ? asNumber(machineCounts.sud_rapier_190)
+          : Math.max(
+              0,
+              asNumber(machineCounts.sud_rapier) - asNumber(machineCounts.sud_rapier_230)
+            );
 
         const completenessKeys = ['electricity', 'salary', 'stores', 'maintenance', 'other', 'design_ppi'];
         const aggregateCompleteness = Object.fromEntries(
@@ -703,6 +720,10 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           avg_pick_wjet: asNumber(w.avg_picks),
           avg_pick_tot: asNumber(payload.summary?.avg_picks),
           cpmc: asNumber(payload.summary?.cost_per_machine_day),
+          costing_looms: asNumber(payload.summary?.costing_looms),
+          machine_days: asNumber(payload.summary?.machine_days),
+          machine_days_ready: payload.summary?.machine_days_ready !== false,
+          production_per_machine_day: asNumber(payload.summary?.production_per_machine_day),
           cpmc_rapier: 0,
           cpmc_wjet: 0,
           rapier_pct: !sectionActive && asNumber(payload.summary?.total_cost) > 0
@@ -777,6 +798,12 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           section_b_electricity_amount: sectionBElectricity,
           section_ab_electricity_total_kwh: asNumber(sectionElectricity.total_kwh || payload.utilities?.total_kwh || payload.summary?.units),
           section_ab_electricity_total_amount: asNumber(sectionElectricity.total_amount || payload.composition?.electricity),
+          section_machine_counts_ready: machineCountsReady,
+          section_machine_counts_as_of_ymd: asNumber(
+            section.machine_counts?.as_of_ymd
+              || sectionSalary.as_of_ymd
+              || sectionStores.as_of_ymd
+          ),
           section_machine_counts: {
             total_section: asNumber(machineCounts.total_section),
             section_a: asNumber(machineCounts.section_a),
@@ -786,6 +813,7 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
             mw_rapier: asNumber(machineCounts.mw_rapier),
             sud_rapier: asNumber(machineCounts.sud_rapier),
             sud_rapier_230: asNumber(machineCounts.sud_rapier_230),
+            sud_rapier_190: derivedSudRapier190,
             rapier_190: asNumber(machineCounts.rapier_190),
           },
           section_groups: sectionProduction.groups || {},

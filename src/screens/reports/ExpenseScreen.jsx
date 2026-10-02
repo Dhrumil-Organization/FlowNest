@@ -714,197 +714,355 @@
 // }
 
 // // ── Daily Units view ──────────────────────────────────────────────
+function DailyUnitsView({ d, onBack }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 700;
+  const rows = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
+  const [openDay, setOpenDay] = useState(rows.length ? rows.length - 1 : -1);
+  const sectionMode = d.is_section_ab === true;
+  const counts = d.section_machine_counts || {};
+  const aCount = machineCountNumber(counts.section_a);
+  const bCount = machineCountNumber(counts.section_b);
 
-// function DailyUnitsView({ d, onBack }) {
-//   const COLS = [
-//     "MW Loom",
-//     "MW Luwa",
-//     "Sud Loom",
-//     "Sud Luwa",
-//     "WJet Loom",
-//     "Warp",
-//     "M",
-//   ];
-//   const initRows = (d.daily || []).map((r) => ({
-//     date: r.date,
-//     values: [
-//       r.mw_looms,
-//       r.mw_luwa,
-//       r.sd_looms,
-//       r.sd_luwa,
-//       r.wj_looms,
-//       r.warping,
-//       r.misc,
-//     ],
-//   }));
-//   const [rows, setRows] = useState(initRows);
-//   const totalKwh = rows.reduce(
-//     (s, r) => s + r.values.reduce((a, v) => a + (Number(v) || 0), 0),
-//     0
-//   );
+  const totalKwh = sectionMode
+    ? Number(d.section_ab_electricity_total_kwh || 0)
+    : rows.reduce((sum, r) => sum + Number(r.total_kwh || 0), 0);
 
-//   const addDay = () => {
-//     const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${
-//       rows[0]?.date?.split("-")[1] || "Jun"
-//     }`;
-//     setRows((prev) => [
-//       ...prev,
-//       { date: nextDate, values: Array(COLS.length).fill("") },
-//     ]);
-//   };
+  const totalAmount = sectionMode
+    ? Number(d.section_ab_electricity_total_amount || 0)
+    : rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-//   return (
-//     <View>
-//       <TouchableOpacity onPress={onBack} style={{ marginBottom: 14 }}>
-//         <Text style={S.subBack}>‹ Back to report</Text>
-//       </TouchableOpacity>
-//       <Text style={S.subTitle}>Daily units consumed</Text>
-//       <Text style={S.subDesc}>
-//         Sub-meter readings in kWh per day. "Misc" is the unmetered residual.
-//         Monthly totals flow straight into the dashboard and electricity cost.
-//       </Text>
+  const fmtDate = (ymd) => {
+    const x = String(ymd || "");
+    if (x.length !== 8) return x;
+    const dt = new Date(Number(x.slice(0,4)), Number(x.slice(4,6))-1, Number(x.slice(6,8)));
+    return `${String(dt.getDate()).padStart(2,"0")}-${dt.toLocaleString("en-US",{month:"short"})}`;
+  };
 
-//       <DayInputTable
-//         days={d.days}
-//         cols={COLS}
-//         rows={rows}
-//         setRows={setRows}
-//         onAddDay={addDay}
-//       />
+  const allocationRows = (r) => [
+    ["Waterjet → A", r.section_ab?.allocation?.waterjet_to_a_kwh],
+    ["SUD 230 → A", r.section_ab?.allocation?.sud_230_to_a_kwh],
+    ["SUD Luwa → A", r.section_ab?.allocation?.sud_luwa_a_kwh],
+    ["Warping + Misc → A", r.section_ab?.allocation?.shared_a_kwh],
+    ["MW + MW Luwa → B", r.section_ab?.allocation?.mw_to_b_kwh],
+    ["SUD 190 → B", r.section_ab?.allocation?.sud_190_to_b_kwh],
+    ["SUD Luwa → B", r.section_ab?.allocation?.sud_luwa_b_kwh],
+    ["Warping + Misc → B", r.section_ab?.allocation?.shared_b_kwh],
+  ];
 
-//       <TouchableOpacity style={S.addDayBtn} onPress={addDay}>
-//         <Text style={S.addDayText}>+ Add a day</Text>
-//       </TouchableOpacity>
+  const legacyRows = (r) => [
+    ["MW Rapier — Looms", r.mw_rapier_looms],
+    ["SUD Rapier — Looms", r.sip_rapier_looms],
+    ["SUD Waterjet — Looms", r.sip_waterjet_looms],
+    ["MW Rapier — Luwa", r.mw_rapier_luwa],
+    ["SUD Rapier — Luwa", r.sip_rapier_luwa],
+    ["Warping", r.warping_shared],
+    ["Miscellaneous", r.misc_shared],
+  ];
 
-//       <View style={S.footCard}>
-//         <View>
-//           <Text style={S.footLabel}>TOTAL UNITS</Text>
-//           <Text style={{ fontSize: 16, fontWeight: "600" }}>
-//             {fN(totalKwh)}{" "}
-//             <Text style={{ fontSize: 13, color: "#9ca3af" }}>kWh</Text>
-//           </Text>
-//         </View>
-//         <View style={{ alignItems: "flex-end" }}>
-//           <Text style={S.footLabel}>ELECTRICITY @ ₹{d.unit_rate}</Text>
-//           <Text style={{ fontSize: 14, fontWeight: "600", color: "#c2823a" }}>
-//             {fL(d.elec_total)}
-//           </Text>
-//         </View>
-//       </View>
-//     </View>
-//   );
-// }
+  return (
+    <View style={DLY.page}>
+      <TouchableOpacity onPress={onBack} style={DLY.back}>
+        <Text style={DLY.backText}>‹ Back to report</Text>
+      </TouchableOpacity>
 
-// // ── Daily Salary view ─────────────────────────────────────────────
-// function DailySalaryView({ d, onBack }) {
-//   const COLS = ["Rapier ₹", "Waterjet ₹", "Total"];
-//   const initRows = (d.daily || []).map((r) => ({
-//     date: r.date,
-//     values: [r.sal_r, r.sal_w, r.sal_t],
-//   }));
-//   const [rows, setRows] = useState(initRows);
+      <View style={[DLY.titleRow, isMobile && { flexDirection: "column" }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={DLY.title}>Electricity units</Text>
+          <Text style={DLY.desc}>
+            Read-only daily electricity entered in Web ERP Unit Consumption and stored in ExpCosting.
+            Direct meters remain direct; only shared loads use the effective-dated machine map.
+          </Text>
+        </View>
+        <View style={DLY.readOnlyPill}>
+          <Text style={DLY.readOnlyPillText}>ERP · READ ONLY</Text>
+        </View>
+      </View>
 
-//   const addDay = () => {
-//     const nextDate = `${String(rows.length + 1).padStart(2, "0")}-${
-//       rows[0]?.date?.split("-")[1] || "Jun"
-//     }`;
-//     setRows((prev) => [...prev, { date: nextDate, values: ["", "", ""] }]);
-//   };
+      {sectionMode && (
+        <View style={[DLY.sectionRow, isMobile && { flexDirection: "column" }]}>
+          <View style={[DLY.sectionCard, { borderTopColor: "#185FA5" }]}>
+            <View style={DLY.sectionTitleLine}>
+              <View style={[DLY.tag, { backgroundColor: "#EAF3FB" }]}>
+                <Text style={[DLY.tagText, { color: "#185FA5" }]}>A</Text>
+              </View>
+              <Text style={DLY.sectionTitle}>Section A · {machineCountLabel(aCount, "mc")}</Text>
+            </View>
+            <Text style={DLY.sectionSub}>
+              Waterjet ({machineCountShort(counts.waterjet)}) + S. Rapier 230 cm ({machineCountShort(counts.sud_rapier_230)})
+            </Text>
+          </View>
 
-//   const tR = rows.reduce((s, r) => s + (Number(r.values[0]) || 0), 0);
-//   const tW = rows.reduce((s, r) => s + (Number(r.values[1]) || 0), 0);
-//   const tT = rows.reduce((s, r) => s + (Number(r.values[2]) || 0), 0);
+          <View style={[DLY.sectionCard, { borderTopColor: "#534AB7" }]}>
+            <View style={DLY.sectionTitleLine}>
+              <View style={[DLY.tag, { backgroundColor: "#F0EDFF" }]}>
+                <Text style={[DLY.tagText, { color: "#534AB7" }]}>B</Text>
+              </View>
+              <Text style={DLY.sectionTitle}>Section B · {machineCountLabel(bCount, "mc")}</Text>
+            </View>
+            <Text style={DLY.sectionSub}>
+              M Weaves ({machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm ({machineCountShort(counts.sud_rapier_190)})
+            </Text>
+          </View>
+        </View>
+      )}
 
-//   return (
-//     <View>
-//       <TouchableOpacity onPress={onBack} style={{ marginBottom: 14 }}>
-//         <Text style={S.subBack}>‹ Back to report</Text>
-//       </TouchableOpacity>
-//       <Text style={S.subTitle}>Daily salary expenses</Text>
-//       <Text style={S.subDesc}>
-//         Daily wage cost per shed (₹). Kept separate from utilities. Monthly
-//         totals flow into the dashboard.
-//       </Text>
+      <View style={[DLY.mtdCard, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={DLY.mtdLabel}>MONTH TO DATE · {d.label || ""}</Text>
+          <Text style={DLY.mtdValue}>
+            {fN(totalKwh)} <Text style={DLY.mtdUnit}>kWh</Text>
+          </Text>
+          {sectionMode && (
+            <View style={DLY.abLine}>
+              <Text style={[DLY.abText, { color: "#185FA5" }]}>A {fN(d.section_a_electricity_kwh)} kWh</Text>
+              <Text style={[DLY.abText, { color: "#534AB7" }]}>B {fN(d.section_b_electricity_kwh)} kWh</Text>
+            </View>
+          )}
+        </View>
+        <View style={[DLY.mtdRight, isMobile && { alignItems: "flex-start", marginTop: 10 }]}>
+          <Text style={DLY.mtdLabel}>ELECTRICITY COST</Text>
+          <Text style={[DLY.mtdValue, { color: "#185FA5" }]}>{fINR(totalAmount)}</Text>
+          <Text style={DLY.mtdSub}>@ {fINR(d.unit_rate)}/kWh</Text>
+        </View>
+      </View>
 
-//       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-//         <View>
-//           <View style={S.tableRow}>
-//             <Text style={[S.th, { minWidth: 70, textAlign: "left" }]}>
-//               Date
-//             </Text>
-//             {COLS.map((c) => (
-//               <Text key={c} style={S.th}>
-//                 {c}
-//               </Text>
-//             ))}
-//           </View>
-//           {rows.map((row, ri) => (
-//             <View key={ri} style={S.tableRow}>
-//               <Text
-//                 style={[
-//                   S.td,
-//                   { minWidth: 70, textAlign: "left", fontWeight: "500" },
-//                 ]}
-//               >
-//                 {row.date}
-//               </Text>
-//               {[0, 1].map((ci) => (
-//                 <TextInput
-//                   key={ci}
-//                   style={S.tdInput}
-//                   value={String(row.values[ci] || "")}
-//                   onChangeText={(v) => {
-//                     setRows(
-//                       rows.map((r, rr) => {
-//                         if (rr !== ri) return r;
-//                         const vals = [...r.values];
-//                         vals[ci] = v;
-//                         vals[2] = String(
-//                           (Number(vals[0]) || 0) + (Number(vals[1]) || 0)
-//                         );
-//                         return { ...r, values: vals };
-//                       })
-//                     );
-//                   }}
-//                   keyboardType="numeric"
-//                   placeholder="0"
-//                   placeholderTextColor="#d1d5db"
-//                 />
-//               ))}
-//               <Text style={[S.td, { color: "#c2823a", fontWeight: "500" }]}>
-//                 {fN(Number(row.values[2]) || 0)}
-//               </Text>
-//             </View>
-//           ))}
-//           <View
-//             style={[
-//               S.tableRow,
-//               { borderTopWidth: 1, borderTopColor: "#e5e7eb" },
-//             ]}
-//           >
-//             <Text
-//               style={[
-//                 S.th,
-//                 { minWidth: 70, textAlign: "left", color: "#c2823a" },
-//               ]}
-//             >
-//               TOTAL
-//             </Text>
-//             <Text style={[S.th, { color: "#c2823a" }]}>₹{fN(tR)}</Text>
-//             <Text style={[S.th, { color: "#c2823a" }]}>₹{fN(tW)}</Text>
-//             <Text style={[S.th, { color: "#c2823a" }]}>₹{fN(tT)}</Text>
-//           </View>
-//         </View>
-//       </ScrollView>
+      {rows.length === 0 ? (
+        <View style={DLY.emptyCard}>
+          <Text style={DLY.emptyText}>No daily electricity readings are available for this month.</Text>
+        </View>
+      ) : rows.map((r, i) => {
+        const open = openDay === i;
+        const sectionA = Number(r.section_ab?.section_a_kwh || 0);
+        const sectionB = Number(r.section_ab?.section_b_kwh || 0);
+        const reconciled = sectionMode ? r.section_ab?.is_reconciled !== false : r.is_reconciled !== false;
 
-//       <TouchableOpacity style={S.addDayBtn} onPress={addDay}>
-//         <Text style={S.addDayText}>+ Add a day</Text>
-//       </TouchableOpacity>
-//     </View>
-//   );
-// }
+        return (
+          <View key={`${r.date_ymd}-${i}`} style={[DLY.dayCard, open && { borderColor: "#C9B8A4" }]}>
+            <TouchableOpacity
+              onPress={() => setOpenDay(open ? -1 : i)}
+              activeOpacity={0.76}
+              style={DLY.dayHead}
+            >
+              <View style={[DLY.dayNo, open && { backgroundColor: "#185FA5" }]}>
+                <Text style={[DLY.dayNoText, open && { color: "#FFFFFF" }]}>{Number(r.day || i + 1)}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={DLY.dayTitle}>{fmtDate(r.date_ymd)}</Text>
+                <Text style={DLY.daySub}>
+                  {sectionMode ? `A ${fN(sectionA)} · B ${fN(sectionB)} kWh` : `${fN(r.total_kwh)} kWh`}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={DLY.dayKwh}>{fN(r.total_kwh)} kWh</Text>
+                <Text style={DLY.dayCost}>{fINR(r.amount || 0)}</Text>
+              </View>
+              <Text style={[DLY.chevron, open && { transform: [{ rotate: "180deg" }] }]}>▾</Text>
+            </TouchableOpacity>
 
-// // ── Daily Maintenance / Other view ────────────────────────────────
+            {open && (
+              <View style={DLY.dayBody}>
+                {sectionMode && (
+                  <View style={[DLY.sectionTotals, isMobile && { flexDirection: "column" }]}>
+                    <View style={[DLY.sectionTotalCard, { borderLeftColor: "#185FA5" }]}>
+                      <Text style={[DLY.sectionTotalLabel, { color: "#185FA5" }]}>SECTION A</Text>
+                      <Text style={DLY.sectionTotalValue}>{fN(sectionA)} kWh</Text>
+                      <Text style={DLY.sectionTotalCost}>{fINR(r.section_ab?.section_a_amount)}</Text>
+                    </View>
+                    <View style={[DLY.sectionTotalCard, { borderLeftColor: "#534AB7" }]}>
+                      <Text style={[DLY.sectionTotalLabel, { color: "#534AB7" }]}>SECTION B</Text>
+                      <Text style={DLY.sectionTotalValue}>{fN(sectionB)} kWh</Text>
+                      <Text style={DLY.sectionTotalCost}>{fINR(r.section_ab?.section_b_amount)}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <Text style={DLY.groupLabel}>{sectionMode ? "ALLOCATION DETAIL" : "METER DETAIL"}</Text>
+                {(sectionMode ? allocationRows(r) : legacyRows(r)).map(([label, value]) => (
+                  <View key={label} style={DLY.auditRow}>
+                    <Text style={DLY.auditLabel}>{label}</Text>
+                    <Text style={DLY.auditValue}>{fN(value)} kWh</Text>
+                  </View>
+                ))}
+
+                <View style={DLY.dayTotal}>
+                  <View>
+                    <Text style={DLY.dayTotalLabel}>DAY TOTAL</Text>
+                    <Text style={DLY.dayTotalSub}>
+                      {fINR(r.unit_rate || d.unit_rate || 0)}/kWh · {reconciled ? "reconciled" : "check difference"}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={DLY.dayTotalKwh}>{fN(r.total_kwh)} kWh</Text>
+                    <Text style={DLY.dayTotalCost}>{fINR(r.amount || 0)}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Daily Salary view ─────────────────────────────────────────────
+function DailySalaryView({ d, onBack, fill = false }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 700;
+  const sectionActive = d?.section_ab_active === true;
+
+  const rows = (() => {
+    if (sectionActive && Array.isArray(d.salary_daily)) {
+      return d.salary_daily.map((row) => ({
+        date: ymdLabel(row.date_ymd),
+        a: Number(row.section_a_amount || 0),
+        b: Number(row.section_b_amount || 0),
+        total: Number(row.manual_total || row.total || 0),
+        sourceRapier: Number(row.rapier_salary || 0),
+        sourceWaterjet: Number(row.waterjet_salary || 0),
+        ready: row.classification_ready !== false,
+      }));
+    }
+
+    return (d.daily || [])
+      .filter((r) => Number(r.sal_r || 0) > 0 || Number(r.sal_w || 0) > 0 || Number(r.sal_t || 0) > 0)
+      .map((r) => ({
+        date: r.date,
+        a: Number(r.sal_r || 0),
+        b: Number(r.sal_w || 0),
+        total: Number(r.sal_t || 0),
+        sourceRapier: Number(r.sal_r || 0),
+        sourceWaterjet: Number(r.sal_w || 0),
+        ready: true,
+      }));
+  })();
+
+  const totalA = rows.reduce((sum, row) => sum + row.a, 0);
+  const totalB = rows.reduce((sum, row) => sum + row.b, 0);
+  const totalSalary = rows.reduce((sum, row) => sum + row.total, 0);
+  const counts = d.section_machine_counts || {};
+  const rapierTotal = machineCountNumber(counts.total_rapier);
+  const sud230 = machineCountNumber(counts.sud_rapier_230);
+
+  return (
+    <View style={DLY.page}>
+      <TouchableOpacity onPress={onBack} style={DLY.back}>
+        <Text style={DLY.backText}>‹ Back to report</Text>
+      </TouchableOpacity>
+
+      <View style={[DLY.titleRow, isMobile && { flexDirection: "column" }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={DLY.title}>{sectionActive ? "Daily salary allocation" : "Daily salary expenses"}</Text>
+          <Text style={DLY.desc}>
+            {sectionActive
+              ? `Read-only salary entered in Web ERP and stored as Rapier_Salary + Waterjet_Salary. Waterjet moves to Section A; Rapier uses the effective-dated machine map${sud230 > 0 && rapierTotal > 0 ? ` (${sud230}/${rapierTotal})` : ""}.`
+              : "Read-only view of the existing Rapier / Waterjet salary source."}
+          </Text>
+        </View>
+        <View style={DLY.readOnlyPill}>
+          <Text style={DLY.readOnlyPillText}>ERP · READ ONLY</Text>
+        </View>
+      </View>
+
+      {sectionActive && (
+        <View style={[DLY.sectionRow, isMobile && { flexDirection: "column" }]}>
+          <View style={[DLY.sectionCard, { borderTopColor: "#185FA5" }]}>
+            <View style={DLY.sectionTitleLine}>
+              <View style={[DLY.tag, { backgroundColor: "#EAF3FB" }]}>
+                <Text style={[DLY.tagText, { color: "#185FA5" }]}>A</Text>
+              </View>
+              <Text style={DLY.sectionTitle}>Section A · {machineCountLabel(counts.section_a, "mc")}</Text>
+            </View>
+            <Text style={DLY.sectionSub}>
+              Waterjet ({machineCountShort(counts.waterjet)}) + Rapier 230 cm share ({machineCountShort(counts.sud_rapier_230)})
+            </Text>
+          </View>
+
+          <View style={[DLY.sectionCard, { borderTopColor: "#534AB7" }]}>
+            <View style={DLY.sectionTitleLine}>
+              <View style={[DLY.tag, { backgroundColor: "#F0EDFF" }]}>
+                <Text style={[DLY.tagText, { color: "#534AB7" }]}>B</Text>
+              </View>
+              <Text style={DLY.sectionTitle}>Section B · {machineCountLabel(counts.section_b, "mc")}</Text>
+            </View>
+            <Text style={DLY.sectionSub}>
+              Rapier 190 cm ({machineCountShort(counts.rapier_190)}) · M Weaves {machineCountShort(counts.mw_rapier)} · S. Rapier {machineCountShort(counts.sud_rapier_190)}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <View style={[DLY.mtdCard, { borderLeftColor: "#C2823A" }, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={DLY.mtdLabel}>MONTH TO DATE · {d.label || ""}</Text>
+          <Text style={[DLY.mtdValue, { color: "#C2823A" }]}>{fINR(totalSalary)}</Text>
+          {sectionActive && (
+            <View style={DLY.abLine}>
+              <Text style={[DLY.abText, { color: "#185FA5" }]}>A {fINR(totalA)}</Text>
+              <Text style={[DLY.abText, { color: "#534AB7" }]}>B {fINR(totalB)}</Text>
+            </View>
+          )}
+        </View>
+
+        {sectionActive && (
+          <View style={[DLY.mtdRight, isMobile && { alignItems: "flex-start", marginTop: 10 }]}>
+            <Text style={DLY.mtdLabel}>ALLOCATION BASIS</Text>
+            <Text style={DLY.basisText}>Waterjet → Section A</Text>
+            <Text style={DLY.basisText}>
+              {sud230 > 0 && rapierTotal > 0
+                ? `Rapier → A ${sud230}/${rapierTotal} · B remainder`
+                : "Rapier allocation · machine mapping unavailable"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {rows.length === 0 ? (
+        <View style={DLY.emptyCard}>
+          <Text style={DLY.emptyText}>No salary entry is available for this period.</Text>
+        </View>
+      ) : rows.map((row, i) => (
+        <View key={`${row.date}-${i}`} style={DLY.salaryCard}>
+          <View style={DLY.salaryHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={DLY.salaryDate}>{row.date}</Text>
+              <Text style={DLY.salarySource}>
+                {sectionActive
+                  ? `Source · Rapier ${fINR(row.sourceRapier)} · Waterjet ${fINR(row.sourceWaterjet)}`
+                  : "ERP salary source"}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={DLY.salaryTotal}>{fINR(row.total)}</Text>
+              <Text style={[DLY.salaryStatus, { color: row.ready ? "#2F855A" : "#B54747" }]}>
+                {row.ready ? "allocated" : "map not ready"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[DLY.salaryAB, isMobile && { flexDirection: "column" }]}>
+            <View style={[DLY.salaryABCard, { borderLeftColor: sectionActive ? "#185FA5" : "#B77932" }]}>
+              <Text style={[DLY.salaryABLabel, { color: sectionActive ? "#185FA5" : "#B77932" }]}>
+                {sectionActive ? "SECTION A" : "RAPIER"}
+              </Text>
+              <Text style={DLY.salaryABValue}>{fINR(row.a)}</Text>
+            </View>
+
+            <View style={[DLY.salaryABCard, { borderLeftColor: sectionActive ? "#534AB7" : "#185FA5" }]}>
+              <Text style={[DLY.salaryABLabel, { color: sectionActive ? "#534AB7" : "#185FA5" }]}>
+                {sectionActive ? "SECTION B" : "WATERJET"}
+              </Text>
+              <Text style={DLY.salaryABValue}>{fINR(row.b)}</Text>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ── Daily Maintenance / Other view ────────────────────────────────
 // function DailyInputView({ title, desc, d, onBack }) {
 //   const COLS = ["Rapier", "Waterjet", "Common"];
 //   const initRows = (d.daily || []).map((r) => ({
@@ -1056,10 +1214,10 @@
 //     {
 //       l: "PRODUCTION",
 //       v: `${f2(d.prod_total_L)} L m`,
-//       s: Number(d.days || 0) > 0 ? `${fN(Number(d.prod_total || 0) / Number(d.days) / Number(d.section_machine_counts?.total_section || 126))} m / mc·day` : "month-to-date",
+//       s: Number(d.days || 0) > 0 ? `${fN(Number(d.prod_total || 0) / Number(d.days) / machineCountNumber(d.section_machine_counts?.total_section))} m / mc·day` : "month-to-date",
 //       c: "#1D9E75",
 //     },
-//     { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: `${Number(d.section_machine_counts?.total_section || 126)} looms`, c: "#534AB7" },
+//     { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: `${machineCountNumber(d.section_machine_counts?.total_section)} looms`, c: "#534AB7" },
 //     {
 //       l: "UNITS",
 //       v: `${Math.round(d.kwh_total / 1000)}K kWh`,
@@ -1369,8 +1527,8 @@ function ClaudeProductionAuto({ d }) {
   const counts = d.section_machine_counts || {};
   const rows = d.section_ab_active
     ? [
-        ['A', 'Section A', 'Waterjet + S. Rapier 230 cm', d.section_a_prod, d.section_a_avg_picks, '#185FA5'],
-        ['B', 'Section B', 'Rapier 190 cm', d.section_b_prod, d.section_b_avg_picks, '#534AB7'],
+        ['A', 'Section A', `Waterjet (${machineCountShort(counts.waterjet)}) + S. Rapier 230 cm (${machineCountShort(counts.sud_rapier_230)})`, d.section_a_prod, d.section_a_avg_picks, '#185FA5'],
+        ['B', 'Section B', `M Weaves (${machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(counts.sud_rapier_190)})`, d.section_b_prod, d.section_b_avg_picks, '#534AB7'],
       ]
     : [
         ['R', 'Rapier', 'MW + SIP', d.prod_rapier, d.avg_pick_mw, '#B77932'],
@@ -1399,7 +1557,7 @@ function ClaudeProductionAuto({ d }) {
         </View>
       ))}
       <View style={S.clProdTotal}>
-        <Text style={S.clProdTotalLabel}>Total · {Number(counts.total_section || 126)} machines</Text>
+        <Text style={S.clProdTotalLabel}>Total · {machineCountLabel(counts.total_section)}</Text>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={S.clProdTotalValue}>{f2(Number(d.prod_total || 0) / 1e5)} L m</Text>
           <Text style={S.clProdPicks}>{f2(d.avg_pick_tot)} pk</Text>
@@ -1417,6 +1575,14 @@ function ClaudeManagementCard({ name, subtitle, accent, prod, picks, elec, sal, 
     ['Stores', store, '#1D9E75'],
     ...(extended ? [['Maintenance', maintenance, '#534AB7'], ['Other', other, '#BA7517']] : []),
   ];
+
+  // Management Summary is a COST summary, not the production source card.
+  // Production/picks may already exist from checking even when no expense head
+  // has been entered yet. Do not show those production metrics here as if a
+  // zero-cost management result were complete; the Production block above is
+  // the authoritative place to view metres/picks independently of expenses.
+  const hasExpenseData = rows.some(([, value]) => Math.abs(Number(value || 0)) > 0);
+
   return (
     <View style={[S.clMgmtCard, { borderTopColor: accent }]}>
       <View style={S.clMgmtHead}>
@@ -1431,7 +1597,9 @@ function ClaudeManagementCard({ name, subtitle, accent, prod, picks, elec, sal, 
           </View>
           <Text style={S.clMgmtSub}>{subtitle}</Text>
         </View>
-        <Text style={S.clMgmtMeta}>{f2(Number(prod || 0) / 1e5)} L m · {f2(picks)} pk</Text>
+        <Text style={S.clMgmtMeta}>
+          {hasExpenseData ? `${f2(Number(prod || 0) / 1e5)} L m · ${f2(picks)} pk` : 'No expense data'}
+        </Text>
       </View>
       {rows.map(([label, value, color]) => (
         <View key={label} style={S.clMgmtRow}>
@@ -1441,68 +1609,281 @@ function ClaudeManagementCard({ name, subtitle, accent, prod, picks, elec, sal, 
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={S.clMgmtValue}>{fINR(value)}</Text>
-            <Text style={S.clMgmtPerPick}>₹{f3(safePerPick(value, prod, picks))}/pk</Text>
+            <Text style={S.clMgmtPerPick}>
+              {hasExpenseData ? `₹${f3(safePerPick(value, prod, picks))}/pk` : '—/pk'}
+            </Text>
           </View>
         </View>
       ))}
       <View style={S.clMgmtFoot}>
-        <View><Text style={S.clFootLabel}>COST / PICK</Text><Text style={S.clFootCost}>₹{f3(cpp)}</Text></View>
-        <View style={{ alignItems: 'flex-end' }}><Text style={S.clFootLabel}>AVG PICKS</Text><Text style={S.clFootPick}>{f2(picks)}</Text></View>
+        <View><Text style={S.clFootLabel}>COST / PICK</Text><Text style={S.clFootCost}>{hasExpenseData ? `₹${f3(cpp)}` : '—'}</Text></View>
+        <View style={{ alignItems: 'flex-end' }}><Text style={S.clFootLabel}>AVG PICKS</Text><Text style={S.clFootPick}>{hasExpenseData ? f2(picks) : '—'}</Text></View>
       </View>
     </View>
   );
 }
 
 function ClaudeComparativeChart({ months, states }) {
-  const data = months.map((mo) => ({
-    label: mo.shortLabel,
-    prod: Number(states[mo.key]?.data?.prod_total_L || 0),
-    cpp: Number(states[mo.key]?.data?.cpp_total || 0),
-  })).reverse();
-  const maxProd = Math.max(...data.map(x => x.prod), 1);
-  const maxCpp = Math.max(...data.map(x => x.cpp), 0.001);
-  const left = 54, right = 646, top = 24, bottom = 196;
-  const step = (right - left) / Math.max(data.length, 1);
-  const barW = Math.min(34, step * 0.42);
-  const pts = data.map((row, i) => ({
-    x: left + step * i + step / 2,
-    y: bottom - (row.cpp / maxCpp) * (bottom - top),
-  }));
+  const data = months.map((mo) => {
+    const row = states[mo.key]?.data || {};
+    const hasExpenseData = [
+      row.elec_total,
+      row.sal_total,
+      row.store_total,
+      row.maintenance_total,
+      row.other_total,
+    ].some((value) => Math.abs(Number(value || 0)) > 0);
+
+    return {
+      key: mo.key,
+      label: mo.shortLabel,
+      fullLabel: mo.fullLabel || mo.label || mo.shortLabel,
+      prod: Number(row.prod_total_L || 0),
+      picks: Number(row.avg_pick_tot || 0),
+      cpp: Number(row.cpp_total || 0),
+      hasExpenseData,
+    };
+  }).reverse();
+
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [tooltipOpenedByUser, setTooltipOpenedByUser] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  // Tooltip must never appear just because the chart mounted/re-rendered.
+  // Clear any preserved Fast Refresh state whenever the six-month dataset changes.
+  const chartDataSignature = data
+    .map((row) => `${row.key}:${row.prod}:${row.picks}:${row.cpp}:${row.hasExpenseData ? 1 : 0}`)
+    .join('|');
+
+  React.useEffect(() => {
+    setSelectedIndex(null);
+    setTooltipOpenedByUser(false);
+  }, [chartDataSignature]);
+
+  const width = chartWidth > 0 ? chartWidth : Math.max(240, Math.min(SCREEN_W - 64, 520));
+  const chartHeight = 236;
+  const plotTop = 30;
+  const plotBottom = 182;
+  const plotLeft = 54;
+  const plotRight = Math.max(plotLeft + 150, width - 62);
+  const plotHeight = plotBottom - plotTop;
+  const plotWidth = plotRight - plotLeft;
+  const step = plotWidth / Math.max(data.length, 1);
+  const barWidth = Math.max(16, Math.min(28, step * 0.42));
+
+  const maxProdRaw = Math.max(...data.map((row) => row.prod), 0);
+  const maxProd = maxProdRaw > 0 ? maxProdRaw * 1.08 : 1;
+
+  const validCostRows = data.filter((row) => row.hasExpenseData);
+  const maxCppRaw = Math.max(...validCostRows.map((row) => row.cpp), 0);
+  const maxCpp = maxCppRaw > 0 ? maxCppRaw * 1.12 : 0.001;
+
+  const xForIndex = (index) => plotLeft + step * index + step / 2;
+  const yForProd = (value) => plotBottom - (Number(value || 0) / maxProd) * plotHeight;
+  const yForCpp = (value) => plotBottom - (Number(value || 0) / maxCpp) * plotHeight;
+
+  const costPoints = data.map((row, index) => row.hasExpenseData ? {
+    index,
+    x: xForIndex(index),
+    y: yForCpp(row.cpp),
+    row,
+  } : null);
+
+  const selectedPoint = selectedIndex !== null ? costPoints[selectedIndex] : null;
+  const visibleSelectedPoint = tooltipOpenedByUser ? selectedPoint : null;
+  const tooltipWidth = Math.min(174, Math.max(148, width - 24));
+  const tooltipHeight = 104;
+  const tooltipGap = 12;
+  const tooltipShowsRight = visibleSelectedPoint
+    ? visibleSelectedPoint.x <= width * 0.52
+    : true;
+  const tooltipLeft = visibleSelectedPoint
+    ? Math.max(6, Math.min(
+        width - tooltipWidth - 6,
+        tooltipShowsRight
+          ? visibleSelectedPoint.x + tooltipGap
+          : visibleSelectedPoint.x - tooltipWidth - tooltipGap,
+      ))
+    : 6;
+  const tooltipTop = visibleSelectedPoint
+    ? Math.max(4, Math.min(
+        chartHeight - tooltipHeight - 4,
+        visibleSelectedPoint.y - tooltipHeight / 2,
+      ))
+    : 4;
+
   return (
     <View style={S.clChartCard}>
-      <View style={S.clChartHead}><Text style={S.clCardTitle}>Production vs cost / pick</Text><Text style={S.clChartSub}>last 6 months</Text></View>
-      <Svg width="100%" height={232} viewBox="0 0 700 232" preserveAspectRatio="none">
-        {[0, .25, .5, .75, 1].map((p) => {
-          const y = bottom - p * (bottom - top);
-          return <Line key={p} x1={left} x2={right} y1={y} y2={y} stroke="#EEE8DF" strokeWidth="1" />;
-        })}
-        {data.map((row, i) => {
-          const x = left + step * i + step / 2;
-          const h = (row.prod / maxProd) * (bottom - top);
-          return <Rect key={row.label} x={x - barW/2} y={bottom - h} width={barW} height={Math.max(1,h)} rx="5" fill="#B77932" opacity="0.86" />;
-        })}
-        <Polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#0D1B2A" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-        {pts.map((p,i)=><Circle key={i} cx={p.x} cy={p.y} r="4.5" fill="#0D1B2A" stroke="#fff" strokeWidth="2" />)}
-        {data.map((row,i)=>{
-          const x=left+step*i+step/2;
-          return <SvgText key={row.label} x={x} y="220" textAnchor="middle" fontSize="11" fill="#8A8177">{row.label}</SvgText>;
-        })}
-        <SvgText x="10" y="18" fontSize="10" fill="#8A8177">L m</SvgText>
-        <SvgText x="660" y="18" fontSize="10" fill="#8A8177">₹/pk</SvgText>
-        <SvgText x="10" y={top+4} fontSize="9" fill="#A69C91">{maxProd.toFixed(1)}</SvgText>
-        <SvgText x="654" y={top+4} fontSize="9" fill="#A69C91">{maxCpp.toFixed(3)}</SvgText>
-      </Svg>
+      <View style={S.clChartHead}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={S.clCardTitle}>Production vs cost / pick</Text>
+          <Text style={S.clChartHint}>Tap a line dot to view month details</Text>
+        </View>
+        <Text style={S.clChartSub}>last 6 months</Text>
+      </View>
+
+      <View style={S.clChartAxisHead}>
+        <Text style={S.clChartAxisLeft}>Production · L m</Text>
+        <Text style={S.clChartAxisRight}>Cost / pick · ₹/pk</Text>
+      </View>
+
+      <View
+        onLayout={(event) => {
+          const next = Math.round(event.nativeEvent.layout.width);
+          if (next > 0 && Math.abs(next - chartWidth) > 1) setChartWidth(next);
+        }}
+        style={{ position: 'relative', width: '100%', height: chartHeight, marginTop: 8 }}
+      >
+        <Svg width={width} height={chartHeight}>
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+            const y = plotBottom - ratio * plotHeight;
+            return (
+              <Line
+                key={`grid-${ratio}`}
+                x1={plotLeft}
+                x2={plotRight}
+                y1={y}
+                y2={y}
+                stroke="#EEE8DF"
+                strokeWidth="1"
+              />
+            );
+          })}
+
+          <SvgText x={4} y={plotTop + 4} fontSize="8.5" fontWeight="600" fill="#8A8177">{`${maxProdRaw.toFixed(2)} L m`}</SvgText>
+          <SvgText x={4} y={plotBottom + 3} fontSize="8.5" fill="#A69C91">0</SvgText>
+          <SvgText x={width - 4} y={plotTop + 4} textAnchor="end" fontSize="8.5" fontWeight="600" fill="#8A8177">{maxCppRaw > 0 ? `₹${maxCppRaw.toFixed(3)}/pk` : '—'}</SvgText>
+          <SvgText x={width - 4} y={plotBottom + 3} textAnchor="end" fontSize="8.5" fill="#A69C91">₹0/pk</SvgText>
+
+          {data.map((row, index) => {
+            const x = xForIndex(index);
+            const y = yForProd(row.prod);
+            const h = Math.max(1, plotBottom - y);
+            return (
+              <Rect
+                key={`bar-${row.key}`}
+                x={x - barWidth / 2}
+                y={plotBottom - h}
+                width={barWidth}
+                height={h}
+                rx="5"
+                fill="#B77932"
+                opacity="0.88"
+              />
+            );
+          })}
+
+          {costPoints.map((point, index) => {
+            if (!point || index === 0 || !costPoints[index - 1]) return null;
+            const prev = costPoints[index - 1];
+            return (
+              <Line
+                key={`cost-line-${index}`}
+                x1={prev.x}
+                y1={prev.y}
+                x2={point.x}
+                y2={point.y}
+                stroke="#0D1B2A"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            );
+          })}
+
+          {costPoints.map((point, index) => point ? (
+            <Circle
+              key={`dot-${point.row.key}`}
+              cx={point.x}
+              cy={point.y}
+              r={tooltipOpenedByUser && selectedIndex === index ? 5.8 : 4.5}
+              fill="#0D1B2A"
+              stroke="#FFFFFF"
+              strokeWidth={tooltipOpenedByUser && selectedIndex === index ? 2.5 : 2}
+            />
+          ) : null)}
+
+          {data.map((row, index) => (
+            <SvgText
+              key={`label-${row.key}`}
+              x={xForIndex(index)}
+              y={222}
+              textAnchor="middle"
+              fontSize="10"
+              fill="#8A8177"
+            >
+              {row.label}
+            </SvgText>
+          ))}
+        </Svg>
+
+        {costPoints.map((point, index) => point ? (
+          <TouchableOpacity
+            key={`hit-${point.row.key}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${point.row.fullLabel} cost per pick ₹${f3(point.row.cpp)}`}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (tooltipOpenedByUser && selectedIndex === index) {
+                setSelectedIndex(null);
+                setTooltipOpenedByUser(false);
+                return;
+              }
+              setSelectedIndex(index);
+              setTooltipOpenedByUser(true);
+            }}
+            style={{
+              position: 'absolute',
+              left: point.x - 22,
+              top: point.y - 22,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+            }}
+          />
+        ) : null)}
+
+        {visibleSelectedPoint && (
+          <View
+            pointerEvents="none"
+            style={[
+              S.clChartTooltip,
+              { width: tooltipWidth, left: tooltipLeft, top: tooltipTop },
+            ]}
+          >
+            <Text style={S.clChartTooltipMonth}>{visibleSelectedPoint.row.fullLabel}</Text>
+            <View style={S.clChartTooltipRow}>
+              <Text style={S.clChartTooltipLabel}>Production</Text>
+              <Text style={S.clChartTooltipValue}>{f2(visibleSelectedPoint.row.prod)} L m</Text>
+            </View>
+            <View style={S.clChartTooltipRow}>
+              <Text style={S.clChartTooltipLabel}>Avg picks</Text>
+              <Text style={S.clChartTooltipValue}>{f2(visibleSelectedPoint.row.picks)} pk</Text>
+            </View>
+            <View style={S.clChartTooltipRow}>
+              <Text style={S.clChartTooltipLabel}>Cost / pick</Text>
+              <Text style={S.clChartTooltipValue}>₹{f3(visibleSelectedPoint.row.cpp)}/pk</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
       <View style={S.clLegend}>
         <View style={S.clLegendItem}><View style={[S.clLegendBox,{backgroundColor:'#B77932'}]}/><Text style={S.clLegendText}>Production (L m)</Text></View>
         <View style={S.clLegendItem}><View style={[S.clLegendDot,{backgroundColor:'#0D1B2A'}]}/><Text style={S.clLegendText}>Cost / pick (₹)</Text></View>
       </View>
+
+      {data.some((row) => !row.hasExpenseData && row.prod > 0) && (
+        <Text style={S.clChartPendingNote}>Months with production but no expense entry are not plotted as ₹0 on the cost/pick line.</Text>
+      )}
     </View>
   );
 }
 
 function ClaudeEfficiencyCard({ d }) {
-  const machineCount = Number(d.section_machine_counts?.total_section || 126);
-  const prodMcDay = Number(d.days || 0) > 0 ? Number(d.prod_total || 0) / machineCount / Number(d.days) : 0;
+  const machineCount = machineCountNumber(d.section_machine_counts?.total_section);
+  const prodMcDay = Number(d.days || 0) > 0 && machineCount > 0
+    ? Number(d.prod_total || 0) / machineCount / Number(d.days)
+    : 0;
   const rows = [
     ['Units / metre', `${f2(d.units_per_mtr)} kWh`],
     ['Salary / metre', fINR(d.sal_per_mtr)],
@@ -1556,6 +1937,7 @@ function ExpenseDataIntegrityNotice({ d }) {
 function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setTrendSheet, pastOpen, togglePast }) {
   const extended = d.section_ab_active === true;
   const inputCount = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const costingReady = !extended || d.total_cost_complete === true;
   return (
     <View style={S.clDashboard}>
       <KPIGrid d={d} label={m.fullLabel} cols={isLarge ? 3 : 1} />
@@ -1569,8 +1951,8 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
         </View>
         <View style={[S.clCard, isLarge && { flex: .95 }]}>
           <Text style={S.clEyebrow}>INPUTS</Text>
-          <ClaudeInputLink icon="⚡" title="Daily units consumed" sub={`${(d.daily||[]).length} days · ${fN(d.kwh_total)} kWh`} accent="#185FA5" onPress={()=>setView('daily-units')} />
-          <ClaudeInputLink icon="₹" title="Daily salary expenses" sub={`${(d.daily||[]).length} days · ${fINR(d.sal_total)}`} accent="#C2823A" onPress={()=>setView('daily-salary')} />
+          <ClaudeInputLink icon="⚡" title="Daily units consumed" sub={`${inputCount(d.electricity_daily)} days · ${fN(d.kwh_total)} kWh`} accent="#185FA5" onPress={()=>setView('daily-units')} />
+          <ClaudeInputLink icon="₹" title="Daily salary expenses" sub={`${inputCount(d.salary_daily)} days · ${fINR(d.sal_total)}`} accent="#C2823A" onPress={()=>setView('daily-salary')} />
           {extended && <ClaudeInputLink icon="▦" title="Daily maintenance" sub={`${inputCount(d.maintenance_daily)} days · ${fINR(d.maintenance_total)}`} accent="#534AB7" onPress={()=>setView('daily-maint')} />}
           {extended && <ClaudeInputLink icon="+" title="Daily other expenses" sub={`${inputCount(d.other_daily)} days · ${fINR(d.other_total)}`} accent="#BA7517" onPress={()=>setView('daily-other')} />}
         </View>
@@ -1584,9 +1966,9 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
       <Text style={S.clSectionHeading}>Management summary</Text>
       <View style={[S.clMgmtGrid, isLarge && { flexDirection: 'row' }]}>
         {extended ? <>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section A · ${Number(d.section_machine_counts?.section_a||40)} machines`} subtitle="Waterjet + S. Rapier 230 cm" accent="#185FA5" prod={d.section_a_prod} picks={d.section_a_avg_picks} elec={d.section_a_elec} sal={d.section_a_salary} store={d.section_a_stores} maintenance={d.section_a_maintenance} other={d.section_a_other} cpp={d.section_a_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'A',title:'Section A · daily trend'})}/></View>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section B · ${Number(d.section_machine_counts?.section_b||86)} machines`} subtitle="Rapier 190 cm" accent="#534AB7" prod={d.section_b_prod} picks={d.section_b_avg_picks} elec={d.section_b_elec} sal={d.section_b_salary} store={d.section_b_stores} maintenance={d.section_b_maintenance} other={d.section_b_other} cpp={d.section_b_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'B',title:'Section B · daily trend'})}/></View>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Total · Section A + B" subtitle={`${Number(d.section_machine_counts?.total_section||126)} machines`} accent="#0D1B2A" prod={d.prod_total} picks={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} maintenance={d.maintenance_total} other={d.other_total} cpp={d.cpp_total} extended onTrend={()=>setTrendSheet({kind:'section',section:'T',title:'Total · daily trend'})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section A · ${machineCountLabel(d.section_machine_counts?.section_a)}`} subtitle={`Waterjet (${machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier 230 cm (${machineCountShort(d.section_machine_counts?.sud_rapier_230)})`} accent="#185FA5" prod={d.section_a_prod} picks={d.section_a_avg_picks} elec={d.section_a_elec} sal={d.section_a_salary} store={d.section_a_stores} maintenance={d.section_a_maintenance} other={d.section_a_other} cpp={d.section_a_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'A',title:'Section A · daily trend'})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section B · ${machineCountLabel(d.section_machine_counts?.section_b)}`} subtitle={`M Weaves (${machineCountShort(d.section_machine_counts?.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(d.section_machine_counts?.sud_rapier_190)})`} accent="#534AB7" prod={d.section_b_prod} picks={d.section_b_avg_picks} elec={d.section_b_elec} sal={d.section_b_salary} store={d.section_b_stores} maintenance={d.section_b_maintenance} other={d.section_b_other} cpp={d.section_b_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'B',title:'Section B · daily trend'})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Total · Section A + B" subtitle={machineCountLabel(d.section_machine_counts?.total_section)} accent="#0D1B2A" prod={d.prod_total} picks={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} maintenance={d.maintenance_total} other={d.other_total} cpp={d.cpp_total} extended onTrend={()=>setTrendSheet({kind:'section',section:'T',title:'Total · daily trend'})}/></View>
         </> : <>
           <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Rapier" subtitle="MW + SIP" accent="#B77932" prod={d.prod_rapier} picks={d.avg_pick_mw} elec={d.elec_rapier} sal={d.sal_rapier} store={d.store_rapier} cpp={d.cpp_rapier}/></View>
           <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Waterjet" subtitle="Legacy division" accent="#185FA5" prod={d.prod_wjet} picks={d.avg_pick_wjet} elec={d.elec_wjet} sal={d.sal_wjet} store={d.store_wjet} cpp={d.cpp_wjet}/></View>
@@ -1610,7 +1992,7 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
         <View style={isLarge?{flex:1}:undefined}>
           {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · Common" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)}</Text></ExpBlock>}
           {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct / indirect · A/B/Common" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)}</Text></ExpBlock>}
-          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={`₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} picks`} amt={`₹${f3(d.cpp_total)}/pk`}>
+          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
             {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total],...(extended?[['Maintenance',d.maintenance_total],['Other',d.other_total]]:[])].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}<View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total cost</Text><Text style={[S.clABValue,{color:'#B77932'}]}>{fINR(d.total)}</Text></View>
           </ExpBlock>
         </View>
@@ -1764,8 +2146,11 @@ function ExecutiveKpi({ label, value, sub, accent, hero = false, fullMobile = fa
 
 function ExecutiveKpiGrid({ d, isLarge }) {
   const days = Number(d.days || 0);
+  const currentMachineCount = machineCountNumber(d.section_machine_counts?.total_section);
   const productionPerMcDay =
-    days > 0 ? Number(d.prod_total || 0) / 126 / days : 0;
+    days > 0 && currentMachineCount > 0
+      ? Number(d.prod_total || 0) / currentMachineCount / days
+      : 0;
 
   const items = [
     {
@@ -1914,15 +2299,15 @@ function ExecutiveSectionCard({
 }
 
 function ExecutiveSectionSummary({ d, isLarge }) {
-  const aCount = Number(d.section_machine_counts?.section_a || 40);
-  const bCount = Number(d.section_machine_counts?.section_b || 86);
+  const aCount = machineCountNumber(d.section_machine_counts?.section_a);
+  const bCount = machineCountNumber(d.section_machine_counts?.section_b);
 
   const isAB = d.section_ab_active === true;
   const cards = isAB
     ? [
         {
           title: "Section A",
-          subtitle: `${aCount} machines · Waterjet + Rapier 230`,
+          subtitle: `${machineCountLabel(aCount)} · Waterjet (${machineCountShort(d.section_machine_counts?.waterjet)}) + Rapier 230 (${machineCountShort(d.section_machine_counts?.sud_rapier_230)})`,
           accent: E_COLOR.blue,
           production: d.section_a_prod,
           picks: d.section_a_avg_picks,
@@ -1937,7 +2322,7 @@ function ExecutiveSectionSummary({ d, isLarge }) {
         },
         {
           title: "Section B",
-          subtitle: `${bCount} machines · Rapier 190`,
+          subtitle: `${machineCountLabel(bCount)} · MW (${machineCountShort(d.section_machine_counts?.mw_rapier)}) + S. Rapier 190 (${machineCountShort(d.section_machine_counts?.sud_rapier_190)})`,
           accent: E_COLOR.violet,
           production: d.section_b_prod,
           picks: d.section_b_avg_picks,
@@ -2523,7 +2908,7 @@ function ProfessionalExpenseDashboard({
 //   const [activeTab, setActiveTab] = useState(0);
 //   const [view, setView] = useState("report");
 //   const [pastOpen, setPastOpen] = useState({});
-//   const scrollRef = useRef < ScrollView > null;
+//   const scrollRef = useRef(null);
 
 //   const m = months[activeTab];
 //   const st = states[m?.key];
@@ -3585,6 +3970,19 @@ const f4 = (v) => Number(v || 0).toFixed(4);
 const fN = (v) => Math.round(v || 0).toLocaleString("en-IN");
 const fINR = (v, decimals = 2) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 
+const machineCountNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+const machineCountLabel = (value, suffix = "machines") => {
+  const n = machineCountNumber(value);
+  return n > 0 ? `${n} ${suffix}` : "Mapping unavailable";
+};
+const machineCountShort = (value) => {
+  const n = machineCountNumber(value);
+  return n > 0 ? String(n) : "—";
+};
+
 const cleanMoneyInput = (value) => {
   const raw = String(value ?? "").replace(/[^0-9.]/g, "");
   const [whole = "", ...fractionParts] = raw.split(".");
@@ -3665,8 +4063,8 @@ const buildUtilityRateRows = (d) => {
       cost_per_pick: Number(production || 0) > 0 && Number(picks || 0) > 0 ? Number(amount || 0) / Number(production || 0) / Number(picks || 0) : 0,
     });
     return [
-      sectionRow('section_a', 'Section A · 40 machines', d.section_a_electricity_kwh, d.section_a_electricity_amount, d.section_a_mtr, d.section_a_avg_picks),
-      sectionRow('section_b', 'Section B · 86 machines', d.section_b_electricity_kwh, d.section_b_electricity_amount, d.section_b_mtr, d.section_b_avg_picks),
+      sectionRow('section_a', `Section A · ${machineCountLabel(d.section_machine_counts?.section_a)}`, d.section_a_electricity_kwh, d.section_a_electricity_amount, d.section_a_mtr, d.section_a_avg_picks),
+      sectionRow('section_b', `Section B · ${machineCountLabel(d.section_machine_counts?.section_b)}`, d.section_b_electricity_kwh, d.section_b_electricity_amount, d.section_b_mtr, d.section_b_avg_picks),
     ];
   }
 
@@ -4206,20 +4604,35 @@ function ComparativeChart({ months, states }) {
 // ── Expandable expense block with icon ───────────────────────────
 // ── Daily Expense + Utility Trends (Client Artifact) ─────────────
 function TrendBars({ rows, valueKey, valueFormatter, selected, onSelect, barColor = '#c2823a' }) {
-  const max = Math.max(...rows.map(r => Number(r[valueKey] || 0)), 0.000001);
+  const numericValues = rows.map((r) => {
+    if (r?._available === false) return 0;
+    const n = Number(r?.[valueKey]);
+    return Number.isFinite(n) ? n : 0;
+  });
+  const max = Math.max(...numericValues, 0.000001);
+
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingVertical: 6 }}>
       {rows.map((r, i) => {
-        const v = Number(r[valueKey] || 0);
+        const available = r?._available !== false;
+        const raw = Number(r?.[valueKey]);
+        const v = Number.isFinite(raw) ? raw : 0;
         const active = selected === i;
+        const barPct = available && v > 0 ? Math.max(3, (v / max) * 100) : 0;
+
         return (
-          <TouchableOpacity key={`${r.date_ymd || r.day}-${i}`} onPress={() => onSelect(i)}
-            style={{ width: 38, alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Text style={{ fontSize: 9, color: active ? '#111827' : '#9ca3af', marginBottom: 3 }}>
-              {active ? valueFormatter(v) : ''}
+          <TouchableOpacity
+            key={`${r.date_ymd || r.day}-${i}`}
+            onPress={() => onSelect(i)}
+            style={{ width: 42, alignItems: 'center', justifyContent: 'flex-end' }}
+          >
+            <Text style={{ fontSize: 9, color: active ? '#111827' : '#9ca3af', marginBottom: 3, minHeight: 12 }}>
+              {active ? (available ? valueFormatter(v, r) : 'Pending') : ''}
             </Text>
             <View style={{ height: 92, width: 22, justifyContent: 'flex-end', backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden' }}>
-              <View style={{ width: '100%', height: `${Math.max(3, (v / max) * 100)}%`, backgroundColor: barColor, opacity: active ? 1 : 0.62 }} />
+              {barPct > 0 && (
+                <View style={{ width: '100%', height: `${barPct}%`, backgroundColor: barColor, opacity: active ? 1 : 0.62 }} />
+              )}
             </View>
             <Text style={{ fontSize: 9, color: active ? '#111827' : '#6b7280', marginTop: 4 }}>{r.day}</Text>
           </TouchableOpacity>
@@ -4234,41 +4647,157 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
   const isUtility = safeTrend.kind === 'utility';
   const isRapier = safeTrend.kind === 'rapier';
   const isWaterjet = safeTrend.kind === 'waterjet';
+  const isSection = safeTrend.kind === 'section';
+  const sectionKey = String(safeTrend.section || 'T').toUpperCase();
+
   const rows = isUtility
     ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key)
     : (d.expense_daily_trend || []);
-  const valueOf = r => isUtility ? Number(r.cost_per_mtr || 0)
-    : isRapier ? Number(r.rapier_cost_per_pick || 0)
-    : isWaterjet ? Number(r.waterjet_cost_per_pick || 0)
-    : Number(r.cost_per_pick || 0);
-  const positive = rows.map(valueOf).filter(v => v > 0);
-  const avg = positive.length ? positive.reduce((a,v)=>a+v,0) / positive.length : 0;
-  const best = positive.length ? Math.min(...positive) : 0;
-  const worst = positive.length ? Math.max(...positive) : 0;
+
+  const costReady = (r) => isUtility || r?.total_cost_complete === true;
+
+  const prod = (r) => {
+    if (isUtility) return Number(r.production_mtr || 0);
+    if (isSection && sectionKey === 'A') return Number(r.section_a_mtr || 0);
+    if (isSection && sectionKey === 'B') return Number(r.section_b_mtr || 0);
+    if (isRapier) return Number(r.rapier_mtr || 0);
+    if (isWaterjet) return Number(r.waterjet_mtr || 0);
+    return Number(r.production_mtr || 0);
+  };
+
+  const picks = (r) => {
+    if (isSection && sectionKey === 'A') return Number(r.section_a_avg_picks || 0);
+    if (isSection && sectionKey === 'B') return Number(r.section_b_avg_picks || 0);
+    if (isRapier) return Number(r.rapier_avg_picks || 0);
+    if (isWaterjet) return Number(r.waterjet_avg_picks || 0);
+    return Number(r.avg_picks || 0);
+  };
+
+  const cost = (r) => {
+    if (isUtility) return Number(r.amount || 0);
+    if (isSection && sectionKey === 'A') return Number(r.section_a_total_cost || 0);
+    if (isSection && sectionKey === 'B') return Number(r.section_b_total_cost || 0);
+    if (isRapier) return Number(r.rapier_total_cost || 0);
+    if (isWaterjet) return Number(r.waterjet_total_cost || 0);
+    return Number(r.total_cost || 0);
+  };
+
+  const valueOf = (r) => {
+    if (!costReady(r)) return null;
+    if (isUtility) return Number(r.cost_per_mtr || 0);
+
+    if (isSection) {
+      const m = prod(r);
+      const p = picks(r);
+      return m > 0 && p > 0 ? cost(r) / m / p : 0;
+    }
+
+    if (isRapier) return Number(r.rapier_cost_per_pick || 0);
+    if (isWaterjet) return Number(r.waterjet_cost_per_pick || 0);
+    return Number(r.cost_per_pick || 0);
+  };
+
+  const availableValues = rows
+    .map(valueOf)
+    .filter((v) => v !== null && Number.isFinite(v));
+  const avg = availableValues.length
+    ? availableValues.reduce((a, v) => a + v, 0) / availableValues.length
+    : null;
+  const best = availableValues.length ? Math.min(...availableValues) : null;
+  const worst = availableValues.length ? Math.max(...availableValues) : null;
+
   const [selected, setSelected] = useState(Math.max(0, rows.length - 1));
-  React.useEffect(() => { setSelected(Math.max(0, rows.length - 1)); }, [safeTrend.kind, safeTrend.key, rows.length]);
+  React.useEffect(() => {
+    setSelected(Math.max(0, rows.length - 1));
+  }, [safeTrend.kind, safeTrend.key, safeTrend.section, rows.length]);
+
   const row = rows[Math.min(selected, Math.max(0, rows.length - 1))] || {};
-  const title = isUtility ? (safeTrend.label || 'Utility') : isRapier ? 'Rapier' : isWaterjet ? 'Waterjet' : 'Total (Rapier + Waterjet)';
-  const prod = r => isUtility ? Number(r.production_mtr || 0) : isRapier ? Number(r.rapier_mtr || 0) : isWaterjet ? Number(r.waterjet_mtr || 0) : Number(r.production_mtr || 0);
-  const picks = r => isRapier ? Number(r.rapier_avg_picks || 0) : isWaterjet ? Number(r.waterjet_avg_picks || 0) : Number(r.avg_picks || 0);
-  const cost = r => isUtility ? Number(r.amount || 0) : isRapier ? Number(r.rapier_total_cost || 0) : isWaterjet ? Number(r.waterjet_total_cost || 0) : Number(r.total_cost || 0);
+  const rowReady = costReady(row);
+  const title = isUtility
+    ? (safeTrend.label || 'Utility')
+    : isSection
+      ? (safeTrend.title || (sectionKey === 'A' ? 'Section A' : sectionKey === 'B' ? 'Section B' : 'Total · Section A + B'))
+      : isRapier
+        ? 'Rapier'
+        : isWaterjet
+          ? 'Waterjet'
+          : 'Total (Rapier + Waterjet)';
+
+  const statText = (v) => v === null ? '—' : `₹${f3(v)}${isUtility ? '/m' : '/pk'}`;
+
   if (!open || !trend) return null;
+
   return <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
     <View style={{flex:1,backgroundColor:'rgba(15,23,42,0.38)',justifyContent:'center',padding:18}}>
       <View style={{backgroundColor:'#fff',borderRadius:16,maxHeight:'88%',padding:14,width:'100%',maxWidth:720,alignSelf:'center'}}>
         <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
-          <View style={{flex:1,paddingRight:10}}><Text style={{fontSize:17,fontWeight:'700',color:'#111827'}}>{title}</Text>
-            <Text style={{fontSize:10.5,color:'#6b7280',marginTop:3,lineHeight:15}}>{isUtility ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds." : "Daily cost per pick — electricity, wages and allocated stores ÷ metres ÷ picks."}</Text></View>
+          <View style={{flex:1,paddingRight:10}}>
+            <Text style={{fontSize:17,fontWeight:'700',color:'#111827'}}>{title}</Text>
+            <Text style={{fontSize:10.5,color:'#6b7280',marginTop:3,lineHeight:15}}>
+              {isUtility
+                ? "Daily electricity cost per metre — units × rate ÷ that day's production of the machines it feeds."
+                : "Production and production-weighted picks remain visible even when costing is pending. ₹/pick is shown only for days whose expense sources are complete."}
+            </Text>
+          </View>
           <TouchableOpacity onPress={onClose} style={{padding:6}}><Text style={{fontSize:20,color:'#6b7280'}}>×</Text></TouchableOpacity>
         </View>
+
         <View style={{flexDirection:'row',gap:7,marginBottom:8}}>
-          {[['MONTH AVG',avg],['BEST DAY',best],['WORST DAY',worst]].map(([l,v])=><View key={l} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:9,padding:8}}><Text style={{fontSize:9,color:'#6b7280'}}>{l}</Text><Text style={{fontSize:14,fontWeight:'700',marginTop:2}}>₹{isUtility?f3(v):f3(v)}{isUtility?'/m':'/pk'}</Text></View>)}
+          {[['MONTH AVG',avg],['BEST DAY',best],['WORST DAY',worst]].map(([l,v]) => (
+            <View key={l} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:9,padding:8}}>
+              <Text style={{fontSize:9,color:'#6b7280'}}>{l}</Text>
+              <Text style={{fontSize:14,fontWeight:'700',marginTop:2}}>{statText(v)}</Text>
+            </View>
+          ))}
         </View>
-        <TrendBars rows={rows.map(r=>({...r,_v:valueOf(r)}))} valueKey="_v" valueFormatter={v=>`₹${f3(v)}`} selected={selected} onSelect={setSelected} barColor={isUtility?'#185FA5':isWaterjet?'#185FA5':'#c2823a'} />
-        {!!row.date_ymd && <View style={{backgroundColor:'#f8fafc',borderRadius:9,padding:9,marginVertical:6}}><Text style={{fontSize:11.5,fontWeight:'700'}}>Day {row.day}</Text><Text style={{fontSize:10.5,color:'#4b5563',marginTop:3}}>{isUtility ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row))}/m` : `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row))}/pick`}</Text></View>}
+
+        <TrendBars
+          rows={rows.map(r => ({...r, _v: valueOf(r), _available: costReady(r)}))}
+          valueKey="_v"
+          valueFormatter={(v) => `₹${f3(v)}`}
+          selected={selected}
+          onSelect={setSelected}
+          barColor={isUtility ? '#185FA5' : isWaterjet ? '#185FA5' : isSection && sectionKey === 'B' ? '#534AB7' : '#c2823a'}
+        />
+
+        {!!row.date_ymd && (
+          <View style={{backgroundColor:'#f8fafc',borderRadius:9,padding:9,marginVertical:6}}>
+            <Text style={{fontSize:11.5,fontWeight:'700'}}>Day {row.day}</Text>
+            <Text style={{fontSize:10.5,color:'#4b5563',marginTop:3}}>
+              {isUtility
+                ? `${fN(row.kwh)} kWh · ${fN(prod(row))} m · ${fL(cost(row))} · ₹${f3(valueOf(row) || 0)}/m`
+                : rowReady
+                  ? `${fN(prod(row))} m · ${f2(picks(row))} picks · ${fL(cost(row))} · ₹${f3(valueOf(row) || 0)}/pick`
+                  : `${fN(prod(row))} m · ${f2(picks(row))} picks · Cost pending · ₹/pick —`}
+            </Text>
+          </View>
+        )}
+
         <ScrollView style={{maxHeight:210}} nestedScrollEnabled>
-          <View style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#e5e7eb'}}><Text style={{flex:0.8,fontSize:9,fontWeight:'700'}}>DATE</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'kWh':'PROD m'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'PROD m':'PICKS'}</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>COST</Text><Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'₹/m':'₹/PICK'}</Text></View>
-          {rows.map((r,i)=><TouchableOpacity key={`${r.date_ymd}-${i}`} onPress={()=>setSelected(i)} style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f3f4f6',backgroundColor:i===selected?'#f8fafc':'#fff'}}><Text style={{flex:0.8,fontSize:10}}>{r.day}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?r.kwh:prod(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?prod(r):picks(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10}}>{fL(cost(r))}</Text><Text style={{flex:1,textAlign:'right',fontSize:10,fontWeight:'700'}}>₹{f3(valueOf(r))}</Text></TouchableOpacity>)}
+          <View style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#e5e7eb'}}>
+            <Text style={{flex:0.8,fontSize:9,fontWeight:'700'}}>DATE</Text>
+            <Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'kWh':'PROD m'}</Text>
+            <Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'PROD m':'PICKS'}</Text>
+            <Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>COST</Text>
+            <Text style={{flex:1,textAlign:'right',fontSize:9,fontWeight:'700'}}>{isUtility?'₹/m':'₹/PICK'}</Text>
+          </View>
+          {rows.map((r,i) => {
+            const ready = costReady(r);
+            const v = valueOf(r);
+            return (
+              <TouchableOpacity
+                key={`${r.date_ymd}-${i}`}
+                onPress={() => setSelected(i)}
+                style={{flexDirection:'row',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f3f4f6',backgroundColor:i===selected?'#f8fafc':'#fff'}}
+              >
+                <Text style={{flex:0.8,fontSize:10}}>{r.day}</Text>
+                <Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?r.kwh:prod(r))}</Text>
+                <Text style={{flex:1,textAlign:'right',fontSize:10}}>{fN(isUtility?prod(r):picks(r))}</Text>
+                <Text style={{flex:1,textAlign:'right',fontSize:10}}>{ready ? fL(cost(r)) : '—'}</Text>
+                <Text style={{flex:1,textAlign:'right',fontSize:10,fontWeight:'700'}}>{ready ? `₹${f3(v || 0)}` : '—'}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
     </View>
@@ -4501,203 +5030,6 @@ function DayInputTable({ days, cols, rows, setRows, onAddDay }) {
 
 // ── Daily Units view ──────────────────────────────────────────────
 
-function DailyUnitsView({ d, onBack }) {
-  const rows = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
-  const [openDay, setOpenDay] = useState(rows.length ? rows.length - 1 : -1);
-  const sectionMode = d.is_section_ab === true;
-  const totalKwh = sectionMode ? Number(d.section_ab_electricity_total_kwh || 0) : rows.reduce((sum, r) => sum + Number(r.total_kwh || 0), 0);
-  const totalAmount = sectionMode ? Number(d.section_ab_electricity_total_amount || 0) : rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
-  const monthLabel = d.label || '';
-  const fmtDate = (ymd) => {
-    const x = String(ymd || '');
-    if (x.length !== 8) return x;
-    const dt = new Date(Number(x.slice(0,4)), Number(x.slice(4,6))-1, Number(x.slice(6,8)));
-    return `${String(dt.getDate()).padStart(2,'0')}-${dt.toLocaleString('en-US',{month:'short'})}`;
-  };
-  const meterRows = (r) => [
-    ['MW Rapier — Looms', r.mw_rapier_looms],
-    ['Sud Rapier — Looms', r.sip_rapier_looms],
-    ['Sud W-Jet — Looms', r.sip_waterjet_looms],
-  ];
-  const moreRows = (r) => [
-    ['MW Rapier — Luwa (humid.)', r.mw_rapier_luwa],
-    ['Sud Rapier — Luwa (humid.)', r.sip_rapier_luwa],
-    ['Warping (shared)', r.warping_shared],
-    ['Miscellaneous (shared)', r.misc_shared],
-  ];
-
-  return (
-    <View>
-      <TouchableOpacity onPress={onBack} style={{ marginBottom: 12 }}>
-        <Text style={S.subBack}>‹ Back to report</Text>
-      </TouchableOpacity>
-      <Text style={S.subTitle}>{sectionMode ? 'Daily units · Section A / Section B' : 'Electricity units'}</Text>
-      <Text style={S.subDesc}>
-        {sectionMode ? 'Read-only electricity from Expense Costing. Section A = Waterjet + SUD 230; Section B = MW + SUD 190. Shared electricity uses the approved machine ratios.' : 'Read-only daily sub-meter readings from Expense Costing. Tap a day to audit the meter split. No value is entered or saved from this screen.'}
-      </Text>
-
-      <View style={{borderWidth:1,borderColor:'#e5e7eb',borderRadius:12,padding:12,marginBottom:10,flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10}}>
-        <View style={{flexShrink:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>MONTH TO DATE {monthLabel ? `· ${monthLabel}` : ''}</Text><Text style={{fontSize:20,fontWeight:'700',marginTop:3}}>{fN(totalKwh)} <Text style={{fontSize:12,color:'#6b7280'}}>kWh</Text></Text></View>
-        <View style={{alignItems:'flex-end'}}><Text style={{fontSize:9,color:'#6b7280'}}>ELECTRICITY COST</Text><Text style={{fontSize:17,fontWeight:'700',color:'#185FA5',marginTop:3}}>{fINR(totalAmount)}</Text></View>
-      </View>
-
-      {sectionMode && <View style={{flexDirection:'row',gap:8,marginBottom:10}}>
-        {[
-          ['SECTION A · 40 MC', d.section_a_electricity_kwh, d.section_a_electricity_amount],
-          ['SECTION B · 86 MC', d.section_b_electricity_kwh, d.section_b_electricity_amount],
-        ].map(([label,kwh,amount]) => <View key={label} style={{flex:1,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10,padding:10,backgroundColor:'#fff'}}><Text style={{fontSize:9,fontWeight:'800',color:'#6b7280'}}>{label}</Text><Text style={{fontSize:15,fontWeight:'800',marginTop:4}}>{fN(kwh)} kWh</Text><Text style={{fontSize:11,color:'#185FA5',fontWeight:'700',marginTop:3}}>{fINR(amount)}</Text></View>)}
-      </View>}
-
-      {rows.length === 0 ? <View style={{padding:18,borderWidth:1,borderColor:'#e5e7eb',borderRadius:10}}><Text style={{fontSize:12,color:'#6b7280'}}>No daily electricity readings are available for this month.</Text></View> : rows.map((r, i) => {
-        const open = openDay === i;
-        return <View key={`${r.date_ymd}-${i}`} style={{borderWidth:1,borderColor:open?'#cbd5e1':'#e5e7eb',borderRadius:10,marginBottom:7,overflow:'hidden',backgroundColor:'#fff'}}>
-          <TouchableOpacity onPress={()=>setOpenDay(open?-1:i)} style={{padding:11,flexDirection:'row',alignItems:'center'}} activeOpacity={0.75}>
-            <View style={{width:25,height:25,borderRadius:6,backgroundColor:open?'#185FA5':'#f3f4f6',alignItems:'center',justifyContent:'center',marginRight:9}}><Text style={{fontSize:11,fontWeight:'700',color:open?'#fff':'#6b7280'}}>{Number(r.day || i+1)}</Text></View>
-            <View style={{flex:1}}><Text style={{fontSize:12,fontWeight:'700'}}>{fmtDate(r.date_ymd)}</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{sectionMode ? `A ${fN(r.section_ab?.section_a_kwh)} · B ${fN(r.section_ab?.section_b_kwh)} kWh` : `${fN(r.total_kwh)} kWh`}</Text></View>
-            <View style={{alignItems:'flex-end',marginRight:8}}><Text style={{fontSize:11,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:9.5,color:'#6b7280',marginTop:2}}>{fINR(r.amount || 0)}</Text></View><Text style={{fontSize:11,color:'#6b7280'}}>{open?'⌃':'⌄'}</Text>
-          </TouchableOpacity>
-          {open && <View style={{borderTopWidth:1,borderTopColor:'#f1f5f9',paddingHorizontal:11,paddingBottom:10}}>
-            {sectionMode ? <>
-              <View style={{flexDirection:'row',gap:8,paddingVertical:9}}>
-                <View style={{flex:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>SECTION A</Text><Text style={{fontSize:12,fontWeight:'800'}}>{fN(r.section_ab?.section_a_kwh)} kWh</Text><Text style={{fontSize:10,color:'#185FA5'}}>{fINR(r.section_ab?.section_a_amount)}</Text></View>
-                <View style={{flex:1}}><Text style={{fontSize:9,color:'#6b7280',fontWeight:'700'}}>SECTION B</Text><Text style={{fontSize:12,fontWeight:'800'}}>{fN(r.section_ab?.section_b_kwh)} kWh</Text><Text style={{fontSize:10,color:'#185FA5'}}>{fINR(r.section_ab?.section_b_amount)}</Text></View>
-              </View>
-              {[
-                ['Waterjet → A', r.section_ab?.allocation?.waterjet_to_a_kwh], ['SUD 230 → A', r.section_ab?.allocation?.sud_230_to_a_kwh],
-                ['SUD Luwa → A (10/48)', r.section_ab?.allocation?.sud_luwa_a_kwh], ['Warping + Misc → A (40/126)', r.section_ab?.allocation?.shared_a_kwh],
-                ['MW + MW Luwa → B', r.section_ab?.allocation?.mw_to_b_kwh], ['SUD 190 → B', r.section_ab?.allocation?.sud_190_to_b_kwh],
-                ['SUD Luwa → B (38/48)', r.section_ab?.allocation?.sud_luwa_b_kwh], ['Warping + Misc → B (86/126)', r.section_ab?.allocation?.shared_b_kwh],
-              ].map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:10.5,color:'#4b5563',flex:1,paddingRight:8}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            </> : <>
-              {meterRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:7,borderBottomWidth:1,borderBottomColor:'#f8fafc'}}><Text style={{fontSize:11,color:'#374151'}}>{label}</Text><Text style={{fontSize:11,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-              <Text style={{fontSize:9,fontWeight:'700',color:'#6b7280',marginTop:9,marginBottom:2}}>MORE METERS · HUMIDIFICATION, WARPING, MISC</Text>
-              {moreRows(r).map(([label,v])=><View key={label} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:6}}><Text style={{fontSize:10.5,color:'#4b5563'}}>{label}</Text><Text style={{fontSize:10.5,fontWeight:'600'}}>{fN(v)} kWh</Text></View>)}
-            </>}
-            <View style={{marginTop:6,paddingTop:8,borderTopWidth:1,borderTopColor:'#e5e7eb',flexDirection:'row',justifyContent:'space-between'}}><View><Text style={{fontSize:10,fontWeight:'700'}}>DAY TOTAL</Text><Text style={{fontSize:9,color:'#6b7280',marginTop:2}}>₹{f2(r.unit_rate || d.unit_rate || 0)}/kWh · {(sectionMode ? r.section_ab?.is_reconciled : r.is_reconciled) === false ? `difference ${fN(sectionMode ? r.section_ab?.difference_kwh : r.difference_kwh)} kWh` : 'reconciled'}</Text></View><View style={{alignItems:'flex-end'}}><Text style={{fontSize:13,fontWeight:'700',color:'#185FA5'}}>{fN(r.total_kwh)} kWh</Text><Text style={{fontSize:10,color:'#6b7280',marginTop:2}}>{fINR(r.amount || 0)}</Text></View></View>
-          </View>}
-        </View>;
-      })}
-    </View>
-  );
-}
-
-// ── Daily Salary view ─────────────────────────────────────────────
-function DailySalaryView({ d, onBack, fill = false }) {
-  const sectionActive = d?.section_ab_active === true;
-  const cf = fill ? { flex: 1 } : null;
-
-  const buildRows = () => {
-    if (sectionActive && Array.isArray(d.salary_daily)) {
-      return d.salary_daily.map((row) => ({
-        date: ymdLabel(row.date_ymd),
-        values: [
-          Number(row.section_a_amount || 0),
-          Number(row.section_b_amount || 0),
-          Number(row.manual_total || row.total || 0),
-        ],
-      }));
-    }
-
-    return (d.daily || [])
-      .filter((r) => Number(r.sal_r || 0) > 0 || Number(r.sal_w || 0) > 0 || Number(r.sal_t || 0) > 0)
-      .map((r) => ({
-        date: r.date,
-        values: [Number(r.sal_r || 0), Number(r.sal_w || 0), Number(r.sal_t || 0)],
-      }));
-  };
-
-  const rows = buildRows();
-  const labels = sectionActive
-    ? ["Section A ₹", "Section B ₹", "Total"]
-    : ["Rapier ₹", "Waterjet ₹", "Total"];
-
-  const tA = rows.reduce((s, r) => s + Number(r.values[0] || 0), 0);
-  const tB = rows.reduce((s, r) => s + Number(r.values[1] || 0), 0);
-  const tT = rows.reduce((s, r) => s + Number(r.values[2] || 0), 0);
-
-  return (
-    <View>
-      <TouchableOpacity onPress={onBack} style={{ marginBottom: 14 }}>
-        <Text style={S.subBack}>‹ Back to report</Text>
-      </TouchableOpacity>
-
-      <Text style={S.subTitle}>
-        {sectionActive ? "Daily salary allocation" : "Daily salary expenses"}
-      </Text>
-
-      <Text style={S.subDesc}>
-        {sectionActive
-          ? "Read-only Section A / Section B allocation from the existing Rapier + Waterjet salary source. Waterjet salary goes to Section A; Rapier salary is split by the active 230 cm / total Rapier machine map."
-          : "Read-only view of the existing Rapier / Waterjet salary source."}
-      </Text>
-
-      {rows.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={fill ? { flexGrow: 1 } : undefined}
-        >
-          <View style={fill ? { flex: 1 } : undefined}>
-            <View style={S.tableRow}>
-              <Text style={[S.th, cf, { minWidth: 82, textAlign: "left" }]}>Date</Text>
-              {labels.map((label) => (
-                <Text key={label} style={[S.th, cf]}>{label}</Text>
-              ))}
-            </View>
-
-            {rows.map((row, i) => (
-              <View key={`${row.date}-${i}`} style={S.tableRow}>
-                <Text style={[S.td, cf, { minWidth: 82, textAlign: "left", fontWeight: "500" }]}>
-                  {row.date}
-                </Text>
-                <Text style={[S.td, cf]}>{fINR(row.values[0])}</Text>
-                <Text style={[S.td, cf]}>{fINR(row.values[1])}</Text>
-                <Text style={[S.td, cf, { color: "#c2823a", fontWeight: "600" }]}>
-                  {fINR(row.values[2])}
-                </Text>
-              </View>
-            ))}
-
-            <View style={[S.tableRow, { borderTopWidth: 1, borderTopColor: "#e5e7eb" }]}>
-              <Text style={[S.th, cf, { minWidth: 82, textAlign: "left", color: "#c2823a" }]}>
-                TOTAL
-              </Text>
-              <Text style={[S.th, cf, { color: "#c2823a" }]}>{fINR(tA)}</Text>
-              <Text style={[S.th, cf, { color: "#c2823a" }]}>{fINR(tB)}</Text>
-              <Text style={[S.th, cf, { color: "#c2823a" }]}>{fINR(tT)}</Text>
-            </View>
-          </View>
-        </ScrollView>
-      ) : (
-        <View style={S.emptyDailyCard}>
-          <Text style={S.emptyDailyText}>No salary entry is available for this period.</Text>
-        </View>
-      )}
-
-      {sectionActive && (
-        <View style={S.allocCard}>
-          <Text style={S.allocLabel}>MONTH TO DATE · SECTION A / B</Text>
-          <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: 8 }}>
-            {[
-              ["Section A", d.section_a_salary],
-              ["Section B", d.section_b_salary],
-              ["Total", d.sal_total],
-            ].map(([label, value]) => (
-              <View key={label} style={{ alignItems: "center", flex: 1 }}>
-                <Text style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{label}</Text>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: "#c2823a" }}>
-                  {fINR(value)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ── Daily Maintenance / Other view ────────────────────────────────
 function DailySectionExpenseView({
   kind,
   title,
@@ -5043,6 +5375,11 @@ function DailySectionExpenseView({
 
 // ── KPI grid ──────────────────────────────────────────────────────
 function KPIGrid({ d, label, cols = 1 }) {
+  const totalMachines = machineCountNumber(d.section_machine_counts?.total_section);
+  const prodPerMcDay = Number(d.production_per_machine_day || 0);
+  const machineSub = d.section_ab_active
+    ? machineCountLabel(totalMachines, "machines")
+    : `${Number(d.costing_looms || 0) || 126} looms`;
   const items = [
     {
       l: "TOTAL COST",
@@ -5060,10 +5397,10 @@ function KPIGrid({ d, label, cols = 1 }) {
     {
       l: "PRODUCTION",
       v: `${f2(d.prod_total_L)} L m`,
-      s: `${fN(d.prod_total / d.days)} m / mc·day`,
+      s: `${fN(prodPerMcDay)} m / mc·day`,
       c: "#1D9E75",
     },
-    { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: "126 looms", c: "#534AB7" },
+    { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: machineSub, c: "#534AB7" },
     {
       l: "UNITS",
       v: `${Math.round(d.kwh_total / 1000)}K kWh`,
@@ -5615,7 +5952,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   // needs its own year/month picker.
   const [avgPicksOpen, setAvgPicksOpen] = useState(false);
   const [trendSheet, setTrendSheet] = useState(null);
-  const scrollRef = useRef < ScrollView > null;
+  const scrollRef = useRef(null);
 
   const m = months[activeTab];
   const st = states[m?.key];
@@ -5839,14 +6176,36 @@ const S = StyleSheet.create({
   clABLabel: { fontSize: 10.5, color: '#111827' },
   clABValue: { fontSize: 10.5, fontWeight: '700', color: '#111827' },
   clSmallMuted: { marginTop: 6, fontSize: 9.5, color: '#8A8177', lineHeight: 14 },
-  clChartCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5DED4', borderRadius: 10, padding: 14 },
-  clChartHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  clChartSub: { fontSize: 9.5, color: '#8A8177' },
-  clLegend: { flexDirection: 'row', gap: 14, marginTop: 2 },
+  clChartCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5DED4', borderRadius: 12, padding: 14 },
+  clChartHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
+  clChartSub: { fontSize: 9.5, color: '#8A8177', paddingTop: 1 },
+  clChartHint: { fontSize: 9, color: '#A69C91', marginTop: 3 },
+  clChartAxisHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: -2, paddingHorizontal: 2 },
+  clChartAxisLeft: { fontSize: 9, fontWeight: '700', color: '#8A8177' },
+  clChartAxisRight: { fontSize: 9, fontWeight: '700', color: '#8A8177', textAlign: 'right' },
+  clLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 3 },
   clLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   clLegendBox: { width: 9, height: 9, borderRadius: 2 },
   clLegendDot: { width: 8, height: 8, borderRadius: 4 },
   clLegendText: { fontSize: 9.5, color: '#8A8177' },
+  clChartTooltip: {
+    position: 'absolute',
+    backgroundColor: '#0D1B2A',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    zIndex: 20,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  clChartTooltipMonth: { fontSize: 10.5, fontWeight: '800', color: '#FFFFFF', marginBottom: 5 },
+  clChartTooltipRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
+  clChartTooltipLabel: { fontSize: 9.5, color: '#C9D3DE' },
+  clChartTooltipValue: { fontSize: 10, fontWeight: '800', color: '#FFFFFF' },
+  clChartPendingNote: { fontSize: 9, color: '#8A8177', lineHeight: 13, marginTop: 7 },
   clStatGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   clStat: { width: '31.5%', minHeight: 64, backgroundColor: '#FBF8F3', borderWidth: 1, borderColor: '#EEE8DF', borderRadius: 9, padding: 10 },
   clStatLabel: { fontSize: 8.5, fontWeight: '800', letterSpacing: 0.4, color: '#8A8177', textTransform: 'uppercase' },
@@ -6458,6 +6817,126 @@ const S = StyleSheet.create({
     borderRadius: 20,
   },
   retryText: { color: "#fff", fontWeight: "600" },
+});
+
+
+const DLY = StyleSheet.create({
+  page: { paddingBottom: 24 },
+  back: { alignSelf: "flex-start", paddingVertical: 5, marginBottom: 5 },
+  backText: { fontSize: 12, fontWeight: "700", color: "#B77932" },
+  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 10 },
+  title: { fontSize: 18, lineHeight: 23, fontWeight: "800", color: "#111827" },
+  desc: { marginTop: 3, fontSize: 10.5, lineHeight: 16, color: "#8A8177" },
+  readOnlyPill: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: "#F3EFE9", borderWidth: 1, borderColor: "#E5DED4"
+  },
+  readOnlyPillText: { fontSize: 8, fontWeight: "800", letterSpacing: 0.45, color: "#8A8177" },
+
+  sectionRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  sectionCard: {
+    flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5DED4",
+    borderTopWidth: 3, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8
+  },
+  sectionTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  tag: {
+    minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 7,
+    alignItems: "center", justifyContent: "center"
+  },
+  tagText: { fontSize: 9.5, fontWeight: "800" },
+  sectionTitle: { fontSize: 11, fontWeight: "800", color: "#111827" },
+  sectionSub: { marginTop: 3, fontSize: 9.5, lineHeight: 13, color: "#8A8177" },
+
+  mtdCard: {
+    marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 16,
+    backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5DED4",
+    borderLeftWidth: 3, borderLeftColor: "#185FA5", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12
+  },
+  mtdLabel: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.5, color: "#8A8177" },
+  mtdValue: { marginTop: 4, fontSize: 19, fontWeight: "800", color: "#111827" },
+  mtdUnit: { fontSize: 11, color: "#8A8177" },
+  mtdRight: { alignItems: "flex-end" },
+  mtdSub: { marginTop: 2, fontSize: 9, color: "#8A8177" },
+  abLine: { marginTop: 3, flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  abText: { fontSize: 9.5, fontWeight: "800" },
+  basisText: { marginTop: 3, fontSize: 9.5, color: "#5F584F", fontWeight: "600" },
+
+  emptyCard: {
+    padding: 18, borderWidth: 1, borderColor: "#E5DED4",
+    borderRadius: 10, backgroundColor: "#FFFFFF"
+  },
+  emptyText: { fontSize: 11, color: "#8A8177" },
+
+  dayCard: {
+    marginBottom: 8, overflow: "hidden", backgroundColor: "#FFFFFF",
+    borderWidth: 1, borderColor: "#E5DED4", borderRadius: 10
+  },
+  dayHead: {
+    minHeight: 58, flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 13, paddingVertical: 10
+  },
+  dayNo: {
+    width: 32, height: 32, borderRadius: 8, backgroundColor: "#F3EFE9",
+    alignItems: "center", justifyContent: "center"
+  },
+  dayNoText: { fontSize: 11, fontWeight: "800", color: "#8A8177" },
+  dayTitle: { fontSize: 12.5, fontWeight: "800", color: "#111827" },
+  daySub: { marginTop: 2, fontSize: 9.5, color: "#8A8177" },
+  dayKwh: { fontSize: 11, fontWeight: "800", color: "#185FA5" },
+  dayCost: { marginTop: 2, fontSize: 9.5, color: "#8A8177" },
+  chevron: { marginLeft: 3, fontSize: 11, color: "#A69C91" },
+  dayBody: {
+    borderTopWidth: 1, borderTopColor: "#E5DED4", backgroundColor: "#FBF8F3",
+    paddingHorizontal: 13, paddingVertical: 10
+  },
+  sectionTotals: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  sectionTotalCard: {
+    flex: 1, borderLeftWidth: 3, borderRadius: 8,
+    backgroundColor: "#FFFFFF", paddingHorizontal: 10, paddingVertical: 9
+  },
+  sectionTotalLabel: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.4 },
+  sectionTotalValue: { marginTop: 3, fontSize: 12, fontWeight: "800", color: "#111827" },
+  sectionTotalCost: { marginTop: 2, fontSize: 9.5, color: "#8A8177" },
+  groupLabel: {
+    marginTop: 8, marginBottom: 2, fontSize: 8.5, fontWeight: "800",
+    letterSpacing: 0.45, color: "#8A8177"
+  },
+  auditRow: {
+    minHeight: 33, flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", gap: 10, borderBottomWidth: 1,
+    borderBottomColor: "#F1ECE5", paddingVertical: 5
+  },
+  auditLabel: { flex: 1, fontSize: 10.5, color: "#5F584F" },
+  auditValue: { fontSize: 10.5, fontWeight: "700", color: "#111827" },
+  dayTotal: {
+    marginTop: 8, paddingTop: 9, borderTopWidth: 1, borderTopColor: "#E5DED4",
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10
+  },
+  dayTotalLabel: { fontSize: 9, fontWeight: "800", color: "#5F584F" },
+  dayTotalSub: { marginTop: 2, fontSize: 8.5, color: "#8A8177" },
+  dayTotalKwh: { fontSize: 13, fontWeight: "800", color: "#185FA5" },
+  dayTotalCost: { marginTop: 2, fontSize: 9.5, color: "#8A8177" },
+
+  salaryCard: {
+    marginBottom: 8, backgroundColor: "#FFFFFF", borderWidth: 1,
+    borderColor: "#E5DED4", borderRadius: 10, padding: 12
+  },
+  salaryHead: {
+    flexDirection: "row", alignItems: "flex-start",
+    justifyContent: "space-between", gap: 10
+  },
+  salaryDate: { fontSize: 12.5, fontWeight: "800", color: "#111827" },
+  salarySource: { marginTop: 2, fontSize: 9, color: "#8A8177" },
+  salaryTotal: { fontSize: 12, fontWeight: "800", color: "#C2823A" },
+  salaryStatus: { marginTop: 2, fontSize: 8.5, fontWeight: "700" },
+  salaryAB: { marginTop: 10, flexDirection: "row", gap: 8 },
+  salaryABCard: {
+    flex: 1, borderLeftWidth: 3, borderRadius: 8,
+    backgroundColor: "#FBF8F3", paddingHorizontal: 10, paddingVertical: 9
+  },
+  salaryABLabel: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.4 },
+  salaryABValue: { marginTop: 3, fontSize: 12, fontWeight: "800", color: "#111827" },
 });
 
 

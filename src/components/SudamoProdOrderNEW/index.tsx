@@ -1032,7 +1032,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
 
                         <View style={{ flexDirection: 'row', gap: 8, marginTop: 9, marginBottom: 4 }}>
                             <TouchableOpacity
-                                onPress={() => handleIconPress(item, 'pending')}
+                                onPress={() => handleIconPress(item, 'accept')}
                                 disabled={disabled}
                                 style={{
                                     flex: 1, minHeight: 42, borderRadius: 9,
@@ -1044,7 +1044,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                                 <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>Authorize</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                onPress={() => handleIconPress(item, 'verifyreject')}
+                                onPress={() => handleIconPress(item, 'reject')}
                                 disabled={disabled}
                                 style={{
                                     flex: 1, minHeight: 42, borderRadius: 9,

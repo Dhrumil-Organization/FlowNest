@@ -426,7 +426,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             yearno: activeYearNo,
             fromdate: toYmd(fromDate),
             todate: toYmd(toDate),
-            // ExpprodQty: 1,
+            ExpprodQty: 1,
             ExpProdQtyType: browseIsNewDesign ? 1 : 0,
         });
         setIssuesLoading(false);
@@ -611,9 +611,9 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
             <SafeAreaView style={s.screen} />
             <HeaderBarwithBack
                 userName={''}
-                header={'Weft Carton Issue'}
+                header={'Weft Issue'}
                 subHeader={'Issue and manage weft yarn for production'}
-                breadcrumb={'Weft Carton Issue'}
+                breadcrumb={'Weft Issue'}
                 SearchBar={false}
             />
 

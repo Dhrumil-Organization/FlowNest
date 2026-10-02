@@ -38,6 +38,8 @@ registerPermissionArea({
         { key: 'sales_analysis', name: 'Sales Analysis', type: 'report', displayOrder: 20, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
         { key: 'collection_analysis', name: 'Collection Analysis', type: 'report', displayOrder: 30, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
         { key: 'production_report', name: 'Production Report', type: 'report', displayOrder: 40, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
+        // Reports -> Beam Shortage. Resource path = 'reports.beam_shortage' (paths never carry the area key).
+        { key: 'beam_shortage', name: 'Beam Shortage', type: 'report', displayOrder: 50, actions: [] },
       ],
     },
   ],

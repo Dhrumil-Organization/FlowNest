@@ -398,6 +398,7 @@ export const LEGACY_ROUTES = {
   costingHistory: '/costing/history',
   costingVariance: '/costing/variance',
   realCostingDashboard: '/real-costing-chain/dashboard',
+  beamShortageReport: '/reports/beam_shortage',
 } as const;
 
 export const DesignAPI = {
@@ -726,6 +727,15 @@ export const DyeingAPI = {
   // POST /dyeing/remove_status { OrderUId, OrderSrNo, ChartNo, ParCode, ShdCode, Status, prptype, yearno }
   removeStatus: (payload: Record<string, any>) =>
     client.post('/dyeing/remove_status', payload),
+};
+
+// Reports -> Beam Shortage (read-only).
+// POST /reports/beam_shortage { prptype, prpcode, yearno, fromdate: 'YYYY-MM-DD', todate: 'YYYY-MM-DD' }
+// Completed beams only (islasttaka = 1): design-wise summary + beam-wise detail
+// (beamno, warped, produced, shortage). If the Laravel route is named
+// differently, change only LEGACY_ROUTES.beamShortageReport.
+export const BeamShortageAPI = {
+  report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.beamShortageReport, body),
 };
 
 export const GreyPackingAPI = {

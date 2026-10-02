@@ -98,6 +98,8 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'purchase-import-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Purchase Import Auth' },
   'purchase-grade-auth': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Purchase Grade Auth' },
   'monthly-expense-report': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Expense Report' },
+  visits: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Visits' },
+  'visitors-report': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Visitors Report' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },

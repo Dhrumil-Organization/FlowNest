@@ -357,6 +357,32 @@ registerPermissionArea({
           displayOrder: 142,
           actions: [{ key: 'view', name: 'View' }],
         },
+        // Visitor management (gate register) — Visits = watchman entry, Visitors Report = management
+        {
+          key: 'visits',
+          name: 'Visits',
+          type: 'screen',
+          displayOrder: 143,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'New Visitor Entry' },
+            { key: 'edit', name: 'Edit Entry' },
+            { key: 'checkout', name: 'Mark OUT / Undo OUT' },
+            { key: 'delete', name: 'Delete Entry', dangerous: true },
+          ],
+        },
+        {
+          key: 'visitors_report',
+          name: 'Visitors Report',
+          type: 'screen',
+          displayOrder: 144,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'edit', name: 'Edit Entry' },
+            { key: 'delete', name: 'Delete Entry', dangerous: true },
+            { key: 'export', name: 'Export (Excel / PDF / Print)' },
+          ],
+        },
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -1145,6 +1171,44 @@ registerUiNodes([
     permission: 'production.monthly_expense_report',
     action: 'view',
     order: 142,
+  },
+  // Visits (gate register for the watchman · new entry · photos · mark OUT · English / Hindi)
+  {
+    id: 'nav.visits',
+    kind: 'navigation',
+    title: 'Visits',
+    permission: 'production.visits',
+    action: 'view',
+    route: 'visits',
+    icon: 'how-to-reg',
+    order: 143,
+  },
+  {
+    id: 'screen.visits',
+    kind: 'screen',
+    title: 'Visits',
+    permission: 'production.visits',
+    action: 'view',
+    order: 143,
+  },
+  // Visitors Report (summary · register · photos · edit / delete · Excel / PDF / print)
+  {
+    id: 'nav.visitors_report',
+    kind: 'navigation',
+    title: 'Visitors Report',
+    permission: 'production.visitors_report',
+    action: 'view',
+    route: 'visitors-report',
+    icon: 'assessment',
+    order: 144,
+  },
+  {
+    id: 'screen.visitors_report',
+    kind: 'screen',
+    title: 'Visitors Report',
+    permission: 'production.visitors_report',
+    action: 'view',
+    order: 144,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

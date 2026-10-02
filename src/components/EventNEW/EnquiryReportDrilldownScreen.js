@@ -34,6 +34,8 @@ import {
   useSotLayout,
 } from "@/src/components/erpUi";
 import { ModalPanel } from "./ui";
+import EnquiryExcelPreview, { EXCEL_GREEN } from "./EnquiryExcelPreview";
+import { buildEventReportModel } from "./eventExcelBuilder";
 
 export default function EnquiryReportDrilldownScreen({
   token,
@@ -43,6 +45,7 @@ export default function EnquiryReportDrilldownScreen({
   setEnquiryReportDrilldownVisible,
   getEnquiryReporteventCode,
   setEnquiryReporteventCode,
+  getEnquiryReportEventName,
   showInqReport,
 }) {
   const router = useRouter();
@@ -57,6 +60,38 @@ export default function EnquiryReportDrilldownScreen({
   const [selected, setSelected] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [getUserPrptype, setUserPrptype] = useState("");
+  // Excel export (preview + download) of everything shown on this screen
+  const [excelModel, setExcelModel] = useState(null);
+  const [excelBusy, setExcelBusy] = useState(false);
+
+  const openExcel = async () => {
+    if (excelBusy) return;
+    if (!enquiries.length) {
+      AppAlert.alert("Excel export", "There are no enquiries to export for this user.");
+      return;
+    }
+    try {
+      setExcelBusy(true);
+      const yearNo = await getEventYearNo();
+      setExcelModel(
+        buildEventReportModel({
+          enquiries,
+          eventName: getEnquiryReportEventName,
+          eventCode,
+          userName,
+          userRole,
+          generatedBy: username,
+          yearNo,
+          now: new Date(),
+        })
+      );
+    } catch (err) {
+      console.log("Excel build failed:", err);
+      AppAlert.alert("Excel export", err?.message || "Could not prepare the Excel file.");
+    } finally {
+      setExcelBusy(false);
+    }
+  };
   // const [getUserPrptype, setUserPrptypeFromAPI] = useState('');
 
   useEffect(() => {
@@ -249,7 +284,26 @@ export default function EnquiryReportDrilldownScreen({
       crumbs={["Event Report", "Event Report Details"]}
       title={userName || "Event Report Details"}
       subtitle={`${userRole || ""} · ${enquiries.length} enquiries`}
-      right={<IconBtn icon="refresh" label="Refresh" onPress={onRefresh} loading={refreshing} />}
+      right={
+        <View style={styles.headActions}>
+          <TouchableOpacity
+            style={[styles.excelBtn, (excelBusy || loading) && { opacity: 0.55 }]}
+            onPress={openExcel}
+            disabled={excelBusy || loading}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Export to Excel"
+          >
+            {excelBusy ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon name="grid-on" size={16} color="#fff" />
+            )}
+            <Text style={styles.excelBtnText}>Excel</Text>
+          </TouchableOpacity>
+          <IconBtn icon="refresh" label="Refresh" onPress={onRefresh} loading={refreshing} />
+        </View>
+      }
     />
   );
 
@@ -569,6 +623,13 @@ export default function EnquiryReportDrilldownScreen({
             </ScrollView>
           )}
         </ModalPanel>
+
+        {/* Excel preview + download */}
+        <EnquiryExcelPreview
+          open={!!excelModel}
+          onClose={() => setExcelModel(null)}
+          model={excelModel}
+        />
       </View>
     </>
   );
@@ -587,6 +648,17 @@ function DetailRow({ label, value, half = false }) {
 // Styles (NEW ERP tokens)
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: T.bg },
+  headActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  excelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    backgroundColor: EXCEL_GREEN,
+  },
+  excelBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.3 },
   listContent: {
     width: "100%",
     maxWidth: CONTENT_MAX,

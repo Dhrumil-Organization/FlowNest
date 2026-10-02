@@ -28,6 +28,7 @@ export default function ReportsLayout() {
       <Stack.Screen name="expense" />
       <Stack.Screen name="production" />
       <Stack.Screen name="production-machine" />
+      <Stack.Screen name="beam-shortage" />
     </Stack>
   );
 }

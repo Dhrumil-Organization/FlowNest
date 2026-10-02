@@ -18,6 +18,7 @@ import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 const ROUTE_MAP: Record<string, string> = {
   RealCosting: '/new/(tabs)/reports/real-costing',
   Expense: '/new/(tabs)/reports/expense',
+  BeamShortage: '/new/(tabs)/reports/beam-shortage',
 };
 
 export default function ReportsHome() {
@@ -27,6 +28,8 @@ export default function ReportsHome() {
   const cards = [
     { key: 'management.reports.real_costing', title: 'Real Costing Chain', sub: 'Assumed vs actual by design and beam', route: 'RealCosting' },
     { key: 'management.reports.expense', title: 'Expense & Production', sub: 'Electricity, salary, stores and cost per pick', route: 'Expense' },
+    // Registered resource path is 'reports.beam_shortage' (see dashboard.permission.ts) — assignable per role / user.
+    { key: 'reports.beam_shortage', title: 'Beam Shortage', sub: 'Completed beams: warped vs produced, design-wise with beam detail', route: 'BeamShortage' },
   ].filter(x => canAccess(x.key));
 
   // FIX: this screen used to draw its own "MADHUSUDHAN FABRICS" / "Reports"

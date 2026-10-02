@@ -403,6 +403,9 @@ export default function EnquiryReportScreen({
               setEnquiryReportDrilldownVisible
             }
             getEnquiryReporteventCode={getEnquiryReporteventCode}
+            getEnquiryReportEventName={
+              EVENTS.find((e) => e.EventId === getEnquiryReporteventCode)?.EventName || ""
+            }
             setEnquiryReporteventCode={setEnquiryReporteventCode}
             showInqReport={showInqReport}
           />

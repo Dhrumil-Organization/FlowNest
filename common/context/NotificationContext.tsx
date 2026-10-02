@@ -87,7 +87,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Credit Limit Request', 'credit-limit'],
     ['Outstanding Days Request', 'outstanding-days-request'],
     // ['Receivables', 'Receivables-Screen'],
-    ['Receivables' , 'Receivables-Screen'],
+    ['Receivables' , 'receivables-screen'],
     ['Collection', 'Collection'],
     ['Yarn Purchase Order', 'yarn-purchase-order'],
     ['Production Order Tracking', 'production-order-tracking'],

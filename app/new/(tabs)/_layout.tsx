@@ -71,7 +71,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
   // 'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
   'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
-  'Receivables-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Receivables' },
+  'receivables-screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Receivables' },
   'fabric-stock': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Fabric Stock' },
   'yarn-stock': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Yarn Stock' },
   'doff-entry': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Doff Entry' },

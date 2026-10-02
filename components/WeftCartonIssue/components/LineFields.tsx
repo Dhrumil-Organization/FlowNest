@@ -121,7 +121,7 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
                 <View style={s.col}>
                     <Text style={s.label}>Design</Text>
                     <Select
-                        text={value.dsn ? `${value.dsn.DsnCode} ${value.dsn.DsnName || ''}` : ''}
+                        text={value.dsn ? (value.dsn.DsnName || String(value.dsn.DsnCode)) : ''}
                         placeholder={value.beam ? 'Select design' : 'Beam first'}
                         disabled={!value.beam}
                         loading={dLoading}
@@ -205,7 +205,10 @@ const LineFields = ({ token, prpcode, yearno, stkType, dmy, beams, beamsLoading,
                 title={`Designs on ${value.beam?.BeamNo || ''}`}
                 items={designs}
                 loading={dLoading}
-                labelOf={d => `${d.DsnCode}  ${d.DsnName || ''}`}
+                // first line: the design (DsnCode + DsnName), clearly labelled
+                labelOf={d => `Design: ${d.DsnCode}  ${d.DsnName || ''}`}
+                // second line in the list (also searchable): the issue design, key IssDsnName
+                subOf={d => d.IssDsnName ? `Issue design: ${Number(d.IssDsnCode) > 0 ? `${d.IssDsnCode}  ` : ''}${d.IssDsnName}` : ''}
                 emptyText="No order design linked to this beam."
                 onClose={() => setPick(null)}
                 onSelect={d => { setPick(null); onChange({ ...value, dsn: d, rsr: null, rsrRow: undefined }); }}

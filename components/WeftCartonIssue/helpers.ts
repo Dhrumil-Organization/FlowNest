@@ -116,3 +116,7 @@ export const typeOf = (...srcs: any[]): '1' | '0' => {
     }
     return '0';
 };
+
+/** Server answered "Expected production quantity / qty must be greater than zero." (error_code VALIDATION). Wording differs between endpoints, so qty and quantity both match. */
+export const isExpQtyError = (r: { ok: boolean; message?: string; errorCode?: string }): boolean =>
+    !r.ok && /expected\s+prod\w*\s+q(ty|uantity)/i.test(r.message || '');

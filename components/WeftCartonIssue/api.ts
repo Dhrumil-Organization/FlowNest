@@ -261,3 +261,10 @@ export async function fetchNewExpProdQty(
         return 0;
     }
 }
+
+/** Expected production qty. isNewDesign 1 -> getExpectedWeftIssue (new), 0 -> get_expprodqty_from_issueqty (old). */
+export const fetchExpByFlag = (
+    t: string,
+    isNewDesign: boolean,
+    p: Parameters<typeof fetchExpProdQty>[1],
+): Promise<number> => (isNewDesign ? fetchNewExpProdQty(t, p) : fetchExpProdQty(t, p));

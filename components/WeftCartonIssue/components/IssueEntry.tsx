@@ -2,9 +2,10 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as api from '../api';
-import { f2, flagOf, makeClientRef, r3 } from '../helpers';
+import { f2, flagOf, isExpQtyError, makeClientRef, r3 } from '../helpers';
 import { C, s } from '../styles';
 import type { Carton } from '../types';
+import ExpQtyRefresh, { ExpRefreshInfo } from './ExpQtyRefresh';
 import LineFields, { Beam, LineValue } from './LineFields';
 import { EntryBus } from './entryBus';
 
@@ -41,16 +42,25 @@ const IssueEntry = ({
     const savingRef = useRef(false);               // blocks double-tap before state has updated
     const clientRef = useRef<string | null>(null); // kept across retries of the same entry
 
+    // "Expected Production Qty must be greater than zero." -> show a Refresh button under chees / weight
+    const [expNeedsRefresh, setExpNeedsRefresh] = useState(false);
+    const [expRefreshing, setExpRefreshing] = useState(false);
+    const [expInfo, setExpInfo] = useState<ExpRefreshInfo>(null);
+    const refreshedExp = useRef<{ key: string; value: number } | null>(null); // value fetched by the Refresh button
+    const expKey = (w: number) => `${line.beam?.UId}|${line.dsn?.DsnCode}|${line.rsr}|${w}`;
+    const resetExpRefresh = () => { setExpNeedsRefresh(false); setExpInfo(null); refreshedExp.current = null; };
+
     useEffect(() => () => bus.set(0), [bus]);      // leaving / changing carton clears the bar's "this entry"
 
     // any change to the entry means a new request id
     const touchEntry = useCallback(() => { clientRef.current = null; }, []);
-    const handleLine = useCallback((v: LineValue) => { touchEntry(); setLine(v); setFormErr(''); }, [touchEntry]);
+    const handleLine = useCallback((v: LineValue) => { touchEntry(); setLine(v); setFormErr(''); setExpNeedsRefresh(false); setExpInfo(null); refreshedExp.current = null; }, [touchEntry]);
 
     const onChees = (v: string) => {
         touchEntry();
         setChees(v);
         setFormErr('');
+        resetExpRefresh();
         bus.set(Math.max(0, parseInt(v, 10) || 0));
         if (wtTouched) return;
         const n = parseInt(v, 10);
@@ -58,7 +68,7 @@ const IssueEntry = ({
         setWt(n >= carton.Chees ? f2(carton.Wt) : f2((carton.Wt / carton.Chees) * n)); // last chees takes exact balance
     };
 
-    const onWt = (v: string) => { touchEntry(); setWt(v); setWtTouched(v !== ''); setFormErr(''); };
+    const onWt = (v: string) => { touchEntry(); setWt(v); setWtTouched(v !== ''); setFormErr(''); resetExpRefresh(); };
 
     const addBeam = async () => {
         if (savingRef.current) return;
@@ -79,17 +89,16 @@ const IssueEntry = ({
 
         try {
             const isNewDesign = flagOf(line.dsn) === '1';
-            const exp = isNewDesign
-                ? await api.fetchNewExpProdQty(token, {
-                    prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
-                    srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
-                    IssUId: undefined, DsnRcpSrNo: line.rsr,
-                })
-                : await api.fetchExpProdQty(token, {
-                    prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
-                    srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
-                    IssUId: undefined, DsnRcpSrNo: line.rsr,
-                });
+            const expParams = {
+                prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+                srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                IssUId: undefined, DsnRcpSrNo: line.rsr,
+            };
+            // value fetched by the Refresh button (same beam / design / recipe / weight) is used as it is
+            const pre = refreshedExp.current;
+            const exp = pre && pre.key === expKey(w) && pre.value > 0
+                ? pre.value
+                : await api.fetchExpByFlag(token, isNewDesign, expParams);
 
             const r = await api.saveLine(token, {
                 prpcode, yearno, IssDate: ymd, Shift: shift, StkType: line.stkType || stkType || 'I',
@@ -97,6 +106,7 @@ const IssueEntry = ({
                 BeamUId: line.beam.UId, BeamNo: line.beam.BeamNo || '', DsnCode: line.dsn.DsnCode, DsnRcpSrNo: line.rsr,
                 IssDsnCode: line.dsn.IssDsnCode || 0, IssDsnName: line.dsn.IssDsnName || '',
                 ExpProdQty: exp, ExpQty: exp, ExpProdQtyType: isNewDesign ? '1' : '0', ExpQtyType: isNewDesign ? '1' : '0',
+                // ExpProdQty: '0',
                 Chees: ch, Wt: w, ClientRefId: clientRef.current,
                 CartNo: carton.CartNo, TranType: carton.TranType, PUId: carton.PUId, PSrNo: carton.PSrNo, PSubSr: carton.PSubSr,
                 ItmCode: carton.ItmCode, MerCode: carton.MerCode, GrdCode: carton.GrdCode, ShdCode: carton.ShdCode, Denier: carton.Denier,
@@ -106,6 +116,7 @@ const IssueEntry = ({
                 // NETWORK: keep clientRef so the retry cannot create a second line.
                 // A real server rejection (SAVE_FAILED, already issued ...) is final -> new ref for the next try.
                 if (r.errorCode !== 'NETWORK') clientRef.current = null;
+                if (isExpQtyError(r)) { setExpNeedsRefresh(true); setExpInfo(null); }
                 const msg = r.message || 'Could not save. Try again.';
                 if (onError) onError(msg); else setFormErr(msg);   // modal like the success one; form stays as it is
                 // only these two codes need a balance reload (as before). Nothing else is refreshed on error.
@@ -117,11 +128,39 @@ const IssueEntry = ({
             // reset the form, then let the screen update balance + list locally (no extra API call)
             setLine(emptyLine); setChees(''); setWt(''); setWtTouched(false); setFormErr('');
             clientRef.current = null;
+            resetExpRefresh();
             bus.set(0);
             onSaved(saved, r.message || 'Issue saved successfully.');
         } finally {
             savingRef.current = false;
             setSaving(false);
+        }
+    };
+
+    /** Refresh button: re-read the expected production qty. isnewdesign 0 -> old api, 1 -> new api. */
+    const refreshExp = async () => {
+        if (expRefreshing) return;
+        const w = r3(parseFloat(wt));
+        if (!line.beam || !line.dsn || !line.rsr || !(w > 0)) {
+            setExpInfo({ ok: false, text: 'Select beam, design, weft position and weight first.' });
+            return;
+        }
+        setExpRefreshing(true);
+        try {
+            const exp = await api.fetchExpByFlag(token, flagOf(line.dsn) === '1', {
+                prpcode, yearno, reqqty: w, itmcode: carton.ItmCode, shdcode: carton.ShdCode,
+                srno: line.rsr, beamuid: line.beam.UId, dsncode: line.dsn.DsnCode,
+                IssUId: undefined, DsnRcpSrNo: line.rsr,
+            });
+            if (exp > 0) {
+                refreshedExp.current = { key: expKey(w), value: exp };
+                setExpInfo({ ok: true, text: `Now ${f2(exp)}. Tap Add beam to save.` });
+            } else {
+                refreshedExp.current = null;
+                setExpInfo({ ok: false, text: 'Check the beam, design, weft position and weight, then refresh again.' });
+            }
+        } finally {
+            setExpRefreshing(false);
         }
     };
 
@@ -152,6 +191,9 @@ const IssueEntry = ({
                 </View>
             </View>
 
+            {expNeedsRefresh && (
+                <ExpQtyRefresh loading={expRefreshing} info={expInfo} onRefresh={refreshExp} isNewDesign={flagOf(line.dsn) === '1'} />
+            )}
             {!!chees && !wtTouched && <Text style={[s.hint, { marginTop: 0, marginBottom: 8 }]}>Weight filled from average chees weight. Edit it if the scale says otherwise.</Text>}
             {!!formErr && (
                 <View style={[s.msg, { backgroundColor: C.bad, flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingLeft: 12, paddingRight: 6 }]}>

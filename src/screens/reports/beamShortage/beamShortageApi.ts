@@ -23,6 +23,8 @@ export type BeamShortageRequest = {
   yearno: string | number;
   fromdate: string; // YYYY-MM-DD
   todate: string; // YYYY-MM-DD
+  /** Source filter sent to the existing Beam Shortage API. */
+  beamtype: 'all' | 'creel' | 'indent';
 };
 
 export const BeamShortageService = {

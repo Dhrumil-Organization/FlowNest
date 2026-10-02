@@ -1,9 +1,10 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { cartonBalance, fetchExpProdQty, fetchNewExpProdQty, findIssue, modifyLine } from '../api';
-import { f2, flagOf, r3, typeOf, ymdShow } from '../helpers';
+import { cartonBalance, fetchExpByFlag, findIssue, modifyLine } from '../api';
+import { f2, flagOf, isExpQtyError, r3, typeOf, ymdShow } from '../helpers';
 import { C, s, tagStyle } from '../styles';
+import ExpQtyRefresh, { ExpRefreshInfo } from './ExpQtyRefresh';
 import LineFields, { Beam, LineValue } from './LineFields';
 
 export type EditableLine = {
@@ -42,6 +43,13 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
     // object, the user picked a design from the list -> that design's own flags are used.
     const initialDsn = useRef<any>(null);
 
+    // "Expected Production Qty must be greater than zero." -> show a Refresh button under chees / weight
+    const [expNeedsRefresh, setExpNeedsRefresh] = useState(false);
+    const [expRefreshing, setExpRefreshing] = useState(false);
+    const [expInfo, setExpInfo] = useState<ExpRefreshInfo>(null);
+    const refreshedExp = useRef<{ key: string; value: number } | null>(null); // value fetched by the Refresh button
+    const resetExpRefresh = () => { setExpNeedsRefresh(false); setExpInfo(null); refreshedExp.current = null; };
+
     useEffect(() => {
         if (!visible || !line) return;
         initialDsn.current = { DsnCode: line.DsnCode, DsnName: line.DsnName, IssDsnCode: line.IssDsnCode, IssDsnName: line.IssDsnName, isnewdesign: typeOf(line) };
@@ -55,6 +63,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         setWt(f2(line.Qty));
         setErr('');
         setErrorNotice(null);
+        resetExpRefresh();
         setInfo(null);
         cartonBalance(token, prpcode, yearno, line.CartNo).then(r => {
             const c = r.payload?.data;
@@ -92,6 +101,37 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
     }, [val.beam?.UId, val.dsn?.DsnCode, val.rsr, line?.UId]);
 
     if (!line) return null;
+
+    const expKey = (w: number) => `${val.beam?.UId}|${val.dsn?.DsnCode}|${val.rsr}|${w}`;
+    // Which api: design picked in this modify -> its own isnewdesign, otherwise the type already in the browse row
+    const currentIsNew = (): boolean => (val.dsn && val.dsn !== initialDsn.current ? flagOf(val.dsn) === '1' : typeOf(line) === '1');
+
+    /** Refresh button: re-read the expected production qty. isnewdesign 0 -> old api, 1 -> new api. */
+    const refreshExp = async () => {
+        if (expRefreshing) return;
+        const w = r3(parseFloat(wt));
+        if (!val.beam || !val.dsn || !val.rsr || !(w > 0)) {
+            setExpInfo({ ok: false, text: 'Select beam, design, weft position and weight first.' });
+            return;
+        }
+        setExpRefreshing(true);
+        try {
+            const exp = await fetchExpByFlag(token, currentIsNew(), {
+                prpcode, yearno, reqqty: w, itmcode: info?.itm ?? line.ItmCode, shdcode: info?.shd ?? line.ShdCode,
+                srno: val.rsr, beamuid: val.beam.UId, dsncode: val.dsn.DsnCode,
+                IssUId: line.UId, DsnRcpSrNo: val.rsr,
+            });
+            if (exp > 0) {
+                refreshedExp.current = { key: expKey(w), value: exp };
+                setExpInfo({ ok: true, text: `Now ${f2(exp)}. Tap Save changes to save.` });
+            } else {
+                refreshedExp.current = null;
+                setExpInfo({ ok: false, text: 'Check the beam, design, weft position and weight, then refresh again.' });
+            }
+        } finally {
+            setExpRefreshing(false);
+        }
+    };
 
     const availChees = (info?.balChees ?? 0) + Number(line.Chees);
     const availWt = r3((info?.balWt ?? 0) + Number(line.Qty));
@@ -137,9 +177,13 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
             srno: val.rsr, beamuid: val.beam.UId, dsncode: val.dsn.DsnCode,
             IssUId: line.UId, DsnRcpSrNo: val.rsr,
         };
-        const exp = shouldFetchExpProdQty
-            ? (isNewDesign ? await fetchNewExpProdQty(token, expParams) : await fetchExpProdQty(token, expParams))
-            : existingExp;
+        // value fetched by the Refresh button (same beam / design / recipe / weight) is used as it is
+        const pre = refreshedExp.current;
+        const exp = pre && pre.key === expKey(w) && pre.value > 0
+            ? pre.value
+            : shouldFetchExpProdQty
+                ? await fetchExpByFlag(token, isNewDesign, expParams)
+                : existingExp;
 
         const r = await modifyLine(token, {
             prpcode, yearno, uid: line.UId, srno: line.SrNo, subsr: line.SubSr,
@@ -164,6 +208,7 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
         if (!r.ok) {
             // server rejected the modify: same error modal as save; OK keeps the user on this form
             setErrorNotice({ title: 'Save Failed', message: r.message || 'Could not save the change.' });
+            if (isExpQtyError(r)) { setExpNeedsRefresh(true); setExpInfo(null); }
             return;
         }
         onSaved(r.message || 'Line updated.');
@@ -187,19 +232,23 @@ const EditLineSheet = ({ visible, line, token, prpcode, yearno, stkType, dmy, ex
                         <LineFields
                             token={token} prpcode={prpcode} yearno={yearno} stkType={stkType} dmy={dmy}
                             beams={beams} beamsLoading={beamsLoading} mitmcode={info?.mitm ?? ''}
-                            value={val} onChange={(v) => { setVal(v); setErr(''); }}
+                            value={val} onChange={(v) => { setVal(v); setErr(''); resetExpRefresh(); }}
                         />
 
                         <View style={s.row2}>
                             <View style={s.col}>
                                 <Text style={s.label}>Chees</Text>
-                                <TextInput style={s.input} keyboardType="number-pad" value={chees} onChangeText={v => { setChees(v); setErr(''); }} />
+                                <TextInput style={s.input} keyboardType="number-pad" value={chees} onChangeText={v => { setChees(v); setErr(''); resetExpRefresh(); }} />
                             </View>
                             <View style={s.col}>
                                 <Text style={s.label}>Weight (kg)</Text>
-                                <TextInput style={s.input} keyboardType="decimal-pad" value={wt} onChangeText={v => { setWt(v); setErr(''); }} />
+                                <TextInput style={s.input} keyboardType="decimal-pad" value={wt} onChangeText={v => { setWt(v); setErr(''); resetExpRefresh(); }} />
                             </View>
                         </View>
+
+                        {expNeedsRefresh && (
+                            <ExpQtyRefresh loading={expRefreshing} info={expInfo} onRefresh={refreshExp} isNewDesign={currentIsNew()} />
+                        )}
 
                         {!!effect && t && (
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 }}>

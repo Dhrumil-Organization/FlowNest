@@ -12,6 +12,8 @@ import {
     ScrollView,
     ActivityIndicator,
     TextInput,
+    SafeAreaView,
+    StatusBar,
 } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -857,1007 +859,329 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
     // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
+    // ------------------------------------------------------------------
+    // Filter sheet UI (same look as Payable). Only the presentation changed:
+    // all selections, search, lazy-loading and load handlers are the existing ones.
+    // ------------------------------------------------------------------
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+    const selectField = (key: string, label: string, value: string, options: { label: string; onPress: () => void }[]) => (
+        <View style={styles.simpleFieldGroup}>
+            <Text style={styles.simpleLabel}>{label}</Text>
+            <TouchableOpacity
+                style={styles.simpleSelect}
+                activeOpacity={0.85}
+                onPress={() => setOpenDropdown(openDropdown === key ? null : key)}
+            >
+                <Text style={styles.simpleSelectText} numberOfLines={1}>{value || `Select ${label}`}</Text>
+                <Icon name={openDropdown === key ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color="#27445A" />
+            </TouchableOpacity>
+            {openDropdown === key && (
+                <View style={styles.simpleOptions}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+                        {options.map((option, index) => (
+                            <TouchableOpacity
+                                key={`${key}-${index}`}
+                                style={styles.simpleOption}
+                                onPress={() => { option.onPress(); setOpenDropdown(null); }}
+                            >
+                                <Text style={styles.simpleOptionText}>{option.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+        </View>
+    );
+
+    // `selectedPrpgrp` / `selectedInternal` arrive from the parent as display strings
+    const propertyOptions = (receivables_prpgroup || []).map((item: any) => ({
+        label: item?.PrpTypeOf || item?.PrpName || item?.PrpCode || 'Property',
+        onPress: () => onExeChangeReceive(item),
+    }));
+    const internalOptions = (internal_dropdown || []).map((item: any) => ({
+        label: item?.lable || item?.label || item?.value || 'Internal',
+        onPress: () => onExeChangeInternal(item),
+    }));
+    const prpgrpLabel = typeof selectedPrpgrp === 'string' ? selectedPrpgrp : ((selectedPrpgrp as any)?.PrpTypeOf || '');
+    const internalLabel = typeof selectedInternal === 'string' ? selectedInternal : ((selectedInternal as any)?.lable || '');
+
+    // One collapsible multi-select block (header row + search + select all/clear + lazy-loaded list)
+    const multiSelect = (cfg: {
+        title: string;
+        loading?: boolean;
+        isOpen: boolean;
+        onToggle: () => void;
+        count: number;
+        search: string;
+        onSearch: (v: string) => void;
+        searchPlaceholder: string;
+        onSelectAll?: () => void;
+        onClear: () => void;
+        items: any[];
+        keyOf: (i: any) => string;
+        titleOf: (i: any) => string;
+        subOf?: (i: any) => string;
+        isSelected: (i: any) => boolean;
+        onItemPress: (i: any) => void;
+        listRef: React.RefObject<ScrollView>;
+        onEnd: () => void;
+        loadingMore: boolean;
+        emptyText: string;
+    }) => (
+        <View>
+            <TouchableOpacity
+                style={styles.optionalSelect}
+                activeOpacity={0.85}
+                onPress={cfg.loading ? undefined : cfg.onToggle}
+            >
+                <Text style={styles.optionalSelectText}>
+                    {cfg.loading ? 'Loading...' : `${cfg.title} (${cfg.count})`}
+                </Text>
+                {cfg.loading
+                    ? <ActivityIndicator size="small" color="#F97316" />
+                    : <Icon name={cfg.isOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color="#27445A" />}
+            </TouchableOpacity>
+            {cfg.isOpen && !cfg.loading && (
+                <View style={styles.multiSelectOptions}>
+                    <View style={styles.inlineSearchBox}>
+                        <Icon name="search" size={20} color="#64748B" />
+                        <TextInput
+                            style={styles.inlineSearchInput}
+                            placeholder={cfg.searchPlaceholder}
+                            placeholderTextColor="#94A3B8"
+                            value={cfg.search}
+                            onChangeText={cfg.onSearch}
+                            autoCorrect={false}
+                            autoCapitalize="none"
+                        />
+                    </View>
+                    {(!!cfg.onSelectAll || cfg.count > 0) && (
+                        <View style={styles.inlineActionsRow}>
+                            {!!cfg.onSelectAll && (
+                                <TouchableOpacity style={styles.inlineActionButton} onPress={cfg.onSelectAll}>
+                                    <Text style={styles.inlineActionText}>Select All</Text>
+                                </TouchableOpacity>
+                            )}
+                            {cfg.count > 0 && (
+                                <TouchableOpacity style={styles.inlineActionButton} onPress={cfg.onClear}>
+                                    <Icon name="close" size={16} color="#C2410C" />
+                                    <Text style={styles.inlineActionText}>Clear</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+                    {cfg.items.length > 0 ? (
+                        <ScrollView
+                            ref={cfg.listRef}
+                            style={styles.inlineListScroll}
+                            nestedScrollEnabled
+                            keyboardShouldPersistTaps="handled"
+                            onScroll={({ nativeEvent }) => {
+                                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                                if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 20) {
+                                    cfg.onEnd();
+                                }
+                            }}
+                            scrollEventThrottle={16}
+                        >
+                            {cfg.items.map((item: any) => (
+                                <TouchableOpacity key={cfg.keyOf(item)} style={styles.inlineOption} onPress={() => cfg.onItemPress(item)}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={styles.inlineOptionTextPlain}>{cfg.titleOf(item)}</Text>
+                                        {!!cfg.subOf && !!cfg.subOf(item) && <Text style={styles.inlineOptionSub}>{cfg.subOf(item)}</Text>}
+                                    </View>
+                                    <Icon name={cfg.isSelected(item) ? 'check-circle' : 'radio-button-unchecked'} size={20} color="#F97316" />
+                                </TouchableOpacity>
+                            ))}
+                            {cfg.loadingMore && <ActivityIndicator size="small" color="#F97316" style={styles.loadingIndicator} />}
+                        </ScrollView>
+                    ) : <Text style={styles.noOptionText}>{cfg.emptyText}</Text>}
+                </View>
+            )}
+        </View>
+    );
+
+    const handleReset = () => {
+        setSelectedDashPrp([]);
+        setSelectedDashParty([]);
+        setSelectedDashSubHead([]);
+        setSelectedDashSexe([]);
+        setSearchQuery('');
+        setSearchQueryParty('');
+        setSearchQuerySubHead('');
+        setSearchQuerySexe('');
+    };
+
     return (
-        <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
+        <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent={false}>
+            <StatusBar barStyle="light-content" backgroundColor="#10283A" translucent={false} />
             <View style={styles.modalOverlay}>
                 <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
-                    <LinearGradient
-                        colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                        style={styles.gradientBackground}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        {/* Close Button */}
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>
-
-                        {/* Scrollable Form Container */}
-                        <ScrollView
-                            style={styles.scrollableFormContainer}
-                            contentContainerStyle={styles.scrollableFormContent}
-                            nestedScrollEnabled={true}
-                        >
-
-                            {/* Internal Dropdown */}
-                            <View style={styles.inputGroup}>
-                                {/* <Text style={styles.label}>Sales Property Group</Text> */}
+                    <SafeAreaView style={styles.safeAreaContainer}>
+                        <View style={styles.referenceFilterSheet}>
+                            <View style={styles.referenceFilterHeader}>
                                 <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsIntDropdownOpen(!isIntDropdownOpen)}
+                                    style={styles.referenceBackButton}
+                                    onPress={onClose}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Back to receivables"
                                 >
-                                    <Text style={styles.dropdownText}>{selectedInternal}</Text>
+                                    <Icon name="arrow-back" size={24} color="#FFFFFF" />
                                 </TouchableOpacity>
-                                {isIntDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            {/* <TouchableOpacity
-                                                style={styles.dropdownOption}
-                                                onPress={() => {
-                                                    onExeChangeInternal(null); // Send empty value
-                                                    setIsExeDropdownOpen(false);
-                                                }}
-                                            >
-                                                <Text style={styles.dropdownOptionText}>Select</Text>
-                                            </TouchableOpacity> */}
-                                            {internal_dropdown.map((internal) => (
-                                                <TouchableOpacity
-                                                    key={internal.value}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedInternal === internal.lable && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onExeChangeInternal(internal);
-                                                        setIsIntDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{internal.lable}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
 
+                                <View style={styles.commonHeaderTitleBlock}>
+                                    <View style={styles.filterHeaderTitleRow}>
+                                        <Icon name="filter-alt" size={20} color="#F97316" />
+                                        <Text style={styles.filterHeaderTitle}>Receivables Filter</Text>
+                                    </View>
+                                    <Text style={styles.commonHeaderSubtitle}>Select store, property and party</Text>
+                                </View>
+
+                                <TouchableOpacity style={styles.referenceCloseButton} onPress={onClose}>
+                                    <Icon name="close" size={22} color="#10283A" />
+                                </TouchableOpacity>
                             </View>
 
-                            {/* Property Group Dropdown */}
-                            {hineidePrp === false ? (<>
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Sales Property Group</Text>
-                                    <TouchableOpacity
-                                        style={styles.dropdownButton}
-                                        onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
-                                    >
-                                        <Text style={styles.dropdownText}>{selectedPrpgrp}</Text>
-                                    </TouchableOpacity>
-                                    {isExeDropdownOpen && (
-                                        <View style={styles.dropdownOptionsContainer}>
-                                            <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                                <TouchableOpacity
-                                                    style={styles.dropdownOption}
-                                                    onPress={() => {
-                                                        onExeChangeReceive(null); // Send empty value
-                                                        setIsExeDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>Select Property Group</Text>
-                                                </TouchableOpacity>
-                                                {receivables_prpgroup.map((exe) => (
-                                                    <TouchableOpacity
-                                                        key={exe.PrpTypeCode}
-                                                        style={[
-                                                            styles.dropdownOption,
-                                                            selectedPrpgrp === exe.PrpTypeOf && styles.selectedOption,
-                                                        ]}
-                                                        onPress={() => {
-                                                            onExeChangeReceive(exe);
-                                                            setIsExeDropdownOpen(false);
-                                                        }}
-                                                    >
-                                                        <Text style={styles.dropdownOptionText}>{exe.PrpTypeOf}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                        </View>
-                                    )}
-
-                                </View></>) : (<></>)}
-                            {/* <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Sales Property Group</Text>
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedPrpgrp}</Text>
-                                </TouchableOpacity>
-                                {isExeDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            <TouchableOpacity
-                                                style={styles.dropdownOption}
-                                                onPress={() => {
-                                                    onExeChangeReceive(null); // Send empty value
-                                                    setIsExeDropdownOpen(false);
-                                                }}
-                                            >
-                                                <Text style={styles.dropdownOptionText}>Select Property Group</Text>
-                                            </TouchableOpacity>
-                                            {receivables_prpgroup.map((exe) => (
-                                                <TouchableOpacity
-                                                    key={exe.PrpTypeCode}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedPrpgrp === exe.PrpTypeOf && styles.selectedOption,
-                                                    ]}
-                                                    onPress={() => {
-                                                        onExeChangeReceive(exe);
-                                                        setIsExeDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={styles.dropdownOptionText}>{exe.PrpTypeOf}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                            </View> */}
-
-
-                            {/* Accordion for Design Selection */}
-                            {getdashPropertyLoading ? (<>
-                                <TouchableOpacity
-                                    style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {'Loading...'}
-                                    </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
-
-                                    <ActivityIndicator size={24} color="#fff" />
-                                </TouchableOpacity></>) : (<>
-                                    <TouchableOpacity
-                                        style={styles.accordionHeader}
-                                        onPress={toggleDesignAccordion}
-                                    >
-                                        <Text style={styles.accordionHeaderText}>
-                                            {isDashPrpAccordionOpen ? `Hide Property: (${selectedDashPrp.length})` : `Select Property: (${selectedDashPrp.length})`}
-                                        </Text>
-                                        <Icon
-                                            name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                            size={24}
-                                            color="#fff"
-                                        />
-                                    </TouchableOpacity></>)}
-
-
-                            {isDashPrpAccordionOpen && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Property..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQuery}
-                                            onChangeText={setSearchQuery}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-                                    {/* Select All & Remove All Buttons */}
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered = getdashPrp.filter(
-                                                    (prp) =>
-                                                        prp.PrpCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                        prp.PrpName.toLowerCase().includes(searchQuery.toLowerCase())
-                                                );
-                                                setSelectedDashPrp(filtered);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedDashPrp.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelected}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Selected Designs (Chips) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedDashPrp.map((prp) => (
-                                            <View key={prp.PrpCode} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {/* {prp.PrpName} ({prp.PrpCode}) */}
-                                                    {prp.PrpName}
-                                                </Text>
-                                            </View>
-                                        ))}
-
-                                    </ScrollView>
-
-                                    {/* Design List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRef}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMorePrpGrp();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedDashPrp.map((prp) => (
-                                            <TouchableOpacity
-                                                key={prp.PrpCode}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedDashPrp.some((d) => d.PrpCode === prp.PrpCode) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleDashPrp(prp)}
-                                            >
-                                                <Text style={styles.designName}>{prp.PrpName}</Text>
-                                                {/* <Text style={styles.designCode}>{prp.PrpCode}</Text> */}
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMorePrpGrp && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-
-                                </>
-                            )}
-
-                            {/* Accordion for Party Selection */}
-                            {getdashPartyLoading ? (<>
-                                <TouchableOpacity
-                                    style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {'Loading...'}
-                                    </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
-
-                                    <ActivityIndicator size={24} color="#fff" />
-                                </TouchableOpacity></>) : (<><TouchableOpacity
-                                    style={styles.accordionHeader}
-                                    onPress={toggleDesignAccordionParty}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {isDashPartyAccordionOpen ? `Hide Party: (${selectedDashParty.length})` : `Select Party: (${selectedDashParty.length})`}
-                                    </Text>
-                                    <Icon
-                                        name={isDashPartyAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    />
-                                </TouchableOpacity></>)}
-
-
-
-                            {isDashPartyAccordionOpen && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Party..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQueryParty}
-                                            onChangeText={setSearchQueryParty}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-
-                                    {/* Remove "Select All" button and keep only "Remove All" if needed */}
-                                    <View style={styles.selectAllContainer}>
-                                        {selectedDashParty.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelectedParty}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Selected Party (Chip) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedDashParty.map((party) => (
-                                            <View key={party.acccode} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {party.accname} ({party.acccode})
-                                                </Text>
-                                            </View>
-                                        ))}
-                                    </ScrollView>
-
-                                    {/* Party List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRefParty}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true}
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreParty();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedDashParty.map((party) => (
-                                            <TouchableOpacity
-                                                key={party.acccode}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedDashParty.some((d) => d.acccode === party.acccode) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleDashParty(party)} // Updated to single select
-                                            >
-                                                <Text style={styles.designName}>{party.accname}</Text>
-                                                <Text style={styles.designCode}>{party.acccode}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMoreParty && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-                                </>
-                            )}
-
-
-                            {/* Accordion for SubHead Selection */}
-                            {getdashSubHeadLoading ? (
-                                <><TouchableOpacity
-                                    style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {'Loading...'}
-                                    </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
-
-                                    <ActivityIndicator size={24} color="#fff" />
-                                </TouchableOpacity>
-                                </>) : (
-                                <><TouchableOpacity
-                                    style={styles.accordionHeader}
-                                    onPress={toggleDesignAccordionSubHead}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {isDashSubHeadAccordionOpen ? `Hide SubHead: (${selectedDashSubHead.length})` : `Select SubHead: (${selectedDashSubHead.length})`}
-                                    </Text>
-                                    <Icon
-                                        name={isDashSubHeadAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    />
-                                </TouchableOpacity></>)}
-
-
-                            {isDashSubHeadAccordionOpen && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search SubHead..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQuerySubHead}
-                                            onChangeText={setSearchQuerySubHead}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-                                    {/* Select All & Remove All Buttons */}
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered12 = getdashSubHead.filter(
-                                                    (sub) =>
-                                                        sub.SHName.toLowerCase().includes(searchQuerySubHead.toLowerCase()) ||
-                                                        sub.SHead.toLowerCase().includes(searchQuerySubHead.toLowerCase())
-                                                );
-                                                setSelectedDashSubHead(filtered12);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedDashSubHead.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelectedSubHead}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Selected Designs (Chips) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedDashSubHead.map((sub) => (
-                                            <View key={sub.SHead} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {sub.SHName} ({sub.SHead})
-                                                    {/* {party.accname} */}
-                                                </Text>
-                                            </View>
-                                        ))}
-
-                                    </ScrollView>
-
-                                    {/* Design List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRefSubHead}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreSubHead();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedDashSubHead.map((sub) => (
-                                            <TouchableOpacity
-                                                key={sub.SHead}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedDashSubHead.some((d) => d.SHead === sub.SHead) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleDashSubHead(sub)}
-                                            >
-                                                <Text style={styles.designName}>{sub.SHName}</Text>
-                                                <Text style={styles.designCode}>{sub.SHead}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMoreSubHead && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-
-                                </>
-                            )}
-
-                            {/* Accordion for Sexe Selection */}
-                            {getdashSexeLoading ? (<>
-                                <TouchableOpacity
-                                    style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
-                                >
-                                    <Text style={styles.accordionHeaderText}>
-                                        {'Loading...'}
-                                    </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
-
-                                    <ActivityIndicator size={24} color="#fff" />
-                                </TouchableOpacity></>) : (
-                                <>
-                                    <TouchableOpacity
-                                        style={styles.accordionHeader}
-                                        onPress={toggleDesignAccordionSexe}
-                                    >
-                                        <Text style={styles.accordionHeaderText}>
-                                            {isDashSexeAccordionOpen ? `Hide Sales Executive : (${selectedDashSexe.length})` : `Select Sales Executive: (${selectedDashSexe.length})`}
-                                        </Text>
-                                        <Icon
-                                            name={isDashSexeAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                            size={24}
-                                            color="#fff"
-                                        />
-                                    </TouchableOpacity></>)}
-
-
-                            {isDashSexeAccordionOpen && (
-                                <>
-
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Sales Executive..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQuerySexe}
-                                            onChangeText={setSearchQuerySexe}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered12 = getdashSexe.filter(
-                                                    (sexe) =>
-                                                        sexe.Code.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
-                                                        sexe.SalesExecutive.toLowerCase().includes(searchQuerySexe.toLowerCase())
-                                                );
-                                                setSelectedDashSexe(filtered12);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedDashSexe.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelectedSexe}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedDashSexe.map((sexe) => (
-                                            <View key={sexe.Code} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {sexe.SalesExecutive} ({sexe.Code})
-
-                                                </Text>
-                                            </View>
-                                        ))}
-
-                                    </ScrollView>
-
-
-                                    <ScrollView
-                                        ref={scrollViewRefSexe}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreSexe();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedDashSexe.map((sexe) => (
-                                            <TouchableOpacity
-                                                key={sexe.Code}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedDashSexe.some((d) => d.Code === sexe.Code) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleDashSexe(sexe)}
-                                            >
-                                                <Text style={styles.designName}>{sexe.SalesExecutive}</Text>
-                                                <Text style={styles.designCode}>{sexe.Code}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMoreSexe && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-
-                                    </ScrollView>
-
-                                </>
-                            )}
-
-                            {/*------------------------------------------------------------ DATE------------------------------------------------------- */}
-
-                            {/* Date Range Picker Button (Below Sales Executive Dropdown) */}
-                            {/* <TouchableOpacity
-                                style={styles.dateRangeButton}
-                                onPress={() => setShowDateRangePicker(true)}
+                            <ScrollView
+                                contentContainerStyle={styles.referenceFilterContent}
+                                showsVerticalScrollIndicator={false}
+                                nestedScrollEnabled
+                                keyboardShouldPersistTaps="handled"
                             >
-                                <Text style={styles.dateRangeButtonText}>
-                                    {fromDate && toDate
-                                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
-                                        : "Select Date Range"}
-                                </Text>
-                                <Icon name="calendar-today" size={20} color="#fff" />
-                            </TouchableOpacity>
-
-
-                            <Modal
-                                visible={showDateRangePicker}
-                                transparent={true}
-                                animationType="slide"
-                                onRequestClose={() => setShowDateRangePicker(false)}
-                            >
-                                <View style={stylesEnhanced.modalOverlay}>
-                                    <View style={stylesEnhanced.modalContainer}>
-                                       
-                                        <View style={stylesEnhanced.modalHeader}>
-                                            <TouchableOpacity onPress={() => setShowDateRangePicker(false)}>
-                                                <Icon name="close" size={24} color="#666" />
-                                            </TouchableOpacity>
-                                            <Text style={stylesEnhanced.modalTitle}>Select Date Range</Text>
-                                            <TouchableOpacity onPress={clearDateRange}>
-                                                <Text style={stylesEnhanced.clearButton}>Clear</Text>
-                                            </TouchableOpacity>
-                                        </View>
-
-
-                                        <View style={stylesEnhanced.rangeDisplay}>
-                                            <View style={stylesEnhanced.rangeDisplayItem}>
-                                                <Text style={stylesEnhanced.rangeLabel}>Start Date</Text>
-                                                <Text style={stylesEnhanced.rangeValue}>
-                                                    {formatDateToDisplay(startDate)}
-                                                </Text>
-                                            </View>
-                                            <Icon name="arrow-forward" size={20} color="#999" />
-                                            <View style={stylesEnhanced.rangeDisplayItem}>
-                                                <Text style={stylesEnhanced.rangeLabel}>End Date</Text>
-                                                <Text style={stylesEnhanced.rangeValue}>
-                                                    {formatDateToDisplay(endDate)}
-                                                </Text>
-                                            </View>
-                                        </View>
-
-
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            style={stylesEnhanced.predefinedRangesContainer}
-                                            contentContainerStyle={stylesEnhanced.predefinedRangesContent}
-                                        >
-                                            {predefinedRanges.map((range, index) => (
-                                                <TouchableOpacity
-                                                    key={index}
-                                                    style={[
-                                                        stylesEnhanced.predefinedButton,
-                                                        startDate && endDate &&
-                                                        isSameDay(startDate, range.start) &&
-                                                        isSameDay(endDate, range.end) &&
-                                                        stylesEnhanced.predefinedButtonActive
-                                                    ]}
-                                                    onPress={() => handlePredefinedRange(range)}
-                                                >
-                                                    <Text style={[
-                                                        stylesEnhanced.predefinedButtonText,
-                                                        startDate && endDate &&
-                                                        isSameDay(startDate, range.start) &&
-                                                        isSameDay(endDate, range.end) &&
-                                                        stylesEnhanced.predefinedButtonTextActive
-                                                    ]}>
-                                                        {range.label}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-
-
-                                        <View style={stylesEnhanced.calendarContainer}>
-                                            <Calendar
-                                                current={currentMonth}
-                                                onMonthChange={(month: DateData) => setCurrentMonth(month.dateString)}
-                                                onDayPress={handleDateSelect}
-                                                markedDates={calendarMarkedDates}
-                                                markingType={'period'}
-                                                style={stylesEnhanced.calendar}
-                                                theme={{
-                                                    backgroundColor: '#ffffff',
-                                                    calendarBackground: '#ffffff',
-                                                    textSectionTitleColor: '#6c757d',
-                                                    textSectionTitleDisabledColor: '#d9e1e8',
-                                                    selectedDayBackgroundColor: theme.BRAND_GRADIENT_START,
-                                                    selectedDayTextColor: '#ffffff',
-                                                    todayTextColor: theme.BRAND_GRADIENT_START,
-                                                    dayTextColor: '#2d4150',
-                                                    textDisabledColor: '#d9e1e8',
-                                                    dotColor: '#00adf5',
-                                                    selectedDotColor: '#ffffff',
-                                                    arrowColor: theme.BRAND_GRADIENT_START,
-                                                    disabledArrowColor: '#d9e1e8',
-                                                    monthTextColor: '#212529',
-                                                    indicatorColor: theme.BRAND_GRADIENT_START,
-                                                    textDayFontWeight: '400',
-                                                    textMonthFontWeight: 'bold',
-                                                    textDayHeaderFontWeight: '600',
-                                                    textDayFontSize: 14,
-                                                    textMonthFontSize: 16,
-                                                    textDayHeaderFontSize: 12,
-                                                }}
-                                                enableSwipeMonths={true}
-                                                firstDay={1}
-                                                hideExtraDays={false}
-                                                showWeekNumbers={false}
-                                            />
-                                        </View>
-
-
-                                        <View style={stylesEnhanced.actionButtons}>
-                                            <TouchableOpacity
-                                                style={stylesEnhanced.cancelButton}
-                                                onPress={() => setShowDateRangePicker(false)}
-                                            >
-                                                <Text style={stylesEnhanced.cancelButtonText}>Cancel</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={stylesEnhanced.applyButton}
-                                                onPress={applyDateRange}
-                                            >
-                                                <Text style={stylesEnhanced.applyButtonText}>Apply Range</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
+                                <View style={styles.commonFilterCard}>
+                                    {selectField('internal', 'Store', internalLabel || 'Internal', internalOptions)}
+                                    {hineidePrp === false && selectField('property', 'Property Group', prpgrpLabel, propertyOptions)}
                                 </View>
-                            </Modal>
 
-                            {showFromDatePicker && (
-                                <DateTimePicker
-                                    value={fromDate || new Date()}
-                                    mode="date"
-                                    display="default"
-                                    onChange={(event, selectedDate) => {
-                                        setShowFromDatePicker(false);
-                                        if (selectedDate) {
-                                            setFromDate(selectedDate);
-                                            setShowDateRangePicker(true);
-                                        }
-                                    }}
-                                />
-                            )}
+                                <View style={styles.optionalSection}>
+                                    <Text style={styles.optionalTitle}>Additional Filters</Text>
 
+                                    {multiSelect({
+                                        title: 'Property',
+                                        loading: getdashPropertyLoading,
+                                        isOpen: isDashPrpAccordionOpen,
+                                        onToggle: toggleDesignAccordion,
+                                        count: selectedDashPrp.length,
+                                        search: searchQuery,
+                                        onSearch: setSearchQuery,
+                                        searchPlaceholder: 'Search Property...',
+                                        onSelectAll: () => {
+                                            const filtered = getdashPrp.filter(
+                                                (prp) =>
+                                                    prp.PrpCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                    prp.PrpName.toLowerCase().includes(searchQuery.toLowerCase())
+                                            );
+                                            setSelectedDashPrp(filtered);
+                                        },
+                                        onClear: removeAllSelected,
+                                        items: displayedDashPrp,
+                                        keyOf: (i) => i.PrpCode,
+                                        titleOf: (i) => i.PrpName || i.PrpCode,
+                                        isSelected: (i) => selectedDashPrp.some((d) => d.PrpCode === i.PrpCode),
+                                        onItemPress: toggleDashPrp,
+                                        listRef: scrollViewRef,
+                                        onEnd: loadMorePrpGrp,
+                                        loadingMore: isLoadingMorePrpGrp,
+                                        emptyText: 'No properties available',
+                                    })}
 
-                            {showToDatePicker && (
-                                <DateTimePicker
-                                    value={toDate || new Date()}
-                                    mode="date"
-                                    display="default"
-                                    onChange={(event, selectedDate) => {
-                                        setShowToDatePicker(false);
-                                        if (selectedDate) {
-                                            setToDate(selectedDate);
-                                            setShowDateRangePicker(true);
-                                        }
-                                    }}
-                                />
-                            )} */}
+                                    {multiSelect({
+                                        title: 'Party Selection',
+                                        loading: getdashPartyLoading,
+                                        isOpen: isDashPartyAccordionOpen,
+                                        onToggle: toggleDesignAccordionParty,
+                                        count: selectedDashParty.length,
+                                        search: searchQueryParty,
+                                        onSearch: setSearchQueryParty,
+                                        searchPlaceholder: 'Search Party...',
+                                        onClear: removeAllSelectedParty,
+                                        items: displayedDashParty,
+                                        keyOf: (i) => i.acccode,
+                                        titleOf: (i) => i.accname || i.acccode,
+                                        subOf: (i) => i.acccode,
+                                        isSelected: (i) => selectedDashParty.some((d) => d.acccode === i.acccode),
+                                        onItemPress: toggleDashParty,
+                                        listRef: scrollViewRefParty,
+                                        onEnd: loadMoreParty,
+                                        loadingMore: isLoadingMoreParty,
+                                        emptyText: 'No parties available',
+                                    })}
 
-                            {/*------------------------------------------------------------ DATE------------------------------------------------------- */}
+                                    {multiSelect({
+                                        title: 'SubHead Selection',
+                                        loading: getdashSubHeadLoading,
+                                        isOpen: isDashSubHeadAccordionOpen,
+                                        onToggle: toggleDesignAccordionSubHead,
+                                        count: selectedDashSubHead.length,
+                                        search: searchQuerySubHead,
+                                        onSearch: setSearchQuerySubHead,
+                                        searchPlaceholder: 'Search SubHead...',
+                                        onSelectAll: () => {
+                                            const filtered = getdashSubHead.filter(
+                                                (sub) =>
+                                                    sub.SHName.toLowerCase().includes(searchQuerySubHead.toLowerCase()) ||
+                                                    sub.SHead.toLowerCase().includes(searchQuerySubHead.toLowerCase())
+                                            );
+                                            setSelectedDashSubHead(filtered);
+                                        },
+                                        onClear: removeAllSelectedSubHead,
+                                        items: displayedDashSubHead,
+                                        keyOf: (i) => i.SHead,
+                                        titleOf: (i) => i.SHName || i.SHead,
+                                        subOf: (i) => i.SHead,
+                                        isSelected: (i) => selectedDashSubHead.some((d) => d.SHead === i.SHead),
+                                        onItemPress: toggleDashSubHead,
+                                        listRef: scrollViewRefSubHead,
+                                        onEnd: loadMoreSubHead,
+                                        loadingMore: isLoadingMoreSubHead,
+                                        emptyText: 'No subheads available',
+                                    })}
 
-                        </ScrollView>
+                                    {multiSelect({
+                                        title: 'Sales Executive',
+                                        loading: getdashSexeLoading,
+                                        isOpen: isDashSexeAccordionOpen,
+                                        onToggle: toggleDesignAccordionSexe,
+                                        count: selectedDashSexe.length,
+                                        search: searchQuerySexe,
+                                        onSearch: setSearchQuerySexe,
+                                        searchPlaceholder: 'Search Sales Executive...',
+                                        onSelectAll: () => {
+                                            const filtered = getdashSexe.filter(
+                                                (sexe) =>
+                                                    sexe.Code.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
+                                                    sexe.SalesExecutive.toLowerCase().includes(searchQuerySexe.toLowerCase())
+                                            );
+                                            setSelectedDashSexe(filtered);
+                                        },
+                                        onClear: removeAllSelectedSexe,
+                                        items: displayedDashSexe,
+                                        keyOf: (i) => i.Code,
+                                        titleOf: (i) => i.SalesExecutive || i.Code,
+                                        subOf: (i) => i.Code,
+                                        isSelected: (i) => selectedDashSexe.some((d) => d.Code === i.Code),
+                                        onItemPress: toggleDashSexe,
+                                        listRef: scrollViewRefSexe,
+                                        onEnd: loadMoreSexe,
+                                        loadingMore: isLoadingMoreSexe,
+                                        emptyText: 'No sales executives available',
+                                    })}
+                                </View>
+                            </ScrollView>
 
-                        {/* <>
-                                {(getdashAccount && getdashAccount.length > 0) ? (
-                                    <>
-                                        {getdashAccountLoading ? (<>
-                                            <TouchableOpacity
-                                                style={styles.accordionHeader}
-                                            // onPress={toggleDesignAccordion}
-                                            >
-                                                <Text style={styles.accordionHeaderText}>
-                                                    {'Loading...'}
-                                                </Text>
-                                               
-
-                                                <ActivityIndicator size={24} color="#fff" />
-                                            </TouchableOpacity></>) : (
-                                            <>
-                                                <TouchableOpacity
-                                                    style={styles.accordionHeader}
-                                                    onPress={toggleDesignAccordionAccount}
-                                                >
-                                                    <Text style={styles.accordionHeaderText}>
-                                                        {isDashAccountAccordionOpen ? `Hide Account : (${selectedDashAccount.length})` : `Select Account: (${selectedDashAccount.length})`}
-                                                    </Text>
-                                                    <Icon
-                                                        name={isDashAccountAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                                        size={24}
-                                                        color="#fff"
-                                                    />
-                                                </TouchableOpacity></>)}
-
-
-                                        {isDashAccountAccordionOpen && (
-                                            <>
-                                               
-                                                <View style={styles.searchContainer}>
-                                                    <TextInput
-                                                        style={styles.searchInput}
-                                                        placeholder="Search Sales Executive..."
-                                                        placeholderTextColor="#ccc"
-                                                        value={searchQueryAccount}
-                                                        onChangeText={setSearchQueryAccount}
-                                                    />
-                                                    <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                                </View>
-                                          
-                                                <View style={styles.selectAllContainer}>
-                                                    <TouchableOpacity
-                                                        style={styles.selectAllButton}
-                                                        onPress={() => {
-                                                            const filtered12 = getdashAccount.filter(
-                                                                (acc) =>
-                                                                    acc.AccCode.toLowerCase().includes(searchQueryAccount.toLowerCase()) ||
-                                                                    acc.AccName.toLowerCase().includes(searchQueryAccount.toLowerCase())
-                                                            );
-                                                            setSelectedDashAccount(filtered12);
-                                                        }}
-                                                    >
-                                                        <Text style={styles.selectAllButtonText}>Select All</Text>
-                                                    </TouchableOpacity>
-                                                    {selectedDashAccount.length > 0 && (
-                                                        <TouchableOpacity
-                                                            style={styles.removeAllButton}
-                                                            onPress={removeAllSelectedAccount}
-                                                        >
-                                                            <Icon name="close" size={20} color="#fff" />
-                                                        </TouchableOpacity>
-                                                    )}
-                                                </View>
-
-                                               
-                                                <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                                    {selectedDashAccount.map((acc) => (
-                                                        <View key={acc.AccCode} style={styles.selectedDesignChip}>
-                                                            <Text style={styles.selectedDesignText}>
-                                                                {acc.AccName} ({acc.AccCode})
-                                                            
-                                                            </Text>
-                                                        </View>
-                                                    ))}
-
-                                                </ScrollView>
-
-                                               
-                                                <ScrollView
-                                                    ref={scrollViewRefAccount}
-                                                    style={styles.designListContainer}
-                                                    contentContainerStyle={styles.designListContent}
-                                                    nestedScrollEnabled={true} // Enable nested scrolling
-                                                    onScroll={({ nativeEvent }) => {
-                                                        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                                        const paddingToBottom = 20;
-                                                        if (
-                                                            layoutMeasurement.height + contentOffset.y >=
-                                                            contentSize.height - paddingToBottom
-                                                        ) {
-                                                            loadMoreAccount();
-                                                        }
-                                                    }}
-                                                    scrollEventThrottle={16}
-                                                >
-                                                    {displayedDashAccount.map((acc) => (
-                                                        <TouchableOpacity
-                                                            key={acc.AccCode}
-                                                            style={[
-                                                                styles.designItem,
-                                                                selectedDashAccount.some((d) => d.AccCode === acc.AccCode) &&
-                                                                styles.selectedDesignItem,
-                                                            ]}
-                                                            onPress={() => toggleDashAccount(acc)}
-                                                        >
-                                                            <Text style={styles.designName}>{acc.AccName}</Text>
-                                                            <Text style={styles.designCode}>{acc.AccCode}</Text>
-                                                        </TouchableOpacity>
-                                                    ))}
-                                                    {isLoadingMoreAccount && (
-                                                        <ActivityIndicator
-                                                            size="small"
-                                                            color="#fff"
-                                                            style={styles.loadingIndicator}
-                                                        />
-                                                    )}
-                                                </ScrollView>
-
-                                            </>
-                                        )}</>
-                                ) : (<>
-                                    <TouchableOpacity
-                                        style={styles.accordionHeader}
-                                        onPress={handleLoadPressAccount}
-                                        disabled={getAccountLoading}
-                                    >
-                                        <Text style={styles.accordionHeaderText}>
-                                            {getAccountLoading ? 'Loading...' : 'Load Account'}
-                                        </Text>
-                                        {getAccountLoading ? (
-                                            <>
-                                                <ActivityIndicator
-                                                    size={24}
-                                                    color="#fff"
-                                                // style={styles.loadingIndicator}
-                                                />
-                                            </>
-                                        ) : (<>
-                                            <Icon
-                                                name={'refresh'}
-                                                size={24}
-                                                color="#fff"
-                                            />
-                                        </>)}
-                                      
-                                    </TouchableOpacity></>)}
-                            </>
-
-
-
-
-
-                     
-
-                        {/* Load Button (Fixed at Bottom) */}
-                        <View style={styles.loadButtonContainer}>
-                            <TouchableOpacity style={styles.loadButton} onPress={handleLoadPress}>
-                                {isLoading ? (
-                                    <ActivityIndicator size={24} color={theme.BRAND_GRADIENT_START} />
-                                ) : (
-                                    <Icon name="refresh" size={24} color={theme.BRAND_GRADIENT_START} />
-                                )}
-                            </TouchableOpacity>
+                            <View style={styles.referenceFilterActions}>
+                                <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+                                    <Icon name="refresh" size={22} color="#10283A" />
+                                    <Text style={styles.resetButtonText}>Reset</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.applyButton} onPress={handleLoadPress}>
+                                    {isLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Icon name="filter-alt" size={22} color="#FFFFFF" />}
+                                    <Text style={styles.applyButtonText}>Apply</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                        {/* <View style={styles.loadButtonContainer}>
-                            <TouchableOpacity style={styles.loadButton} onPress={dashAccount()}>
-                                {getAccountLoading ? (
-                                    <ActivityIndicator size={24} color={theme.BRAND_GRADIENT_START} />
-                                ) : (
-                                    <Icon name="refresh" size={24} color={theme.BRAND_GRADIENT_START} />
-                                )}
-                            </TouchableOpacity>
-                        </View> */}
-                    </LinearGradient>
+                    </SafeAreaView>
                 </Animated.View>
             </View>
         </Modal>
@@ -1869,6 +1193,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
+    },
+    safeAreaContainer: {
+        flex: 1,
+        backgroundColor: '#FBFAF7',
+        // Android does not apply the top safe-area inset to the core SafeAreaView.
+        // Reserve the status-bar height so the common header never slides underneath it.
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
     },
     drawerContainer: {
         position: 'absolute',
@@ -1883,18 +1214,50 @@ const styles = StyleSheet.create({
     },
     gradientBackground: {
         flex: 1,
-        padding: 20,
+        backgroundColor: '#F8F7F4',
+        borderTopLeftRadius: 26,
+        borderTopRightRadius: 26,
+        overflow: 'hidden',
+    },
+    filterHeader: {
+        minHeight: 76,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#10283A',
+    },
+    filterHeaderTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    filterHeaderTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    filterIntro: {
+        paddingHorizontal: 18,
+        paddingTop: 14,
+        paddingBottom: 4,
+    },
+    filterIntroText: {
+        color: '#64748B',
+        fontSize: 12,
     },
     closeButton: {
-        alignSelf: 'flex-end',
-        padding: 40,
+        padding: 8,
+        borderRadius: 18,
+        backgroundColor: '#FFFFFF',
     },
     stepIndicator: {
         alignItems: 'center',
         marginBottom: 20,
     },
     stepText: {
-        color: '#fff',
+        color: '#10283A',
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -1903,33 +1266,41 @@ const styles = StyleSheet.create({
         padding: 10,
     },
     inputGroup: {
-        marginBottom: 15,
+        marginBottom: 14,
+        paddingHorizontal: 18,
         zIndex: 10,
     },
     label: {
-        fontSize: 16,
-        marginBottom: 5,
-        color: '#fff',
+        fontSize: 13,
+        marginBottom: 7,
+        color: '#183247',
+        fontWeight: '700',
     },
     dateInput: {
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderColor: '#D8DEE5',
+        borderRadius: 10,
+        padding: 12,
+        backgroundColor: '#FFFFFF',
     },
     dateText: {
-        color: '#fff',
+        color: '#183247',
     },
     dropdownButton: {
+        minHeight: 48,
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderColor: '#D8DEE5',
+        borderRadius: 10,
+        paddingHorizontal: 13,
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
     },
     dropdownText: {
-        color: '#fff',
+        color: '#183247',
+        fontSize: 14,
+        fontWeight: '500',
     },
     dropdownOptionsContainer: {
         position: 'relative',
@@ -1970,8 +1341,8 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     loadButton: {
-        backgroundColor: 'rgb(255, 255, 255)',
-        borderRadius: 5,
+        backgroundColor: '#F97316',
+        borderRadius: 12,
         alignItems: 'center',
         // flex: 1,
         padding: 10,
@@ -1985,15 +1356,15 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
         paddingHorizontal: 10,
         marginBottom: 10,
     },
     searchInput: {
         flex: 1,
         padding: 10,
-        color: '#fff',
+        color: '#183247',
     },
     searchIcon: {
         marginLeft: 10,
@@ -2003,20 +1374,20 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     selectedDesignChip: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
+        backgroundColor: '#FFF0E5',
         padding: 8,
         borderRadius: 12,
         marginRight: 5,
     },
     selectedDesignText: {
-        color: '#fff',
+        color: '#C2410C',
         fontSize: 12,
     },
 
     designListContainer: {
         maxHeight: 300, // Fixed height for the design list
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
+        borderColor: '#E2E8F0',
         borderRadius: 8,
         marginBottom: 10,
     },
@@ -2026,17 +1397,18 @@ const styles = StyleSheet.create({
     designItem: {
         padding: 15,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
+        borderBottomColor: '#EEF2F6',
     },
     selectedDesignItem: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: '#FFF0E5',
     },
     designName: {
-        color: '#fff',
+        color: '#183247',
         fontSize: 14,
+        fontWeight: '600',
     },
     designCode: {
-        color: '#ccc',
+        color: '#64748B',
         fontSize: 12,
     },
     loadingIndicator: {
@@ -2047,12 +1419,15 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 15,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#D8DEE5',
+        borderRadius: 12,
         marginBottom: 10,
+        minHeight: 54,
     },
     accordionHeaderText: {
-        color: '#fff',
+        color: '#10283A',
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -2105,7 +1480,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     selectAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
+        backgroundColor: '#FFF0E5',
         padding: 10,
         borderRadius: 8,
         marginRight: 10,
@@ -2117,7 +1492,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     removeAllButton: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
+        backgroundColor: '#FFF0E5',
         padding: 8,
         borderRadius: 12,
     },
@@ -2210,6 +1585,218 @@ const styles = StyleSheet.create({
     },
 
 
+
+    referenceFilterSheet: {
+        flex: 1,
+        backgroundColor: '#FBFAF7',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: 'hidden',
+    },
+    referenceFilterHeader: {
+        minHeight: 82,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#10283A',
+    },
+    referenceBackButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    commonHeaderTitleBlock: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    commonHeaderSubtitle: {
+        color: '#B8C7D8',
+        fontSize: 11,
+        marginTop: 3,
+        fontWeight: '500',
+    },
+    referenceCloseButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 22,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    referenceFilterContent: {
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 24,
+    },
+    commonFilterCard: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 18,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    simpleFieldGroup: {
+        marginBottom: 14,
+        zIndex: 20,
+    },
+    multiSelectFieldGroup: {
+        marginBottom: 10,
+        zIndex: 30,
+    },
+    simpleLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#183247',
+        marginBottom: 7,
+    },
+    required: { color: '#EF4444' },
+    simpleSelect: {
+        minHeight: 48,
+        borderWidth: 1,
+        borderColor: '#D7DEE6',
+        borderRadius: 11,
+        paddingHorizontal: 13,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+    },
+    simpleSelectText: {
+        flex: 1,
+        color: '#183247',
+        fontSize: 14,
+        marginRight: 8,
+    },
+    simpleOptions: {
+        marginTop: 5,
+        borderWidth: 1,
+        borderColor: '#D7DEE6',
+        borderRadius: 11,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.12,
+        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 2 },
+    },
+    simpleOption: {
+        paddingHorizontal: 14,
+        paddingVertical: 13,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEF1F4',
+    },
+    simpleOptionText: { color: '#183247', fontSize: 14 },
+    dateRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
+    dateColumn: { flex: 1 },
+    optionalSection: { marginTop: 4 },
+    optionalTitle: { color: '#183247', fontSize: 14, fontWeight: '800', marginBottom: 9 },
+    optionalSelect: {
+        minHeight: 48,
+        borderWidth: 1,
+        borderColor: '#D7DEE6',
+        borderRadius: 11,
+        paddingHorizontal: 13,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        marginBottom: 8,
+    },
+    optionalSelectText: { color: '#183247', fontSize: 13, fontWeight: '600' },
+    inlineOption: {
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F3F6F8',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5EAF0',
+    },
+    inlineOptionText: { flex: 1, color: '#183247', fontSize: 13, marginRight: 8 },
+    multiSelectOptions: {
+        marginTop: 5,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#D7DEE6',
+        borderRadius: 11,
+        overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+    },
+    noOptionText: { color: '#7B8794', padding: 12 },
+    referenceFilterActions: {
+        flexDirection: 'row',
+        gap: 12,
+        padding: 18,
+        borderTopWidth: 1,
+        borderTopColor: '#ECE7DF',
+        backgroundColor: '#FBFAF7',
+    },
+    resetButton: {
+        flex: 1,
+        minHeight: 50,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2D9CE',
+        backgroundColor: '#F2EEE8',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    resetButtonText: { color: '#10283A', fontSize: 15, fontWeight: '800' },
+    applyButton: {
+        flex: 1,
+        minHeight: 50,
+        borderRadius: 12,
+        backgroundColor: '#EA641F',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    applyButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+    inlineOptionTextPlain: { color: '#183247', fontSize: 13 },
+    inlineOptionSub: { color: '#7B8794', fontSize: 10, marginTop: 2 },
+    inlineSearchBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 42,
+        paddingHorizontal: 12,
+        backgroundColor: '#F8FAFC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5EAF0',
+    },
+    inlineSearchInput: { flex: 1, paddingVertical: 0, color: '#10283A', fontSize: 13 },
+    inlineActionsRow: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5EAF0',
+    },
+    inlineActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: '#FFF1E6',
+    },
+    inlineActionText: { color: '#C2410C', fontSize: 12, fontWeight: '800' },
+    inlineListScroll: { maxHeight: 240 },
 
 });
 

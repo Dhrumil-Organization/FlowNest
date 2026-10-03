@@ -4,7 +4,7 @@
 //
 //   ‹ Reports
 //   Beam Shortage
-//   [from] → [to]  [FY 26-27] [FY 25-26] [Month] [90d]
+//   [from] → [to]  [FY 26-27] [FY 25-26] [Month] [90d]                 [All] [Creel] [Indent]
 //   [All items ⌄] [Yarn & piece dyed ⌄] [All machines ⌄] [⌕ find a design or beam no.]  clear filters
 //   SORT [Shortage m ▾] [Shortage %] [Design]                    12 designs · 31 beams
 //   | Warped | Produced | Shortage m · % |
@@ -24,7 +24,7 @@
 // shortage; % = shortage ÷ warped. One financial year at a time — the range
 // never mixes two April–March years.
 //
-// Source: POST /reports/beam_shortage  { prptype, prpcode, yearno, fromdate, todate }
+// Source: POST /reports/beam_shortage  { prptype, prpcode, yearno, fromdate, todate, beamtype }
 // (beamShortageApi.ts — USE_MOCK = true serves the hard-coded test data instead)
 
 import { useBusinessContext } from '@/src/core/business';
@@ -99,6 +99,7 @@ const EMPTY: BeamShortageData = { lines: [], summaryOnly: [] };
 type Range = { from: string; to: string };
 /** which list comes first: designs (tap -> beams) or beams (tap -> designs) */
 type ViewMode = 'design' | 'beam';
+type BeamSource = 'all' | 'creel' | 'indent';
 
 export default function BeamShortageScreen() {
   const router = useRouter();
@@ -126,6 +127,8 @@ export default function BeamShortageScreen() {
   const [picker, setPicker] = useState<null | 'item' | 'type' | 'machine'>(null);
   const [dsel, setDsel] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('design');
+  // API source filter: Creel is the default as requested.
+  const [beamSource, setBeamSource] = useState<BeamSource>('creel');
   const [bsel, setBsel] = useState<string | null>(null);
 
   const reqId = useRef(0);
@@ -142,6 +145,7 @@ export default function BeamShortageScreen() {
         yearno: yearNoFor(r.from, yearNo, sessionFy),
         fromdate: r.from,
         todate: r.to,
+        beamtype: beamSource,
       };
       console.log('[Reports/BeamShortage] request ->', body);
       const response: any = await BeamShortageService.report(body);
@@ -159,7 +163,7 @@ export default function BeamShortageScreen() {
     } finally {
       if (id === reqId.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [isReady, prpGroup, prpCode, yearNo, sessionFy]);
+  }, [isReady, prpGroup, prpCode, yearNo, sessionFy, beamSource]);
 
   const rangeRef = useRef(range);
   rangeRef.current = range;
@@ -394,6 +398,8 @@ export default function BeamShortageScreen() {
             </TouchableOpacity>
           );
         })}
+
+        <BeamSourceTabs value={beamSource} onChange={setBeamSource} narrow={narrow} />
       </View>
       {clamped && (
         <Text style={st.note}>
@@ -600,6 +606,46 @@ function DesignLine({ r, onPress }: { r: DesignRow; onPress?: () => void }) {
 }
 
 /** The flip between the two drill-down orders. */
+function BeamSourceTabs({
+  value,
+  onChange,
+  narrow,
+}: {
+  value: BeamSource;
+  onChange: (v: BeamSource) => void;
+  narrow: boolean;
+}) {
+  const tabs: { key: BeamSource; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'creel', label: 'Creel' },
+    { key: 'indent', label: 'Indent' },
+  ];
+
+  return (
+    <View
+      style={[st.sourceTabs, narrow && st.sourceTabsNarrow]}
+      accessibilityRole="tablist"
+    >
+      {tabs.map((tab) => {
+        const active = value === tab.key;
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            onPress={() => onChange(tab.key)}
+            activeOpacity={0.78}
+            style={[st.sourceTab, active && st.sourceTabOn]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${tab.label} beam shortage`}
+          >
+            <Text style={[st.sourceTabText, active && st.sourceTabTextOn]}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 function ViewFlip({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
   const seg = (k: ViewMode, label: string, hint: string) => {
     const on = view === k;
@@ -772,6 +818,44 @@ const st = StyleSheet.create({
   presetOn: { backgroundColor: T.copper, borderColor: T.copper },
   presetText: { fontSize: 9.5, fontWeight: '800', color: T.copper },
   note: { fontSize: 10, color: T.muted, lineHeight: 14 },
+
+  sourceTabs: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.sub,
+    borderRadius: 9,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: T.border,
+    minWidth: 204,
+    height: 34,
+  },
+  sourceTabsNarrow: {
+    width: '100%',
+    marginLeft: 0,
+    marginTop: 2,
+  },
+  sourceTab: {
+    flex: 1,
+    minWidth: 62,
+    height: 26,
+    paddingHorizontal: 10,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceTabOn: {
+    backgroundColor: T.copper,
+  },
+  sourceTabText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: T.muted,
+  },
+  sourceTabTextOn: {
+    color: '#fff',
+  },
 
   filters: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   select: {

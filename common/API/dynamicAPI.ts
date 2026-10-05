@@ -16,7 +16,7 @@ import AsyncStorage from '@/common/utils/compatibleStorage';
 export type ErpProperty = 'sudamo_knits' | 'rayons';
 
 const IS_LOCAL = false; 
-const LOCAL_API_URL = 'http://192.168.13.100:4017';
+const LOCAL_API_URL = 'http://192.168.13.100:4018';
 
 const LIVE_API_URLS: Record<ErpProperty, string> = {
   sudamo_knits: 'https://apig.tms-webapp.com',

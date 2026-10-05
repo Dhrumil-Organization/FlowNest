@@ -105,6 +105,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
   'beam-close': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Open/Close' },
   'beam-gaiting/index': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Gaiting' },
+  'weft-carton-issue-new': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Weft Carton Issue' },
 };
 
 // FEATURE: bottom tab bar caps at this many real tabs; anything beyond it

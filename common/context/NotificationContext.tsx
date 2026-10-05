@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { APP_NAVIGATION } from '@/src/core/navigation';
+import { getNewUserResources, newUserCanAccess } from '@/src/core/permissions/newUser';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
@@ -140,7 +141,45 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Weft Issue Return', 'weft-issue-return'],
     ['Sudamo Sales Order Entry', 'sudamo-sales-order-entry'],
     ['Fabric Stock Verification', 'fabric-stock-verification'],
+    ['Weft Carton Issue', 'weft-carton-issue-new'],
 ].map(([name, route]) => ({ name, route }));
+
+// Legacy route / Legacy Home app name (lower-case) -> New ERP route name
+// (the `route` of the navigation node in src/registry/modules/production.module.ts).
+// Modules whose New route equals the Legacy route (new-account-request,
+// outstanding-days-request, party-dashboard, design-authorization,
+// production-report, warehouse, yarn-management-system, feedback,
+// yarn-manufacturing, doff-entry, price-list, event, ...) need no entry here —
+// they resolve directly. Weft Carton Issue and Yarn Sales Order stay Legacy-only.
+const NEW_ROUTE_ALIASES: Record<string, string> = {
+    'credit-limit': 'credit-limit-request',
+    'receivables': 'receivables-screen',
+    'yarn-purchase-order': 'purchase-order',
+    'yarn purchase order': 'purchase-order',
+    'grey-purchase-order': 'grey-order',
+    'snap-view': 'snapview',
+    'payable': 'Payable-Screen',
+    'daily-collection-report': 'daily-report',
+    'sales-order-tracking': 'sales-tracking',
+    'purchase-order-tracking': 'purchase-tracking',
+    'yarn-stock-verification': 'yarnstockverification',
+    'fabric-stock-verification': 'fabricstockverification',
+    'sales order-inactive': 'sales-order-inactive',
+    'sales order(inactive)': 'sales-order-inactive',
+    'process complete auth.': 'process-complete-auth',
+    'febric-stock': 'fabric-stock',
+    'febric stock': 'fabric-stock',
+    'checking-scanner': 'checking-scanner-new',
+    'creel-management-system': 'creel-management-new',
+    'creel-issue-return': 'creel-issue-return-new',
+    'beam-gaiting': 'beam-gaiting-new',
+    'beam-close': 'beam-close-new',
+    'beam close': 'beam-close-new',
+    'poyrateentry': 'poy-rate-entry',
+    'quarterwisedispatch': 'quarter-summary',
+    'sales-order-entry': 'orders',
+    'sales order entry': 'orders',
+};
 
 const getLegacyUserMenuNames = async (): Promise<Set<string>> => {
     const raw = await AsyncStorage.getItem('user_menu_apps');
@@ -313,10 +352,27 @@ const resolveNotificationTarget = async (
         return { path, platform, route: routeEntry.route };
     }
 
-    const item = APP_NAVIGATION.find(
+    let item = APP_NAVIGATION.find(
         (entry) => normalizeRoute(entry.routeName) === normalized ||
             normalizeName(entry.title) === normalizeName(route),
     );
+
+    // The backend may still send the LEGACY route / app name for a module that
+    // has a different route name in the New ERP. Only when the direct lookup
+    // above finds nothing, translate it to the New ERP route. Rights are still
+    // checked below against the New ERP permission of the resolved screen.
+    if (!item) {
+        const aliasRoute =
+            NEW_ROUTE_ALIASES[normalized] || NEW_ROUTE_ALIASES[normalizeName(route)];
+        if (aliasRoute) {
+            item = APP_NAVIGATION.find(
+                (entry) => normalizeRoute(entry.routeName) === normalizeRoute(aliasRoute),
+            );
+            if (item) {
+                console.log('🔁 [NOTIFICATION ROUTE] Legacy route mapped to New:', route, '->', item.routeName);
+            }
+        }
+    }
 
     if (!item) {
         console.log('❌ [NOTIFICATION ROUTE] New route not registered:', route);
@@ -326,12 +382,21 @@ const resolveNotificationTarget = async (
     const appSession = useAppSessionStore.getState().appSession;
     const user = useAppSessionStore.getState().user;
 
-    const allowed = canAccessNewResource(
-        appSession,
+    // NEW USER (login `role1` empty) gets a fixed module set — the same rule
+    // PermissionProvider applies to the tabs / route guard.
+    const newUserResources = getNewUserResources(
+        useAppSessionStore.getState().rawLoginResponse,
         user,
-        item.resource,
-        item.action,
     );
+
+    const allowed = newUserResources
+        ? newUserCanAccess(newUserResources, item.resource)
+        : canAccessNewResource(
+            appSession,
+            user,
+            item.resource,
+            item.action,
+        );
 
     console.log('🔐 [NOTIFICATION ROUTE] New rights:', {
         resource: item.resource,

@@ -414,4 +414,4 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, color: T.ink, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
   bioTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
   bioSub: { color: T.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-});
+});

@@ -12,11 +12,31 @@ import AppAlert from '@/common/utils/appAlert';
 // prpdbconfig, email_password, usermenu, etc.) is read or displayed —
 // only fields that belong on a profile screen.
 // ─────────────────────────────────────────────────────────────
+//
+// DELETE ACCOUNT — same as the Legacy profile screen
+// (components/ProfileScreen/index.tsx -> handleDeleteAccount):
+//   two confirmations ("Delete Account" -> "Final Confirmation"), then
+//   POST {API}/api/delete_account  body {}  headers Authorization: Bearer,
+//   Content-Type: application/json, X-Requested-With: XMLHttpRequest.
+//   success === true -> "Account Deleted" alert, the whole local storage is
+//   cleared (deleteAcoountSession) and the user is sent out of the app;
+//   request error -> "Deletion Failed" alert.
+// New ERP additions: the saved Auto Login / property-switch credentials of
+// the deleted account are removed from the device too, and the user lands on
+// the same screen as New ERP "Sign out" (landing) instead of the Legacy login.
+// ─────────────────────────────────────────────────────────────
+import { API } from '@/common/API/dynamicAPI';
+import { deleteAcoountSession } from '@/common/utils/profileStorage';
 import { SubScreenHeader } from '@/src/components/layout/SubScreenHeader';
+import { getActiveNewErpProperty } from '@/src/core/authFlow';
+import { clearCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
+import { forgetRememberedLogin } from '@/src/lib/rememberedLogin';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
-import React from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+import React, { useState } from 'react';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function getInitials(u: any): string {
@@ -83,6 +103,8 @@ function SectionCard({ title, children, style }: { title: string; children: Reac
 
 export default function ProfileScreen() {
   const logout = useAppSessionStore((s) => s.logout);
+  const token = useAppSessionStore((s) => s.token);
+  const [deleting, setDeleting] = useState(false);
   const sessionUser = useAppSessionStore((s) => s.user);
   const rawLoginResponse = useAppSessionStore((s) => s.rawLoginResponse);
 
@@ -110,6 +132,88 @@ export default function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
     ]);
+
+  // Legacy: handleDeleteAccount -> "Delete Permanently"
+  const deleteAccount = async () => {
+    if (deleting) return;
+    try {
+      setDeleting(true);
+
+      const headers = {
+        Authorization: `Bearer ${token || ''}`,
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      };
+
+      const response = await axios.post(
+        `${API}/api/delete_account`,
+        {}, // body
+        { headers }, // config
+      );
+
+      if (response.data.success === true) {
+        console.log('DELETE ACCOUNT API RESPONSE =>', response?.data);
+
+        AppAlert.alert('Account Deleted', 'Your account has been permanently deleted.');
+
+        // The deleted account's saved password must not stay on the device.
+        try {
+          const property = await getActiveNewErpProperty();
+          await forgetRememberedLogin(property);
+          await clearCredentialsForPropertySwitch();
+        } catch (e) {
+          console.log('DELETE ACCOUNT: saved login cleanup failed', e);
+        }
+
+        await deleteAcoountSession(); // legacy: AsyncStorage.clear()
+        setDeleting(false);
+        await logout(); // resets the New ERP session store and opens the landing screen
+        return;
+      }
+
+      // Legacy left the loader spinning when the server answered without
+      // success:true. Stop it and tell the user the account was NOT deleted.
+      setDeleting(false);
+      AppAlert.alert(
+        'Deletion Failed',
+        String(response?.data?.message || 'Unable to delete your account at this time. Please try again later.'),
+      );
+    } catch (error) {
+      setDeleting(false);
+      console.log('DELETE ACCOUNT ERROR =>', error);
+
+      AppAlert.alert(
+        'Deletion Failed',
+        'Unable to delete your account at this time. Please try again later.',
+      );
+    }
+  };
+
+  // Legacy: handleDeleteAccount (same two confirmations, same texts)
+  const confirmDeleteAccount = () => {
+    if (deleting) return;
+    AppAlert.alert(
+      'Delete Account',
+      'This will permanently delete your FlowNest account and remove your personal data associated with this account. This action cannot be undone.',
+      [
+        { text: 'Keep Account', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            AppAlert.alert(
+              'Final Confirmation',
+              'Are you absolutely sure you want to permanently delete your account? Once deleted, you will lose access to your account, profile information, and app data.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete Permanently', style: 'destructive', onPress: () => void deleteAccount() },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
@@ -189,9 +293,44 @@ export default function ProfileScreen() {
         )}
 
         {/* Sign out */}
-        <TouchableOpacity style={[st.signOutBtn, isWide && st.signOutBtnWide]} onPress={confirmSignOut} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[st.signOutBtn, isWide && st.signOutBtnWide, deleting && st.btnDisabled]}
+          onPress={confirmSignOut}
+          disabled={deleting}
+          activeOpacity={0.85}
+        >
           <Text style={st.signOutBtnText}>Sign Out</Text>
         </TouchableOpacity>
+
+        {/* Delete account (same flow as the Legacy profile screen) */}
+        <View style={[st.dangerCard, isWide && st.dangerCardWide]}>
+          <View style={st.dangerHead}>
+            <View style={st.dangerIcon}>
+              <Icon name="delete-outline" size={20} color={T.red} />
+            </View>
+            <View style={st.dangerTextWrap}>
+              <Text style={st.dangerTitle}>Delete Account</Text>
+              <Text style={st.dangerSub}>
+                Permanently deletes your account and the personal data linked to it. This cannot be undone.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[st.deleteBtn, deleting && st.btnDisabled]}
+            onPress={confirmDeleteAccount}
+            disabled={deleting}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Delete Account"
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon name="delete" size={18} color="#fff" />
+            )}
+            <Text style={st.deleteBtnText}>{deleting ? 'Deleting…' : 'Delete Account'}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 24 }} />
        </View>
@@ -315,4 +454,39 @@ const st = StyleSheet.create({
   },
   signOutBtnWide: { alignSelf: 'center', width: '100%', maxWidth: 360 },
   signOutBtnText: { color: T.red, fontWeight: '700', fontSize: 14, letterSpacing: 0.3 },
+  btnDisabled: { opacity: 0.55 },
+
+  dangerCard: {
+    marginTop: 18,
+    backgroundColor: T.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: `${T.red}55`,
+    padding: 14,
+    gap: 12,
+  },
+  dangerCardWide: { alignSelf: 'center', width: '100%', maxWidth: 520 },
+  dangerHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  dangerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${T.red}14`,
+  },
+  dangerTextWrap: { flex: 1, minWidth: 0 },
+  dangerTitle: { fontSize: 14, fontWeight: '800', color: T.ink },
+  dangerSub: { marginTop: 2, fontSize: 12, lineHeight: 17, fontWeight: '500', color: T.muted },
+  deleteBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: T.red,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  deleteBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 0.3 },
 });

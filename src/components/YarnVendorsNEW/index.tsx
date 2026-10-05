@@ -1,38 +1,40 @@
 // ─────────────────────────────────────────────────────────────
 // FILE: src/components/YarnVendorsNEW/index.tsx
-// NEW ERP — Yarn Vendors (AI chat with Claude).
+// NEW ERP — Yarn Vendors (AI vendor search → preview → Excel).
 //
-// The user sends a message, Claude answers. NOTHING is stored (no table on the
-// backend, no storage in the app):
-//   - the conversation lives only in this component's state;
-//   - it is cleared when the user leaves the screen (blur), opens it again,
-//     switches property / logs in again (the wrapper remounts it), or taps
-//     "New chat". While the screen is open the full conversation is kept and
-//     sent as context, so replies stay consistent like a real AI chat.
+// The screen has ONLY two inputs:
+//   1. Yarn item  (required)   e.g. "150 Denier Polyester FDY"
+//   2. City       (optional)   INDIAN cities only — empty = all India
+// Both accept several values separated by commas (max 5 each). All items and
+// all cities go to the backend in ONE request, which asks Claude ONCE for every
+// item in every city. Each party is kept only when it is located in the city it
+// is listed under, and a "Results by item and city" table shows how many
+// parties each combination gave. An item name may
+// contain any characters — only a comma separates two items.
+// There is no free chat: these two values are the only thing sent
+// (POST /api/yarn-vendors-chat { item, city }, Bearer token — ./api.ts).
+// The backend builds the question for Claude with its strict rules, Claude
+// searches the web and returns a fixed list: party name, what the party calls
+// the item, rate, contact no, address, city, state, remarks, source page.
 //
-// A chat screen: the request goes to the ERP backend (POST /api/yarn-vendors-chat,
-// Bearer token) which calls Claude — see ./api.ts. The API key and the strict
-// chat rules live on the backend (config/yarnvendorschat.php), not in the app.
+// The result is shown as an Excel preview (the same sheet data that is written
+// to the file — ./excel.ts) or as cards, and can be downloaded as .xlsx.
 //
-// Behaviour:
-//   - each message shows its real send / receive time; a day chip separates days
-//   - typing indicator while Claude is answering, Stop button to cancel
-//   - a failed message stays in the chat marked "Not sent" with Retry
-//     (it is not sent again as context unless retried)
-//   - Enter sends on web (Shift+Enter = new line); the send button on phones
-//   - long-press / copy icon copies a message
+// Nothing is stored: the result lives only in this component's state and is
+// cleared when the user leaves the screen, logs in again / switches property,
+// or runs a new search.
 // ─────────────────────────────────────────────────────────────
 import { AppAlert } from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { NavigationContext } from '@react-navigation/native';
-import * as Clipboard from 'expo-clipboard';
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
+  ActivityIndicator,
+  Keyboard,
+  Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -40,112 +42,85 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
-import { ChatError, ChatTurn, sendToClaude } from './api';
-import { MAX_INPUT_CHARS, SUGGESTIONS, WELCOME_TEXT } from './config';
+import { previewStyle } from '../VisitorsReportNEW/xlsxLite';
+import { Coverage, SearchError, SearchResult, searchVendors, Vendor } from './api';
+import { ITEM_EXAMPLES, MAX_CITIES, MAX_CITY_BOX_CHARS, MAX_ITEM_BOX_CHARS, MAX_ITEMS, splitList } from './config';
+import { buildSheet, downloadExcel, excelFileName, HEADER_ROWS, NOTICE, searchedCities, searchedItems } from './excel';
 
 type Props = { token?: string; API?: string; username?: string };
+type View2 = 'excel' | 'cards';
 
-type ChatMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  /** When the user sent it / when Claude's reply arrived (device clock). */
-  at: number;
-  /** User message whose request failed — excluded from context until retried. */
-  failed?: boolean;
-  /** Why it failed (shown under the bubble). */
-  error?: string;
-};
-
-type Row =
-  | { kind: 'day'; key: string; label: string }
-  | { kind: 'msg'; key: string; msg: ChatMessage }
-  | { kind: 'typing'; key: string };
-
-let seq = 0;
-const newId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
-
-/* ------------------------------ time helpers ----------------------------- */
 const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
 
-/** 12-hour clock, e.g. "9:05 AM" (built by hand: locale APIs differ per device). */
-export const formatTime = (ms: number) => {
-  const d = new Date(ms);
-  const h = d.getHours();
-  return `${h % 12 === 0 ? 12 : h % 12}:${pad(d.getMinutes())} ${h < 12 ? 'AM' : 'PM'}`;
-};
-
+/** "2026-10-05 16:20:11" -> "05 Oct 2026, 4:20 PM" */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const dayKey = (ms: number) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-};
-const dayLabel = (ms: number) => {
-  const now = new Date();
-  if (dayKey(ms) === dayKey(now.getTime())) return 'Today';
-  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (dayKey(ms) === dayKey(y.getTime())) return 'Yesterday';
-  const d = new Date(ms);
-  return `${pad(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+export const prettyStamp = (stamp: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(stamp || '');
+  if (!m) return stamp || '';
+  const h = Number(m[4]);
+  return `${m[3]} ${MONTHS[Number(m[2]) - 1] || m[2]} ${m[1]}, ${h % 12 === 0 ? 12 : h % 12}:${m[5]} ${h < 12 ? 'AM' : 'PM'}`;
 };
 
-/* ------------------------------ typing dots ------------------------------ */
-function TypingDots() {
-  const dots = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
-  useEffect(() => {
-    const loops = dots.map((v, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 160),
-          Animated.timing(v, { toValue: 1, duration: 320, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(v, { toValue: 0.3, duration: 320, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.delay((2 - i) * 160),
-        ]),
-      ),
-    );
-    loops.forEach((l) => l.start());
-    return () => loops.forEach((l) => l.stop());
-  }, [dots]);
-  return (
-    <View style={s.dots} accessibilityLabel="Assistant is typing">
-      {dots.map((v, i) => (
-        <Animated.View key={i} style={[s.dot, { opacity: v }]} />
-      ))}
-    </View>
-  );
-}
+/** First phone number in a contact text, digits and + only (for tel:). */
+const dialable = (contact: string) => {
+  const first = (contact || '').split(/[,;/]| or /i)[0] || '';
+  const digits = first.replace(/[^0-9+]/g, '');
+  return digits.replace(/\D/g, '').length >= 8 ? digits : '';
+};
 
-/* --------------------------------- screen -------------------------------- */
+const hostOf = (url: string) => {
+  const m = /^https?:\/\/(?:www\.)?([^/?#]+)/i.exec(url || '');
+  return m ? m[1] : '';
+};
+
+const open = (url: string) => {
+  if (!url) return;
+  Linking.openURL(url).catch(() => AppAlert.alert('Could not open', 'This link could not be opened on this device.'));
+};
+
 export default function YarnVendorsNEW({ token, API, username }: Props) {
   const { width } = useWindowDimensions();
   const phone = width < 768;
-  const bubbleMax = phone ? '86%' : '72%';
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [waiting, setWaiting] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [item, setItem] = useState('');
+  const [city, setCity] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [result, setResult] = useState<SearchResult | null>(null);
+  const [error, setError] = useState('');
+  const [itemError, setItemError] = useState('');
+  const [cityError, setCityError] = useState('');
+  const [view, setView] = useState<View2 | null>(null); // null = default for the screen size
+  const [saving, setSaving] = useState(false);
+  /** What is being searched right now (shown in the progress panel). */
+  const [searching, setSearching] = useState<{ item: string; area: string } | null>(null);
 
-  const listRef = useRef<any>(null);
   const abortRef = useRef<any>(null);
-  const runRef = useRef(0); // bumps on every send / clear so a late reply of an old run is ignored
+  const runRef = useRef(0);
   const mountedRef = useRef(true);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  messagesRef.current = messages;
+  const cityRef = useRef<any>(null);
 
-  // Token + API host come from ErpSessionGate (same as every production screen).
-  const configured = Boolean(token && API);
+  const signedIn = Boolean(token && API);
+  // What the two boxes currently hold, split on commas (shown as chips).
+  const itemList = useMemo(() => splitList(item), [item]);
+  const cityList = useMemo(() => splitList(city), [city]);
+  const activeView: View2 = view || (phone ? 'cards' : 'excel');
 
   /* ------------------------------ lifecycle ------------------------------ */
-  const resetChat = useCallback(() => {
+  const resetAll = useCallback(() => {
     runRef.current++;
     abortRef.current?.abort();
     abortRef.current = null;
-    setMessages([]);
-    setInput('');
-    setWaiting(false);
-    setCopiedId(null);
+    setLoading(false);
+    setSearching(null);
+    setResult(null);
+    setError('');
+    setItemError('');
+    setCityError('');
+    setItem('');
+    setCity('');
+    setView(null);
   }, []);
 
   useEffect(() => {
@@ -157,385 +132,640 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     };
   }, []);
 
-  // Leaving the screen clears the chat (tabs keep screens mounted, so this
-  // cannot rely on unmount alone).
+  // Leaving the screen clears everything (tabs keep screens mounted).
   const navigation = useContext(NavigationContext);
   useEffect(() => {
     if (!navigation) return undefined;
-    return navigation.addListener('blur', () => resetChat());
-  }, [navigation, resetChat]);
+    return navigation.addListener('blur', () => resetAll());
+  }, [navigation, resetAll]);
 
-  /* -------------------------------- send --------------------------------- */
-  const runRequest = useCallback(async (history: ChatMessage[], userMsgId: string) => {
+  // Seconds counter while a search is running.
+  useEffect(() => {
+    if (!loading) return undefined;
+    setElapsed(0);
+    const started = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [loading]);
+
+  /* -------------------------------- search ------------------------------- */
+  const runSearch = useCallback(async (rawItem?: string) => {
+    if (loading) return;
+    // Both boxes may hold several comma separated values.
+    const itemList = splitList(rawItem ?? item);
+    const cityList = splitList(city);
+    const it = itemList.join(', ');
+    const ct = cityList.join(', ');
+    if (itemList.length === 0) {
+      setItemError('Enter a yarn item name.');
+      return;
+    }
+    if (itemList.length > MAX_ITEMS) {
+      setItemError(`Enter at most ${MAX_ITEMS} yarn items at a time.`);
+      return;
+    }
+    if (cityList.length > MAX_CITIES) {
+      setCityError(`Enter at most ${MAX_CITIES} cities at a time.`);
+      return;
+    }
+    Keyboard.dismiss();
+    setItemError('');
+    setCityError('');
+    setError('');
+    setResult(null);
+    setView(null);
+    if (rawItem !== undefined) setItem(it);
+
     const run = ++runRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    setWaiting(true);
-
-    // Context = every message that really went through, in order.
-    const turns: ChatTurn[] = history
-      .filter((m) => !m.failed)
-      .map((m) => ({ role: m.role, content: m.text }));
-
+    setSearching({ item: it, area: ct || 'All India' });
+    setLoading(true);
     try {
-      const reply = await sendToClaude(API || '', token || '', turns, controller.signal);
+      const r = await searchVendors(API || '', token || '', it, ct, controller.signal);
       if (!mountedRef.current || run !== runRef.current) return;
-      setMessages((prev) => [...prev, { id: newId(), role: 'assistant', text: reply, at: Date.now() }]);
+      setResult(r);
     } catch (e: any) {
       if (!mountedRef.current || run !== runRef.current) return;
-      const err = e instanceof ChatError ? e : new ChatError('server', e?.message || 'Something went wrong.');
-      const note = err.kind === 'cancelled' ? 'Stopped before the answer arrived.' : err.message;
-      setMessages((prev) => prev.map((m) => (m.id === userMsgId ? { ...m, failed: true, error: note } : m)));
+      const err = e instanceof SearchError ? e : new SearchError('server', e?.message || 'Something went wrong.');
+      if (err.kind === 'invalid') {
+        if (/cit(y|ies)/i.test(err.message)) setCityError(err.message);
+        else setItemError(err.message);
+      }
+      else if (err.kind !== 'cancelled') setError(err.message);
     } finally {
       if (mountedRef.current && run === runRef.current) {
         abortRef.current = null;
-        setWaiting(false);
+        setLoading(false);
+        setSearching(null);
       }
     }
-  }, [API, token]);
+  }, [API, city, item, loading, token]);
 
-  const send = useCallback((raw?: string) => {
-    if (waiting) return;
-    const text = (raw ?? input).trim();
-    if (!text) return;
-    const msg: ChatMessage = { id: newId(), role: 'user', text, at: Date.now() };
-    const next = [...messagesRef.current, msg];
-    setMessages(next);
-    setInput('');
-    void runRequest(next, msg.id);
-  }, [input, runRequest, waiting]);
-
-  const retry = useCallback((id: string) => {
-    if (waiting) return;
-    const current = messagesRef.current;
-    const failed = current.find((m) => m.id === id);
-    if (!failed) return;
-    // Move it to the end as a fresh send (new time), so the order shown is the
-    // order Claude receives.
-    const fresh: ChatMessage = { id: newId(), role: 'user', text: failed.text, at: Date.now() };
-    const next = [...current.filter((m) => m.id !== id), fresh];
-    setMessages(next);
-    void runRequest(next, fresh.id);
-  }, [runRequest, waiting]);
-
-  const stop = useCallback(() => {
+  const cancel = useCallback(() => {
     abortRef.current?.abort();
   }, []);
 
-  const confirmNewChat = useCallback(() => {
-    if (messagesRef.current.length === 0 && !waiting) return;
-    AppAlert.alert('Start a new chat?', 'The current conversation will be cleared. It is not saved anywhere.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => resetChat() },
-    ]);
-  }, [resetChat, waiting]);
-
-  const copy = useCallback(async (m: ChatMessage) => {
+  const save = useCallback(async () => {
+    if (!result || saving) return;
+    setSaving(true);
     try {
-      await Clipboard.setStringAsync(m.text);
-      setCopiedId(m.id);
-      setTimeout(() => {
-        if (mountedRef.current) setCopiedId((cur) => (cur === m.id ? null : cur));
-      }, 1500);
-    } catch {
-      // clipboard not available — nothing to do
+      await downloadExcel(result, username || '');
+    } catch (e: any) {
+      AppAlert.alert('Excel', e?.message || 'The Excel file could not be saved.');
+    } finally {
+      if (mountedRef.current) setSaving(false);
     }
-  }, []);
+  }, [result, saving, username]);
 
-  /* -------------------------------- rows --------------------------------- */
-  const rows = useMemo<Row[]>(() => {
-    const out: Row[] = [];
-    let lastDay = '';
-    messages.forEach((m) => {
-      const k = dayKey(m.at);
-      if (k !== lastDay) {
-        lastDay = k;
-        out.push({ kind: 'day', key: `day-${k}-${m.id}`, label: dayLabel(m.at) });
-      }
-      out.push({ kind: 'msg', key: m.id, msg: m });
-    });
-    if (waiting) out.push({ kind: 'typing', key: 'typing' });
-    return out;
-  }, [messages, waiting]);
+  const sheet = useMemo(() => (result && result.status === 'ok' ? buildSheet(result, username || '') : null), [result, username]);
 
-  const scrollToEnd = useCallback(() => {
-    requestAnimationFrame(() => listRef.current?.scrollToEnd?.({ animated: true }));
-  }, []);
-  useEffect(() => {
-    if (rows.length > 0) scrollToEnd();
-  }, [rows.length, scrollToEnd]);
-
-  /* ------------------------------- render -------------------------------- */
-  const renderRow = ({ item }: { item: Row }) => {
-    if (item.kind === 'day') {
-      return (
-        <View style={s.dayRow}>
-          <Text style={s.dayChip}>{item.label}</Text>
-        </View>
-      );
+  /* -------------------------------- render ------------------------------- */
+  const onEnter = (e: any, action: () => void) => {
+    if (e?.nativeEvent?.key === 'Enter') {
+      e.preventDefault?.();
+      action();
     }
-    if (item.kind === 'typing') {
-      return (
-        <View style={[s.msgRow, s.rowLeft]}>
-          <View style={s.aiAvatar}><Icon name="auto-awesome" size={15} color="#fff" /></View>
-          <View style={[s.bubble, s.aiBubble, { paddingVertical: 14 }]}><TypingDots /></View>
-        </View>
-      );
-    }
-    const m = item.msg;
-    const mine = m.role === 'user';
-    return (
-      <View style={[s.msgRow, mine ? s.rowRight : s.rowLeft]}>
-        {!mine ? <View style={s.aiAvatar}><Icon name="auto-awesome" size={15} color="#fff" /></View> : null}
-        <View style={{ maxWidth: bubbleMax as any, minWidth: 0, flexShrink: 1, alignItems: mine ? 'flex-end' : 'flex-start' }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onLongPress={() => void copy(m)}
-            delayLongPress={350}
-            style={[s.bubble, mine ? s.userBubble : s.aiBubble, m.failed && s.failedBubble]}
-          >
-            {mine ? (
-              <Text style={s.userText} selectable>{m.text}</Text>
-            ) : (
-              <Markdown style={mdStyles as any}>{m.text}</Markdown>
-            )}
-          </TouchableOpacity>
+  };
 
-          <View style={[s.metaRow, mine && { justifyContent: 'flex-end' }]}>
-            {m.failed ? (
-              <>
-                <Icon name="error-outline" size={13} color={T.red} />
-                <Text style={[s.meta, { color: T.red }]}>Not sent</Text>
-                <Text style={s.meta}>· {formatTime(m.at)}</Text>
-              </>
-            ) : (
-              <>
-                <Text style={s.meta}>{formatTime(m.at)}</Text>
-                {mine ? <Icon name="done" size={13} color={T.muted} /> : null}
-              </>
-            )}
-            {!m.failed ? (
-              <TouchableOpacity onPress={() => void copy(m)} hitSlop={HIT} accessibilityLabel="Copy message" style={s.metaBtn}>
-                <Icon name={copiedId === m.id ? 'check' : 'content-copy'} size={13} color={copiedId === m.id ? T.green : T.muted} />
-                {copiedId === m.id ? <Text style={[s.meta, { color: T.green }]}>Copied</Text> : null}
+  const form = (
+    <View style={[s.card, S.card]}>
+      <View style={[s.fields, phone && { flexDirection: 'column' }]}>
+        <View style={[s.field, !phone && { flex: 3 }]}>
+          <Text style={s.label}>Yarn item <Text style={{ color: T.red }}>*</Text></Text>
+          <View style={[s.inputBox, !!itemError && { borderColor: T.red }]}>
+            <Icon name="grain" size={18} color={T.muted} />
+            <TextInput
+              value={item}
+              onChangeText={(t) => { setItem(t.replace(/[\r\n]+/g, ' ').slice(0, MAX_ITEM_BOX_CHARS)); if (itemError) setItemError(''); }}
+              placeholder="e.g. 150 Denier Polyester FDY"
+              placeholderTextColor={T.muted}
+              style={s.input}
+              maxLength={MAX_ITEM_BOX_CHARS}
+              editable={!loading && signedIn}
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => cityRef.current?.focus?.()}
+              onKeyPress={(e: any) => { if (Platform.OS === 'web') onEnter(e, () => void runSearch()); }}
+              accessibilityLabel="Yarn item name"
+            />
+            {item.length > 0 && !loading ? (
+              <TouchableOpacity onPress={() => setItem('')} hitSlop={HIT} accessibilityLabel="Clear item">
+                <Icon name="close" size={18} color={T.muted} />
               </TouchableOpacity>
             ) : null}
           </View>
-
-          {m.failed ? (
-            <View style={[s.failBox, mine && { alignItems: 'flex-end' }]}>
-              {m.error ? <Text style={s.failText}>{m.error}</Text> : null}
-              <TouchableOpacity
-                onPress={() => retry(m.id)}
-                disabled={waiting}
-                style={[s.retryBtn, waiting && { opacity: 0.5 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Retry sending"
-              >
-                <Icon name="refresh" size={15} color={T.red} />
-                <Text style={s.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
+          {itemError
+            ? <Text style={s.fieldError}>{itemError}</Text>
+            : <Text style={s.hint}>Any name or symbols are fine. A comma starts the next item (max {MAX_ITEMS}).</Text>}
+          <ValueChips values={itemList} max={MAX_ITEMS} />
         </View>
-      </View>
-    );
-  };
 
-  const empty = (
-    <View style={s.empty}>
-      <View style={s.emptyIcon}><Icon name="auto-awesome" size={26} color="#fff" /></View>
-      <Text style={s.emptyTitle}>Yarn Vendors Assistant</Text>
-      <Text style={s.emptyText}>{WELCOME_TEXT}</Text>
-      {configured ? (
-        <View style={s.suggestions}>
-          {SUGGESTIONS.map((q) => (
-            <TouchableOpacity key={q} style={s.suggestion} onPress={() => send(q)} activeOpacity={0.8}>
-              <Icon name="north-east" size={14} color={T.copper} />
-              <Text style={s.suggestionText}>{q}</Text>
+        <View style={[s.field, !phone && { flex: 2 }]}>
+          <Text style={s.label}>City in India <Text style={s.optional}>(optional)</Text></Text>
+          <View style={[s.inputBox, !!cityError && { borderColor: T.red }]}>
+            <Icon name="place" size={18} color={T.muted} />
+            <TextInput
+              ref={cityRef}
+              value={city}
+              onChangeText={(t) => { setCity(t.replace(/[\r\n]+/g, ' ').slice(0, MAX_CITY_BOX_CHARS)); if (cityError) setCityError(''); }}
+              placeholder="e.g. Surat, Mumbai"
+              placeholderTextColor={T.muted}
+              style={s.input}
+              maxLength={MAX_CITY_BOX_CHARS}
+              editable={!loading && signedIn}
+              autoCorrect={false}
+              autoCapitalize="words"
+              returnKeyType="search"
+              onSubmitEditing={() => void runSearch()}
+              onKeyPress={(e: any) => { if (Platform.OS === 'web') onEnter(e, () => void runSearch()); }}
+              accessibilityLabel="City"
+            />
+            {city.length > 0 && !loading ? (
+              <TouchableOpacity onPress={() => setCity('')} hitSlop={HIT} accessibilityLabel="Clear city">
+                <Icon name="close" size={18} color={T.muted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          {cityError
+            ? <Text style={s.fieldError}>{cityError}</Text>
+            : <Text style={s.hint}>Only cities of India. For several cities put a comma between them (max {MAX_CITIES}). Empty = all India.</Text>}
+          <ValueChips values={cityList} max={MAX_CITIES} />
+        </View>
+
+        <TouchableOpacity
+          style={[s.searchBtn, phone && { alignSelf: 'stretch', marginTop: 0 }, (loading || !signedIn) && { opacity: 0.55 }]}
+          onPress={() => void runSearch()}
+          disabled={loading || !signedIn}
+          accessibilityRole="button"
+          accessibilityLabel="Find vendors"
+        >
+          <Icon name="travel-explore" size={19} color="#fff" />
+          <Text style={s.searchBtnText}>Find vendors</Text>
+        </TouchableOpacity>
+      </View>
+
+      {itemList.length * Math.max(1, cityList.length) > 1 && !loading ? (
+        <Text style={s.pairs}>
+          {itemList.length} {itemList.length === 1 ? 'item' : 'items'} x {cityList.length || 1} {cityList.length > 1 ? 'cities' : cityList.length === 1 ? 'city' : 'area (all India)'} = {itemList.length * Math.max(1, cityList.length)} combinations in one search. Fewer combinations give more parties for each.
+        </Text>
+      ) : null}
+
+      {!result && !loading ? (
+        <View style={s.examples}>
+          <Text style={s.examplesLabel}>Try</Text>
+          {ITEM_EXAMPLES.map((ex) => (
+            <TouchableOpacity key={ex} style={s.example} onPress={() => { setItem(ex); setItemError(''); }} disabled={!signedIn}>
+              <Text style={s.exampleText}>{ex}</Text>
             </TouchableOpacity>
           ))}
         </View>
       ) : null}
-      <Text style={s.privacy}>This chat is not saved. It clears when you leave this screen.</Text>
+
+      {!signedIn ? (
+        <View style={s.warn}>
+          <Icon name="link-off" size={18} color={T.pd} />
+          <Text style={s.warnText}>Your login session was not found. Please sign in again.</Text>
+        </View>
+      ) : null}
     </View>
   );
 
-  const canSend = input.trim().length > 0 && !waiting;
+  const progress = loading && searching ? (
+    <View style={[s.card, S.card, s.centerCard]}>
+      <ActivityIndicator size="large" color={T.copper} />
+      <Text style={s.bigTitle}>Searching the web…</Text>
+      <Text style={s.centerText}>
+        Finding parties that sell <Text style={s.bold}>{searching.item}</Text> in <Text style={s.bold}>{searching.area}</Text>.{searching.item.includes(',') || searching.area.includes(',') ? ' Every item is covered in every city.' : ''}
+      </Text>
+      <Text style={s.timer}>{clock(elapsed)}</Text>
+      <Text style={s.hintCenter}>This usually takes 30 seconds to 2 minutes. Keep this screen open.</Text>
+      <TouchableOpacity style={s.ghostBtn} onPress={cancel} accessibilityRole="button" accessibilityLabel="Cancel search">
+        <Icon name="close" size={16} color={T.red} />
+        <Text style={[s.ghostBtnText, { color: T.red }]}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  ) : null;
 
-  return (
-    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}>
-      <View style={s.page}>
-        {/* toolbar */}
-        <View style={s.toolbar}>
-          <View style={[s.status, { backgroundColor: configured ? `${T.green}14` : `${T.amber}1F` }]}>
-            <View style={[s.statusDot, { backgroundColor: configured ? T.green : T.amber }]} />
-            <Text style={[s.statusText, { color: configured ? T.green : T.pd }]} numberOfLines={1}>
-              {configured ? 'Claude AI' : 'Not signed in'}
-            </Text>
+  const errorBox = error && !loading ? (
+    <View style={[s.card, s.errorCard]}>
+      <Icon name="error-outline" size={22} color={T.red} />
+      <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
+        <Text style={s.errorText}>{error}</Text>
+        <TouchableOpacity style={[s.ghostBtn, { alignSelf: 'flex-start', borderColor: T.red }]} onPress={() => void runSearch()}>
+          <Icon name="refresh" size={16} color={T.red} />
+          <Text style={[s.ghostBtnText, { color: T.red }]}>Try again</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ) : null;
+
+  const emptyResult = result && result.status !== 'ok' ? (
+    <View style={[s.card, S.card, s.centerCard]}>
+      <Icon name={result.status === 'no_results' ? 'search-off' : 'block'} size={40} color={T.border} />
+      <Text style={s.bigTitle}>
+        {result.status === 'not_yarn_item' ? 'Not a yarn item'
+          : result.status === 'invalid_city' ? 'City not recognised'
+            : 'No parties found'}
+      </Text>
+      <Text style={s.centerText}>
+        {result.status === 'not_yarn_item'
+          ? `"${result.item}" ${result.items.length > 1 ? 'do' : 'does'} not look like ${result.items.length > 1 ? 'yarn items' : 'a yarn item'}. This screen only finds vendors of yarn items.`
+          : result.status === 'invalid_city'
+            ? `"${result.city}" ${result.cities.length > 1 ? 'were' : 'was'} not recognised as ${result.cities.length > 1 ? 'places' : 'a place'} in India. Only Indian cities can be searched — check the spelling, or leave the city empty for all India.`
+            : `No party with a traceable web listing was found for "${result.item}" in ${result.area}. Try a more common item name${result.city ? ', or leave the city empty' : ''}.`}
+      </Text>
+      {result.status === 'no_results' ? <View style={{ alignSelf: 'stretch', gap: 10 }}><SkippedNotes result={result} /><CoverageTable result={result} /></View> : null}
+    </View>
+  ) : null;
+
+  const okResult = result && result.status === 'ok' && sheet ? (
+    <View style={{ gap: 10 }}>
+      {/* summary + actions */}
+      <View style={[s.card, S.card]}>
+        <View style={[s.summary, phone && { flexDirection: 'column', alignItems: 'stretch' }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.eyebrow}>{result.vendors.length} {result.vendors.length === 1 ? 'PARTY' : 'PARTIES'} · {(searchedCities(result).join(', ') || result.area).toUpperCase()}</Text>
+            <Text style={s.summaryTitle} numberOfLines={3}>{searchedItems(result).join(', ') || result.item}</Text>
+            <Text style={s.summaryMeta}>{result.searchedAt ? `Searched ${prettyStamp(result.searchedAt)}` : ''}</Text>
           </View>
-          {username ? <Text style={s.userName} numberOfLines={1}>{username}</Text> : <View style={{ flex: 1 }} />}
           <TouchableOpacity
-            onPress={confirmNewChat}
-            disabled={messages.length === 0 && !waiting}
-            style={[s.newChat, messages.length === 0 && !waiting && { opacity: 0.45 }]}
+            style={[s.downloadBtn, saving && { opacity: 0.6 }]}
+            onPress={() => void save()}
+            disabled={saving}
             accessibilityRole="button"
-            accessibilityLabel="New chat"
+            accessibilityLabel="Download Excel"
           >
-            <Icon name="add-comment" size={16} color={T.nav} />
-            <Text style={s.newChatText}>New chat</Text>
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="file-download" size={19} color="#fff" />}
+            <Text style={s.downloadText}>{Platform.OS === 'web' ? 'Download Excel' : 'Save / share Excel'}</Text>
           </TouchableOpacity>
         </View>
 
-        {!configured ? (
-          <View style={s.banner}>
-            <Icon name="link-off" size={18} color={T.pd} />
-            <Text style={s.bannerText}>
-              Your login session was not found, so messages can not be sent. Please sign in again.
-            </Text>
-          </View>
-        ) : null}
+        <SkippedNotes result={result} />
+        <CoverageTable result={result} />
 
-        {/* conversation */}
-        <FlatList
-          ref={listRef}
-          data={rows}
-          keyExtractor={(r: Row) => r.key}
-          renderItem={renderRow}
-          ListEmptyComponent={empty}
-          contentContainerStyle={[s.listContent, rows.length === 0 && { flexGrow: 1, justifyContent: 'center' }]}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => { if (rows.length > 0) scrollToEnd(); }}
-          showsVerticalScrollIndicator={false}
-        />
+        {result.note ? <Text style={s.note}>{result.note}</Text> : null}
 
-        {/* composer */}
-        <View style={s.composerWrap}>
-          <View style={s.composer}>
-            <TextInput
-              value={input}
-              onChangeText={(t) => setInput(t.length > MAX_INPUT_CHARS ? t.slice(0, MAX_INPUT_CHARS) : t)}
-              placeholder="Ask about yarn vendors…"
-              placeholderTextColor={T.muted}
-              style={s.input}
-              multiline
-              maxLength={MAX_INPUT_CHARS}
-              editable={configured}
-              blurOnSubmit={false}
-              onKeyPress={(e: any) => {
-                // Web / hardware keyboard: Enter sends, Shift+Enter makes a new line.
-                if (Platform.OS === 'web' && e?.nativeEvent?.key === 'Enter' && !e?.nativeEvent?.shiftKey) {
-                  e.preventDefault?.();
-                  send();
-                }
-              }}
-            />
-            {waiting ? (
-              <TouchableOpacity style={[s.sendBtn, { backgroundColor: T.red }]} onPress={stop} accessibilityRole="button" accessibilityLabel="Stop">
-                <Icon name="stop" size={20} color="#fff" />
+        <View style={s.notice}>
+          <Icon name="info-outline" size={16} color={T.pd} />
+          <Text style={s.noticeText}>{NOTICE}</Text>
+        </View>
+
+        <View style={s.toggleRow}>
+          <View style={s.toggle}>
+            {(['excel', 'cards'] as View2[]).map((v) => (
+              <TouchableOpacity key={v} style={[s.toggleBtn, activeView === v && s.toggleOn]} onPress={() => setView(v)} accessibilityRole="button">
+                <Icon name={v === 'excel' ? 'grid-on' : 'view-agenda'} size={15} color={activeView === v ? '#fff' : T.nav} />
+                <Text style={[s.toggleText, activeView === v && { color: '#fff' }]}>{v === 'excel' ? 'Excel preview' : 'Cards'}</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[s.sendBtn, !canSend && s.sendBtnOff]}
-                onPress={() => send()}
-                disabled={!canSend || !configured}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-              >
-                <Icon name="send" size={19} color="#fff" />
-              </TouchableOpacity>
-            )}
+            ))}
           </View>
-          <View style={s.composerFoot}>
-            <Text style={s.footNote} numberOfLines={1}>AI answers can be wrong — verify rates and terms with the vendor.</Text>
-            {input.length > MAX_INPUT_CHARS * 0.8 ? (
-              <Text style={[s.footNote, { color: input.length >= MAX_INPUT_CHARS ? T.red : T.muted }]}>
-                {input.length}/{MAX_INPUT_CHARS}
-              </Text>
-            ) : null}
-          </View>
+          <Text style={s.fileName} numberOfLines={1}>{excelFileName(result)}</Text>
         </View>
       </View>
-    </KeyboardAvoidingView>
+
+      {activeView === 'excel' ? <SheetPreview sheet={sheet} /> : (
+        <View style={[s.cardGrid, !phone && { flexDirection: 'row', flexWrap: 'wrap' }]}>
+          {result.vendors.map((v, i) => (
+            <View key={`${v.party_name}-${i}`} style={phone ? null : { width: width >= 1180 ? '33.33%' : '50%', padding: 5 }}>
+              <VendorCard vendor={v} index={i} showItem={searchedItems(result).length > 1} showArea={searchedCities(result).length > 1} />
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  ) : null;
+
+  const intro = !result && !loading && !error ? (
+    <View style={s.intro}>
+      <View style={s.introIcon}><Icon name="travel-explore" size={26} color="#fff" /></View>
+      <Text style={s.bigTitle}>Find yarn vendors</Text>
+      <Text style={s.centerText}>
+        Enter a yarn item and, if you want, a city of India. You get a list of parties selling it — party name, what
+        they call the item, rate, contact and address — as an Excel sheet you can preview and download. Several items
+        or cities: put a comma between them.
+      </Text>
+      <Text style={s.hintCenter}>Nothing is saved. The list clears when you leave this screen.</Text>
+    </View>
+  ) : null;
+
+  return (
+    <View style={s.root}>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={s.page}>
+          {form}
+          {progress}
+          {errorBox}
+          {emptyResult}
+          {okResult}
+          {intro}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ------------------------------ small pieces ------------------------------ */
+/** The values a box currently holds, shown as chips once there is more than one. */
+function ValueChips({ values, max }: { values: string[]; max: number }) {
+  if (values.length < 2) return null;
+  return (
+    <View style={s.chips}>
+      {values.map((v, i) => (
+        <Text key={`${v}-${i}`} style={[s.chip, i >= max && s.chipOver]} numberOfLines={1}>{v}</Text>
+      ))}
+    </View>
+  );
+}
+
+/** Values that were entered but not searched, and items whose search failed. */
+function SkippedNotes({ result }: { result: SearchResult }) {
+  const lines: string[] = [];
+  if (result.skippedItems.length) lines.push(`Not searched — not a yarn item: ${result.skippedItems.join(', ')}`);
+  if (result.skippedCities.length) lines.push(`Not searched — not a city of India: ${result.skippedCities.join(', ')}`);
+  if (result.failedItems.length) lines.push(`Search could not be completed for: ${result.failedItems.join(', ')}. Search these again.`);
+  if (!lines.length) return null;
+  return (
+    <View style={s.skipped}>
+      <Icon name="error-outline" size={16} color={T.red} />
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        {lines.map((line) => <Text key={line} style={s.skippedText}>{line}</Text>)}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Results by item and city: one row per item, one column per city, the number
+ * of parties each combination gave — so it is clear every item was searched in
+ * every city. Shown only when more than one combination was asked for.
+ */
+function CoverageTable({ result }: { result: SearchResult }) {
+  const cov = result.coverage;
+  if (cov.length < 2) return null;
+  const items = Array.from(new Set(cov.map((x) => x.item)));
+  const areas = Array.from(new Set(cov.map((x) => x.area)));
+  const find = (item: string, area: string): Coverage | undefined => cov.find((x) => x.item === item && x.area === area);
+  const cellOf = (x?: Coverage) => {
+    if (!x) return { text: '', color: T.muted, bg: 'transparent' };
+    if (x.status === 'ok') return { text: String(x.count), color: T.green, bg: `${T.green}14` };
+    if (x.status === 'no_results') return { text: '0', color: T.muted, bg: T.alt };
+    if (x.status === 'failed') return { text: 'Failed', color: T.red, bg: `${T.red}14` };
+    if (x.status === 'invalid_city') return { text: 'Not India', color: T.red, bg: `${T.red}0D` };
+    return { text: 'Not yarn', color: T.red, bg: `${T.red}0D` };
+  };
+  const ITEM_W = 170;
+  const CELL_W = 96;
+  return (
+    <View style={s.cov}>
+      <Text style={s.covTitle}>RESULTS BY ITEM AND CITY (parties found)</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled>
+        <View>
+          <View style={s.covRow}>
+            <View style={[s.covCell, { width: ITEM_W, alignItems: 'flex-start' }]}><Text style={s.covHead}>Yarn item</Text></View>
+            {areas.map((a) => (
+              <View key={a} style={[s.covCell, { width: CELL_W }]}><Text style={s.covHead} numberOfLines={2}>{a}</Text></View>
+            ))}
+          </View>
+          {items.map((it) => (
+            <View key={it} style={s.covRow}>
+              <View style={[s.covCell, { width: ITEM_W, alignItems: 'flex-start' }]}><Text style={s.covItem} numberOfLines={2}>{it}</Text></View>
+              {areas.map((a) => {
+                const cell = cellOf(find(it, a));
+                return (
+                  <View key={a} style={[s.covCell, { width: CELL_W }]}>
+                    <Text style={[s.covValue, { color: cell.color, backgroundColor: cell.bg }]} numberOfLines={1}>{cell.text}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ------------------------------ Excel preview ----------------------------- */
+// Draws the same SheetSpec that is written to the .xlsx (cell styles included).
+const CHAR_W = 7.4;
+
+function SheetPreview({ sheet }: { sheet: ReturnType<typeof buildSheet> }) {
+  const widths = sheet.cols.map((w) => Math.round(w * CHAR_W));
+  const total = widths.reduce((a, b) => a + b, 0);
+  const sourceCol = sheet.cols.length - 1;
+  return (
+    <View style={[s.sheetWrap, S.card]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator persistentScrollbar nestedScrollEnabled>
+        <View style={{ width: total }}>
+          {sheet.rows.map((row, r) => {
+            const titleRow = r < HEADER_ROWS - 1; // merged title / meta rows
+            if (titleRow) {
+              const st = previewStyle(row[0].s);
+              return (
+                <View key={r} style={[s.sheetTitleRow, r === HEADER_ROWS - 2 && { height: 8 }]}>
+                  {row[0].v !== '' ? (
+                    <Text style={{ color: st.color, fontSize: st.size + 1.5, fontWeight: st.bold ? '800' : '500' }} numberOfLines={2}>{String(row[0].v)}</Text>
+                  ) : null}
+                </View>
+              );
+            }
+            return (
+              <View key={r} style={{ flexDirection: 'row' }}>
+                {row.map((cell, ci) => {
+                  const st = previewStyle(cell.s);
+                  const isLink = ci === sourceCol && r >= HEADER_ROWS && typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v);
+                  const text = (
+                    <Text
+                      style={{ color: isLink ? T.blue : st.color, fontSize: st.size + 2, fontWeight: st.bold ? '700' : '400', textAlign: st.align }}
+                      numberOfLines={r === HEADER_ROWS - 1 ? 1 : 4}
+                    >
+                      {String(cell.v)}
+                    </Text>
+                  );
+                  return (
+                    <View key={ci} style={[s.sheetCell, { width: widths[ci], backgroundColor: st.bg }]}>
+                      {isLink ? <TouchableOpacity onPress={() => open(String(cell.v))}>{text}</TouchableOpacity> : text}
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+/* --------------------------------- card ---------------------------------- */
+function Line({ icon, children }: { icon: string; children: React.ReactNode }) {
+  return (
+    <View style={s.line}>
+      <Icon name={icon as any} size={15} color={T.muted} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, minWidth: 0 }}>{children}</View>
+    </View>
+  );
+}
+
+function VendorCard({ vendor, index, showItem, showArea }: { vendor: Vendor; index: number; showItem: boolean; showArea: boolean }) {
+  const tel = dialable(vendor.contact_no);
+  const place = [vendor.city, vendor.state].filter(Boolean).join(', ');
+  return (
+    <View style={[s.vCard, S.card]}>
+      <View style={s.vHead}>
+        <View style={s.vNo}><Text style={s.vNoText}>{index + 1}</Text></View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={s.vName} numberOfLines={2}>{vendor.party_name}</Text>
+          {place ? <Text style={s.vPlace} numberOfLines={1}>{place}</Text> : null}
+        </View>
+        <View style={[s.rate, !vendor.rate && { backgroundColor: T.alt }]}>
+          <Text style={s.rateLabel}>RATE</Text>
+          <Text style={[s.rateText, !vendor.rate && { color: T.muted }]} numberOfLines={2}>{vendor.rate || 'Not listed'}</Text>
+        </View>
+      </View>
+
+      <View style={s.vBody}>
+        {(showItem && vendor.searched_item) || (showArea && vendor.searched_area) ? (
+          <View style={s.tags}>
+            {showItem && vendor.searched_item ? <Text style={s.tag} numberOfLines={1}>{vendor.searched_item}</Text> : null}
+            {showArea && vendor.searched_area ? <Text style={[s.tag, s.tagArea]} numberOfLines={1}>{vendor.searched_area}</Text> : null}
+          </View>
+        ) : null}
+        {vendor.party_item_name ? (
+          <Line icon="label-outline">
+            <Text style={s.k}>Party calls it</Text>
+            <Text style={s.v}>{vendor.party_item_name}</Text>
+          </Line>
+        ) : null}
+        <Line icon="call">
+          <Text style={s.k}>Contact</Text>
+          {vendor.contact_no ? (
+            tel ? (
+              <TouchableOpacity onPress={() => open(`tel:${tel}`)} accessibilityRole="link" accessibilityLabel={`Call ${vendor.contact_no}`}>
+                <Text style={[s.v, { color: T.blue }]}>{vendor.contact_no}</Text>
+              </TouchableOpacity>
+            ) : <Text style={s.v}>{vendor.contact_no}</Text>
+          ) : <Text style={[s.v, { color: T.muted }]}>Not shown on the listing</Text>}
+        </Line>
+        {vendor.address ? (
+          <Line icon="place">
+            <Text style={s.k}>Address</Text>
+            <Text style={s.v}>{vendor.address}</Text>
+          </Line>
+        ) : null}
+        {vendor.remarks ? (
+          <Line icon="notes">
+            <Text style={s.k}>Remarks</Text>
+            <Text style={s.v}>{vendor.remarks}</Text>
+          </Line>
+        ) : null}
+      </View>
+
+      {vendor.source_url ? (
+        <TouchableOpacity style={s.source} onPress={() => open(vendor.source_url)} accessibilityRole="link">
+          <Icon name="open-in-new" size={14} color={T.blue} />
+          <Text style={s.sourceText} numberOfLines={1}>Source: {hostOf(vendor.source_url) || vendor.source_url}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 }
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
-
-const mdStyles = {
-  body: { color: T.ink, fontSize: 14.5, lineHeight: 21 },
-  paragraph: { marginTop: 0, marginBottom: 6 },
-  strong: { fontWeight: '700' },
-  bullet_list: { marginBottom: 6 },
-  ordered_list: { marginBottom: 6 },
-  heading1: { fontSize: 17, fontWeight: '800', color: T.nav, marginBottom: 6 },
-  heading2: { fontSize: 16, fontWeight: '800', color: T.nav, marginBottom: 6 },
-  heading3: { fontSize: 15, fontWeight: '800', color: T.nav, marginBottom: 4 },
-  code_inline: { backgroundColor: T.alt, color: T.ink, borderRadius: 4, paddingHorizontal: 4 },
-  fence: { backgroundColor: T.alt, borderColor: T.border, borderRadius: 8, padding: 8, color: T.ink },
-  code_block: { backgroundColor: T.alt, borderColor: T.border, borderRadius: 8, padding: 8, color: T.ink },
-  table: { borderColor: T.border, borderRadius: 6 },
-  th: { padding: 6, backgroundColor: T.sub },
-  td: { padding: 6 },
-  tr: { borderColor: T.border },
-  link: { color: T.blue },
-  hr: { backgroundColor: T.border },
-};
+const noOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null;
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
+  content: { padding: 12, flexGrow: 1 },
+  page: { width: '100%', maxWidth: 1200, alignSelf: 'center', gap: 10 },
 
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8 },
-  status: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, flexShrink: 1 },
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  userName: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: T.muted, textAlign: 'right' },
-  newChat: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
-  newChatText: { fontSize: 12.5, fontWeight: '700', color: T.nav },
+  card: { backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 14, gap: 12 },
+  centerCard: { alignItems: 'center', paddingVertical: 28, gap: 8 },
 
-  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: `${T.amber}66`, backgroundColor: `${T.amber}14` },
-  bannerText: { flex: 1, minWidth: 0, fontSize: 12.5, lineHeight: 18, color: T.pd, fontWeight: '600' },
+  fields: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  field: { minWidth: 0, alignSelf: 'stretch' },
+  label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 5 },
+  optional: { fontWeight: '600', textTransform: 'none', letterSpacing: 0 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12 },
+  input: { flex: 1, minWidth: 0, height: 44, fontSize: 15, color: T.ink, ...(noOutline || {}) },
+  hint: { fontSize: 11.5, color: T.muted, marginTop: 4 },
+  fieldError: { fontSize: 12, fontWeight: '600', color: T.red, marginTop: 4 },
+  searchBtn: { height: 46, marginTop: 20, paddingHorizontal: 18, borderRadius: 10, backgroundColor: T.copper, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  searchBtnText: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
 
-  listContent: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12 },
-  dayRow: { alignItems: 'center', marginVertical: 8 },
-  dayChip: { fontSize: 11, fontWeight: '700', color: T.muted, backgroundColor: T.alt, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
+  pairs: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: T.muted },
+  cov: { borderWidth: 1, borderColor: T.border, borderRadius: 10, backgroundColor: T.sub, padding: 10, gap: 6 },
+  covTitle: { fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
+  covRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: T.hair },
+  covCell: { paddingHorizontal: 6, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  covHead: { fontSize: 11.5, fontWeight: '800', color: T.nav, textAlign: 'center' },
+  covItem: { fontSize: 12.5, fontWeight: '700', color: T.ink },
+  covValue: { minWidth: 44, textAlign: 'center', fontSize: 12.5, fontWeight: '800', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6 },
+  chip: { maxWidth: '100%', fontSize: 11.5, fontWeight: '700', color: T.nav, backgroundColor: T.alt, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
+  chipOver: { color: T.red, backgroundColor: `${T.red}14` },
+  skipped: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 10, backgroundColor: `${T.red}0D`, borderWidth: 1, borderColor: `${T.red}44` },
+  skippedText: { fontSize: 12.5, lineHeight: 18, color: T.red, fontWeight: '600' },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  tag: { maxWidth: '100%', fontSize: 11, fontWeight: '800', color: T.yd, backgroundColor: `${T.yd}14`, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden' },
+  tagArea: { color: T.pd, backgroundColor: `${T.amber}1F` },
+  examples: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  examplesLabel: { fontSize: 11.5, fontWeight: '700', color: T.muted, marginRight: 2 },
+  example: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 11, borderRadius: 16, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub },
+  exampleText: { fontSize: 12.5, fontWeight: '600', color: T.nav },
 
-  msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 10 },
-  rowLeft: { justifyContent: 'flex-start' },
-  rowRight: { justifyContent: 'flex-end' },
-  aiAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  bubble: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 9, minWidth: 0 },
-  aiBubble: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderBottomLeftRadius: 5, ...S.card },
-  userBubble: { backgroundColor: T.nav, borderBottomRightRadius: 5 },
-  failedBubble: { backgroundColor: T.muted },
-  userText: { color: '#fff', fontSize: 14.5, lineHeight: 21 },
+  warn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: `${T.amber}66`, backgroundColor: `${T.amber}14` },
+  warnText: { flex: 1, minWidth: 0, fontSize: 12.5, color: T.pd, fontWeight: '600' },
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, paddingHorizontal: 4, minHeight: 16 },
-  meta: { fontSize: 10.5, fontWeight: '600', color: T.muted },
-  metaBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
-  failBox: { marginTop: 4, gap: 6, paddingHorizontal: 4 },
-  failText: { fontSize: 12, lineHeight: 17, color: T.red, fontWeight: '600', textAlign: 'right' },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 40, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: T.red, backgroundColor: T.surface },
-  retryText: { fontSize: 12.5, fontWeight: '700', color: T.red },
+  bigTitle: { fontSize: 17, fontWeight: '800', color: T.nav, textAlign: 'center', marginTop: 4 },
+  centerText: { fontSize: 13.5, lineHeight: 20, color: T.muted, textAlign: 'center', maxWidth: 560 },
+  bold: { fontWeight: '800', color: T.ink },
+  timer: { fontSize: 22, fontWeight: '800', color: T.copper, marginTop: 4 },
+  hintCenter: { fontSize: 12, color: T.muted, textAlign: 'center', maxWidth: 520 },
+  ghostBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, marginTop: 6 },
+  ghostBtnText: { fontSize: 13, fontWeight: '700' },
 
-  dots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: T.muted },
+  errorCard: { flexDirection: 'row', alignItems: 'flex-start', borderColor: `${T.red}66`, backgroundColor: `${T.red}0D` },
+  errorText: { fontSize: 13.5, lineHeight: 19, fontWeight: '600', color: T.red },
 
-  empty: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 24, gap: 6 },
-  emptyIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  emptyTitle: { fontSize: 17, fontWeight: '800', color: T.nav, textAlign: 'center' },
-  emptyText: { fontSize: 13.5, lineHeight: 20, color: T.muted, textAlign: 'center', maxWidth: 460 },
-  suggestions: { alignSelf: 'stretch', gap: 8, marginTop: 12, maxWidth: 520, width: '100%', alignItems: 'stretch' },
-  suggestion: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
-  suggestionText: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '600', color: T.ink },
-  privacy: { marginTop: 14, fontSize: 11.5, color: T.muted, textAlign: 'center' },
+  intro: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 30, gap: 6 },
+  introIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center' },
 
-  composerWrap: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10, backgroundColor: T.bg },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingLeft: 14, paddingRight: 5, paddingVertical: 5, ...S.card },
-  input: { flex: 1, minWidth: 0, minHeight: 40, maxHeight: 130, fontSize: 14.5, lineHeight: 20, color: T.ink, paddingTop: 10, paddingBottom: 10, textAlignVertical: 'center', ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null) },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center' },
-  sendBtnOff: { backgroundColor: T.muted, opacity: 0.6 },
-  composerFoot: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingHorizontal: 8, marginTop: 5 },
-  footNote: { fontSize: 10.5, color: T.muted, flexShrink: 1 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  eyebrow: { fontSize: 11, fontWeight: '800', color: T.copper, letterSpacing: 0.8 },
+  summaryTitle: { fontSize: 18, fontWeight: '800', color: T.nav, marginTop: 2 },
+  summaryMeta: { fontSize: 12, color: T.muted, marginTop: 2 },
+  downloadBtn: { height: 46, paddingHorizontal: 18, borderRadius: 10, backgroundColor: T.green, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  downloadText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  note: { fontSize: 13, lineHeight: 19, color: T.ink },
+  notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 10, backgroundColor: `${T.amber}14`, borderWidth: 1, borderColor: `${T.amber}55` },
+  noticeText: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 17, color: T.pd, fontWeight: '600' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  toggle: { flexDirection: 'row', gap: 4, padding: 3, borderRadius: 11, borderWidth: 1, borderColor: T.border, backgroundColor: T.sub },
+  toggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 12, borderRadius: 8 },
+  toggleOn: { backgroundColor: T.nav },
+  toggleText: { fontSize: 12.5, fontWeight: '700', color: T.nav },
+  fileName: { flex: 1, minWidth: 120, fontSize: 11.5, color: T.muted, textAlign: 'right' },
+
+  sheetWrap: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
+  sheetTitleRow: { paddingHorizontal: 10, paddingVertical: 4, justifyContent: 'center' },
+  sheetCell: { paddingHorizontal: 7, paddingVertical: 6, borderRightWidth: 1, borderBottomWidth: 1, borderColor: T.border, justifyContent: 'flex-start' },
+
+  cardGrid: { gap: 10 },
+  vCard: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, overflow: 'hidden', flex: 1 },
+  vHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, backgroundColor: T.sub, borderBottomWidth: 1, borderBottomColor: T.hair },
+  vNo: { width: 26, height: 26, borderRadius: 13, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center' },
+  vNoText: { color: '#fff', fontSize: 11.5, fontWeight: '800' },
+  vName: { fontSize: 14.5, fontWeight: '800', color: T.ink },
+  vPlace: { fontSize: 12, color: T.muted, marginTop: 1 },
+  rate: { maxWidth: 130, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: `${T.green}14`, alignItems: 'flex-end' },
+  rateLabel: { fontSize: 9, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
+  rateText: { fontSize: 13, fontWeight: '800', color: T.green, textAlign: 'right' },
+  vBody: { padding: 12, gap: 9 },
+  line: { flexDirection: 'row', gap: 8 },
+  k: { fontSize: 10.5, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  v: { fontSize: 13.5, lineHeight: 19, fontWeight: '600', color: T.ink, marginTop: 1 },
+  source: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: T.hair },
+  sourceText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: T.blue },
 });

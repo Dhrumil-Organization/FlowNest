@@ -388,16 +388,15 @@ function PriorityGuide({ wide }: { wide: boolean }) {
         picture={(
           <Frame title="Dragging card #3 above #2">
             <CardMock self={1} client="1" design="Rib Stop 145" party="Chennai Sportswear" chart="CH-2-01" qty="7,200 m" date="10-09-2026" />
-            <View style={g.dropLine} />
-            <CardMock self={2} client="3" design="8228" party="Mumbai Uniforms" chart="CH-3-02" qty="4,800 m" date="11-09-2026" />
-            <CardMock dragging self={3} client="2" design="Rib Stop 145" party="Chennai Sportswear" chart="CH-2-03" qty="3,600 m" date="12-09-2026" />
+            <CardMock dragging self={2} client="2" design="Rib Stop 145" party="Chennai Sportswear" chart="CH-2-03" qty="3,600 m" date="12-09-2026" />
+            <CardMock self={3} client="3" design="8228" party="Mumbai Uniforms" chart="CH-3-02" qty="4,800 m" date="11-09-2026" />
             <View style={g.unsaved}><Icon name="error-outline" size={12} color={T.amber} /><Text style={g.unsavedText}>Unsaved</Text></View>
           </Frame>
         )}
       >
         <Li b="1.">Hold the ≡ handle on the left of a card and drag up or down.</Li>
-        <Li b="2.">A copper line shows exactly where the card will land. Near the top / bottom edge the list scrolls by itself.</Li>
-        <Li b="3.">Release — the card moves and all Self numbers renumber (1, 2, 3 …).</Li>
+        <Li b="2.">The card lifts (copper border) and follows your finger. The other cards slide aside to open the place where it will land, and the Self numbers update live. Near the top / bottom edge the list scrolls by itself — the longer you hold, the faster it goes.</Li>
+        <Li b="3.">Release — the card drops into the open place and all Self numbers renumber (1, 2, 3 …).</Li>
         <Li b="4.">The header shows <Text style={[g.bold, { color: T.amber }]}>Unsaved</Text>. Press <Text style={g.bold}>Save</Text> (top right of the list) to store the new order. It then shows <Text style={[g.bold, { color: T.green }]}>Saved</Text>.</Li>
         <Tip kind="rule">Only the Self order is saved. The Client priority is never changed from here.</Tip>
         <Tip>Dragging is off while you search — clear the search box to reorder. With a status filter on, you only reorder the cards you see; hidden cards keep their places.</Tip>

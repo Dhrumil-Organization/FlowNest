@@ -1753,8 +1753,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -2545,131 +2547,136 @@ const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShad
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Chart list — precise handle-only drag reorder, virtualized AND accurate   */
-/*  at scale. (Unchanged mechanics — see comments below.)                    */
+/*  Chart list — drag a card by its handle to reorder. Virtualized, so it     */
+/*  stays smooth with thousands of charts on app, web, phone and tablet.      */
 /* -------------------------------------------------------------------------- */
-/*  at scale (thousands to 1,00,000+ charts).                                */
+/*  HOW IT LOOKS: the grabbed card lifts and follows the finger; the other    */
+/*  cards slide up / down to open the slot it will drop into; near the top /  */
+/*  bottom edge the list scrolls by itself. The order changes on release.     */
 /*                                                                            */
-/*  Two separate problems had to be solved together here:                    */
-/*   1. RENDERING: a plain ScrollView mounts every card's full JSX tree up-   */
-/*      front, which is what freezes the app once there are a few thousand   */
-/*      charts. Fixed with FlatList, which only mounts cards near the        */
-/*      viewport (LIST_* tuning below) and recycles the rest.                */
-/*   2. DRAG ACCURACY: once rendering is virtualized, a card that isn't      */
-/*      currently mounted has no real on-screen position to measure — so any */
-/*      drop-target math that depends on *measuring* card layouts (onLayout) */
-/*      only ever knows about the small mounted window, and guesses wrong    */
-/*      for anything further away. That's what made reordering land in the   */
-/*      wrong place with large datasets.                                    */
+/*  HOW IT STAYS ACCURATE AT SCALE:                                           */
+/*   - FlatList is the ONLY vertical scroller (never nest it in a ScrollView  */
+/*     — that mounts every row and breaks auto-scroll). Only rows near the    */
+/*     viewport are mounted.                                                  */
+/*   - Every row has a FIXED height, so the position of ANY chart — mounted   */
+/*     or not — is plain arithmetic (LIST_PADDING_TOP + index * ITEM_HEIGHT). */
+/*     The drop slot is one division; nothing is measured or scanned.         */
+/*   - Only DIFFERENCES of finger / scroll positions are used, so there is    */
+/*     no dependency on absolute screen coordinates (status bars, headers).   */
+/*   - ONE always-mounted "grab strip" lies over the handle column and owns   */
+/*     the gesture. It is not inside the scroll view, so the list can never   */
+/*     steal the touch, and a drag survives the dragged row being recycled    */
+/*     during a long auto-scroll.                                             */
+/*   - The card that follows the finger is a floating copy above the list;    */
+/*     moving it never re-renders the list. A slot change re-renders only     */
+/*     the one card that has to slide.                                        */
 /*                                                                            */
-/*  The fix for (2): every card is given a FIXED height (CARD_BOX_HEIGHT).   */
-/*  With a fixed, uniform row height, the on-screen position of ANY chart —  */
-/*  mounted or not — is pure arithmetic: `LIST_PADDING_TOP + index *         */
-/*  ITEM_HEIGHT`. So the drop-target index is computed with plain division,  */
-/*  never by measuring or scanning cards. This is O(1) per pointer-move      */
-/*  event and gives an EXACT index regardless of how many charts there are   */
-/*  or how many of them are actually mounted right now — the same accuracy  */
-/*  as the original (unvirtualized) implementation, but it scales.          */
-/*                                                                            */
-/*  Trade-off: to keep every card exactly CARD_BOX_HEIGHT tall regardless of */
-/*  content, the shade-chip row is a single horizontally-scrollable line —   */
-/*  no shade is ever hidden or truncated; you swipe sideways to see the rest.*/
-/*                                                                            */
-/*  Two more things keep this scaling on the render side:                   */
-/*   - Each card is its own React.memo'd component (ChartCard) so moving     */
-/*     the drop-line only re-renders the (at most two) cards whose line/     */
-/*     dragging flags actually changed.                                     */
-/*   - The drag handle's PanResponder is created once per MOUNTED card via   */
-/*     useMemo inside ChartCard, not once per chart up-front.                */
-/*                                                                            */
-/*  UX rule (unchanged): the dragged card NEVER gets moved away from its     */
-/*  original slot. The user drags only the handle; a strong insertion line   */
-/*  moves between cards and shows exactly where the card will land. The      */
-/*  actual array is changed only on release. While the handle is held near   */
-/*  the top/bottom edge, the list auto-scrolls continuously so long lists    */
-/*  remain draggable.                                                       */
+/*  Trade-off of the fixed height: the shade-chip row is a single             */
+/*  horizontally-scrollable line — no shade is hidden; swipe sideways.        */
 /* -------------------------------------------------------------------------- */
 
-const AUTO_SCROLL_EDGE = 72;
+const AUTO_SCROLL_ZONE = 28;       // card edge this close to the list edge => scroll
 const AUTO_SCROLL_MAX_STEP = 16;
 const AUTO_SCROLL_INTERVAL = 16;
+// The longer the card is held at the edge, the faster the list runs — so a
+// card can be carried across thousands of charts in one drag.
+const AUTO_SCROLL_BOOST_MS = 700;  // every 700 ms at the edge adds +1x speed
+const AUTO_SCROLL_MAX_BOOST = 8;   // up to 8x the base speed
+const DRAG_OVERHANG = 20;          // how far the dragged card may pass the list edge
+const SLIDE_MS = 130;              // other cards sliding out of the way
 
-// FlatList tuning for very large chart lists — see RENDERING note above.
+// FlatList tuning for very large chart lists.
 const LIST_INITIAL_RENDER = 12;
 const LIST_WINDOW_SIZE = 10;
 const LIST_MAX_PER_BATCH = 10;
 const LIST_UPDATE_BATCH_PERIOD = 50;
+const LIST_FOOTER_HEIGHT = 64;
 
-// --- Fixed row geometry — see DRAG ACCURACY note above. Every card is this ---
-// --- exact height; this is what makes drop-target index math exact & O(1). --
+// --- Fixed row geometry. Every card is this exact height; this is what ---
+// --- makes the drop-slot math exact & O(1). ------------------------------
 const CARD_BOX_HEIGHT = 146; // the card's own box height (its `s.card` style)
-const ROW_GAP = 6;           // matches `s.card.marginBottom` below
+const ROW_GAP = 6;           // space between two cards
 const ITEM_HEIGHT = CARD_BOX_HEIGHT + ROW_GAP; // total vertical space one row consumes
-const LIST_PADDING_TOP = 8;  // matches `s.listContent.padding` below
+const LIST_PADDING = 8;      // matches `s.listContent.padding` below
+const LIST_PADDING_TOP = LIST_PADDING;
+// Width of the handle column measured from the list's left edge:
+// list padding + card border + handle (which runs out to the card edge).
+const GRAB_STRIP_WIDTH = LIST_PADDING + 1 + 34;
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+// While the list is auto-scrolling fast, cards snap to their slot instead of
+// sliding — a slide could not keep up and would only look untidy.
+const slideMode = { instant: false };
 
 /* ---------------------------------------------------------------------- */
-/*  ChartCard — one row, fixed height. Memoized so unaffected rows never   */
-/*  re-render while dragging; only the card being dragged and the (at      */
-/*  most two) cards around the current drop-line change props on any       */
-/*  given frame.                                                           */
+/*  ChartCard — one row, fixed height. Memoized: while dragging, only the  */
+/*  card that has to slide (and the grabbed one) change props.             */
 /* ---------------------------------------------------------------------- */
 
 type ChartCardProps = {
   chart: PriorityChart;
-  index: number;
   canEdit: boolean;
-  isDragging: boolean;
-  showTopLine: boolean;
-  showBottomLine: boolean;
+  /** Self number to show (live while dragging). */
+  displayNo: number;
+  /** -1 = slide one slot up, +1 = one slot down, 0 = stay. */
+  shift: -1 | 0 | 1;
+  /** A drag is in progress somewhere in the list (slides are animated). */
+  dragActive: boolean;
+  /** This is the grabbed card's own slot: kept as an empty gap. */
+  isPlaceholder: boolean;
+  /** This is the floating copy that follows the finger. */
+  isFloating: boolean;
   onOpenStatus: (chartKey: string) => void;
-  onDragStart: (chartKey: string, index: number, pageY: number) => void;
-  onDragMove: (pageY: number) => void;
-  onDragEnd: () => void;
 };
 
 const ChartCard = React.memo(function ChartCard({
   chart,
-  index,
   canEdit,
-  isDragging,
-  showTopLine,
-  showBottomLine,
+  displayNo,
+  shift,
+  dragActive,
+  isPlaceholder,
+  isFloating,
   onOpenStatus,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
 }: ChartCardProps) {
-  // Created once per MOUNTED card — never once per chart in the whole
-  // dataset, since only visible cards ever mount.
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => canEdit,
-        onMoveShouldSetPanResponder: () => canEdit,
-        onPanResponderGrant: (event) => onDragStart(chart.key, index, event.nativeEvent.pageY),
-        onPanResponderMove: (event) => onDragMove(event.nativeEvent.pageY),
-        onPanResponderRelease: onDragEnd,
-        onPanResponderTerminate: onDragEnd,
-        onPanResponderTerminationRequest: () => false,
-      }),
-    [canEdit, chart.key, index, onDragStart, onDragMove, onDragEnd],
-  );
+  // Slide to make room for the dragged card. Animated only while a drag is
+  // active; when the drag ends the transform is dropped at once, so the
+  // re-ordered list never "jumps".
+  const [slide] = useState(() => new Animated.Value(shift * ITEM_HEIGHT));
+  const slideTarget = useRef(shift);
+  useEffect(() => {
+    if (slideTarget.current === shift && dragActive) return;
+    slideTarget.current = shift;
+    if (!dragActive || slideMode.instant) {
+      slide.stopAnimation();
+      slide.setValue(shift * ITEM_HEIGHT);
+      return;
+    }
+    Animated.timing(slide, {
+      toValue: shift * ITEM_HEIGHT,
+      duration: SLIDE_MS,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [dragActive, shift, slide]);
 
   return (
-    <React.Fragment>
-      {showTopLine && <View style={s.dropLineTop} />}
-
-      <View
+    <View style={isFloating ? null : s.row}>
+      <Animated.View
         style={[
           s.card,
           { borderColor: T.border },
-          isDragging && s.draggingCard,
+          isFloating && s.draggingCard,
+          isPlaceholder && s.placeholderCard,
+          dragActive && !isFloating && !isPlaceholder ? { transform: [{ translateY: slide }] } : null,
         ]}
       >
         <View style={s.cardInner}>
           {canEdit ? (
-            <View style={s.dragHandle} {...panResponder.panHandlers}>
-              <Icon name="drag-handle" size={22} color={T.muted} />
+            // Looks like the handle; the touch itself is taken by the list's
+            // grab strip lying over this column (see ChartList).
+            <View style={s.dragHandle}>
+              <Icon name="drag-handle" size={22} color={isFloating ? T.copper : T.muted} />
             </View>
           ) : null}
 
@@ -2678,7 +2685,7 @@ const ChartCard = React.memo(function ChartCard({
               <View style={s.priorityInline}>
                 <View style={s.priorityItem}>
                   <View style={[s.numBadge, { borderColor: T.green }]}>
-                    <Text style={s.numText}>{chart.displayPriority}</Text>
+                    <Text style={s.numText}>{displayNo}</Text>
                   </View>
                   <Text style={[s.priorityLabel, { color: T.green }]}>Self</Text>
                 </View>
@@ -2755,29 +2762,25 @@ const ChartCard = React.memo(function ChartCard({
             </ScrollView>
           </View>
         </View>
-      </View>
-
-      {showBottomLine && <View style={s.dropLine} />}
-    </React.Fragment>
+      </Animated.View>
+    </View>
   );
 }, (prev, next) =>
   prev.chart === next.chart &&
-  prev.index === next.index &&
   prev.canEdit === next.canEdit &&
-  prev.isDragging === next.isDragging &&
-  prev.showTopLine === next.showTopLine &&
-  prev.showBottomLine === next.showBottomLine &&
-  prev.onOpenStatus === next.onOpenStatus &&
-  prev.onDragStart === next.onDragStart &&
-  prev.onDragMove === next.onDragMove &&
-  prev.onDragEnd === next.onDragEnd,
+  prev.displayNo === next.displayNo &&
+  prev.shift === next.shift &&
+  prev.dragActive === next.dragActive &&
+  prev.isPlaceholder === next.isPlaceholder &&
+  prev.isFloating === next.isFloating &&
+  prev.onOpenStatus === next.onOpenStatus,
 );
 
 /* ---------------------------------------------------------------------- */
-/*  ChartList — the FlatList shell + all drag/auto-scroll bookkeeping.     */
-/*  See the big comment above: drop-target detection is pure index math,   */
-/*  not layout measurement, so it is exact for any chart count.            */
+/*  ChartList — the FlatList shell + all drag / auto-scroll bookkeeping.   */
 /* ---------------------------------------------------------------------- */
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
 
 function ChartList({
   charts,
@@ -2791,41 +2794,50 @@ function ChartList({
   onOpenStatus: (chartKey: string) => void;
 }) {
   const listRef = useRef<FlatList<PriorityChart>>(null);
+  const stripRef = useRef<View>(null);
   const scrollOffsetRef = useRef(0);
+  const lastScrollEventAt = useRef(0);
   const viewportHeightRef = useRef(0);
-  const viewportTopRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const [contentWidth, setContentWidth] = useState(0);
 
-  // Drag callbacks below are created ONCE (stable useCallback identities) so
-  // ChartCard's per-card PanResponder memoization isn't invalidated on every
-  // render. They read the live chart list through this ref instead of
-  // closing over the `charts` prop directly.
+  // Read through refs so the gesture callbacks are created only once.
   const chartsRef = useRef(charts);
-  useEffect(() => { chartsRef.current = charts; }, [charts]);
+  const canEditRef = useRef(canEdit);
+  const onReorderRef = useRef(onReorder);
+  useEffect(() => {
+    chartsRef.current = charts;
+    canEditRef.current = canEdit;
+    onReorderRef.current = onReorder;
+  }, [charts, canEdit, onReorder]);
 
+  // Live drag data. Kept in a ref so a finger move never waits for React.
   const dragRef = useRef<{
     key: string;
     fromIndex: number;
-    centerContentY: number;
-    startMoveY: number;
-    lastMoveY: number;
-    startScrollOffset: number;
-    viewportTop: number;
-    autoScrollDirection: -1 | 0 | 1;
-    autoScrollSpeed: number;
+    hoverIndex: number;
+    startPageY: number;
+    lastPageY: number;
+    startCardTop: number;      // card top inside the visible list when grabbed
+    scrollDirection: -1 | 0 | 1;
+    scrollSpeed: number;
+    edgeSince: number;
   } | null>(null);
 
   const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
 
-  // `dropAfterIndex` means: show the insertion line immediately BELOW this
-  // index. `-1` means the line is at the very top (before the first card).
-  // Mirrored into a ref so `handleDragEnd` (a stable callback) always reads
-  // the latest value without needing to be recreated on every change.
-  const [dropAfterIndex, setDropAfterIndexState] = useState<number | null>(null);
-  const dropAfterIndexRef = useRef<number | null>(null);
-  const setDropAfterIndex = useCallback((value: number | null) => {
-    dropAfterIndexRef.current = value;
-    setDropAfterIndexState(value);
+  // What React needs to draw: which card is grabbed and which slot is open.
+  const [dragState, setDragState] = useState<{ key: string; fromIndex: number } | null>(null);
+  const [hoverIndex, setHoverIndexState] = useState<number | null>(null);
+
+  // Top of the floating card inside the visible list. An Animated value, so
+  // following the finger never re-renders anything.
+  const [floatY] = useState(() => new Animated.Value(0));
+
+  const maxScrollOffset = useCallback(() => {
+    const content = contentHeightRef.current ||
+      (LIST_PADDING_TOP + chartsRef.current.length * ITEM_HEIGHT + 20 + LIST_FOOTER_HEIGHT);
+    return Math.max(0, content - viewportHeightRef.current);
   }, []);
 
   const stopAutoScroll = useCallback(() => {
@@ -2835,173 +2847,212 @@ function ChartList({
     }
   }, []);
 
-  // Exact content-space top-of-card for any index — pure arithmetic, valid
-  // for a card whether it's currently mounted or not (see the big comment
-  // above). This is what removes any dependency on measuring layouts.
-  const centerContentYForIndex = useCallback(
-    (index: number) => LIST_PADDING_TOP + index * ITEM_HEIGHT + CARD_BOX_HEIGHT / 2,
-    [],
-  );
-
-  // Store the absolute initial finger Y separately. This avoids accumulating
-  // floating-point/scroll errors when auto-scroll changes the list's offset.
-  const updateDropTarget = useCallback((moveY: number) => {
+  // Places the floating card under the finger and works out the open slot.
+  // Uses only differences (finger travel, list scroll) — exact everywhere.
+  const updateDrag = useCallback(() => {
     const drag = dragRef.current;
     if (!drag) return;
 
-    const list = chartsRef.current;
+    const count = chartsRef.current.length;
     const viewport = viewportHeightRef.current;
     const offset = scrollOffsetRef.current;
 
-    // Auto-scroll is based on the actual finger position in the visible
-    // viewport, not on the dragged card. This remains accurate while the
-    // list itself is scrolling.
-    const screenY = moveY - drag.viewportTop;
-
+    let top = drag.startCardTop + (drag.lastPageY - drag.startPageY);
     if (viewport > 0) {
-      if (screenY < AUTO_SCROLL_EDGE) {
-        const strength = Math.min(
-          1,
-          Math.max(0, (AUTO_SCROLL_EDGE - screenY) / AUTO_SCROLL_EDGE),
-        );
-        drag.autoScrollDirection = -1;
-        drag.autoScrollSpeed = Math.max(2, Math.round(AUTO_SCROLL_MAX_STEP * strength));
-      } else if (screenY > viewport - AUTO_SCROLL_EDGE) {
-        const strength = Math.min(
-          1,
-          Math.max(0, (screenY - (viewport - AUTO_SCROLL_EDGE)) / AUTO_SCROLL_EDGE),
-        );
-        drag.autoScrollDirection = 1;
-        drag.autoScrollSpeed = Math.max(2, Math.round(AUTO_SCROLL_MAX_STEP * strength));
+      top = clamp(top, -DRAG_OVERHANG, viewport - CARD_BOX_HEIGHT + DRAG_OVERHANG);
+    }
+    floatY.setValue(top);
+
+    // Edge auto-scroll, driven by where the dragged card itself is.
+    if (viewport > 0) {
+      const overTop = AUTO_SCROLL_ZONE - top;
+      const overBottom = top + CARD_BOX_HEIGHT - (viewport - AUTO_SCROLL_ZONE);
+      const reach = AUTO_SCROLL_ZONE + DRAG_OVERHANG;
+      if (overTop > 0) {
+        drag.scrollDirection = -1;
+        drag.scrollSpeed = Math.max(2, Math.round(AUTO_SCROLL_MAX_STEP * Math.min(1, overTop / reach)));
+      } else if (overBottom > 0) {
+        drag.scrollDirection = 1;
+        drag.scrollSpeed = Math.max(2, Math.round(AUTO_SCROLL_MAX_STEP * Math.min(1, overBottom / reach)));
       } else {
-        drag.autoScrollDirection = 0;
-        drag.autoScrollSpeed = 0;
+        drag.scrollDirection = 0;
+        drag.scrollSpeed = 0;
+        drag.edgeSince = 0;
+        slideMode.instant = false;
       }
     }
 
-    // Finger position -> content position. The dragged card's original centre
-    // is adjusted by the finger movement plus whatever the list has
-    // auto-scrolled since the drag began.
-    const movingCenter =
-      drag.centerContentY +
-      (moveY - drag.startMoveY) +
-      (offset - drag.startScrollOffset);
-
-    // Pure index math — O(1), exact for any chart count, and independent of
-    // which cards happen to be mounted. This is what makes drag-to-position
-    // land exactly where the finger is, even with lakhs of charts. Every
-    // card's centre sits at `LIST_PADDING_TOP + i*ITEM_HEIGHT +
-    // CARD_BOX_HEIGHT/2`, evenly spaced by ITEM_HEIGHT — so the index of the
-    // last card whose centre is at/above `movingCenter` is a single division.
-    const relative = movingCenter - LIST_PADDING_TOP - CARD_BOX_HEIGHT / 2;
-    let afterIndex = Math.floor(relative / ITEM_HEIGHT);
-    afterIndex = Math.max(-1, Math.min(list.length - 1, afterIndex));
-
-    setDropAfterIndex(afterIndex);
-  }, [setDropAfterIndex]);
+    // The slot whose centre is nearest to the dragged card's centre. Every
+    // slot centre sits at LIST_PADDING_TOP + i * ITEM_HEIGHT + CARD_BOX_HEIGHT / 2,
+    // so this is a single division — O(1) for any number of charts.
+    const cardTopInContent = top + offset;
+    const hover = clamp(Math.round((cardTopInContent - LIST_PADDING_TOP) / ITEM_HEIGHT), 0, count - 1);
+    if (hover !== drag.hoverIndex) {
+      drag.hoverIndex = hover;
+      setHoverIndexState(hover);
+    }
+  }, [floatY]);
 
   const startAutoScroll = useCallback(() => {
     stopAutoScroll();
-
     autoScrollTimerRef.current = setInterval(() => {
       const drag = dragRef.current;
-      if (!drag) return;
+      if (!drag || drag.scrollDirection === 0) return;
 
-      if (drag.autoScrollDirection === 0) return;
+      const now = Date.now();
+      if (!drag.edgeSince) drag.edgeSince = now;
+      const boost = Math.min(AUTO_SCROLL_MAX_BOOST, 1 + (now - drag.edgeSince) / AUTO_SCROLL_BOOST_MS);
+      slideMode.instant = boost > 1.6;
 
-      const currentOffset = scrollOffsetRef.current;
-      const nextOffset = Math.max(
-        0,
-        currentOffset + drag.autoScrollDirection * drag.autoScrollSpeed,
-      );
+      const current = scrollOffsetRef.current;
+      const next = clamp(current + drag.scrollDirection * drag.scrollSpeed * boost, 0, maxScrollOffset());
+      if (Math.abs(next - current) < 0.5) return;
 
-      if (nextOffset === currentOffset) return;
-
-      scrollOffsetRef.current = nextOffset;
-      listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
-
-      // Recalculate immediately after each auto-scroll tick so the highlighted
-      // line follows the finger all the way through a long list.
-      updateDropTarget(drag.lastMoveY);
+      scrollOffsetRef.current = next;
+      listRef.current?.scrollToOffset({ offset: next, animated: false });
+      updateDrag();
     }, AUTO_SCROLL_INTERVAL);
-  }, [stopAutoScroll, updateDropTarget]);
+  }, [maxScrollOffset, stopAutoScroll, updateDrag]);
 
-  const handleDragEnd = useCallback(() => {
+  const finishDrag = useCallback((commit: boolean) => {
     const drag = dragRef.current;
-
     stopAutoScroll();
+    slideMode.instant = false;
     dragRef.current = null;
-    setDraggingKey(null);
+    setDragState(null);
+    setHoverIndexState(null);
+    if (!commit || !drag) return;
 
-    if (!drag) {
-      setDropAfterIndex(null);
-      return;
-    }
-
-    const afterIndex = dropAfterIndexRef.current;
-    const fromIndex = drag.fromIndex;
     const list = chartsRef.current;
-
-    setDropAfterIndex(null);
-
-    if (afterIndex == null) return;
-
-    // Convert "line below index X" into the final array index AFTER the
-    // dragged card is removed. This is the important part that prevents
-    // off-by-one reorder bugs when moving upward vs downward.
-    let targetIndex: number;
-    if (afterIndex < 0) {
-      targetIndex = 0;
-    } else if (afterIndex < fromIndex) {
-      targetIndex = afterIndex + 1;
-    } else if (afterIndex > fromIndex) {
-      targetIndex = afterIndex;
-    } else {
-      targetIndex = fromIndex;
+    // The list must still be the one the drag started on.
+    if (list[drag.fromIndex]?.key !== drag.key) return;
+    if (drag.hoverIndex !== drag.fromIndex) {
+      onReorderRef.current(drag.fromIndex, drag.hoverIndex, list);
     }
 
-    targetIndex = Math.max(0, Math.min(list.length - 1, targetIndex));
-
-    if (targetIndex !== fromIndex) {
-      onReorder(fromIndex, targetIndex, list);
+    // Bring the dropped card fully into view (it may hang over the edge).
+    const viewport = viewportHeightRef.current;
+    if (viewport > 0) {
+      const slotTop = LIST_PADDING_TOP + drag.hoverIndex * ITEM_HEIGHT;
+      const offset = scrollOffsetRef.current;
+      let next = offset;
+      if (slotTop - LIST_PADDING_TOP < offset) next = slotTop - LIST_PADDING_TOP;
+      else if (slotTop + CARD_BOX_HEIGHT + LIST_PADDING_TOP > offset + viewport) {
+        next = slotTop + CARD_BOX_HEIGHT + LIST_PADDING_TOP - viewport;
+      }
+      next = clamp(next, 0, maxScrollOffset());
+      if (Math.abs(next - offset) > 0.5) {
+        scrollOffsetRef.current = next;
+        listRef.current?.scrollToOffset({ offset: next, animated: false });
+      }
     }
-  }, [onReorder, setDropAfterIndex, stopAutoScroll]);
+  }, [maxScrollOffset, stopAutoScroll]);
 
-  const handleDragStart = useCallback((chartKey: string, index: number, pageY: number) => {
+  // Which card is under a touch on the grab strip. `stripY` is measured from
+  // the top of the strip (= top of the visible list), so no screen
+  // coordinates are involved.
+  const cardIndexAt = useCallback((stripY: number) => {
+    if (!Number.isFinite(stripY)) return -1;
+    const inContent = stripY + scrollOffsetRef.current - LIST_PADDING_TOP;
+    if (inContent < 0) return -1;
+    const index = Math.floor(inContent / ITEM_HEIGHT);
+    if (index >= chartsRef.current.length) return -1;
+    // The gap between two cards is not a card.
+    if (inContent - index * ITEM_HEIGHT > CARD_BOX_HEIGHT) return -1;
+    return index;
+  }, []);
+
+  const beginDrag = useCallback((index: number, pageY: number) => {
+    const list = chartsRef.current;
+    const chart = list[index];
+    if (!chart) return;
+
+    // If the list is still gliding from a flick, stop it exactly where we
+    // think it is, so the picked card and the list agree.
+    if (Date.now() - lastScrollEventAt.current < 120) {
+      listRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
+    }
+
     dragRef.current = {
-      key: chartKey,
+      key: chart.key,
       fromIndex: index,
-      centerContentY: centerContentYForIndex(index),
-      startMoveY: pageY,
-      lastMoveY: pageY,
-      startScrollOffset: scrollOffsetRef.current,
-      viewportTop: viewportTopRef.current,
-      autoScrollDirection: 0,
-      autoScrollSpeed: 0,
+      hoverIndex: index,
+      startPageY: pageY,
+      lastPageY: pageY,
+      startCardTop: LIST_PADDING_TOP + index * ITEM_HEIGHT - scrollOffsetRef.current,
+      scrollDirection: 0,
+      scrollSpeed: 0,
+      edgeSince: 0,
     };
-
-    setDraggingKey(chartKey);
-    setDropAfterIndex(index > 0 ? index - 1 : -1);
+    floatY.setValue(dragRef.current.startCardTop);
+    setDragState({ key: chart.key, fromIndex: index });
+    setHoverIndexState(index);
     startAutoScroll();
-  }, [centerContentYForIndex, setDropAfterIndex, startAutoScroll]);
+  }, [floatY, startAutoScroll]);
 
-  const handleDragMove = useCallback((pageY: number) => {
+  const moveDrag = useCallback((pageY: number) => {
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag || !Number.isFinite(pageY)) return;
+    drag.lastPageY = pageY;
+    updateDrag();
+  }, [updateDrag]);
 
-    drag.lastMoveY = pageY;
-    updateDropTarget(pageY);
-  }, [updateDropTarget]);
+  useEffect(() => () => stopAutoScroll(), [stopAutoScroll]);
 
+  // If the list changes under an active drag (refresh, filter, search), the
+  // drag is dropped without reordering — never reorder against stale rows.
   useEffect(() => {
-    return () => stopAutoScroll();
-  }, [stopAutoScroll]);
+    const drag = dragRef.current;
+    if (drag && (!canEdit || charts[drag.fromIndex]?.key !== drag.key)) finishDrag(false);
+  }, [canEdit, charts, finishDrag]);
+
+  // The grab strip's gesture. The strip is a plain view lying over the
+  // handle column, above the list — it takes the touch the moment the finger
+  // lands, so nothing (list scroll, browser scroll) can take it away.
+  const pendingIndexRef = useRef(-1);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: (event) => {
+          if (!canEditRef.current || dragRef.current) return false;
+          pendingIndexRef.current = cardIndexAt(Number(event?.nativeEvent?.locationY));
+          return pendingIndexRef.current >= 0;
+        },
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: (event, gesture) => {
+          const index = pendingIndexRef.current;
+          pendingIndexRef.current = -1;
+          if (index >= 0) beginDrag(index, Number(event?.nativeEvent?.pageY ?? gesture.y0));
+        },
+        onPanResponderMove: (event, gesture) => {
+          moveDrag(Number(event?.nativeEvent?.pageY ?? gesture.moveY));
+        },
+        onPanResponderRelease: () => finishDrag(true),
+        // The system took the touch away (call, gesture nav, …): change nothing.
+        onPanResponderTerminate: () => finishDrag(false),
+      }),
+    [beginDrag, cardIndexAt, finishDrag, moveDrag],
+  );
+
+  // Web: the strip lies over the list, so pass mouse-wheel scrolling through.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !canEdit) return undefined;
+    const node: any = stripRef.current;
+    if (!node?.addEventListener) return undefined;
+    const onWheel = (event: any) => {
+      const next = clamp(scrollOffsetRef.current + Number(event?.deltaY || 0), 0, maxScrollOffset());
+      scrollOffsetRef.current = next;
+      listRef.current?.scrollToOffset({ offset: next, animated: false });
+      if (dragRef.current) updateDrag();
+    };
+    node.addEventListener('wheel', onWheel, { passive: true });
+    return () => node.removeEventListener('wheel', onWheel);
+  }, [canEdit, maxScrollOffset, updateDrag]);
 
   const keyExtractor = useCallback((item: PriorityChart) => item.key, []);
 
   // Fixed row height means FlatList never has to measure anything to know
-  // where an item sits — this also makes scrolling/virtualization itself
-  // cheaper and more accurate for very large lists.
+  // where an item sits.
   const getItemLayout = useCallback(
     (_data: ArrayLike<PriorityChart> | null | undefined, index: number) => ({
       length: ITEM_HEIGHT,
@@ -3014,84 +3065,125 @@ function ChartList({
   const { width } = useWindowDimensions();
   const wide = width >= 700;
 
+  const dragFrom = dragState ? dragState.fromIndex : -1;
+  const dragTo = dragState && hoverIndex != null ? hoverIndex : dragFrom;
+
   const renderItem = useCallback(({ item, index }: { item: PriorityChart; index: number }) => {
-    const isDragging = draggingKey === item.key;
-
-    // The line is intentionally BELOW the selected card, never floating
-    // over the card. For the first insertion position it is shown above
-    // the first card.
-    const showTopLine =
-      draggingKey != null &&
-      dropAfterIndex === -1 &&
-      index === 0 &&
-      !isDragging;
-
-    const showBottomLine =
-      draggingKey != null &&
-      dropAfterIndex === index &&
-      !isDragging;
+    // Cards between the grabbed card's old slot and the open slot move one
+    // slot towards the old slot, and show the Self number they would get.
+    let shift: -1 | 0 | 1 = 0;
+    if (dragFrom >= 0 && index !== dragFrom) {
+      if (dragFrom < index && index <= dragTo) shift = -1;
+      else if (dragTo <= index && index < dragFrom) shift = 1;
+    }
+    const numberFrom = shift === 0 ? item : charts[index + shift] ?? item;
 
     return (
       <ChartCard
         chart={item}
-        index={index}
         canEdit={canEdit}
-        isDragging={isDragging}
-        showTopLine={showTopLine}
-        showBottomLine={showBottomLine}
+        displayNo={numberFrom.displayPriority}
+        shift={shift}
+        dragActive={dragFrom >= 0}
+        isPlaceholder={index === dragFrom}
+        isFloating={false}
         onOpenStatus={onOpenStatus}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
       />
     );
-  }, [draggingKey, dropAfterIndex, canEdit, onOpenStatus, handleDragStart, handleDragMove, handleDragEnd]);
+  }, [charts, dragFrom, dragTo, canEdit, onOpenStatus]);
+
+  const floatingChart = dragState ? charts[dragState.fromIndex] : null;
+  const floatingValid = !!floatingChart && floatingChart.key === dragState?.key;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[s.body, wide && s.bodyWide]}>
-      <FlatList
-        ref={listRef}
-        data={charts}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        getItemLayout={getItemLayout}
-        contentContainerStyle={s.listContent}
-        showsVerticalScrollIndicator
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        onScroll={(event) => {
-          scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-          const drag = dragRef.current;
-          if (drag) {
-            // Keep the line correct even when the list emits a native scroll
-            // event during an edge-scroll tick.
-            updateDropTarget(drag.lastMoveY);
-          }
-        }}
-        onLayout={(event) => {
-          viewportHeightRef.current = event.nativeEvent.layout.height;
-          // onLayout gives us height but not an absolute screen Y. Measure it
-          // once so edge auto-scroll uses the real finger position.
-          requestAnimationFrame(() => {
-            const node: any = (listRef.current as any)?.getNativeScrollRef?.() ?? listRef.current;
-            node?.measureInWindow?.((_x: number, y: number, _width: number, height: number) => {
-              viewportTopRef.current = y;
-              viewportHeightRef.current = height;
-            });
-          });
-        }}
-        scrollEnabled={!draggingKey}
-        // --- large-dataset tuning (see RENDERING note above) -----------------
-        initialNumToRender={LIST_INITIAL_RENDER}
-        windowSize={LIST_WINDOW_SIZE}
-        maxToRenderPerBatch={LIST_MAX_PER_BATCH}
-        updateCellsBatchingPeriod={LIST_UPDATE_BATCH_PERIOD}
-        removeClippedSubviews
-        ListFooterComponent={<View style={{ height: 24 }} />}
-      />
-    </ScrollView>
+    <View style={s.listShell}>
+      <View style={[s.listFrame, wide && s.listFrameWide]}>
+        <View style={s.listBox}>
+          <FlatList
+            ref={listRef}
+            data={charts}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            getItemLayout={getItemLayout}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              const y = event.nativeEvent.contentOffset.y;
+              lastScrollEventAt.current = Date.now();
+              if (!dragRef.current) {
+                scrollOffsetRef.current = y;
+                return;
+              }
+              // While dragging on a phone / tablet the list is locked and only
+              // the auto-scroll moves it, so its own (late) scroll events are
+              // ignored. On web they are immediate and are followed.
+              if (Platform.OS === 'web') {
+                scrollOffsetRef.current = y;
+                updateDrag();
+              }
+            }}
+            onContentSizeChange={(w, h) => {
+              contentHeightRef.current = h;
+              setContentWidth((current) => (Math.abs(current - w) > 0.5 ? w : current));
+            }}
+            onLayout={(event) => {
+              viewportHeightRef.current = event.nativeEvent.layout.height;
+            }}
+            // Native: lock the list while a card is held. Web keeps scrolling
+            // on (no scrollbar jump); the grab strip already owns the touch.
+            scrollEnabled={Platform.OS === 'web' ? true : !dragState}
+            initialNumToRender={LIST_INITIAL_RENDER}
+            windowSize={LIST_WINDOW_SIZE}
+            maxToRenderPerBatch={LIST_MAX_PER_BATCH}
+            updateCellsBatchingPeriod={LIST_UPDATE_BATCH_PERIOD}
+            ListFooterComponent={<View style={{ height: LIST_FOOTER_HEIGHT }} />}
+          />
+
+          {canEdit ? (
+            <View
+              ref={stripRef}
+              collapsable={false}
+              accessibilityLabel="Drag a card by its handle to change priority"
+              style={[s.grabStrip, WEB_GRAB_STYLE, dragState ? WEB_GRABBING_STYLE : null]}
+              {...panResponder.panHandlers}
+            />
+          ) : null}
+
+          {floatingValid && floatingChart ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.floatingCard,
+                contentWidth > 0 ? { width: contentWidth - LIST_PADDING * 2 } : { right: LIST_PADDING },
+                { transform: [{ translateY: floatY }] },
+              ]}
+            >
+              <ChartCard
+                chart={floatingChart}
+                canEdit={canEdit}
+                displayNo={(charts[dragTo] ?? floatingChart).displayPriority}
+                shift={0}
+                dragActive={false}
+                isPlaceholder={false}
+                isFloating
+                onOpenStatus={onOpenStatus}
+              />
+            </Animated.View>
+          ) : null}
+        </View>
+      </View>
+    </View>
   );
 }
+
+// Web only: the strip must never let the browser scroll / select text /
+// open the long-press menu, or the drag would be stolen.
+const WEB_GRAB_STYLE: any = Platform.OS === 'web'
+  ? { touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', cursor: 'grab' }
+  : null;
+const WEB_GRABBING_STYLE: any = Platform.OS === 'web' ? { cursor: 'grabbing' } : null;
 
 /* -------------------------------------------------------------------------- */
 /*  Styles                                                                     */
@@ -3165,22 +3257,45 @@ const s = StyleSheet.create({
     padding: 0,
   },
 
-  listContent: { padding: 8, paddingBottom: 20 },
+  listContent: { padding: LIST_PADDING, paddingBottom: 20 },
+  // The list is the ONLY vertical scroller on this screen. (It must not sit
+  // inside another ScrollView: that mounts every row and breaks auto-scroll.)
+  listShell: { flex: 1, backgroundColor: T.bg },
+  listFrame: { flex: 1, paddingHorizontal: 12, paddingTop: 12 },
+  listFrameWide: { maxWidth: 1000, width: '100%', alignSelf: 'center', paddingHorizontal: 16, paddingTop: 16 },
+  listBox: { flex: 1, overflow: 'hidden' },
+  row: { height: ITEM_HEIGHT },
+  // Invisible strip over the handle column — it owns the drag gesture.
+  grabStrip: {
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+    width: GRAB_STRIP_WIDTH, zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  // The card that follows the finger.
+  floatingCard: {
+    position: 'absolute', left: LIST_PADDING, top: 0, zIndex: 20,
+    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
 
   card: {
     backgroundColor: T.surface,
     borderWidth: 1,
     borderRadius: 11,
     padding: 8,
-    marginBottom: ROW_GAP,
     minWidth: 0,
     height: CARD_BOX_HEIGHT,
     overflow: 'hidden',
   },
   cardInner: { flexDirection: 'row', alignItems: 'stretch', minWidth: 0 },
   dragHandle: {
-    width: 26,
+    // Same look as before (26 px icon column), but the touch area now runs
+    // out to the card's left / top / bottom edges for an easy, exact grip.
+    width: 34,
     minHeight: 38,
+    marginLeft: -8,
+    marginVertical: -8,
+    paddingLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
@@ -3303,29 +3418,10 @@ const s = StyleSheet.create({
 
   draggingCard: {
     borderColor: T.copper,
-    opacity: 0.78,
   },
-  dropLine: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: T.copper,
-    marginHorizontal: 2,
-    marginTop: 1,
-    marginBottom: 5,
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dropLineTop: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: T.copper,
-    marginHorizontal: 2,
-    marginTop: -3,
-    marginBottom: 5,
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
+  // The grabbed card's own slot while it is in the air.
+  placeholderCard: {
+    opacity: 0,
   },
 
   saveBtn: {

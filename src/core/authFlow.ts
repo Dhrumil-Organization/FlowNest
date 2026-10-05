@@ -10,8 +10,8 @@
 
 import AsyncStorage from '@/common/utils/compatibleStorage';
 
-import { AuthAPI } from '../api/client';
 import { normalizeErpProperty } from '@/common/API/dynamicAPI';
+import { AuthAPI } from '../api/client';
 import { saveCredentialsForPropertySwitch } from '../lib/biometricAuth';
 import {
   forgetRememberedLogin,
@@ -21,6 +21,7 @@ import {
 import { useAppSessionStore } from '../stores/AppSessionStore';
 import { useAppStore } from '../stores/AppStore';
 import type { UserAccount } from '../types';
+import { LOGIN_PROPERTY_KEY } from './permissions/newUser';
 import { autoSyncPermissionRegistry } from './registry/registryAutoSync';
 
 function makeLegacyUser(user: any): UserAccount {
@@ -95,6 +96,7 @@ export async function performLogin(
 
     const response = res.response || {};
     const token = response.access_token;
+    const user_avaible = response.is_deleted || '';
     const user = response.user;
     const appSession = response?.app_session ?? {
       business_context: {
@@ -107,10 +109,16 @@ export async function performLogin(
       permissions: { dashboards: [], screens: [], resources: [], grants: {} },
       fallback_mode: true,
     };
+    console.log('✅ RESPONSE:', user_avaible);
 
     if (!token || !user) {
-      return { success: false, message: 'Login response is missing token or user.' };
+      return { success: false, message: response?.message || 'Invalid username or password.' };
     }
+
+    if (user_avaible === "1" || user_avaible === 1) {
+      return { success: false, message: 'User not available!, Please Register yourself by Create Account.' };
+    }
+    
 
     // Keep the successfully used credentials in OS secure storage for the
     // in-app property switch. This does not alter the existing login/session
@@ -155,7 +163,17 @@ export async function performLogin(
     // knows to skip the Auto/Manual gate immediately after this call —
     // the gate is only for returning to the app later, not the
     // instant after you just typed your password (or just auto-logged in).
-    useAppSessionStore.getState().setLoggedIn({ token, user, appSession, rawLoginResponse: response });
+    // Remember which property this login belongs to, next to the login
+    // response. The "new user" rule (role1 empty -> fixed modules, see
+    // src/core/permissions/newUser.ts) shows Inquiry for Sudamo only, and
+    // must know the property on a cold start too.
+    const loginProperty = await getActiveNewErpProperty();
+    useAppSessionStore.getState().setLoggedIn({
+      token,
+      user,
+      appSession,
+      rawLoginResponse: { ...response, [LOGIN_PROPERTY_KEY]: loginProperty },
+    });
 
     // Registry sync is additive and non-blocking. It runs only for a Platform Admin.
     // A sync failure must never undo a successful legacy login.

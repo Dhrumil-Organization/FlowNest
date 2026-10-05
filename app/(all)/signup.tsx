@@ -379,7 +379,7 @@ function SignupForm() {
           'Account created successfully!';
         AppAlert.alert(`🎉 ${successMessage}`);
         setTimeout(() => {
-          router.replace('/(auth)/login');
+          router.replace('/new/property-select');
         }, 500);
       } else {
         const errorMessage =

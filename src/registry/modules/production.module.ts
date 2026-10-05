@@ -426,13 +426,13 @@ registerPermissionArea({
           displayOrder: 150,
           actions: [{ key: 'view', name: 'View' }],
         },
-        {
-          key: 'yarn_management_system',
-          name: 'Yarn Management System',
-          type: 'screen',
-          displayOrder: 151,
-          actions: [{ key: 'view', name: 'View' }],
-        },
+        // {
+        //   key: 'yarn_management_system',
+        //   name: 'Yarn Management System',
+        //   type: 'screen',
+        //   displayOrder: 151,
+        //   actions: [{ key: 'view', name: 'View' }],
+        // },
         {
           key: 'quarter_summary',
           name: 'Quarter Summary',
@@ -454,12 +454,21 @@ registerPermissionArea({
           displayOrder: 154,
           actions: [{ key: 'view', name: 'View' }],
         },
-        // Yarn Vendors — AI chat with Claude via POST /api/yarn-vendors-chat (nothing stored)
+        // Yarn Vendors — AI vendor search (item + city -> party list -> Excel) via POST /api/yarn-vendors-chat
         {
           key: 'yarn_vendors',
           name: 'Yarn Vendors',
           type: 'screen',
           displayOrder: 155,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+        // Owner Dashboard — one-page owner summary (sales · collection · outstanding · sales orders · profit ·
+        // alerts · production · deployment · executive table) via GET /api/getOwnerSummaryDashboard
+        {
+          key: 'owner_dashboard',
+          name: 'Owner Dashboard',
+          type: 'screen',
+          displayOrder: 156,
           actions: [{ key: 'view', name: 'View' }],
         },
         // <-- add your new feature's resource object here (step 1)
@@ -1404,24 +1413,24 @@ registerUiNodes([
     order: 150,
   },
   // Yarn Management System (yarn main item · sub item · party item mapping) — moved from the legacy ERP
-  {
-    id: 'nav.yarn_management_system',
-    kind: 'navigation',
-    title: 'Yarn Management System',
-    permission: 'production.yarn_management_system',
-    action: 'view',
-    route: 'yarn-management-system',
-    icon: 'category',
-    order: 151,
-  },
-  {
-    id: 'screen.yarn_management_system',
-    kind: 'screen',
-    title: 'Yarn Management System',
-    permission: 'production.yarn_management_system',
-    action: 'view',
-    order: 151,
-  },
+  // {
+  //   id: 'nav.yarn_management_system',
+  //   kind: 'navigation',
+  //   title: 'Yarn Management System',
+  //   permission: 'production.yarn_management_system',
+  //   action: 'view',
+  //   route: 'yarn-management-system',
+  //   icon: 'category',
+  //   order: 151,
+  // },
+  // {
+  //   id: 'screen.yarn_management_system',
+  //   kind: 'screen',
+  //   title: 'Yarn Management System',
+  //   permission: 'production.yarn_management_system',
+  //   action: 'view',
+  //   order: 151,
+  // },
   // Quarter Summary (quarter-wise order / dispatch / pending) — moved from the legacy ERP
   {
     id: 'nav.quarter_summary',
@@ -1479,7 +1488,7 @@ registerUiNodes([
     action: 'view',
     order: 154,
   },
-  // Yarn Vendors (AI chat with Claude · strict topic rules · chat clears on leaving the screen)
+  // Yarn Vendors (yarn item + optional city -> AI web search -> party list · Excel preview / download)
   {
     id: 'nav.yarn_vendors',
     kind: 'navigation',
@@ -1487,7 +1496,7 @@ registerUiNodes([
     permission: 'production.yarn_vendors',
     action: 'view',
     route: 'yarn-vendors',
-    icon: 'forum',
+    icon: 'travel-explore',
     order: 155,
   },
   {
@@ -1497,6 +1506,25 @@ registerUiNodes([
     permission: 'production.yarn_vendors',
     action: 'view',
     order: 155,
+  },
+  // Owner Dashboard (Date · Month · Executive filters -> KPI cards, profit, alerts, production, deployment, executives)
+  {
+    id: 'nav.owner_dashboard',
+    kind: 'navigation',
+    title: 'Owner Dashboard',
+    permission: 'production.owner_dashboard',
+    action: 'view',
+    route: 'owner-dashboard',
+    icon: 'dashboard',
+    order: 156,
+  },
+  {
+    id: 'screen.owner_dashboard',
+    kind: 'screen',
+    title: 'Owner Dashboard',
+    permission: 'production.owner_dashboard',
+    action: 'view',
+    order: 156,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

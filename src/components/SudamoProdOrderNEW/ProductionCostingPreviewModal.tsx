@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { CostingAPI, DesignAPI } from '@/src/api/legacyClient';
+import ProductionYarnRequirement from './ProductionYarnRequirement';
 
 const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const money = (v: any) => `₹${n(v).toFixed(2)}`;
@@ -27,6 +28,8 @@ function yarnName(line: any, design: any) {
     (y: any) => text(y?.mi_id) === text(line?.mi_id),
   );
   return (
+    text(line?.name) ||
+    text(found?.yarn?.name) ||
     text(found?.name) ||
     text(found?.yarn_name) ||
     text(found?.material_name) ||
@@ -49,12 +52,14 @@ type Props = {
   mdId: string;
   costingId: string;
   onClose: () => void;
+  greigeQty?: number | null;
 };
 
 export default function ProductionCostingPreviewModal({
   visible,
   mdId,
   costingId,
+  greigeQty = null,
   onClose,
 }: Props) {
   const [loading, setLoading] = useState(false);
@@ -89,7 +94,7 @@ export default function ProductionCostingPreviewModal({
         const fullDesign = designResponse?.data?.data;
         const savedCosting = costingResponse?.data?.data;
 
-        if (!savedCosting) throw new Error('Saved costing could not be loaded.');
+        if (!costingResponse?.data?.success || !savedCosting || text(savedCosting.id) !== text(costingId)) throw new Error('The selected saved costing revision could not be verified.');
         if (text(savedCosting?.md_id) !== text(mdId)) {
           throw new Error('Saved costing does not belong to this design.');
         }
@@ -199,6 +204,11 @@ export default function ProductionCostingPreviewModal({
                 Costing: {text(saved?.id) || costingId}
                 {saved?.created_at ? ` · Saved ${text(saved.created_at)}` : ''}
               </Text>
+
+              <ProductionYarnRequirement
+                greigeMetres={greigeQty}
+                lines={lines.map((line: any) => ({ ...line, name: yarnName(line, design) }))}
+              />
 
               {section('warp', 'WARP')}
               {section('weft', 'WEFT')}

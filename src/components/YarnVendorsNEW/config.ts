@@ -1,35 +1,52 @@
 // ─────────────────────────────────────────────────────────────
 // FILE: src/components/YarnVendorsNEW/config.ts
 //
-// App-side settings of the Yarn Vendors AI chat.
+// App-side settings of the Yarn Vendors AI search.
 //
-// The chat goes through the ERP backend like every other screen:
-//   POST {API}/api/yarn-vendors-chat   (Bearer token)   — see ./api.ts
-// The Claude API key, the model, the answer length and the STRICT RULES
-// (what the assistant may talk about) all live on the backend:
-//   backend  config/yarnvendorschat.php  -> system_prompt, model, max_tokens
-//   backend  .env                        -> ANTHROPIC_API_KEY
-// Nothing secret is in the app, and the app can not change the rules.
+// The screen sends ONLY two values to the ERP backend:
+//   POST {API}/api/yarn-vendors-chat   { item, city }   (Bearer token) — see ./api.ts
+// Both may hold several values separated by commas ("A, B" / "Surat, Mumbai").
+// The question Claude is asked, the strict rules, the model, web search and the
+// API key all live on the backend (config/yarnvendorschat.php, .env). The app
+// can not ask anything else.
 // ─────────────────────────────────────────────────────────────
 
 /** Backend endpoint (appended to the ERP API host). */
-export const CHAT_ENDPOINT = '/api/yarn-vendors-chat';
+export const SEARCH_ENDPOINT = '/api/yarn-vendors-chat';
 
-/** Give up waiting for a reply after this long (backend waits up to 45s for Claude). */
-export const CHAT_TIMEOUT_MS = 60000;
+/** A web search answer is slow: the backend may work for up to ~4 minutes. */
+export const SEARCH_TIMEOUT_MS = 260000;
 
-/** First message shown in an empty chat (not sent to Claude). */
-export const WELCOME_TEXT =
-  'Ask anything about yarn vendors — yarn types, quality, rates, terms or how to compare suppliers.';
+/** Same limits as the backend (config/yarnvendorschat.php). */
+export const MAX_ITEMS = 5;
+export const MAX_CITIES = 5;
+/** Longest single value. */
+export const MAX_ITEM_CHARS = 80;
+export const MAX_CITY_CHARS = 50;
+/** Longest text of a whole box (all values + commas). */
+export const MAX_ITEM_BOX_CHARS = MAX_ITEMS * (MAX_ITEM_CHARS + 2);
+export const MAX_CITY_BOX_CHARS = MAX_CITIES * (MAX_CITY_CHARS + 2);
 
-/** Tap-to-fill suggestions on the empty chat. */
-export const SUGGESTIONS = [
-  'What should I check before finalising a new yarn vendor?',
-  'Compare payment terms I can ask a yarn supplier for',
-  'How do I judge quality of 150 denier polyester filament yarn?',
-];
+/**
+ * "A, B ,, a" -> ['A', 'B'] — same splitting as the backend: ONLY a comma separates
+ * two values (an item name may contain any other character), empty parts and
+ * repeats are dropped.
+ */
+export function splitList(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  (text || '').split(',').forEach((part) => {
+    const one = part.replace(/\s+/g, ' ').trim();
+    const key = one.toLowerCase();
+    if (!one || seen.has(key)) return;
+    seen.add(key);
+    out.push(one);
+  });
+  return out;
+}
 
-/** Only the latest N messages are sent as context (the backend applies the same limit). */
-export const MAX_CONTEXT_MESSAGES = 30;
-/** Maximum characters in one user message. */
-export const MAX_INPUT_CHARS = 2000;
+/** Tap-to-fill examples under the item box. */
+export const ITEM_EXAMPLES = ['150 Denier Polyester FDY', '30s Cotton Combed Yarn', 'Viscose Filament Yarn 120D', 'Nylon 6 Yarn 70D'];
+
+/** Company line on the Excel file. */
+export const COMPANY = 'MADHUSUDHAN FABRICS';

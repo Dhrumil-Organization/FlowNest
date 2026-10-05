@@ -1,63 +1,125 @@
 // ─────────────────────────────────────────────────────────────
 // FILE: src/components/YarnVendorsNEW/api.ts
 //
-// The ONE network call of the Yarn Vendors chat — through the ERP backend,
+// The ONE network call of the Yarn Vendors screen — through the ERP backend,
 // with the same Bearer token as every other screen:
 //
 //   POST {API}/api/yarn-vendors-chat
 //   headers  Authorization: Bearer <token>, Content-Type: application/json,
 //            Accept: application/json
-//   body     { messages: [{ role: 'user' | 'assistant', content: string }] }
+//   body     { item: string, city: string }
+//            item: one or more yarn items, comma separated
+//            city: one or more INDIAN cities, comma separated — '' = all India
 //
-//   success  { success: true,  response: { reply, stop_reason } }
-//   failure  { success: false, message, error_type }           (HTTP 200)
-//   HTTP 401 = login expired · HTTP 429 = too many messages (backend throttle)
+//   reply    { success: true, response: { status, item, city, area, items, cities,
+//              skipped_items, skipped_cities, failed_items, coverage, count, searched_at, note,
+//              vendors: [{ searched_item, searched_area, party_name, address, city,
+//              state, contact_no, party_item_name, rate, source_url, remarks }] } }
+//            status: 'ok' | 'no_results' | 'not_yarn_item' | 'invalid_city'
+//   error    { success: false, message, error_type }           (HTTP 200)
 //
-// The backend (YarnVendorsChatController) adds the Claude API key, model and
-// the strict rules and calls Claude. Nothing is stored on either side.
+// This backend's exception handler (app/Exceptions/Handler.php) has its own
+// conventions, handled below:
+//   - login expired  -> HTTP 200 { success: true, response: { isauth: '_AUTHFAILED' } }
+//   - ANY other error -> HTTP 404 { success: false, message: <reason> }
+//     ("The specified resource cannot be found." = the route is not on that server)
 // ─────────────────────────────────────────────────────────────
-import { CHAT_ENDPOINT, CHAT_TIMEOUT_MS, MAX_CONTEXT_MESSAGES } from './config';
+import { SEARCH_ENDPOINT, SEARCH_TIMEOUT_MS } from './config';
 
-export type ChatTurn = { role: 'user' | 'assistant'; content: string };
+export type Vendor = {
+  /** Which of the entered yarn items this party was found for. */
+  searched_item: string;
+  /** Which of the entered cities (or "All India") this party was found for. */
+  searched_area: string;
+  party_name: string;
+  address: string;
+  city: string;
+  state: string;
+  contact_no: string;
+  party_item_name: string;
+  rate: string;
+  source_url: string;
+  remarks: string;
+};
 
-export type ChatErrorKind = 'not-configured' | 'cancelled' | 'network' | 'timeout' | 'auth' | 'rate-limit' | 'overloaded' | 'server';
+/** What one item x city search produced (every pair the user asked for has one). */
+export type Coverage = {
+  item: string;
+  area: string;
+  status: 'ok' | 'no_results' | 'invalid_city' | 'not_yarn_item' | 'failed';
+  count: number;
+};
 
-export class ChatError extends Error {
-  kind: ChatErrorKind;
-  constructor(kind: ChatErrorKind, message: string) {
+export type SearchStatus = 'ok' | 'no_results' | 'not_yarn_item' | 'invalid_city';
+
+export type SearchResult = {
+  status: SearchStatus;
+  item: string;
+  city: string;
+  /** Cities searched ("Surat, Mumbai"), or "All India". */
+  area: string;
+  /** The entered values, split. */
+  items: string[];
+  cities: string[];
+  /** Entered items that are not yarn items — not searched. */
+  skippedItems: string[];
+  /** Entered cities that are not a place in India — not searched. */
+  skippedCities: string[];
+  /** "item (city)" searches that could not be completed this time. */
+  failedItems: string[];
+  /** One entry per item x city: how many parties that search gave. */
+  coverage: Coverage[];
+  vendors: Vendor[];
+  note: string;
+  /** Server time of the search, "YYYY-MM-DD HH:mm:ss". */
+  searchedAt: string;
+};
+
+export type SearchErrorKind = 'cancelled' | 'network' | 'timeout' | 'auth' | 'rate-limit' | 'not-configured' | 'invalid' | 'server';
+
+export class SearchError extends Error {
+  kind: SearchErrorKind;
+  constructor(kind: SearchErrorKind, message: string) {
     super(message);
     this.kind = kind;
   }
 }
 
 /** backend error_type -> app error kind */
-const KIND_OF: Record<string, ChatErrorKind> = {
+const KIND_OF: Record<string, SearchErrorKind> = {
   not_configured: 'not-configured',
+  search_unavailable: 'server',
   timeout: 'timeout',
   network: 'network',
   rate_limit: 'rate-limit',
-  overloaded: 'overloaded',
-  invalid_request: 'server',
+  overloaded: 'server',
+  invalid_request: 'invalid',
   server: 'server',
 };
 
-/**
- * Keep the newest MAX_CONTEXT_MESSAGES turns and drop a leading assistant
- * turn left by the cut (the conversation must start with a user turn).
- */
-export function trimContext(turns: ChatTurn[]): ChatTurn[] {
-  let list = turns.filter((t) => t.content.trim() !== '').slice(-MAX_CONTEXT_MESSAGES);
-  while (list.length > 0 && list[0].role !== 'user') list = list.slice(1);
-  return list;
-}
+const str = (v: any) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
 
-/** Send the conversation and return the assistant's reply text. */
-export async function sendToClaude(API: string, token: string, turns: ChatTurn[], signal?: AbortSignal): Promise<string> {
+const strList = (v: any): string[] => (Array.isArray(v) ? v.map(str).filter((x) => x !== '') : []);
+
+const toVendor = (row: any): Vendor => ({
+  searched_item: str(row?.searched_item),
+  searched_area: str(row?.searched_area),
+  party_name: str(row?.party_name),
+  address: str(row?.address),
+  city: str(row?.city),
+  state: str(row?.state),
+  contact_no: str(row?.contact_no),
+  party_item_name: str(row?.party_item_name),
+  rate: str(row?.rate),
+  source_url: str(row?.source_url),
+  remarks: str(row?.remarks),
+});
+
+/** Ask the backend for the parties selling `item` in `city` (both may be comma lists; city '' = all India). */
+export async function searchVendors(API: string, token: string, item: string, city: string, signal?: AbortSignal): Promise<SearchResult> {
   if (!API || !token) {
-    throw new ChatError('auth', 'Your login session was not found. Please sign in again.');
+    throw new SearchError('auth', 'Your login session was not found. Please sign in again.');
   }
-
-  const messages = trimContext(turns);
 
   // Own controller so the timeout and the caller's cancel both stop the request.
   const controller = new AbortController();
@@ -70,26 +132,26 @@ export async function sendToClaude(API: string, token: string, turns: ChatTurn[]
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, CHAT_TIMEOUT_MS);
+  }, SEARCH_TIMEOUT_MS);
 
   let res: any;
   let text = '';
   try {
-    res = await fetch(`${API}${CHAT_ENDPOINT}`, {
+    res = await fetch(`${API}${SEARCH_ENDPOINT}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ item, city }),
       signal: controller.signal,
     });
     text = await res.text();
   } catch (e: any) {
-    if (timedOut) throw new ChatError('timeout', 'The AI took too long to answer. Please try again.');
-    if (signal?.aborted) throw new ChatError('cancelled', 'Stopped.');
-    throw new ChatError('network', 'Could not reach the server. Check your internet connection and try again.');
+    if (timedOut) throw new SearchError('timeout', 'The search took too long. Please try again.');
+    if (signal?.aborted) throw new SearchError('cancelled', 'Search cancelled.');
+    throw new SearchError('network', 'Could not reach the server. Check your internet connection and try again.');
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', onOuterAbort);
@@ -103,30 +165,61 @@ export async function sendToClaude(API: string, token: string, turns: ChatTurn[]
   }
 
   const status = Number(res.status) || 0;
-  if (status === 401) {
-    throw new ChatError('auth', 'Your login session has expired. Please sign in again.');
+  const serverMessage = str(data?.message);
+
+  // Login expired (backend convention) or a plain 401.
+  if (status === 401 || data?.response?.isauth === '_AUTHFAILED' || /unauthenticated/i.test(serverMessage)) {
+    throw new SearchError('auth', 'Your login session has expired. Please sign in again.');
   }
-  if (status === 429) {
-    throw new ChatError('rate-limit', 'You are sending messages too quickly. Please wait a minute and try again.');
+  // Gateway / web-server timeout while the backend was still searching.
+  if (status === 502 || status === 503 || status === 504) {
+    throw new SearchError('timeout', 'The server stopped waiting before the search finished. Please try again.');
   }
-  if (status === 404) {
-    throw new ChatError('not-configured', 'The AI chat is not available on the server yet. Please contact the administrator.');
-  }
+
+  // The backend answers every exception with HTTP 404 + { success:false, message }.
   if (!res.ok || !data) {
-    throw new ChatError('server', `The server could not answer right now (${status}). Please try again.`);
+    if (!data || /specified (resource|route) cannot be found/i.test(serverMessage)) {
+      throw new SearchError(
+        'not-configured',
+        status === 404
+          ? 'The Yarn Vendors API was not found on this server (/api/yarn-vendors-chat). Please contact the administrator.'
+          : `The server could not answer right now (${status}). Please try again.`,
+      );
+    }
+    // A real server-side error: show its reason so it can be fixed.
+    throw new SearchError('server', serverMessage ? `Server error: ${serverMessage}` : `The server could not answer right now (${status}).`);
   }
 
   if (data.success !== true) {
-    throw new ChatError(
-      KIND_OF[String(data.error_type || '')] || 'server',
-      String(data.message || 'The AI could not answer right now. Please try again.'),
-    );
+    throw new SearchError(KIND_OF[str(data.error_type)] || 'server', serverMessage || 'The search could not be completed. Please try again.');
   }
 
-  const reply = String(data?.response?.reply ?? '').trim();
-  if (!reply) throw new ChatError('server', 'The AI returned an empty answer. Please try again.');
+  const r = data.response || {};
+  const known: SearchStatus[] = ['ok', 'no_results', 'not_yarn_item', 'invalid_city'];
+  const vendors: Vendor[] = Array.isArray(r.vendors) ? r.vendors.map(toVendor).filter((v: Vendor) => v.party_name !== '') : [];
+  let resultStatus: SearchStatus = known.includes(r.status) ? r.status : 'ok';
+  if (resultStatus === 'ok' && vendors.length === 0) resultStatus = 'no_results';
 
-  // Tell the user when the answer was cut by the length limit instead of
-  // letting it look complete.
-  return data?.response?.stop_reason === 'max_tokens' ? `${reply}\n\n_(answer cut short — ask me to continue)_` : reply;
+  return {
+    status: resultStatus,
+    item: str(r.item) || item,
+    city: str(r.city),
+    area: str(r.area) || (city ? city : 'All India'),
+    items: strList(r.items),
+    cities: strList(r.cities),
+    skippedItems: strList(r.skipped_items),
+    skippedCities: strList(r.skipped_cities),
+    failedItems: strList(r.failed_items),
+    coverage: Array.isArray(r.coverage)
+      ? r.coverage.map((cv: any): Coverage => ({
+        item: str(cv?.item),
+        area: str(cv?.area),
+        status: ['ok', 'no_results', 'invalid_city', 'not_yarn_item', 'failed'].includes(cv?.status) ? cv.status : 'no_results',
+        count: Number(cv?.count) || 0,
+      })).filter((cv: Coverage) => cv.item !== '')
+      : [],
+    vendors: resultStatus === 'ok' ? vendors : [],
+    note: str(r.note),
+    searchedAt: str(r.searched_at),
+  };
 }

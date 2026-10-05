@@ -1525,15 +1525,46 @@ function ClaudeInputLink({ icon, title, sub, accent, onPress }) {
 
 function ClaudeProductionAuto({ d }) {
   const counts = d.section_machine_counts || {};
-  const rows = d.section_ab_active
-    ? [
-        ['A', 'Section A', `Waterjet (${machineCountShort(counts.waterjet)}) + S. Rapier 230 cm (${machineCountShort(counts.sud_rapier_230)})`, d.section_a_prod, d.section_a_avg_picks, '#185FA5'],
-        ['B', 'Section B', `M Weaves (${machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(counts.sud_rapier_190)})`, d.section_b_prod, d.section_b_avg_picks, '#534AB7'],
-      ]
-    : [
-        ['R', 'Rapier', 'MW + SIP', d.prod_rapier, d.avg_pick_mw, '#B77932'],
-        ['W', 'Waterjet', 'Legacy division', d.prod_wjet, d.avg_pick_wjet, '#185FA5'],
-      ];
+  const groups = d.section_groups || {};
+
+  const sectionRows = [
+    {
+      tag: 'A',
+      title: 'Section A',
+      sub: `Waterjet (${machineCountShort(counts.waterjet)}) + S. Rapier 230 cm (${machineCountShort(counts.sud_rapier_230)})`,
+      prod: d.section_a_prod,
+      picks: d.section_a_avg_picks,
+      color: '#185FA5',
+      children: [
+        ['Waterjet', groups.waterjet, counts.waterjet],
+        ['S. Rapier 230 cm', groups.sud_230, counts.sud_rapier_230],
+      ],
+    },
+    {
+      tag: 'B',
+      title: 'Section B',
+      sub: `M Weaves (${machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(counts.sud_rapier_190)})`,
+      prod: d.section_b_prod,
+      picks: d.section_b_avg_picks,
+      color: '#534AB7',
+      children: [
+        ['M Weaves', groups.mw, counts.mw_rapier],
+        ['S. Rapier 190 cm', groups.sud_190, counts.sud_rapier_190],
+      ],
+    },
+  ];
+
+  const legacyRows = [
+    ['R', 'Rapier', 'MW + SIP', d.prod_rapier, d.avg_pick_mw, '#B77932'],
+    ['W', 'Waterjet', 'Legacy division', d.prod_wjet, d.avg_pick_wjet, '#185FA5'],
+  ];
+
+  const renderValue = (prod, picks, color) => (
+    <View style={{ alignItems: 'flex-end' }}>
+      <Text style={[S.clProdValue, { color }]}>{f2(Number(prod || 0) / 1e5)} L m</Text>
+      <Text style={S.clProdPicks}>{f2(picks)} pk</Text>
+    </View>
+  );
 
   return (
     <View style={S.clCard}>
@@ -1541,7 +1572,40 @@ function ClaudeProductionAuto({ d }) {
         <Text style={S.clEyebrow}>PRODUCTION · FROM PRODUCTION SYSTEM</Text>
         <View style={S.clAuto}><Text style={S.clAutoText}>● AUTO</Text></View>
       </View>
-      {rows.map(([tag, title, sub, prod, picks, color]) => (
+
+      {d.section_ab_active ? sectionRows.map((section) => (
+        <View key={section.tag}>
+          <View style={S.clProdRow}>
+            <View style={[S.clTag, { backgroundColor: `${section.color}14` }]}>
+              <Text style={[S.clTagText, { color: section.color }]}>{section.tag}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={S.clProdTitle}>{section.title}</Text>
+              <Text style={S.clProdSub}>{section.sub}</Text>
+            </View>
+            {renderValue(section.prod, section.picks, section.color)}
+          </View>
+
+          {section.children.map(([title, group, fallbackMachines]) => {
+            // section_groups is supplied by the API normalization layer from
+            // section_ab.production.groups. Keep the parent-only UI as a safe
+            // fallback when an older API response does not contain group data.
+            if (!group || typeof group !== 'object') return null;
+
+            const machines = Number(group.machines ?? fallbackMachines ?? 0);
+            return (
+              <View key={`${section.tag}-${title}`} style={S.clProdChildRow}>
+                <View style={[S.clProdChildLine, { backgroundColor: `${section.color}55` }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={S.clProdChildTitle}>{title}</Text>
+                  <Text style={S.clProdSub}>{machineCountLabel(machines)}</Text>
+                </View>
+                {renderValue(group.mtr, group.avg_picks, section.color)}
+              </View>
+            );
+          })}
+        </View>
+      )) : legacyRows.map(([tag, title, sub, prod, picks, color]) => (
         <View key={tag} style={S.clProdRow}>
           <View style={[S.clTag, { backgroundColor: `${color}14` }]}>
             <Text style={[S.clTagText, { color }]}>{tag}</Text>
@@ -1550,12 +1614,10 @@ function ClaudeProductionAuto({ d }) {
             <Text style={S.clProdTitle}>{title}</Text>
             <Text style={S.clProdSub}>{sub}</Text>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[S.clProdValue, { color }]}>{f2(Number(prod || 0) / 1e5)} L m</Text>
-            <Text style={S.clProdPicks}>{f2(picks)} pk</Text>
-          </View>
+          {renderValue(prod, picks, color)}
         </View>
       ))}
+
       <View style={S.clProdTotal}>
         <Text style={S.clProdTotalLabel}>Total · {machineCountLabel(counts.total_section)}</Text>
         <View style={{ alignItems: 'flex-end' }}>
@@ -1563,9 +1625,89 @@ function ClaudeProductionAuto({ d }) {
           <Text style={S.clProdPicks}>{f2(d.avg_pick_tot)} pk</Text>
         </View>
       </View>
-      <Text style={S.clNote}>Metres and picks flow from the production system and roll up to the visible section model.</Text>
+      <Text style={S.clNote}>Metres and picks flow from the production system and roll up from machine group to section total.</Text>
     </View>
   );
+}
+
+
+function ClaudeArtifactUtilities({ d, setTrendSheet }) {
+  const [open, setOpen] = useState(false);
+  const counts = d.section_machine_counts || {};
+  const groups = d.section_groups || {};
+  const days = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
+  const n = (v) => Number(v || 0);
+  const sum = (fn) => days.reduce((t, row) => t + n(fn(row)), 0);
+  const sumCost = (fn) => days.reduce((t, row) => t + n(fn(row)) * n(row?.unit_rate), 0);
+  const alloc = (row, key) => row?.section_ab?.allocation?.[key];
+  const basisGroup = (row, key) => row?.section_ab?.production_basis?.groups?.[key] || row?.production_basis?.groups?.[key] || null;
+  const basisMtr = (row, key) => n(basisGroup(row, key)?.mtr ?? basisGroup(row, key)?.production_mtr);
+  const basisWeighted = (row, key) => {
+    const g = basisGroup(row, key);
+    if (!g) return 0;
+    const direct = n(g.weighted_picks ?? g.weighted_pick_mtr ?? g.pick_mtr);
+    return direct || basisMtr(row, key) * n(g.avg_picks ?? g.ppi);
+  };
+  const basisTotals = (key, fallback) => {
+    const mtr = sum(r => basisMtr(r, key));
+    const weighted = sum(r => basisWeighted(r, key));
+    if (mtr > 0 || weighted > 0) return { mtr, weighted, avg: mtr > 0 ? weighted / mtr : 0 };
+    const fm = n(fallback?.mtr), fa = n(fallback?.avg_picks);
+    return { mtr: fm, weighted: fm * fa, avg: fa };
+  };
+
+  const meterDefs = [
+    { key:'mw_rapier_looms', tag:'B', label:'M Weaves — Looms', detail:'R01–R48 · 48 mc', fn:r=>r?.mw_rapier_looms, prodKey:'mw' },
+    { key:'mw_rapier_luwa', tag:'B', label:'M Weaves — Luwa (humid.)', detail:'48 mc', fn:r=>r?.mw_rapier_luwa, prodKey:'mw' },
+    { key:'sud_190_looms', tag:'B', label:'S. Rapier (190 cm) — Looms', detail:'R49–R74, R85–R96 · 38 mc', fn:r=>r?.sud_190_looms, prodKey:'sud_190' },
+    { key:'sud_230_looms', tag:'A', label:'S. Rapier (230 cm) — Looms', detail:'R75–R84 · 10 mc · own sub-meter', fn:r=>r?.sud_230_looms, prodKey:'sud_230' },
+    { key:'sip_rapier_luwa', tag:'A+B', label:'S. Rapier — Luwa (humid.)', detail:'all 48 S. Rapier · split 38:10', fn:r=>r?.sip_rapier_luwa, prodKey:'rapier' },
+    { key:'sip_waterjet_looms', tag:'A', label:'Waterjet — Looms', detail:'W01–W30 · 30 mc', fn:r=>r?.sip_waterjet_looms, prodKey:'waterjet' },
+    { key:'warping_shared', tag:'A+B', label:'Warping (shared)', detail:'A 40 : B 86 by machine count', fn:r=>r?.warping_shared, prodKey:'total' },
+    { key:'misc_shared', tag:'A+B', label:'Miscellaneous (shared)', detail:'A 40 : B 86 by machine count', fn:r=>r?.misc_shared, prodKey:'total' },
+  ];
+  const meterRows = meterDefs.map(x => ({...x, kwh:sum(x.fn), amount:sumCost(x.fn)}));
+
+  const bt = {
+    mw: basisTotals('mw', groups.mw),
+    sud190: basisTotals('sud_190', groups.sud_190),
+    sud230: basisTotals('sud_230', groups.sud_230),
+    waterjet: basisTotals('waterjet', groups.waterjet),
+  };
+  const groupData = [
+    { key:'mw', section:'B', title:'M Weaves', range:'R01–R48', color:'#534AB7', machines:n(groups.mw?.machines||counts.mw_rapier), prod:bt.mw.mtr, weighted:bt.mw.weighted, picks:bt.mw.avg, kwh:sum(r=>alloc(r,'mw_to_b_kwh')), amount:sumCost(r=>alloc(r,'mw_to_b_kwh')), sources:[['Looms meter',r=>r?.mw_rapier_looms],['Luwa (humid.) meter',r=>r?.mw_rapier_luwa]] },
+    { key:'sud190', section:'B', title:'S. Rapier (190 cm)', range:'R49–R74 · R85–R96', color:'#534AB7', machines:n(groups.sud_190?.machines||counts.sud_rapier_190), prod:bt.sud190.mtr, weighted:bt.sud190.weighted, picks:bt.sud190.avg, kwh:sum(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), sources:[['Looms meter',r=>r?.sud_190_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_b_kwh')],['Warping + misc share',r=>alloc(r,'shared_b_kwh')]] },
+    { key:'sud230', section:'A', title:'S. Rapier (230 cm)', range:'R75–R84', color:'#185FA5', machines:n(groups.sud_230?.machines||counts.sud_rapier_230), prod:bt.sud230.mtr, weighted:bt.sud230.weighted, picks:bt.sud230.avg, kwh:sum(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), sources:[['Own sub-meter',r=>r?.sud_230_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_a_kwh')],['Warping + misc share',r=>alloc(r,'shared_a_kwh')]] },
+    { key:'waterjet', section:'A', title:'Waterjet', range:'W01–W30', color:'#185FA5', machines:n(groups.waterjet?.machines||counts.waterjet), prod:bt.waterjet.mtr, weighted:bt.waterjet.weighted, picks:bt.waterjet.avg, kwh:sum(r=>alloc(r,'waterjet_to_a_kwh')), amount:sumCost(r=>alloc(r,'waterjet_to_a_kwh')), sources:[['Looms meter',r=>r?.sip_waterjet_looms]] },
+  ];
+  const pickQty = g => n(g.weighted) || g.prod*g.picks;
+  const costPick = g => pickQty(g)>0 ? g.amount/pickQty(g) : 0;
+  const section = tag => { const rows=groupData.filter(g=>g.section===tag); const prod=rows.reduce((t,g)=>t+g.prod,0), pq=rows.reduce((t,g)=>t+pickQty(g),0), amount=rows.reduce((t,g)=>t+g.amount,0); return {rows,machines:rows.reduce((t,g)=>t+g.machines,0),kwh:rows.reduce((t,g)=>t+g.kwh,0),amount,prod,pickQty:pq,picks:prod>0?pq/prod:0,cpp:pq>0?amount/pq:0}; };
+  const A=section('A'), B=section('B');
+  const T={machines:A.machines+B.machines,kwh:A.kwh+B.kwh,amount:A.amount+B.amount,prod:A.prod+B.prod,pickQty:A.pickQty+B.pickQty,picks:(A.prod+B.prod)>0?(A.pickQty+B.pickQty)/(A.prod+B.prod):0,cpp:(A.pickQty+B.pickQty)>0?(A.amount+B.amount)/(A.pickQty+B.pickQty):0};
+  const meterDates=days.filter(r=>n(r?.total_kwh)>0||n(r?.reported_total_kwh)>0||n(r?.mw_total)>0||n(r?.sip_total)>0).map(r=>Number(r.date_ymd||0)).filter(Boolean).sort((a,b)=>a-b);
+  const fmtYmd = ymd => { const x=String(ymd||''); if(x.length!==8)return x; const dt=new Date(+x.slice(0,4),+x.slice(4,6)-1,+x.slice(6,8)); return `${String(dt.getDate()).padStart(2,'0')} ${dt.toLocaleString('en-US',{month:'short'})}`; };
+  const dateText=meterDates.length?`${fmtYmd(meterDates[0])} – ${fmtYmd(meterDates[meterDates.length-1])}`:'meter-reading dates';
+
+  const Metric=({label,value,sub})=><View style={S.artMetric}><Text style={S.artMetricLabel}>{label}</Text><Text style={S.artMetricValue}>{value}</Text>{!!sub&&<Text style={S.artMetricSub}>{sub}</Text>}</View>;
+  const Group=({g})=><View style={[S.artGroup,{borderLeftColor:g.color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>■ {g.title} <Text style={S.artRange}>{g.range} · {g.machines} mc</Text></Text><Text style={[S.artCount,{color:g.color}]}>counts in {g.section}</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(g.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(g.amount)} sub={g.prod>0?`${fINR(g.amount/g.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(g.prod)} m`}/><Metric label="PICKS" value={`${(pickQty(g)/1e5).toFixed(2)} L`} sub={`${f2(g.picks)} PPI`}/></View><View style={[S.artCostPick,{borderColor:`${g.color}44`,backgroundColor:`${g.color}09`}]}><Text style={[S.artCostPickLabel,{color:g.color}]}>COST / PICK</Text><Text style={[S.artCostPickValue,{color:g.color}]}>₹{f4(costPick(g))}</Text><Text style={S.artCostFormula}>{fINR(g.amount)} ÷ {(pickQty(g)/1e5).toFixed(2)} L picks</Text></View>{g.sources.map(([label,fn])=>{const k=sum(fn),a=sumCost(fn);return <View key={label} style={S.artSourceRow}><Text style={S.artSourceLabel}>{label}</Text><Text style={S.artSourceValue}>{fN(k)} kWh · {fINR(a)}</Text></View>})}</View>;
+  const SectionTotal=({tag,x,color,sub})=><View style={[S.artSectionTotal,{borderTopColor:color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}><Text style={{color}}>{tag}</Text> · Section {tag} total</Text><Text style={S.artCount}>{x.machines} mc</Text></View><Text style={S.artRange}>{sub}</Text><View style={S.artMetricRow}><Metric label="UNITS" value={fN(x.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(x.amount)} sub={x.prod>0?`${fINR(x.amount/x.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(x.prod)} m`}/><Metric label="PICKS" value={`${(x.pickQty/1e5).toFixed(2)} L`} sub={`${f2(x.picks)} PPI`}/></View><View style={S.artSectionCpp}><Text style={S.artCostPickLabel}>COST / PICK</Text><Text style={S.artCostPickValue}>₹{f4(x.cpp)}</Text></View></View>;
+
+  return <View style={S.artUtility}>
+    <TouchableOpacity style={S.artUtilityHead} onPress={()=>setOpen(v=>!v)} activeOpacity={0.72}>
+      <View style={{flex:1}}><Text style={S.artUtilityTitle}>⚡  Utilities / units consumed</Text><Text style={S.artUtilitySub}>{fN(d.kwh_total)} kWh @ {fINR(d.unit_rate)}</Text></View>
+      <Text style={S.artUtilityAmount}>{fINR(d.elec_total)}</Text><Text style={{fontSize:13,color:'#6b7280',marginLeft:10}}>{open?'▴':'▾'}</Text>
+    </TouchableOpacity>
+    {open && <>
+      <Text style={S.artExplain}>Electricity per pick for each machine group. Production and picks come from checking entries dated {dateText} (the days with meter readings) — each entry’s machine number decides its group. Picks = metres × the design’s PPI; cost / pick = electricity ₹ ÷ picks.</Text>
+      <Text style={S.artMiniHead}>BY MACHINE GROUP</Text>{groupData.map(g=><Group key={g.key} g={g}/>)}
+      <Text style={S.artMiniHead}>SECTION TOTALS · SUMMED FROM THE GROUPS ABOVE</Text><SectionTotal tag="A" x={A} color="#185FA5" sub="Waterjet (30) + S. Rapier 230 cm · R75–R84 (10)"/><SectionTotal tag="B" x={B} color="#534AB7" sub="Rapier 190 cm: M Weaves (48) + S. Rapier (38)"/>
+      <View style={[S.artSectionTotal,{borderTopColor:'#0D1B2A'}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>Total · A + B</Text><Text style={S.artCount}>{T.machines} mc</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(T.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(T.amount)}/><Metric label="PRODUCTION" value={`${fN(T.prod)} m`}/><Metric label="PICKS" value={`${(T.pickQty/1e5).toFixed(2)} L`} sub={`${f2(T.picks)} PPI`}/></View><View style={S.artSectionCpp}><Text style={S.artCostPickLabel}>COST / PICK</Text><Text style={S.artCostPickValue}>₹{f4(T.cpp)}</Text></View></View>
+      <Text style={S.artMiniHead}>METER READINGS · UNITS & COST</Text>
+      {meterRows.map(r=><View key={r.key} style={S.artMeterRow}><View style={S.artMeterTag}><Text style={S.artMeterTagText}>{r.tag}</Text></View><View style={{flex:1,minWidth:0}}><Text style={S.artMeterLabel}>{r.label}</Text><Text style={S.artRange}>{r.detail}</Text></View><Text style={S.artMeterValue}>{fN(r.kwh)} kWh · {fINR(r.amount)}</Text><TouchableOpacity onPress={()=>setTrendSheet?.({kind:'utility',key:r.key,label:`${r.label} · ${r.detail}`,prodKey:r.prodKey})} style={{paddingVertical:5,paddingLeft:10}}><Text style={S.clEdit}>daily ›</Text></TouchableOpacity></View>)}
+      <Text style={S.artExplain}>Group electricity is built from the backend's classified daily meter allocations. Section totals add their groups; cost/pick divides cost by weighted production picks.</Text>
+    </>}
+  </View>;
 }
 
 function ClaudeManagementCard({ name, subtitle, accent, prod, picks, elec, sal, store, maintenance = 0, other = 0, cpp, extended, onTrend }) {
@@ -1977,19 +2119,24 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
       </View>
 
       <Text style={S.clSectionHeading}>Expense breakdown</Text>
-      <View style={[S.clBreakGrid, isLarge && { flexDirection:'row' }]}>
-        <View style={isLarge?{flex:1}:undefined}>
-          <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_elec)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_elec)}</Text></View>
-          </ExpBlock>
-          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel="View daily ›" onEdit={()=>setView('daily-salary')}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_salary:d.sal_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_salary:d.sal_wjet)}</Text></View>
+      <View style={S.clBreakGrid}>
+        <View>
+          {extended ? <ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
+          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:'View daily ›'} onEdit={extended?undefined:()=>setView('daily-salary')}>
+            {extended ? <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_salary,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_salary,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.sal_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.sal_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            </> : <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.sal_rapier)}</Text></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.sal_wjet)}</Text></View>
+            </>}
           </ExpBlock>
           <ExpBlock icon="▣" iconColor="#1D9E75" iconBg="#EAF8F3" title="Production-linked expenses" sub={extended?'Stores & spares · ERP-derived A/B':'Stores & spares'} amt={fINR(d.store_total)}>
             <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_stores:d.store_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_stores:d.store_wjet)}</Text></View>
           </ExpBlock>
         </View>
-        <View style={isLarge?{flex:1}:undefined}>
+        <View>
           {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · Common" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)}</Text></ExpBlock>}
           {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct / indirect · A/B/Common" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)}</Text></ExpBlock>}
           <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
@@ -3865,7 +4012,7 @@ function ProfessionalExpenseDashboard({
 //     borderRadius: 20,
 //   },
 //   retryText: { color: "#fff", fontWeight: "600" },
-// });
+
 
 // const header = StyleSheet.create({
 //   wrap: {
@@ -4146,6 +4293,8 @@ function Skeleton({ h = 80 }) {
 }
 const SK = StyleSheet.create({
   box: { backgroundColor: "#f3f4f6", borderRadius: 12, marginBottom: 8 },
+
+
 });
 
 // ── Month tab ─────────────────────────────────────────────────────
@@ -4650,8 +4799,32 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
   const isSection = safeTrend.kind === 'section';
   const sectionKey = String(safeTrend.section || 'T').toUpperCase();
 
+  const utilityRowsFromElectricity = () => {
+    const source = Array.isArray(d.electricity_daily) ? d.electricity_daily : [];
+    const n = (v) => Number(v || 0);
+    const group = (r, key) => r?.section_ab?.production_basis?.groups?.[key] || r?.production_basis?.groups?.[key] || {};
+    const gm = (r, key) => n(group(r,key)?.mtr ?? group(r,key)?.production_mtr);
+    const productionFor = (r) => {
+      if (safeTrend.prodKey === 'mw') return gm(r,'mw');
+      if (safeTrend.prodKey === 'sud_190') return gm(r,'sud_190');
+      if (safeTrend.prodKey === 'sud_230') return gm(r,'sud_230');
+      if (safeTrend.prodKey === 'waterjet') return gm(r,'waterjet');
+      if (safeTrend.prodKey === 'rapier') return gm(r,'sud_190') + gm(r,'sud_230');
+      if (safeTrend.prodKey === 'total') return gm(r,'mw') + gm(r,'sud_190') + gm(r,'sud_230') + gm(r,'waterjet');
+      return 0;
+    };
+    return source.map(r => {
+      const explicit = r?.meter_daily?.[safeTrend.key];
+      const kwh = explicit ? n(explicit.kwh) : n(r?.[safeTrend.key]);
+      const production_mtr = explicit ? n(explicit.production_mtr) : productionFor(r);
+      const amount = explicit ? n(explicit.amount) : kwh * n(r?.unit_rate);
+      const cost_per_mtr = explicit ? n(explicit.cost_per_mtr) : (production_mtr>0?amount/production_mtr:0);
+      return {...r,key:safeTrend.key,kwh,production_mtr,amount,cost_per_mtr};
+    }).filter(r => r.kwh > 0 || r.production_mtr > 0);
+  };
+  const configuredUtilityRows = isUtility ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key) : [];
   const rows = isUtility
-    ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key)
+    ? (configuredUtilityRows.length ? configuredUtilityRows : utilityRowsFromElectricity())
     : (d.expense_daily_trend || []);
 
   const costReady = (r) => isUtility || r?.total_cost_complete === true;
@@ -4700,9 +4873,9 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
   const availableValues = rows
     .map(valueOf)
     .filter((v) => v !== null && Number.isFinite(v));
-  const avg = availableValues.length
-    ? availableValues.reduce((a, v) => a + v, 0) / availableValues.length
-    : null;
+  const avg = isUtility
+    ? (() => { const p=rows.reduce((t,r)=>t+prod(r),0), c=rows.reduce((t,r)=>t+cost(r),0); return p>0?c/p:null; })()
+    : (availableValues.length ? availableValues.reduce((a, v) => a + v, 0) / availableValues.length : null);
   const best = availableValues.length ? Math.min(...availableValues) : null;
   const worst = availableValues.length ? Math.max(...availableValues) : null;
 
@@ -6146,6 +6319,9 @@ const S = StyleSheet.create({
   clTag: { minWidth: 20, height: 20, borderRadius: 7, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   clTagText: { fontSize: 9.5, fontWeight: '800' },
   clProdRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1ECE5' },
+  clProdChildRow: { minHeight: 48, marginLeft: 34, paddingLeft: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: '#F7F3EE' },
+  clProdChildLine: { width: 2, alignSelf: 'stretch', borderRadius: 2 },
+  clProdChildTitle: { fontSize: 10.5, fontWeight: '700', color: '#374151' },
   clProdTitle: { fontSize: 11.5, fontWeight: '800', color: '#111827' },
   clProdSub: { marginTop: 2, fontSize: 9.5, color: '#8A8177' },
   clProdValue: { fontSize: 11.5, fontWeight: '800' },
@@ -6817,6 +6993,37 @@ const S = StyleSheet.create({
     borderRadius: 20,
   },
   retryText: { color: "#fff", fontWeight: "600" },
+  artUtility: { backgroundColor:'#FFFFFF', borderWidth:1, borderColor:'#E5DED4', borderRadius:14, overflow:'hidden', marginBottom:12 },
+  artUtilityHead: { flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:14, paddingVertical:12, borderBottomWidth:1, borderBottomColor:'#EFE8DE' },
+  artUtilityTitle: { fontSize:15, fontWeight:'800', color:'#111827' },
+  artUtilitySub: { marginTop:2, fontSize:11, color:'#8A8177' },
+  artUtilityAmount: { fontSize:14, fontWeight:'800', color:'#185FA5' },
+  artExplain: { fontSize:10, lineHeight:15, color:'#8A8177', paddingHorizontal:14, paddingVertical:10 },
+  artMiniHead: { fontSize:10, fontWeight:'800', color:'#8A8177', letterSpacing:.5, paddingHorizontal:14, paddingTop:10, paddingBottom:6 },
+  artGroup: { marginHorizontal:14, marginBottom:9, padding:10, borderWidth:1, borderColor:'#E5DED4', borderLeftWidth:3, borderRadius:10, backgroundColor:'#FFFFFF' },
+  artGroupHead: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', gap:8 },
+  artGroupTitle: { flex:1, fontSize:12, fontWeight:'800', color:'#1F2937' },
+  artRange: { fontSize:10, fontWeight:'500', color:'#8A8177' },
+  artCount: { fontSize:9, fontWeight:'700', color:'#8A8177' },
+  artMetricRow: { flexDirection:'row', flexWrap:'wrap', gap:5, marginTop:8 },
+  artMetric: { flexGrow:1, flexBasis:120, minWidth:105, backgroundColor:'#F8F4EE', borderWidth:1, borderColor:'#EFE8DE', borderRadius:7, padding:7 },
+  artMetricLabel: { fontSize:8, fontWeight:'800', color:'#8A8177' },
+  artMetricValue: { marginTop:2, fontSize:12, fontWeight:'800', color:'#111827' },
+  artMetricSub: { marginTop:1, fontSize:8, color:'#8A8177' },
+  artCostPick: { marginTop:6, minHeight:30, borderWidth:1, borderRadius:7, paddingHorizontal:8, paddingVertical:6, flexDirection:'row', alignItems:'center', gap:8 },
+  artCostPickLabel: { fontSize:8, fontWeight:'800', letterSpacing:.3, color:'#534AB7' },
+  artCostPickValue: { fontSize:13, fontWeight:'900', color:'#534AB7' },
+  artCostFormula: { marginLeft:'auto', fontSize:8, color:'#8A8177' },
+  artSourceRow: { flexDirection:'row', justifyContent:'space-between', gap:8, paddingTop:6, marginTop:5, borderTopWidth:1, borderTopColor:'#F1ECE5' },
+  artSourceLabel: { flex:1, fontSize:9, color:'#6B7280' },
+  artSourceValue: { fontSize:9, fontWeight:'700', color:'#4B5563', textAlign:'right' },
+  artSectionTotal: { marginHorizontal:14, marginBottom:9, padding:10, borderWidth:1, borderColor:'#E5DED4', borderTopWidth:3, borderRadius:10, backgroundColor:'#FFFFFF' },
+  artSectionCpp: { marginTop:6, paddingHorizontal:8, paddingVertical:6, borderRadius:7, backgroundColor:'#F8F4EE', flexDirection:'row', alignItems:'center', gap:8 },
+  artMeterRow: { marginHorizontal:14, minHeight:30, flexDirection:'row', alignItems:'center', gap:7, borderBottomWidth:1, borderBottomColor:'#EFE8DE' },
+  artMeterTag: { minWidth:28, paddingHorizontal:5, paddingVertical:3, borderRadius:8, backgroundColor:'#F0EDFF', alignItems:'center' },
+  artMeterTagText: { fontSize:8, fontWeight:'800', color:'#534AB7' },
+  artMeterLabel: { flex:1, fontSize:9, color:'#374151' },
+  artMeterValue: { fontSize:9, fontWeight:'700', color:'#6B7280', textAlign:'right' },
 });
 
 

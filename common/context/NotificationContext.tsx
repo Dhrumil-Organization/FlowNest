@@ -141,6 +141,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Weft Issue Return', 'weft-issue-return'],
     ['Sudamo Sales Order Entry', 'sudamo-sales-order-entry'],
     ['Fabric Stock Verification', 'fabric-stock-verification'],
+    ['Weft Carton Issue', 'weft-carton-issue-new'],
 ].map(([name, route]) => ({ name, route }));
 
 // Legacy route / Legacy Home app name (lower-case) -> New ERP route name

@@ -471,6 +471,12 @@ registerPermissionArea({
           displayOrder: 156,
           actions: [{ key: 'view', name: 'View' }],
         },
+        {
+          key: 'weft_carton_issue_new',
+          name: 'Weft Carton Issue',
+          type: 'screen',
+          displayOrder: 90,
+        }
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -1526,5 +1532,23 @@ registerUiNodes([
     action: 'view',
     order: 156,
   },
+   {
+    id: 'nav.weft_carton_issue_new',
+    kind: 'navigation',
+    title: 'Weft Carton Issue',
+    permission: 'production.weft_carton_issue_new',
+    action: 'view',
+    route: 'weft-carton-issue-new',
+    icon: 'assignment-return',
+    order: 126,
+  },
+  {
+    id: 'screen.weft_carton_issue_new',
+    kind: 'screen',
+    title: 'Weft Carton Issue',
+    permission: 'production.weft_carton_issue_new',
+    action: 'view',
+    order: 126,
+  }
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

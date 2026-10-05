@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { flattenPermissionRegistry } from '../../registry';
 import { useAppSessionStore } from '../../stores/AppSessionStore';
+import { getNewUserResources, newUserCanAccess } from './newUser';
 
 export type PermissionContextValue = {
   canAccess: (resourcePath: string) => boolean;
@@ -52,6 +53,13 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const isSuperAdmin =
     Number(user?.id || rawLoginResponse?.user?.id || 0) === 1
     || Number(user?.is_superadmin || rawLoginResponse?.issuperadmin || 0) !== 0;
+
+  // NEW USER (login `role1` empty): a fixed module set replaces the normal
+  // permission flow — see ./newUser.ts. null = not a new user.
+  const newUserResources = useMemo(
+    () => getNewUserResources(rawLoginResponse, user),
+    [rawLoginResponse, user],
+  );
 
   const runtimeGrants = useMemo(() => {
     const grants = new Map<string, boolean>();
@@ -112,6 +120,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       const path = normalize(resourcePath);
       if (!path) return false;
 
+      // New user: ONLY the fixed modules, whatever the grants payload says.
+      if (newUserResources) return newUserCanAccess(newUserResources, path);
+
       // Explicit resource decisions always win, including for SuperAdmin.
       // This keeps newly registered resources available to SuperAdmin by default
       // (no grant row yet), while allowing SuperAdmin to explicitly deny a
@@ -150,7 +161,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       // Legacy backend has only screen + tab levels. Nested children inherit tab access.
       return parts.length > 2 && legacyCanTab(screenKey, tabKey);
     },
-    [isSuperAdmin, legacyCanScreen, legacyCanTab, runtimeGrants],
+    [isSuperAdmin, legacyCanScreen, legacyCanTab, newUserResources, runtimeGrants],
   );
 
   const canDo = useCallback(
@@ -158,6 +169,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       const path = normalize(resourcePath);
       const action = normalize(actionKey);
       if (!canAccess(path)) return false;
+
+      // New user: the fixed modules are fully usable (they have no grant rows).
+      if (newUserResources) return true;
 
       // Explicit action decisions always win, including for SuperAdmin.
       const exact = runtimeGrants.get(`action:${path}:${action}`);
@@ -187,7 +201,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
       return legacyCanAction(screenFromPath(path), action);
     },
-    [canAccess, isSuperAdmin, legacyCanAction, runtimeGrants],
+    [canAccess, isSuperAdmin, legacyCanAction, newUserResources, runtimeGrants],
   );
 
   const requireAccess = useCallback(

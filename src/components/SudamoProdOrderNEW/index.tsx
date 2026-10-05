@@ -146,6 +146,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     const [webViewUrl, setWebViewUrl] = useState('');
     const [costingPreviewMdId, setCostingPreviewMdId] = useState('');
     const [costingPreviewId, setCostingPreviewId] = useState('');
+    const [costingPreviewGreigeQty, setCostingPreviewGreigeQty] = useState<number | null>(null);
     const [showCostingPreview, setShowCostingPreview] = useState(false);
     const [showAuthorizationReview, setShowAuthorizationReview] = useState(false);
     const [authorizationReviewItem, setAuthorizationReviewItem] = useState<any | null>(null);
@@ -154,7 +155,15 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
 
     const { width } = useWindowDimensions();
 
-    const openProductionCosting = (item: any) => {
+    const costingQuantityRequest = useRef<any>(null);
+    useEffect(() => () => {
+        costingQuantityRequest.current?.cancel('Screen closed.');
+        costingQuantityRequest.current = null;
+    }, []);
+
+    const openProductionCosting = async (item: any) => {
+        costingQuantityRequest.current?.cancel('Costing selection changed.');
+        costingQuantityRequest.current = null;
         if (!isConnected || item?.isProcessed) return;
         const source = String(item?.design_costing_source || '').trim().toUpperCase();
         const mdId = String(item?.md_id || '').trim();
@@ -170,6 +179,37 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
             setCostingPreviewMdId(mdId);
             setCostingPreviewId(costingId);
+            let greigeValue = item?.required_greige_qty;
+            if (greigeValue === undefined || greigeValue === null || String(greigeValue).trim() === '') {
+                const request = axios.CancelToken.source();
+                costingQuantityRequest.current = request;
+                try {
+                    const response = await axios.get(`${API}/api/prodorderwebnew/show`, {
+                        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                        params: { uid: item.uid, prpcode: item.prpcode, yearno: item.yearno,
+                            strcode: item.greystrcode || item.strcode, action: 'view', txntype: 'production_order_sudo' },
+                        cancelToken: request.token
+                    });
+                    if (costingQuantityRequest.current !== request) return;
+                    const main = response?.data?.data?.main?.[0];
+                    if (!response?.data?.success || !main || String(main.uid ?? main.UId) !== String(item.uid)) {
+                        throw new Error('The saved Production Order quantity could not be verified.');
+                    }
+                    greigeValue = main.totqty;
+                } catch (error: any) {
+                    if (costingQuantityRequest.current !== request || axios.isCancel(error)) return;
+                    AppAlert.alert('Costing unavailable', error?.response?.data?.message || error?.message || 'The saved Production Order could not be loaded.');
+                    return;
+                } finally {
+                    if (costingQuantityRequest.current === request) costingQuantityRequest.current = null;
+                }
+            }
+            const greigeQty = greigeValue === null || greigeValue === undefined || String(greigeValue).trim() === '' ? NaN : Number(greigeValue);
+            if (!Number.isFinite(greigeQty) || greigeQty < 0) {
+                AppAlert.alert('Costing unavailable', 'The saved Production Order has no valid greige quantity.');
+                return;
+            }
+            setCostingPreviewGreigeQty(greigeQty);
             setShowCostingPreview(true);
             return;
         }
@@ -1898,10 +1938,12 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 visible={showCostingPreview}
                 mdId={costingPreviewMdId}
                 costingId={costingPreviewId}
+                greigeQty={costingPreviewGreigeQty}
                 onClose={() => {
                     setShowCostingPreview(false);
                     setCostingPreviewMdId('');
                     setCostingPreviewId('');
+                    setCostingPreviewGreigeQty(null);
                 }}
             />
 </>

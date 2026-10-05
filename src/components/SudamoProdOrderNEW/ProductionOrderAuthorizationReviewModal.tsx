@@ -4,6 +4,8 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useMemo, useState } from 'react';
 import { WebView } from 'react-native-webview';
+import ProductionYarnRequirement from './ProductionYarnRequirement';
+import { normalizeLegacyYarn } from './productionYarnRequirement';
 import {
     ActivityIndicator,
     Modal,
@@ -67,6 +69,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [detail, setDetail] = useState<any | null>(null);
+    const [yarnState, setYarnState] = useState<{ key: string; loading: boolean; lines: any[]; error: string }>({ key: '', loading: false, lines: [], error: '' });
 
     useEffect(() => {
         setExpandedLegacyCosting(false);
@@ -140,10 +143,12 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
         const isFinish = fabricType.toLowerCase() !== 'greige';
 
         const finishedQty = toNumber(first(meta.base_qty, main.orderqty, 0));
+        // Saved total is the authoritative production basis and includes stock.
+        // Prefer it over a zero/default manual quantity in web metadata.
         const greigeQty = toNumber(first(
-            meta.manual_greige_qty,
-            meta.stock_sell_total_qty,
             main.totqty,
+            meta.stock_sell_total_qty,
+            meta.manual_greige_qty,
             item?.qty,
             0
         ));
@@ -236,6 +241,79 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
             costingAvailable
         };
     }, [detail, item]);
+
+    const yarnReferenceKey = [item?.uid, item?.prpcode, item?.yearno, model.costingSource,
+        model.costingItem.md_id, model.costingItem.design_costing_id, model.costingItem.costuid].join('|');
+
+    useEffect(() => {
+        if (!visible || loading || !detail || !model.costingAvailable) return;
+        const loadedUid = first(model.main.uid, model.main.UId);
+        if (!loadedUid || String(loadedUid) !== String(item?.uid)) return;
+        let active = true;
+        const cancellation = axios.CancelToken.source();
+        const key = yarnReferenceKey;
+        setYarnState({ key, loading: true, lines: [], error: '' });
+        const loadYarns = async () => {
+            try {
+                const config = {
+                    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                    params: { prpcode: model.costingItem.prpcode, yearno: model.costingItem.yearno },
+                    cancelToken: cancellation.token
+                };
+                let lines: any[] = [];
+                let warning = '';
+                if (model.costingSource === 'NEW') {
+                    const id = String(model.costingItem.design_costing_id).trim();
+                    const mdId = String(model.costingItem.md_id).trim();
+                    const [savedResult, designResult] = await Promise.allSettled([
+                        axios.get(`${API}/api/costing/${encodeURIComponent(id)}`, config),
+                        axios.get(`${API}/api/designs/${encodeURIComponent(mdId)}`, config)
+                    ]);
+                    if (!active) return;
+                    if (savedResult.status !== 'fulfilled') throw savedResult.reason;
+                    const response = savedResult.value;
+                    const saved = response?.data?.data;
+                    if (!response?.data?.success || !saved || String(saved.id || '').trim() !== id
+                        || String(saved.md_id || '').trim() !== mdId) {
+                        throw new Error('The saved costing revision could not be verified for this Production Order.');
+                    }
+                    if (!Array.isArray(saved.yarn_lines) || saved.yarn_lines.length === 0) {
+                        throw new Error('The linked costing has no saved yarn consumption rows.');
+                    }
+                    const design = designResult.status === 'fulfilled' && designResult.value?.data?.success
+                        ? designResult.value.data.data : null;
+                    const labels = [...(design?.warp_yarns || []), ...(design?.weft_yarns || []), ...(design?.selvedge_yarns || [])];
+                    lines = saved.yarn_lines.map((line: any) => {
+                        if (!line || typeof line !== 'object') throw new Error('A saved yarn consumption row is invalid.');
+                        const label = labels.find((yarn: any) => String(yarn.mi_id || '') === String(line.mi_id || ''));
+                        return { ...line, name: line.name || label?.yarn?.name || label?.name || label?.yarn_name || 'Yarn name unavailable' };
+                    });
+                } else {
+                    const response = await axios.get(`${API}/api/prodordersudocosting`, {
+                        ...config, params: { ...config.params, costuid: model.costingItem.costuid, txntype: 'production_order_sudo' }
+                    });
+                    if (!response?.data?.success || !response?.data?.data) throw new Error('Linked legacy yarn costing could not be loaded.');
+                    const legacy = response.data.data;
+                    const main = Array.isArray(legacy.main) ? legacy.main[0] : null;
+                    if (!main || String(main.UId ?? main.uid) !== String(model.costingItem.costuid)) {
+                        throw new Error('The saved legacy costing reference could not be verified.');
+                    }
+                    lines = [
+                        ...(Array.isArray(legacy.warp) ? legacy.warp.map((row: any) => normalizeLegacyYarn(row, 'warp')) : []),
+                        ...(Array.isArray(legacy.weft) ? legacy.weft.map((row: any) => normalizeLegacyYarn(row, 'weft')) : [])
+                    ];
+                    if (lines.some(row => row.grams_per_metre === undefined && row.kg_per_metre === undefined)) {
+                        warning = 'Legacy consumption could not be verified for one or more yarns. Check the saved weight, cost divisor, yarn rate and cost.';
+                    }
+                }
+                if (active) setYarnState({ key, loading: false, lines, error: warning });
+            } catch (error: any) {
+                if (active && !axios.isCancel(error)) setYarnState({ key, loading: false, lines: [], error: error?.response?.data?.message || error?.message || 'Saved yarn consumption could not be loaded.' });
+            }
+        };
+        void loadYarns();
+        return () => { active = false; cancellation.cancel('Production Order review changed.'); };
+    }, [visible, loading, detail, yarnReferenceKey, token]);
 
     const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
         <View style={[styles.row, strong && styles.strongRow]}>
@@ -492,7 +570,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                                         if (model.costingSource === 'LEGACY') {
                                                             setExpandedLegacyCosting((current) => !current);
                                                         } else {
-                                                            onViewCosting(model.costingItem);
+                                                            onViewCosting({ ...model.costingItem, required_greige_qty: model.greigeQty });
                                                         }
                                                     }}
                                                     activeOpacity={0.78}
@@ -580,6 +658,13 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                     )}
                                 </View>
                             )}
+
+                            <ProductionYarnRequirement
+                                greigeMetres={model.greigeQty}
+                                lines={yarnState.key === yarnReferenceKey ? yarnState.lines : []}
+                                loading={model.costingAvailable && (yarnState.key !== yarnReferenceKey || yarnState.loading)}
+                                error={!model.costingAvailable ? 'The PO has no linked saved costing for yarn requirements.' : (yarnState.key === yarnReferenceKey ? yarnState.error : '')}
+                            />
 
                             {!!first(model.main?.remarks1, item?.remark) && (
                                 <View style={styles.section}>

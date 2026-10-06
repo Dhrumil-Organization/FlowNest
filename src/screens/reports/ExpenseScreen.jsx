@@ -72,7 +72,7 @@
 //       onPress={onPress}
 //       activeOpacity={0.7}
 //       style={[S.monthTab, active && S.monthTabActive]}
-//     >
+//     > 
 //       <Text style={[S.monthTabText, active && S.monthTabTextActive]}>
 //         {label}
 //       </Text>
@@ -736,7 +736,7 @@ function DailyUnitsView({ d, onBack }) {
     const x = String(ymd || "");
     if (x.length !== 8) return x;
     const dt = new Date(Number(x.slice(0,4)), Number(x.slice(4,6))-1, Number(x.slice(6,8)));
-    return `${String(dt.getDate()).padStart(2,"0")}-${dt.toLocaleString("en-US",{month:"short"})}`;
+    return `${String(dt.getDate()).padStart(2,"0")}-${monthShort(dt)}`;
   };
 
   const allocationRows = (r) => [
@@ -1220,8 +1220,8 @@ function DailySalaryView({ d, onBack, fill = false }) {
 //     { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: `${machineCountNumber(d.section_machine_counts?.total_section)} looms`, c: "#534AB7" },
 //     {
 //       l: "UNITS",
-//       v: `${Math.round(d.kwh_total / 1000)}K kWh`,
-//       s: `@ ₹${d.unit_rate}/unit`,
+//       v: `${Math.round(num(d.kwh_total) / 1000)}K kWh`,
+//       s: `@ ₹${d.unit_rate ?? 0}/unit`,
 //       c: "#BA7517",
 //     },
 //   ];
@@ -1384,11 +1384,11 @@ function DailySalaryView({ d, onBack, fill = false }) {
 //               ["Cost / mc·day", `₹${fN(d.cpmc)}`],
 //               [
 //                 "Rapier",
-//                 `${fLn(d.total_rapier || 0)} · ${d.rapier_pct?.toFixed(1)}%`,
+//                 `${fLn(d.total_rapier || 0)} · ${fx(d.rapier_pct, 1)}%`,
 //               ],
 //               [
 //                 "W-Jet",
-//                 `${fLn(d.total_wjet || 0)} · ${d.wjet_pct?.toFixed(1)}%`,
+//                 `${fLn(d.total_wjet || 0)} · ${fx(d.wjet_pct, 1)}%`,
 //               ],
 //             ].map(([l, v]) => (
 //               <View key={l} style={S.pastMiniCard}>
@@ -1686,7 +1686,7 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
   const A=section('A'), B=section('B');
   const T={machines:A.machines+B.machines,kwh:A.kwh+B.kwh,amount:A.amount+B.amount,prod:A.prod+B.prod,pickQty:A.pickQty+B.pickQty,picks:(A.prod+B.prod)>0?(A.pickQty+B.pickQty)/(A.prod+B.prod):0,cpp:(A.pickQty+B.pickQty)>0?(A.amount+B.amount)/(A.pickQty+B.pickQty):0};
   const meterDates=days.filter(r=>n(r?.total_kwh)>0||n(r?.reported_total_kwh)>0||n(r?.mw_total)>0||n(r?.sip_total)>0).map(r=>Number(r.date_ymd||0)).filter(Boolean).sort((a,b)=>a-b);
-  const fmtYmd = ymd => { const x=String(ymd||''); if(x.length!==8)return x; const dt=new Date(+x.slice(0,4),+x.slice(4,6)-1,+x.slice(6,8)); return `${String(dt.getDate()).padStart(2,'0')} ${dt.toLocaleString('en-US',{month:'short'})}`; };
+  const fmtYmd = ymd => { const x=String(ymd||''); if(x.length!==8)return x; const dt=new Date(+x.slice(0,4),+x.slice(4,6)-1,+x.slice(6,8)); return `${String(dt.getDate()).padStart(2,'0')} ${monthShort(dt)}`; };
   const dateText=meterDates.length?`${fmtYmd(meterDates[0])} – ${fmtYmd(meterDates[meterDates.length-1])}`:'meter-reading dates';
 
   const Metric=({label,value,sub})=><View style={S.artMetric}><Text style={S.artMetricLabel}>{label}</Text><Text style={S.artMetricValue}>{value}</Text>{!!sub&&<Text style={S.artMetricSub}>{sub}</Text>}</View>;
@@ -1695,7 +1695,7 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
 
   return <View style={S.artUtility}>
     <TouchableOpacity style={S.artUtilityHead} onPress={()=>setOpen(v=>!v)} activeOpacity={0.72}>
-      <View style={{flex:1}}><Text style={S.artUtilityTitle}>⚡  Utilities / units consumed</Text><Text style={S.artUtilitySub}>{fN(d.kwh_total)} kWh @ {fINR(d.unit_rate)}</Text></View>
+      <View style={{flex:1}}><Text style={S.artUtilityTitle}>⚡  Utilities / units consumed</Text><Text style={S.artUtilitySub}>{fN(d.kwh_total)} kWh @ {Number(d.unit_rate || 0) > 0 ? fINR(d.unit_rate) : 'tariff pending'}</Text></View>
       <Text style={S.artUtilityAmount}>{fINR(d.elec_total)}</Text><Text style={{fontSize:13,color:'#6b7280',marginLeft:10}}>{open?'▴':'▾'}</Text>
     </TouchableOpacity>
     {open && <>
@@ -1780,9 +1780,9 @@ function ClaudeComparativeChart({ months, states }) {
       key: mo.key,
       label: mo.shortLabel,
       fullLabel: mo.fullLabel || mo.label || mo.shortLabel,
-      prod: Number(row.prod_total_L || 0),
-      picks: Number(row.avg_pick_tot || 0),
-      cpp: Number(row.cpp_total || 0),
+      prod: num(row.prod_total_L),
+      picks: num(row.avg_pick_tot),
+      cpp: num(row.cpp_total),
       hasExpenseData,
     };
   }).reverse();
@@ -1821,8 +1821,10 @@ function ClaudeComparativeChart({ months, states }) {
   const maxCpp = maxCppRaw > 0 ? maxCppRaw * 1.12 : 0.001;
 
   const xForIndex = (index) => plotLeft + step * index + step / 2;
-  const yForProd = (value) => plotBottom - (Number(value || 0) / maxProd) * plotHeight;
-  const yForCpp = (value) => plotBottom - (Number(value || 0) / maxCpp) * plotHeight;
+  // clamped to the plot area so a bad value can never give the native
+  // SVG / view layer an out-of-range or non-finite coordinate
+  const yForProd = (value) => clampNum(plotBottom - (num(value) / maxProd) * plotHeight, plotTop, plotBottom);
+  const yForCpp = (value) => clampNum(plotBottom - (num(value) / maxCpp) * plotHeight, plotTop, plotBottom);
 
   const costPoints = data.map((row, index) => row.hasExpenseData ? {
     index,
@@ -2036,20 +2038,20 @@ function ClaudeEfficiencyCard({ d }) {
   ];
   return (
     <View style={S.clCard}>
-      <Text style={S.clCardTitle}>Efficiency indicators · {d.label}</Text>
+      <Text style={S.clCardTitle}>Efficiency indicators · {d.label ?? ""}</Text>
       <View style={S.clStatGrid}>{rows.map(([label,value])=><View key={label} style={S.clStat}><Text style={S.clStatLabel}>{label}</Text><Text style={S.clStatValue}>{value}</Text></View>)}</View>
     </View>
   );
 }
 
 function ClaudeMonthDelta({ d, prevD }) {
-  const delta=(c,p)=>Number(p||0)!==0?(Number(c||0)-Number(p||0))/Math.abs(Number(p))*100:null;
+  const delta=(c,p)=>num(p)!==0?(num(c)-num(p))/Math.abs(num(p))*100:null;
   const rows=[
     ['TOTAL COST',d.total,prevD?.total,(v)=>fINR(v)],
     ['COST / PICK',d.cpp_total,prevD?.cpp_total,(v)=>`₹${f3(v)}`],
     ['PRODUCTION',d.prod_total_L,prevD?.prod_total_L,(v)=>`${f2(v)} L m`],
   ];
-  return <View style={S.clCard}><Text style={S.clCardTitle}>Month-on-month</Text><Text style={S.clSmallMuted}>{prevD?`${d.label} vs ${prevD.label}`:'No prior month loaded'}</Text><View style={S.clDeltaGrid}>{rows.map(([label,c,p,fmt])=>{const v=delta(c,p);return <View key={label} style={S.clDeltaItem}><Text style={S.clStatLabel}>{label}</Text><Text style={S.clDeltaValue}>{fmt(c)}</Text><Text style={[S.clDeltaPct,{color:v==null?'#A69C91':v>0?'#B54747':'#2F855A'}]}>{v==null?'—':`${v>0?'▲':'▼'} ${Math.abs(v).toFixed(1)}%`}</Text></View>})}</View></View>;
+  return <View style={S.clCard}><Text style={S.clCardTitle}>Month-on-month</Text><Text style={S.clSmallMuted}>{prevD?`${d.label ?? ''} vs ${prevD.label ?? ''}`:'No prior month loaded'}</Text><View style={S.clDeltaGrid}>{rows.map(([label,c,p,fmt])=>{const v=delta(c,p);return <View key={label} style={S.clDeltaItem}><Text style={S.clStatLabel}>{label}</Text><Text style={S.clDeltaValue}>{fmt(c)}</Text><Text style={[S.clDeltaPct,{color:v==null?'#A69C91':v>0?'#B54747':'#2F855A'}]}>{v==null?'—':`${v>0?'▲':'▼'} ${Math.abs(v).toFixed(1)}%`}</Text></View>})}</View></View>;
 }
 
 
@@ -2069,7 +2071,7 @@ function ExpenseDataIntegrityNotice({ d }) {
       <Text style={S.dataIntegrityTitle}>Data reconciliation needs review</Text>
       <Text style={S.dataIntegrityText}>
         {parts.length
-          ? parts.map(([name, value, unit]) => `${name} ${unit === '₹' ? fINR(value) : `${Number(value).toFixed(2)} ${unit}`}`).join(' · ')
+          ? parts.map(([name, value, unit]) => `${name} ${unit === '₹' ? fINR(value) : `${fx(value, 2)} ${unit}`}`).join(' · ')
           : 'One or more Section A/B controls are not reconciled.'}
       </Text>
     </View>
@@ -2089,7 +2091,7 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
       <View style={[S.clPair, isLarge && { flexDirection: 'row' }]}>
         <View style={[S.compositionCard, isLarge && { flex: 1.05, marginBottom: 0 }]}>
           <Text style={S.compositionTitle}>Cost composition · {m.shortLabel} '{m.displayYear}</Text>
-          <DonutChart elec={d.elec_total} sal={d.sal_total} stores={d.store_total} maintenance={d.maintenance_total} other={d.other_total} total={d.total} sectionAB={extended} />
+          <SafeBlock name="Cost composition chart"><DonutChart elec={d.elec_total} sal={d.sal_total} stores={d.store_total} maintenance={d.maintenance_total} other={d.other_total} total={d.total} sectionAB={extended} /></SafeBlock>
         </View>
         <View style={[S.clCard, isLarge && { flex: .95 }]}>
           <Text style={S.clEyebrow}>INPUTS</Text>
@@ -2121,44 +2123,62 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
       <Text style={S.clSectionHeading}>Expense breakdown</Text>
       <View style={S.clBreakGrid}>
         <View>
-          {extended ? <ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
-          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:'View daily ›'} onEdit={extended?undefined:()=>setView('daily-salary')}>
-            {extended ? <>
-              <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_salary,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
-              <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_salary,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
-              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.sal_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.sal_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
-            </> : <>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.sal_rapier)}</Text></View>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.sal_wjet)}</Text></View>
-            </>}
+          {extended ? <SafeBlock name="Utilities"><ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /></SafeBlock> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
+          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:"View daily ›"} onEdit={extended?undefined:()=>setView('daily-salary')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_salary:d.sal_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_salary:d.sal_wjet)}</Text></View>
           </ExpBlock>
           <ExpBlock icon="▣" iconColor="#1D9E75" iconBg="#EAF8F3" title="Production-linked expenses" sub={extended?'Stores & spares · ERP-derived A/B':'Stores & spares'} amt={fINR(d.store_total)}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_stores:d.store_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_stores:d.store_wjet)}</Text></View>
+            {extended ? <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_stores)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_stores,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_stores)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_stores,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.store_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.store_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            </> : <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.store_rapier)}</Text></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.store_wjet)}</Text></View>
+            </>}
           </ExpBlock>
         </View>
         <View>
-          {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · Common" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)}</Text></ExpBlock>}
-          {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct / indirect · A/B/Common" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)}</Text></ExpBlock>}
-          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
-            {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total],...(extended?[['Maintenance',d.maintenance_total],['Other',d.other_total]]:[])].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}<View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total cost</Text><Text style={[S.clABValue,{color:'#B77932'}]}>{fINR(d.total)}</Text></View>
+          {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · common (by effective machine count)" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_maintenance,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_maintenance,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+            <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.maintenance_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.maintenance_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            <Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)} · allocated by the effective A:B machine count for each entry date.</Text>
+          </ExpBlock>}
+          {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct A/B · common allocated by effective machine count" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_other,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_other,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+            <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.other_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.other_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            <Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)} · direct A/B remains direct.</Text>
+          </ExpBlock>}
+          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} avg picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
+            {extended ? <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_a_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_a_cpp)}/pk · ${f2(d.section_a_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_b_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_b_cpp)}/pk · ${f2(d.section_b_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total · A + B</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800',color:'#B77932'}]}>{costingReady?fINR(d.total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.cpp_total)}/pk · ${f2(d.avg_pick_tot)} picks`:'pending'}</Text></View></View>
+              <Text style={[S.clSmallMuted,{marginTop:8}]}>Derived from Electricity + Salary + Stores + Maintenance + Other. A and B use their own weighted production picks.</Text>
+            </> : <>
+              {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total]].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total cost</Text><Text style={[S.clABValue,{color:'#B77932'}]}>{fINR(d.total)}</Text></View>
+            </>}
           </ExpBlock>
         </View>
       </View>
 
       <Text style={S.clSectionHeading}>Comparative analytics · 6 months</Text>
       <View style={[S.clPair, isLarge && { flexDirection:'row' }]}>
-        <View style={isLarge?{flex:1.35}:undefined}><ClaudeComparativeChart months={months} states={states}/></View>
+        <View style={isLarge?{flex:1.35}:undefined}><SafeBlock name="6 month chart"><ClaudeComparativeChart months={months} states={states}/></SafeBlock></View>
         <View style={isLarge?{flex:.65}:undefined}><ClaudeEfficiencyCard d={d}/></View>
       </View>
 
       {extended && <View style={[S.clSplitGrid, isLarge && { flexDirection:'row' }]}>
-        <View style={[S.clCard,{flex:1,alignItems:'center'}]}><Text style={S.clSplitTitle}>Production split · A / B</Text><MiniDonut rapierPct={d.prod_total>0?Number(d.section_a_prod||0)/Number(d.prod_total)*100:0} label="Production split" aLabel="A" bLabel="B" aColor="#185FA5" bColor="#534AB7"/><Text style={S.clSmallMuted}>A {(d.prod_total>0?Number(d.section_a_prod||0)/Number(d.prod_total)*100:0).toFixed(1)}% · B {(d.prod_total>0?Number(d.section_b_prod||0)/Number(d.prod_total)*100:0).toFixed(1)}%</Text></View>
-        <View style={[S.clCard,{flex:1,alignItems:'center'}]}><Text style={S.clSplitTitle}>Cost split · A / B</Text><MiniDonut rapierPct={d.total>0?Number(d.section_a_total||0)/Number(d.total)*100:0} label="Cost split" aLabel="A" bLabel="B" aColor="#185FA5" bColor="#534AB7"/><Text style={S.clSmallMuted}>A {(d.total>0?Number(d.section_a_total||0)/Number(d.total)*100:0).toFixed(1)}% · B {(d.total>0?Number(d.section_b_total||0)/Number(d.total)*100:0).toFixed(1)}%</Text></View>
+        <View style={[S.clCard,{flex:1,alignItems:'center'}]}><Text style={S.clSplitTitle}>Production split · A / B</Text><SafeBlock name="Split chart"><MiniDonut rapierPct={d.prod_total>0?Number(d.section_a_prod||0)/Number(d.prod_total)*100:0} label="Production split" aLabel="A" bLabel="B" aColor="#185FA5" bColor="#534AB7"/></SafeBlock><Text style={S.clSmallMuted}>A {(d.prod_total>0?Number(d.section_a_prod||0)/Number(d.prod_total)*100:0).toFixed(1)}% · B {(d.prod_total>0?Number(d.section_b_prod||0)/Number(d.prod_total)*100:0).toFixed(1)}%</Text></View>
+        <View style={[S.clCard,{flex:1,alignItems:'center'}]}><Text style={S.clSplitTitle}>Cost split · A / B</Text><SafeBlock name="Split chart"><MiniDonut rapierPct={d.total>0?Number(d.section_a_total||0)/Number(d.total)*100:0} label="Cost split" aLabel="A" bLabel="B" aColor="#185FA5" bColor="#534AB7"/></SafeBlock><Text style={S.clSmallMuted}>A {(d.total>0?Number(d.section_a_total||0)/Number(d.total)*100:0).toFixed(1)}% · B {(d.total>0?Number(d.section_b_total||0)/Number(d.total)*100:0).toFixed(1)}%</Text></View>
       </View>}
 
       <ClaudeMonthDelta d={d} prevD={prevD}/>
       <Text style={S.clSectionHeading}>Past performance</Text>
-      <View style={[S.clPastGrid, isLarge && { flexDirection:'row', flexWrap:'wrap' }]}>{months.slice(1).map((mo,i)=><View key={mo.key} style={isLarge?{width:'32.4%'}:{width:'100%'}}><PastRow month={mo} st={states[mo.key]} open={!!pastOpen[i+1]} onToggle={()=>togglePast(i+1)}/></View>)}</View>
+      <View style={[S.clPastGrid, isLarge && { flexDirection:'row', flexWrap:'wrap' }]}>{months.slice(1).map((mo,i)=><View key={mo.key} style={isLarge?{width:'32.4%'}:{width:'100%'}}><SafeBlock name="Month"><PastRow month={mo} st={states[mo.key]} open={!!pastOpen[i+1]} onToggle={()=>togglePast(i+1)}/></SafeBlock></View>)}</View>
     </View>
   );
 }
@@ -2619,7 +2639,7 @@ function CostStructureCard({ d }) {
 
       <View style={{ gap: 14 }}>
         {rows.map(([color, label, value]) => {
-          const width = Math.max(2, Math.min(100, (Number(value || 0) / max) * 100));
+          const width = clampNum((num(value) / max) * 100, 2, 100);
           return (
             <View key={label}>
               <View style={P.structureTop}>
@@ -2901,7 +2921,7 @@ function MonthControlCard({ d }) {
             />
           </View>
           <Text style={P.integrityText}>
-            A + B production difference {Number(integrity.production_difference || 0).toFixed(2)} m ·
+            A + B production difference {fx(integrity.production_difference, 2)} m ·
             Stores difference {fINR(integrity.stores_difference || 0)} ·
             Maintenance difference {fINR(integrity.maintenance_difference || 0)} ·
             Other difference {fINR(integrity.other_difference || 0)}.
@@ -4101,21 +4121,63 @@ import InteractiveDailyTrendChart from "../dashboard/employ/components/Interacti
 // Responsive layout helpers (UI only) — phone 1 col / tablet 2 / desktop 3.
 import { ReportContainer, ResponsiveGrid, SplitPane, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
 import { DASH_GAP } from "@/src/components/dashboard/DashboardGrid";
+// Crash protection: a failing block shows a small "Retry" note instead of
+// taking the screen (or the app) down.
+import { SafeBlock, ScreenErrorBoundary } from "@/src/core/crash/ScreenErrorBoundary";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
 // ── Formatters ────────────────────────────────────────────────────
+// CRASH-SAFETY (iOS + Android): every formatter below accepts anything
+// (undefined, null, "", text, NaN, Infinity) and always returns a string.
+// Number / date text is built by hand — no Intl / toLocaleString — so the
+// result is identical on Hermes (Android) and JavaScriptCore (iOS).
+const num = (v) => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+// toFixed that cannot throw (value may be a string / undefined from the API)
+const fx = (v, digits = 2) => num(v).toFixed(digits);
+// keeps a computed layout / chart number usable by native views
+const clampNum = (v, min, max) => Math.min(max, Math.max(min, num(v)));
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthShort = (dt) => MONTHS_SHORT[dt.getMonth()] || "";
+// Indian digit grouping (12,34,567.89) — same text as toLocaleString("en-IN")
+const formatIN = (value, decimals = 0) => {
+  const n = num(value);
+  const d = Math.min(20, Math.max(0, Math.round(num(decimals))));
+  const abs = Math.abs(n);
+  // round half-up on the decimal text (what toLocaleString did): 1.005 -> 1.01
+  let fixed = abs.toFixed(d);
+  if (String(abs).indexOf("e") < 0 && abs < 1e15 / Math.pow(10, d)) {
+    const shifted = Math.round(Number(`${abs}e${d}`));
+    if (Number.isFinite(shifted)) fixed = Number(`${shifted}e-${d}`).toFixed(d);
+  }
+  if (fixed.indexOf("e") >= 0) return (n < 0 ? "-" : "") + fixed;
+  const dot = fixed.indexOf(".");
+  const whole = dot >= 0 ? fixed.slice(0, dot) : fixed;
+  const fraction = dot >= 0 ? fixed.slice(dot) : "";
+  let grouped = whole.length > 3 ? whole.slice(-3) : whole;
+  let rest = whole.length > 3 ? whole.slice(0, -3) : "";
+  while (rest.length > 2) {
+    grouped = `${rest.slice(-2)},${grouped}`;
+    rest = rest.slice(0, -2);
+  }
+  if (rest) grouped = `${rest},${grouped}`;
+  return `${n < 0 && Number(fixed) !== 0 ? "-" : ""}${grouped}${fraction}`;
+};
+
 const fCr = (v) => {
-  const L = v / 1e5;
+  const L = num(v) / 1e5;
   return L >= 100 ? `₹${(L / 100).toFixed(2)} Cr` : `₹${L.toFixed(2)} L`;
 };
-const fL = (v) => `₹${(v / 1e5).toFixed(2)} L`;
-const fLn = (v) => `${(v / 1e5).toFixed(2)} L`;
-const f2 = (v) => Number(v || 0).toFixed(2);
-const f3 = (v) => Number(v || 0).toFixed(3);
-const f4 = (v) => Number(v || 0).toFixed(4);
-const fN = (v) => Math.round(v || 0).toLocaleString("en-IN");
-const fINR = (v, decimals = 2) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+const fL = (v) => `₹${(num(v) / 1e5).toFixed(2)} L`;
+const fLn = (v) => `${(num(v) / 1e5).toFixed(2)} L`;
+const f2 = (v) => num(v).toFixed(2);
+const f3 = (v) => num(v).toFixed(3);
+const f4 = (v) => num(v).toFixed(4);
+const fN = (v) => formatIN(Math.round(num(v)), 0);
+const fINR = (v, decimals = 2) => `₹${formatIN(v, decimals)}`;
 
 const machineCountNumber = (value) => {
   const n = Number(value);
@@ -4151,7 +4213,7 @@ const ymdLabel = (ymd) => {
   const year = Number(s.slice(0, 4));
   const month = Number(s.slice(4, 6));
   const day = Number(s.slice(6, 8));
-  const mon = new Date(year, month - 1, 1).toLocaleString("en-US", { month: "short" });
+  const mon = MONTHS_SHORT[month - 1] || "";
   return `${String(day).padStart(2, "0")}-${mon}`;
 };
 
@@ -4299,7 +4361,6 @@ const SK = StyleSheet.create({
 
 // ── Month tab ─────────────────────────────────────────────────────
 function MonthTab({ label, active, status, onPress }) {
-  console.log("label",label);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -4329,21 +4390,21 @@ function DonutChart({
   const STROKE = 18;
 
   const values = [
-    { color: "#185FA5", label: "Electricity", amount: Number(elec || 0) },
-    { color: "#c2823a", label: "Salary", amount: Number(sal || 0) },
-    { color: "#1D9E75", label: "Stores", amount: Number(stores || 0) },
+    { color: "#185FA5", label: "Electricity", amount: num(elec) },
+    { color: "#c2823a", label: "Salary", amount: num(sal) },
+    { color: "#1D9E75", label: "Stores", amount: num(stores) },
   ];
 
   if (sectionAB) {
     values.push(
-      { color: "#534AB7", label: "Maintenance", amount: Number(maintenance || 0) },
-      { color: "#BA7517", label: "Other", amount: Number(other || 0) },
+      { color: "#534AB7", label: "Maintenance", amount: num(maintenance) },
+      { color: "#BA7517", label: "Other", amount: num(other) },
     );
   }
 
   const SEGMENTS = values.map((seg) => ({
     ...seg,
-    pct: Number(total || 0) > 0 ? seg.amount / Number(total) : 0,
+    pct: num(total) > 0 ? num(seg.amount / num(total)) : 0,
     value: fL(seg.amount),
   }));
 
@@ -4383,7 +4444,7 @@ function DonutChart({
                 width: SIZE,
                 height: SIZE,
                 overflow: "hidden",
-                transform: [{ rotate: `${arc.start}deg` }],
+                transform: [{ rotate: `${num(arc.start)}deg` }],
               }}
             >
               <View
@@ -4392,7 +4453,7 @@ function DonutChart({
                   width: SIZE,
                   height: SIZE / 2,
                   overflow: "hidden",
-                  transform: [{ rotate: `${Math.min(arc.span, 180)}deg` }],
+                  transform: [{ rotate: `${clampNum(arc.span, 0, 180)}deg` }],
                   transformOrigin: `${SIZE / 2}px ${SIZE / 2}px`,
                 }}
               >
@@ -4465,8 +4526,9 @@ function DonutChart({
 }
 
 // ── Mini donut (Production/Cost split) ───────────────────────────
-function MiniDonut({ rapierPct, label, size = 90 }) {
+function MiniDonut({ rapierPct: rapierPctRaw, label, size = 90 }) {
   const STROKE = 14;
+  const rapierPct = num(rapierPctRaw);
   const wjetPct = 100 - rapierPct;
   return (
     <View style={{ alignItems: "center" }}>
@@ -4767,7 +4829,7 @@ function TrendBars({ rows, valueKey, valueFormatter, selected, onSelect, barColo
         const raw = Number(r?.[valueKey]);
         const v = Number.isFinite(raw) ? raw : 0;
         const active = selected === i;
-        const barPct = available && v > 0 ? Math.max(3, (v / max) * 100) : 0;
+        const barPct = available && v > 0 ? clampNum(Math.max(3, (v / max) * 100), 3, 100) : 0;
 
         return (
           <TouchableOpacity
@@ -4809,17 +4871,15 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
       if (safeTrend.prodKey === 'sud_190') return gm(r,'sud_190');
       if (safeTrend.prodKey === 'sud_230') return gm(r,'sud_230');
       if (safeTrend.prodKey === 'waterjet') return gm(r,'waterjet');
-      if (safeTrend.prodKey === 'rapier') return gm(r,'sud_190') + gm(r,'sud_230');
+      if (safeTrend.prodKey === 'rapier') return gm(r,'mw') + gm(r,'sud_190') + gm(r,'sud_230');
       if (safeTrend.prodKey === 'total') return gm(r,'mw') + gm(r,'sud_190') + gm(r,'sud_230') + gm(r,'waterjet');
       return 0;
     };
     return source.map(r => {
-      const explicit = r?.meter_daily?.[safeTrend.key];
-      const kwh = explicit ? n(explicit.kwh) : n(r?.[safeTrend.key]);
-      const production_mtr = explicit ? n(explicit.production_mtr) : productionFor(r);
-      const amount = explicit ? n(explicit.amount) : kwh * n(r?.unit_rate);
-      const cost_per_mtr = explicit ? n(explicit.cost_per_mtr) : (production_mtr>0?amount/production_mtr:0);
-      return {...r,key:safeTrend.key,kwh,production_mtr,amount,cost_per_mtr};
+      const kwh = n(r?.[safeTrend.key]);
+      const production_mtr = productionFor(r);
+      const amount = kwh * n(r?.unit_rate);
+      return {...r,key:safeTrend.key,kwh,production_mtr,amount,cost_per_mtr:production_mtr>0?amount/production_mtr:0};
     }).filter(r => r.kwh > 0 || r.production_mtr > 0);
   };
   const configuredUtilityRows = isUtility ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key) : [];
@@ -5059,7 +5119,7 @@ function BarRow({
             {fN(kwh)} kWh · {fL(cost)}
           </Text>
           <Text style={{ fontSize: 11, color: "#9ca3af" }}>
-            {costPct?.toFixed(1)}%
+            {fx(costPct, 1)}%
           </Text>
         </View>
       </View>
@@ -5101,7 +5161,7 @@ function BarRow({
       <View style={{ height: 5, backgroundColor: "#f3f4f6", borderRadius: 3 }}>
         <View
           style={{
-            width: `${Math.min(pct, 100)}%`,
+            width: `${clampNum(pct, 0, 100)}%`,
             height: 5,
             backgroundColor: "#185FA5",
             borderRadius: 3,
@@ -5557,7 +5617,7 @@ function KPIGrid({ d, label, cols = 1 }) {
     {
       l: "TOTAL COST",
       v: fCr(d.total),
-      s: `${label} · ${d.days} days${d.section_ab_active && !d.total_cost_complete ? " · INCOMPLETE" : ""}`,
+      s: `${label} · ${d.days ?? 0} days${d.section_ab_active && !d.total_cost_complete ? " · INCOMPLETE" : ""}`,
       c: "#c2823a",
     },
     {
@@ -5576,8 +5636,8 @@ function KPIGrid({ d, label, cols = 1 }) {
     { l: "COST / MC·DAY", v: `₹${fN(d.cpmc)}`, s: machineSub, c: "#534AB7" },
     {
       l: "UNITS",
-      v: `${Math.round(d.kwh_total / 1000)}K kWh`,
-      s: `@ ₹${d.unit_rate}/unit`,
+      v: `${Math.round(num(d.kwh_total) / 1000)}K kWh`,
+      s: `@ ₹${d.unit_rate ?? 0}/unit`,
       c: "#BA7517",
     },
   ];
@@ -5755,7 +5815,7 @@ function PastRow({ month, st, open, onToggle }) {
               : st.status === "error"
                 ? "Failed"
                 : d
-                  ? `${f2(d.prod_total_L)} L m · ${d.days} days${d.section_ab_active ? " · Section A/B" : ""}`
+                  ? `${f2(d.prod_total_L)} L m · ${d.days ?? 0} days${d.section_ab_active ? " · Section A/B" : ""}`
                   : "—"}
           </Text>
         </View>
@@ -5798,14 +5858,14 @@ function PastRow({ month, st, open, onToggle }) {
               ? [
                   ["Cost / pick", `₹${f3(d.cpp_total)}`],
                   ["Cost / mc·day", `₹${fN(d.cpmc)}`],
-                  ["Section A", `${fLn(d.section_a_total || 0)} · ${d.section_a_pct?.toFixed(1)}%`],
-                  ["Section B", `${fLn(d.section_b_total || 0)} · ${d.section_b_pct?.toFixed(1)}%`],
+                  ["Section A", `${fLn(d.section_a_total || 0)} · ${fx(d.section_a_pct, 1)}%`],
+                  ["Section B", `${fLn(d.section_b_total || 0)} · ${fx(d.section_b_pct, 1)}%`],
                 ]
               : [
                   ["Cost / pick", `₹${f3(d.cpp_total)}`],
                   ["Cost / mc·day", `₹${fN(d.cpmc)}`],
-                  ["Rapier", `${fLn(d.total_rapier || 0)} · ${d.rapier_pct?.toFixed(1)}%`],
-                  ["W-Jet", `${fLn(d.total_wjet || 0)} · ${d.wjet_pct?.toFixed(1)}%`],
+                  ["Rapier", `${fLn(d.total_rapier || 0)} · ${fx(d.rapier_pct, 1)}%`],
+                  ["W-Jet", `${fLn(d.total_wjet || 0)} · ${fx(d.wjet_pct, 1)}%`],
                 ]).map(([l, v]) => (
               <View key={l} style={S.pastMiniCard}>
                 <Text style={S.pastMiniLabel}>{l}</Text>
@@ -5824,13 +5884,13 @@ function MonthSettings({ d }) {
   const rows = d.section_ab_active
     ? [
         ["Unit rate (₹/kWh)", fINR(d.unit_rate)],
-        ["Working days", String(Number(d.days || 0))],
+        ["Working days", String(num(d.days))],
         ["Stores — Section A", fINR(d.section_a_stores)],
         ["Stores — Section B", fINR(d.section_b_stores)],
       ]
     : [
         ["Unit rate (₹/kWh)", fINR(d.unit_rate)],
-        ["Working days", String(Number(d.days || 0))],
+        ["Working days", String(num(d.days))],
         ["Stores — Rapier", fINR(d.store_rapier)],
         ["Stores — Waterjet", fINR(d.store_wjet)],
       ];
@@ -5887,11 +5947,7 @@ function ExpenseCoverageNotice({ d, month }) {
     const day = Number(value.slice(6, 8));
     const dt = new Date(year, monthIndex, day);
     if (Number.isNaN(dt.getTime())) return null;
-    return dt.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return `${String(dt.getDate()).padStart(2, '0')} ${monthShort(dt)} ${dt.getFullYear()}`;
   };
 
   const formatShortYmd = (ymd) => {
@@ -5902,10 +5958,7 @@ function ExpenseCoverageNotice({ d, month }) {
     const day = Number(value.slice(6, 8));
     const dt = new Date(year, monthIndex, day);
     if (Number.isNaN(dt.getTime())) return null;
-    return dt.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-    });
+    return `${String(dt.getDate()).padStart(2, '0')} ${monthShort(dt)}`;
   };
 
   const requestedText = formatYmd(requestedYmd);
@@ -6064,7 +6117,7 @@ function ProductionBlock({ d }) {
           const n = Number(value || 0);
           if (Math.abs(n) >= 100000) return `${(n / 100000).toFixed(2)} L m`;
           if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)} K m`;
-          return `${Math.round(n).toLocaleString('en-IN')} m`;
+          return `${formatIN(Math.round(n), 0)} m`;
         }}
       />
       </View>
@@ -6198,7 +6251,7 @@ export default function ExpenseScreen({ token, apiBase }) {
           contentContainerStyle={{ paddingBottom: 32 }}
         >
           <ReportContainer onLayout={layout.onLayout} maxWidth={980}>
-            {subViews[view]}
+            <ScreenErrorBoundary key={`${view}:${m.key}`} name="this entry screen">{subViews[view]}</ScreenErrorBoundary>
           </ReportContainer>
         </ScrollView>
       </View>
@@ -6208,7 +6261,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   // ── Main report ───────────────────────────────────────────────
   return (
     <View style={S.safe}>
-      <DailyTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} />
+      <SafeBlock name="Daily trend"><DailyTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} /></SafeBlock>
       <ScrollView
         style={S.body}
         showsVerticalScrollIndicator={false}
@@ -6244,14 +6297,14 @@ export default function ExpenseScreen({ token, apiBase }) {
           expanded={avgPicksOpen}
           onPress={() => setAvgPicksOpen((o) => !o)}
         /> */}
-        <AvgPicksSection
+        <SafeBlock name="Avg picks"><AvgPicksSection
           token={token}
           apiBase={apiBase}
           month={m}
           expanded={avgPicksOpen}
           context={context}
           refresh={refresh}
-        />
+        /></SafeBlock>
 
         {/* Loading */}
         {st?.status === "loading" && (
@@ -6278,7 +6331,7 @@ export default function ExpenseScreen({ token, apiBase }) {
 
         {/* Data */}
         {st?.status === "done" && d && (
-          <ClaudeDashboardV4
+          <ScreenErrorBoundary key={m.key} name="the expense report"><ClaudeDashboardV4
             d={d}
             m={m}
             months={months}
@@ -6289,7 +6342,7 @@ export default function ExpenseScreen({ token, apiBase }) {
             setTrendSheet={setTrendSheet}
             pastOpen={pastOpen}
             togglePast={togglePast}
-          />
+          /></ScreenErrorBoundary>
         )}
         </ReportContainer>
       </ScrollView>

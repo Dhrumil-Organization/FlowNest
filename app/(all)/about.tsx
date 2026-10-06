@@ -4,6 +4,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from '@/src/core/theme/themeMode';
 import {
     Animated,
     Dimensions,
@@ -204,6 +205,10 @@ const STATS = [
 ];
 
 export default function AboutScreen() {
+    // Theme: this page is outside the NEW ERP navigator, so it listens to the
+    // theme itself — on a change the whole page is drawn again in the new
+    // colours (nothing typed on the page is lost).
+    useTheme();
     const router = useRouter();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;

@@ -71,7 +71,7 @@ export default function HeaderNew({
 
     const handleHome = () => {
         closeMenu();
-        router.replace('/(tabs)');
+        router.replace('/new/(tabs)' as any);
     };
 
     const handleLogout = () => {
@@ -216,9 +216,9 @@ export default function HeaderNew({
                                 style={styles.menuItem}
                                 onPress={() => {
                                     closeMenu();
-                                    if (item === 'Home') router.replace('/(tabs)');
-                                    if (item === 'Settings') router.replace('/settings_main');
-                                    if (item === 'Profile') router.replace('/profile');
+                                    if (item === 'Home') router.replace('/new/(tabs)' as any);
+                                    if (item === 'Settings') router.push('/new/settings' as any);
+                                    if (item === 'Profile') router.push('/new/profile' as any);
                                 }}>
                                 <Text>{item}</Text>
                             </TouchableOpacity>

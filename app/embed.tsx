@@ -1,9 +1,6 @@
-import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
-import { initAPI, initAPIForPrinterList, initAPIForSticker } from '@/common/API/dynamicAPI';
 import { initNewErpAPI, setNewErpProperty } from '@/src/api/client';
 import { performLogin } from '@/src/core/authFlow';
-import { performLegacyEmbeddedLogin } from '@/src/core/embeddedLegacyLogin';
 import {
   FLOWNEST_EMBED_AUTH,
   getEmbeddedParentOrigin,
@@ -13,7 +10,7 @@ import {
   type EmbeddedAuthPayload,
 } from '@/src/core/embeddedAuth';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -23,7 +20,6 @@ import {
   View,
 } from 'react-native';
 
-type ERPChoice = 'NEW' | 'OLD';
 type Property = 'sudamo_knits' | 'rayons';
 
 type AuthState = {
@@ -47,57 +43,45 @@ async function clearEmbeddedSession() {
   ]);
 }
 
-function SelectionScreen({
-  auth,
-  onSelect,
-  busy,
-  error,
-}: {
-  auth: AuthState;
-  onSelect: (erp: ERPChoice) => void;
-  busy: boolean;
-  error: string | null;
-}) {
-  return (
-    <View style={styles.centered}>
-      <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
-      <Text style={styles.title}>Select ERP</Text>
-      <Text style={styles.subtitle}>
-        Choose the ERP you want to open for {auth.property === 'rayons' ? 'Rayons' : 'Sudamo / Knits'}.
-      </Text>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <TouchableOpacity
-        style={[styles.card, busy && styles.disabled]}
-        disabled={busy}
-        onPress={() => onSelect('NEW')}
-        activeOpacity={0.88}
-      >
-        <Text style={styles.cardTitle}>New ERP</Text>
-        <Text style={styles.cardText}>Open the current New ERP platform.</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.card, busy && styles.disabled]}
-        disabled={busy}
-        onPress={() => onSelect('OLD')}
-        activeOpacity={0.88}
-      >
-        <Text style={styles.cardTitle}>Legacy ERP</Text>
-        <Text style={styles.cardText}>Open the existing Legacy ERP platform.</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
+// Embedded (iframe) entry. The parent application sends the credentials with
+// postMessage; the ERP then opens directly. There is ONE ERP now, so the old
+// "New ERP / Legacy ERP" choice between the two steps is removed — the login
+// itself (performLogin + property API selection) is unchanged.
 export default function EmbeddedFlowNestScreen() {
   const embedded = useMemo(() => isEmbeddedWeb(), []);
   const [auth, setAuth] = useState<AuthState | null>(null);
-  const [erp, setErp] = useState<ERPChoice | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const opening = useRef(false);
+
+  const openErp = useCallback(async (credentials: AuthState) => {
+    if (opening.current) return;
+    opening.current = true;
+    setBusy(true);
+    setError(null);
+
+    try {
+      await clearEmbeddedSession();
+
+      await AsyncStorage.setItem('LOOKUP_PLATFORM', 'NEW');
+      await setNewErpProperty(credentials.property);
+      await initNewErpAPI();
+
+      const result = await performLogin(credentials.username, credentials.password);
+      if (!result.success) {
+        throw new Error(result.message || 'ERP login failed.');
+      }
+
+      router.replace('/new/(tabs)');
+    } catch (e: any) {
+      console.error('Embedded ERP open failed:', e);
+      setError(e?.message || 'Unable to open ERP.');
+    } finally {
+      opening.current = false;
+      setBusy(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !embedded) {
@@ -122,60 +106,18 @@ export default function EmbeddedFlowNestScreen() {
         return;
       }
 
-      setAuth({ username, password, property });
-      setErp(null);
+      const credentials: AuthState = { username, password, property };
+      setAuth(credentials);
       setError(null);
       setReady(true);
+      void openErp(credentials);
     };
 
     window.addEventListener('message', handleMessage);
     notifyParentReady();
 
     return () => window.removeEventListener('message', handleMessage);
-  }, [embedded]);
-
-  const handleERPChoice = async (choice: ERPChoice) => {
-    if (!auth || busy) return;
-
-    setBusy(true);
-    setError(null);
-    setErp(choice);
-
-    try {
-      await clearEmbeddedSession();
-
-      if (choice === 'NEW') {
-        await AsyncStorage.setItem('LOOKUP_PLATFORM', 'NEW');
-        await setNewErpProperty(auth.property);
-        await initNewErpAPI();
-
-        const result = await performLogin(auth.username, auth.password);
-        if (!result.success) {
-          throw new Error(result.message || 'New ERP login failed.');
-        }
-
-        router.replace('/new/(tabs)');
-        return;
-      }
-
-      await AsyncStorage.setItem('LOOKUP_PLATFORM', 'OLD');
-      await AsyncStorage.setItem('selected_property', auth.property);
-      await Promise.all([initAPI(auth.property), initAPIForPrinterList(), initAPIForSticker()]);
-
-      const result = await performLegacyEmbeddedLogin(auth);
-      if (!result.success) {
-        throw new Error(result.message || 'Legacy ERP login failed.');
-      }
-
-      router.replace('/(tabs)');
-    } catch (e: any) {
-      console.error('Embedded ERP open failed:', e);
-      setError(e?.message || 'Unable to open ERP.');
-      setErp(null);
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, [embedded, openErp]);
 
   if (Platform.OS !== 'web') {
     return (
@@ -205,28 +147,34 @@ export default function EmbeddedFlowNestScreen() {
         <Text style={styles.waitText}>
           Parent origin: {getEmbeddedParentOrigin() || 'not configured'}
         </Text>
+        {error ? <Text style={[styles.error, { marginTop: 12 }]}>{error}</Text> : null}
       </View>
     );
   }
 
-  if (busy) {
+  if (busy || !error) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#C87516" />
-        <Text style={styles.waitTitle}>
-          Opening {erp === 'NEW' ? 'New ERP' : 'Legacy ERP'}…
-        </Text>
+        <Text style={styles.waitTitle}>Opening ERP…</Text>
+        <Text style={styles.waitText}>{auth.property === 'rayons' ? 'Rayons' : 'Sudamo / Knits'}</Text>
       </View>
     );
   }
 
+  // The login failed: show why and let the user try again.
   return (
-    <SelectionScreen
-      auth={auth}
-      onSelect={handleERPChoice}
-      busy={busy}
-      error={error}
-    />
+    <View style={styles.centered}>
+      <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
+      <Text style={styles.title}>Unable to open ERP</Text>
+      <Text style={styles.error}>{error}</Text>
+      <TouchableOpacity style={styles.card} onPress={() => void openErp(auth)} activeOpacity={0.88}>
+        <Text style={styles.cardTitle}>Try again</Text>
+        <Text style={styles.cardText}>
+          Sign in again for {auth.property === 'rayons' ? 'Rayons' : 'Sudamo / Knits'}.
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 

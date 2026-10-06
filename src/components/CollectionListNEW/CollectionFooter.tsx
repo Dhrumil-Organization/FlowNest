@@ -96,7 +96,7 @@ const Footer: React.FC<FooterProps> = ({
   };
 
   // 👇 Apne actual expo-router routes ke hisaab se path adjust karo
-  const handleHomePress = () => router.push('/(tabs)');
+  const handleHomePress = () => router.push('/new/(tabs)' as any);
   const handleDailyReportPress = () => router.push('/DailyCollectionRPT');
 
   async function getAccessToken(): Promise<string | null> {

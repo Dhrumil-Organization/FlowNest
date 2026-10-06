@@ -72,7 +72,7 @@
 //       onPress={onPress}
 //       activeOpacity={0.7}
 //       style={[S.monthTab, active && S.monthTabActive]}
-//     >
+//     > 
 //       <Text style={[S.monthTabText, active && S.monthTabTextActive]}>
 //         {label}
 //       </Text>

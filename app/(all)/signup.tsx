@@ -21,6 +21,7 @@ import {
   PasswordToggle,
 } from '../../src/components/auth/AuthUI';
 import { T } from '../../src/theme';
+import { useTheme } from '@/src/core/theme/themeMode';
 
 type FieldStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
@@ -553,7 +554,7 @@ function SignupForm() {
 
       <View style={styles.loginRow}>
         <Text style={styles.loginText}>Already have an account? </Text>
-        <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+        <TouchableOpacity onPress={() => router.replace('/new/property-select')}>
           <Text style={styles.loginLink}>Login</Text>
         </TouchableOpacity>
       </View>
@@ -564,6 +565,11 @@ function SignupForm() {
 /* ---------- SHELL ---------- */
 export default function Signup() {
   const router = useRouter();
+  // Theme: this page is outside the NEW ERP navigator, so it listens to the
+  // theme itself — on a change the whole page is drawn again in the new
+  // colours (nothing typed on the page is lost).
+  useTheme();
+
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();

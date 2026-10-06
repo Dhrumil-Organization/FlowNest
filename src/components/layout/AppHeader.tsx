@@ -11,6 +11,7 @@ import { performLogin } from '../../core/authFlow';
 import { getCredentialsForPropertySwitch } from '../../lib/biometricAuth';
 import { useAppSessionStore } from '../../stores/AppSessionStore';
 import { T } from '../../theme';
+import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 
@@ -232,6 +233,17 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
 
       <View style={[s.right, size !== 'mobile' && s.rightWide]}>
         {right}
+        {/* Theme: one tap on tablet / desktop; on phones it is inside Settings. */}
+        {size !== 'mobile' ? <ThemeToggleButton onDark size={size === 'desktop' ? 38 : 36} /> : null}
+        <TouchableOpacity
+          onPress={() => router.push('/new/settings' as any)}
+          style={[s.iconBtn, size === 'desktop' && s.iconBtnDesktop]}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Open settings"
+        >
+          <Icon name="settings" size={iconSize} color="#fff" />
+        </TouchableOpacity>
         {showSignOut && <TouchableOpacity
           onPress={signOut}
           style={[s.iconBtn, size === 'desktop' && s.iconBtnDesktop]}

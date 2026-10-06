@@ -476,6 +476,15 @@ registerPermissionArea({
           name: 'Weft Carton Issue',
           type: 'screen',
           displayOrder: 90,
+        },
+        // Yarn Sales Order — sales order list · party · item / grade / shade rows · save / modify / delete / print
+        // (moved from the legacy ERP; legacy route yarn-sales-order stays as-is)
+        {
+          key: 'yarn_sales_order',
+          name: 'Yarn Sales Order',
+          type: 'screen',
+          displayOrder: 157,
+          actions: [{ key: 'view', name: 'View' }],
         }
         // <-- add your new feature's resource object here (step 1)
       ],
@@ -1549,6 +1558,26 @@ registerUiNodes([
     permission: 'production.weft_carton_issue_new',
     action: 'view',
     order: 126,
+  },
+  // Yarn Sales Order (list · select party · order summary · item -> grade -> shade -> qty / rate · save · print)
+  // — moved from the legacy ERP
+  {
+    id: 'nav.yarn_sales_order',
+    kind: 'navigation',
+    title: 'Yarn Sales Order',
+    permission: 'production.yarn_sales_order',
+    action: 'view',
+    route: 'yarn-sales-order',
+    icon: 'shopping-cart-checkout',
+    order: 157,
+  },
+  {
+    id: 'screen.yarn_sales_order',
+    kind: 'screen',
+    title: 'Yarn Sales Order',
+    permission: 'production.yarn_sales_order',
+    action: 'view',
+    order: 157,
   }
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

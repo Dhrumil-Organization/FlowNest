@@ -7,9 +7,9 @@ This update adds a dedicated web-only `/embed` route. The existing browser and m
 1. Parent React app embeds `https://flownest.tms-webapp.com/embed`.
 2. FlowNest sends `FLOWNEST_READY` to the parent.
 3. Parent sends `{ type: 'FLOWNEST_AUTH', username, password, property }` with `postMessage`.
-4. FlowNest shows only `New ERP` / `Legacy ERP`.
-5. New ERP reuses the existing `performLogin()` + property API selection.
-6. Legacy ERP uses a dedicated embedded login helper that writes the same legacy session keys used by the existing dashboard.
+4. FlowNest signs in and opens the ERP directly (there is one ERP now — the `New ERP` / `Legacy ERP` choice was removed on 6 Oct 2026).
+5. The login reuses the existing `performLogin()` + property API selection.
+6. If the login fails, the reason and a `Try again` button are shown inside the iframe.
 
 ## Parent-origin configuration
 

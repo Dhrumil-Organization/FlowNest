@@ -4,6 +4,8 @@ import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { TopInsetHandled } from '@/src/core/layout/topInset';
 import { APP_NAVIGATION } from '@/src/core/navigation';
 import { usePermission } from '@/src/core/permissions';
+import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
+import { useMyScreens } from '@/src/core/userPrefs/useMyScreens';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -12,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ScreenErrorBoundary } from '@/src/core/crash/ScreenErrorBoundary';
 import {
   Animated,
   Keyboard,
@@ -225,22 +228,11 @@ export default function TabsLayout() {
   //     return true;
   //   });
   // }, [ready, canAccess, canDo]);
-  const visibleItems = useMemo(() => {
-    const filtered = APP_NAVIGATION.filter((item) => {
-      if (!ready) return false;
-      // Skip "Orders" tab
-      // if (item.routeName === 'orders') return false;
-      return item.action && item.action !== 'view'
-        ? canDo(item.resource, item.action)
-        : canAccess(item.resource);
-    });
-    const seen = new Set<string>();
-    return filtered.filter((item) => {
-      if (seen.has(item.routeName)) return false;
-      seen.add(item.routeName);
-      return true;
-    });
-  }, [ready, canAccess, canDo]);
+  // The permission-visible list is built in ONE place now (useMyScreens — same
+  // rule as before: registry order, rights filter, dedupe by routeName).
+  // `visibleItems` is that list minus the screens the user switched off in
+  // Settings > My screens. Rights are not involved in that second step.
+  const { shownItems: visibleItems } = useMyScreens();
 
   const primaryItems = useMemo(() => visibleItems.slice(0, MAX_PRIMARY_TABS), [visibleItems]);
   const primaryRouteNames = useMemo(
@@ -301,6 +293,7 @@ export default function TabsLayout() {
             onSearchChange={setSidebarSearch}
             onNavigate={goTo}
             onClearSearch={() => setSidebarSearch('')}
+            onOpenSettings={() => router.push('/new/settings' as any)}
           />
         ) : null}
 
@@ -318,9 +311,12 @@ export default function TabsLayout() {
             <Tabs
               key={sessionEpoch}
               screenLayout={({ children, route }: { children: React.ReactNode; route: { name: string } }) => (
-                <React.Fragment key={`${route.name}:${routeVisits[route.name] || 0}`}>
+                // ScreenErrorBoundary: a screen that fails shows "Try again" in
+                // its own area — header, menu and every other screen keep
+                // working. Opening the module again from the menu clears it.
+                <ScreenErrorBoundary key={`${route.name}:${routeVisits[route.name] || 0}`}>
                   {children}
-                </React.Fragment>
+                </ScreenErrorBoundary>
               )}
               screenOptions={{
                 headerShown: false,
@@ -449,6 +445,7 @@ type DesktopSidebarProps = {
   onSearchChange: (value: string) => void;
   onNavigate: (routeName: string) => void;
   onClearSearch: () => void;
+  onOpenSettings: () => void;
 };
 
 // DESKTOP SIDEBAR (web >= 1180px): compact rows, width follows the window
@@ -462,6 +459,7 @@ function DesktopSidebar({
   onSearchChange,
   onNavigate,
   onClearSearch,
+  onOpenSettings,
 }: DesktopSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const width = collapsed ? 68 : windowWidth >= 1440 ? 248 : 224;
@@ -557,6 +555,20 @@ function DesktopSidebar({
       </ScrollView>
       {!collapsed ? (
         <View style={desktopStyles.sidebarFooter}>
+          {/* Theme (Light / Dark) + Settings — same controls as the header. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <ThemeToggleButton onDark size={34} label />
+            <TouchableOpacity
+              onPress={onOpenSettings}
+              style={{ height: 34, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(255,255,255,0.06)' }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+            >
+              <Icon name="settings" size={16} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>Settings</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={desktopStyles.footerHint}>ERP workspace</Text>
           <Text style={desktopStyles.footerHintMuted} numberOfLines={2}>Use the search to jump to any module.</Text>
         </View>

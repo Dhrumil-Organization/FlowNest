@@ -1,4 +1,3 @@
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -9,9 +8,8 @@ export default function NotificationAccessDeniedScreen() {
   const params = useLocalSearchParams<{ platform?: string; route?: string }>();
 
   const goHome = async () => {
-    const stored = await AsyncStorage.getItem('LOOKUP_PLATFORM');
-    const platform = String(stored || params.platform || '').toUpperCase();
-    router.replace(platform === 'NEW' ? '/new' : '/(tabs)');
+    // One ERP: home is always the ERP dashboard.
+    router.replace('/new');
   };
 
   return (
@@ -24,10 +22,10 @@ export default function NotificationAccessDeniedScreen() {
       <View style={styles.icon}><Text style={styles.iconText}>!</Text></View>
       <Text style={styles.title}>Notification screen unavailable</Text>
       <Text style={styles.message}>
-        This notification points to a screen that is not available in your current ERP system, or you do not have permission to access it.
+        This notification points to a screen that is not available, or you do not have permission to access it.
       </Text>
       <Text style={styles.subMessage}>
-        You may be using the wrong ERP system, or this screen may not be included in your assigned access. Please contact your administrator.
+        This screen may not be included in your assigned access. Please contact your administrator.
       </Text>
 
       <TouchableOpacity style={styles.button} onPress={goHome}>

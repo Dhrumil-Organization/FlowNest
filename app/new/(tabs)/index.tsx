@@ -1,5 +1,6 @@
 import { APP_NAVIGATION, PermissionRouteGuard } from '@/src/core/navigation';
 import { usePermission } from '@/src/core/permissions';
+import { useMyScreens } from '@/src/core/userPrefs/useMyScreens';
 import { DashboardScreen as DashboardScreen1 } from '@/src/screens/dashboard/DashboardScreen';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import AsyncStorage from '@/common/utils/compatibleStorage';
@@ -28,16 +29,20 @@ export default function DashboardRoute() {
   // The target is always a screen the user IS allowed to open and is never
   // this index route, so it cannot loop back here.
   const ready = hydrated && Boolean(appSession);
+  // Settings > My screens: a screen the user switched off is not picked as the
+  // first screen while another allowed one is still shown (rights unchanged).
+  const { shownItems } = useMyScreens();
   const firstAllowedRoute = useMemo(() => {
     if (!ready || canAccess('dashboard')) return null;
-    const first = APP_NAVIGATION.find((item) => {
+    const isAllowed = (item: (typeof APP_NAVIGATION)[number]) => {
       if (!item.routeName || item.routeName === 'index') return false;
       return item.action && item.action !== 'view'
         ? canDo(item.resource, item.action)
         : canAccess(item.resource);
-    });
+    };
+    const first = shownItems.find(isAllowed) || APP_NAVIGATION.find(isAllowed);
     return first ? first.routeName.replace(/\/index$/, '') : null;
-  }, [ready, canAccess, canDo]);
+  }, [ready, canAccess, canDo, shownItems]);
 
   if (firstAllowedRoute) {
     return <Redirect href={`/new/(tabs)/${firstAllowedRoute}` as any} />;

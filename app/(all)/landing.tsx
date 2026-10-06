@@ -397,6 +397,9 @@
 // });
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import { ensureSingleErp } from '@/src/core/singleErp';
+import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
+import { useTheme } from '@/src/core/theme/themeMode';
 import { AuthButton, BrandMark, NAVY, useAuthResponsive } from '@/src/components/auth/AuthUI';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -415,6 +418,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const CARD_SPACING = 14;
 export default function LandingPage() {
+    // Theme: this page is outside the NEW ERP navigator, so it listens to the
+    // theme itself — on a change the whole page is drawn again in the new
+    // colours (nothing typed on the page is lost).
+    useTheme();
     const router = useRouter();
     const params = useLocalSearchParams<{ notificationLoginRequired?: string }>();
     const [notificationLoginRequired, setNotificationLoginRequired] = useState(false);
@@ -440,13 +447,11 @@ export default function LandingPage() {
 
     useEffect(() => {
         const check = async () => {
+            // One ERP: an old-platform session is cleared here (sign in again).
+            await ensureSingleErp();
             const token = await AsyncStorage.getItem('access_token');
-            const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
-            console.log('L:', l);
-            if (token && l === 'NEW') {
+            if (token) {
                 router.replace('/new');
-            } else if (token && l !== 'NEW') {
-                router.replace('/(tabs)');
             }
         };
         check();
@@ -520,7 +525,11 @@ export default function LandingPage() {
         },
     ];
 
-    const goLogin = () => router.replace('/lookup-select');
+    // Straight to the ERP sign-in (the Legacy / New selection step is removed).
+    const goLogin = async () => {
+        await ensureSingleErp();
+        router.replace('/new/property-select');
+    };
     const goSignup = () => router.push('/signup');
 
     const stats = [
@@ -561,12 +570,20 @@ export default function LandingPage() {
                                 </TouchableOpacity>
                                 <AuthButton label="Sign Up" variant="outlineLight" onPress={goSignup} style={styles.navBtn} />
                                 <AuthButton label="Login" onPress={goLogin} style={[styles.navBtn, { marginLeft: 10 }]} />
+                                {/* Light <-> Dark */}
+                                <View style={{ marginLeft: 10 }}>
+                                    <ThemeToggleButton onDark size={40} />
+                                </View>
                             </View>
                         ) : (
-                            <TouchableOpacity onPress={goLogin} style={styles.navLoginPill} accessibilityRole="button">
-                                <Text style={styles.navLoginText}>Login</Text>
-                                <Icon name="arrow-forward" size={15} color="#fff" />
-                            </TouchableOpacity>
+                            <View style={styles.navMobileRight}>
+                                {/* Light <-> Dark */}
+                                <ThemeToggleButton onDark size={34} />
+                                <TouchableOpacity onPress={goLogin} style={styles.navLoginPill} accessibilityRole="button">
+                                    <Text style={styles.navLoginText}>Login</Text>
+                                    <Icon name="arrow-forward" size={15} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </View>
 
@@ -875,6 +892,7 @@ const styles = StyleSheet.create({
         paddingBottom: 8,
     },
     navLinks: { flexDirection: 'row', alignItems: 'center' },
+    navMobileRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     navLink: { paddingHorizontal: 14, paddingVertical: 8 },
     navLinkText: { color: NAVY.sub, fontSize: 14, fontWeight: '700' },
     navBtn: { minHeight: 40, borderRadius: 11, paddingHorizontal: 18 },

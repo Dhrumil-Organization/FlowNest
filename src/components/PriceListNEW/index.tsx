@@ -185,7 +185,7 @@ export default function PriceListNEW({ token, API }: Props) {
   const handleAddNewRateDate = () => {
     AppAlert.alert(
       'Add new rate date',
-      'New rate dates are entered in the POY Rate Entry module. Open POY Rate Entry from the NEW ERP menu — this price list reloads automatically when you come back.',
+      'New rate dates are entered in the POY Rate Entry module. Open POY Rate Entry from the menu — this price list reloads automatically when you come back.',
     );
   };
 

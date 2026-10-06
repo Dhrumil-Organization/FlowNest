@@ -18,6 +18,8 @@ import { T } from '@/src/theme';
 import { useFonts } from 'expo-font';
 import { ERP_FONT_FILES, ErpFontScope, ErpTypeScale, getErpTypeScale } from '@/src/core/fonts/erpFont';
 import { installErpFont } from '@/src/core/fonts/erpFontPatch';
+import { ThemeRoot } from '@/src/core/theme/ThemeRoot';
+import { screenGuard } from '@/src/core/crash/ScreenErrorBoundary';
 
 // NEW ERP font: Inter on every text of this tree (see src/core/fonts/erpFont.tsx).
 installErpFont();
@@ -64,7 +66,12 @@ export default function NewAppLayout() {
         <SafeAreaProvider>
           <StatusBar barStyle="light-content" backgroundColor={T.nav} />
           <AppCoreProvider>
-            <Stack screenOptions={{ headerShown: false }} />
+            {/* Light <-> Dark: the screens under here are rebuilt once in the new
+                theme. The open route is kept (the stack's state lives in the
+                parent navigator), the providers above stay mounted. */}
+            <ThemeRoot>
+              <Stack screenOptions={{ headerShown: false }} screenLayout={screenGuard} />
+            </ThemeRoot>
           </AppCoreProvider>
         </SafeAreaProvider>
       </NotificationProvider>

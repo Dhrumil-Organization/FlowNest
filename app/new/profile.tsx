@@ -35,6 +35,7 @@ import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -123,6 +124,7 @@ export default function ProfileScreen() {
   // RESPONSIVE: phone = single column; tablet / web = centred page (max
   // 980px) with a horizontal hero and the two detail cards side by side.
   const { width } = useWindowDimensions();
+  const settingsRouter = useRouter();
   const isWide = width >= 760;
   const isDesktop = Platform.OS === 'web' && width >= 1180;
   const gutter = isDesktop ? 28 : isWide ? 22 : width < 360 ? 12 : 16;
@@ -253,6 +255,24 @@ export default function ProfileScreen() {
           </View>
           </View>
         </View>
+
+        {/* Settings: theme (Light / Dark) and "My screens" */}
+        <TouchableOpacity
+          onPress={() => settingsRouter.push('/new/settings' as any)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Open settings"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, borderRadius: 14, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface }}
+        >
+          <View style={{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: `${T.copper}16` }}>
+            <Icon name="settings" size={20} color={T.copper} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 14.5, fontWeight: '800', color: T.ink }}>Settings</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: T.muted, marginTop: 2 }} numberOfLines={1}>Theme and the screens shown in your menu</Text>
+          </View>
+          <Icon name="chevron-right" size={22} color={T.muted} />
+        </TouchableOpacity>
 
         <View style={[st.columns, isWide && st.columnsWide]}>
         {/* Account details */}

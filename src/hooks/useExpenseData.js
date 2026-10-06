@@ -441,7 +441,8 @@ const ymdLabel = (ymd) => {
   const month = Number(s.slice(4, 6));
   const day = Number(s.slice(6, 8));
   if (!year || month < 1 || month > 12 || day < 1 || day > 31) return '';
-  const mon = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short' });
+  // no Intl: same text on Hermes (Android) and JavaScriptCore (iOS)
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1] || '';
   return `${String(day).padStart(2, '0')}-${mon}`;
 };
 

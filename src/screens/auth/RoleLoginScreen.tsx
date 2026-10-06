@@ -331,11 +331,11 @@ export function RoleLoginScreen({ notice, onBack }: { notice?: string | null; on
 
   return (
     <AuthShell
-      eyebrow="NEW ERP SYSTEM"
+      eyebrow="MADHUSUDHAN FABRICS"
       title="Sign in"
       subtitle="Username and password only. Year, property, group and store are derived automatically from your ERP user defaults."
       onBack={onBack || goBack}
-      brandTitle="Welcome to the New ERP"
+      brandTitle="Welcome to the ERP"
       brandSubtitle="Login creates your business context and permission context for every screen you open."
       highlights={highlights}
     >

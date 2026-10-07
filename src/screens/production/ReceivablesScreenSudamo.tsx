@@ -1,11 +1,14 @@
 import React from 'react';
-import PayableNew from '../../components/PayableNew';
+import ReceivablesSudamoNEW from '../../components/OutstandingNEW/ReceivablesSudamo';
 import { ErpSessionGate } from '../../core/session/erpSession';
 
-// Token + API host come from the common ErpSessionGate:
-//   - sudamo_knits -> apig, rayons -> apiy (login selection AND header switch)
-//   - screen renders only after the correct token/host are known
-//   - screen remounts fresh when property or token changes (no refresh needed)
+// Receivables Sudamo on its own (always the Sudamo / Knits screen).
+// The menu does not open this one directly: `ReceivablesScreen` picks
+// Sudamo or Rayons from the logged-in property.
 export function ReceivablesScreenSudamo() {
-  return <ErpSessionGate>{(s) => <PayableNew token={s.token} username={s.username} />}</ErpSessionGate>;
+  return (
+    <ErpSessionGate>
+      {(s) => <ReceivablesSudamoNEW token={s.token} API={s.API} username={s.username} />}
+    </ErpSessionGate>
+  );
 }

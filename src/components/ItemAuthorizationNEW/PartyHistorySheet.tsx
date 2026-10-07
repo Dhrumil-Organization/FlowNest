@@ -3,6 +3,7 @@
 // two tabs — Parties (n) / History (n) — each with its own search (any field),
 // search of the other tab reset on tab switch, party name header on history,
 // credit-limit history cards with AUTHORISED / REJECTED / PENDING stamp.
+import { TruncText } from '@/src/components/ui/TruncText';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -31,7 +32,7 @@ const TONE = {
 function KV({ k, v, color }: { k: string; v: any; color?: string }) {
   return (
     <View style={p.kvItem}>
-      <Text style={p.kvK} numberOfLines={1}>{k}</Text>
+      <TruncText style={p.kvK} numberOfLines={1}>{k}</TruncText>
       <Text style={[p.kvV, color ? { color } : null]}>{str(v) || '—'}</Text>
     </View>
   );
@@ -101,7 +102,7 @@ export default function PartyHistorySheet({
         <ActivityIndicator size="large" color={T.copper} style={{ paddingVertical: 32 }} />
       ) : history.length > 0 ? (
         <>
-          <Text style={p.parHead} numberOfLines={2}>{parname}</Text>
+          <TruncText style={p.parHead} numberOfLines={2}>{parname}</TruncText>
           {history.map((item, i) => {
             const tone = TONE[authTone(item.isauth)];
             const st = str(item.status);
@@ -109,7 +110,7 @@ export default function PartyHistorySheet({
             return (
               <View key={`${str(item.uid)}-${i}`} style={[p.card, { borderLeftWidth: 4, borderLeftColor: item.isauth ? tone.c : T.border }]}>
                 <View style={p.headRow}>
-                  <Text style={[p.title, { flex: 1 }]} numberOfLines={1}>{str(item.prptypename)}</Text>
+                  <TruncText style={[p.title, { flex: 1 }]} numberOfLines={1}>{str(item.prptypename)}</TruncText>
                   <Text style={p.date}>{str(item.date)}</Text>
                 </View>
                 {item.isauth ? (

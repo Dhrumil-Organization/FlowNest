@@ -91,3 +91,24 @@ Sales Analysis (hidden in Legacy Home).
 ## 9. Legacy selection removed, dark theme, Settings (6 Oct 2026)
 
 See `THEME_AND_SETTINGS.md`.
+
+## 10. Receivables / Receivables Sudamo / Payable rebuilt (7 Oct 2026)
+
+| Screen | Route (`app/new/(tabs)/`) | Permission | Component (`src/components/OutstandingNEW/`) |
+|---|---|---|---|
+| Receivables (Rayons login) | `receivables-screen` | `production.receivables` | `Receivables.tsx` |
+| Receivables Sudamo (Sudamo / Knits login) | `receivables-screen` (same menu entry) | `production.receivables` | `ReceivablesSudamo.tsx` |
+| Payable | `Payable-Screen` | `production.payable` | `Payable.tsx` |
+
+- One engine for the three screens: `OutstandingView.tsx` (flow), `api.ts` (endpoints), `model.ts` (payloads, number
+  formats, columns, totals, cumulative), `FilterSheet.tsx`, `SummaryPanel.tsx`, `DetailPanel.tsx`, `ui.tsx`.
+- Receivables is property-wise, same rule as the Legacy Home (`prp === 'sudamo_knits' ? 'receivables-sudamo' : 'receivables'`):
+  `src/screens/production/ReceivablesScreen.tsx` picks the screen from the logged-in property.
+  `receivables-screen-sudamo` redirects to `receivables-screen`.
+- Removed: `src/components/ReceivablesNew/`, `src/components/PayableNew/` (the earlier New screens). Permissions, menu
+  entries and Legacy screens are untouched.
+- "Flow kept exactly as legacy" and "Deliberate differences from legacy": header comment of `OutstandingView.tsx`.
+- Checked: payloads (keys, values, key order), amounts, totals, column order, search and the cumulative balance give the
+  same output as the Legacy expressions (94,000 generated cases + the Legacy sample response); the three screens were
+  run in a browser against a mock API at phone / tablet / desktop widths (a small DOM stand-in for React Native, not
+  the real app). NOT done: a run on a device / against the real server.

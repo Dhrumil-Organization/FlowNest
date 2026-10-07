@@ -46,6 +46,7 @@
 //
 // Layout: tabs (Request / History / Verify) · toolbar (search · refresh) · count chip ·
 // card grid (1 / 2 / 3 columns) · confirm sheet · party history sheet · row detail sheet · scroll-to-top.
+import { TruncText } from '@/src/components/ui/TruncText';
 import { AppAlert } from '@/common/utils/appAlert';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -279,11 +280,11 @@ export default function DesignAuthorizationNEW({ token, API }: Props) {
         <View style={[s.card, { borderLeftColor: accent }]}>
           <View style={s.cardTop}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={s.eyebrow} numberOfLines={1}>ITEM · {str(item.ItmCode) || '-'}</Text>
-              <Text style={s.title} numberOfLines={2}>{str(item.ItmName) || '-'}</Text>
+              <TruncText style={s.eyebrow} numberOfLines={1}>ITEM · {str(item.ItmCode) || '-'}</TruncText>
+              <TruncText style={s.title} numberOfLines={2}>{str(item.ItmName) || '-'}</TruncText>
             </View>
             <View style={[s.badge, { backgroundColor: `${toneC}14`, borderColor: toneC }]}>
-              <Text style={[s.badgeText, { color: toneC }]} numberOfLines={1}>{str(item.AuthStatus) || '-'}</Text>
+              <TruncText style={[s.badgeText, { color: toneC }]} numberOfLines={1}>{str(item.AuthStatus) || '-'}</TruncText>
             </View>
           </View>
 
@@ -486,7 +487,7 @@ export default function DesignAuthorizationNEW({ token, API }: Props) {
       <Sheet open={d1Open} onClose={() => { setD1Open(false); setD1Rows([]); }} eyebrow="ITEM DETAILS" title={str(d1Party) || 'Details'} wideMax={720}>
         {d1Rows.map((d, i) => (
           <View key={`${str(d.SrNo) || i}`} style={s.d1Card}>
-            <Text style={s.title} numberOfLines={2}>{str(d.ItmName) || '-'}</Text>
+            <TruncText style={s.title} numberOfLines={2}>{str(d.ItmName) || '-'}</TruncText>
             <View style={s.kv}>
               <KV k="Grade" v={d.GrdName} />
               <KV k="Shade" v={d.ShdName} />
@@ -513,8 +514,8 @@ export default function DesignAuthorizationNEW({ token, API }: Props) {
 function KV({ k, v }: { k: string; v: any }) {
   return (
     <View style={s.kvItem}>
-      <Text style={s.kvK} numberOfLines={1}>{k}</Text>
-      <Text style={s.kvV} numberOfLines={2}>{str(v) || '-'}</Text>
+      <TruncText style={s.kvK} numberOfLines={1}>{k}</TruncText>
+      <TruncText style={s.kvV} numberOfLines={2}>{str(v) || '-'}</TruncText>
     </View>
   );
 }

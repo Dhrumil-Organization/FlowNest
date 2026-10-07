@@ -3,6 +3,7 @@
 // PartyNames + prod type, Quality/Batch/Shade/Property, and the six figures
 // Packing no., Pack. date, Dyeing no. of cones (Cones), Dyeing qty. (NetWt),
 // Packing no. of cones (PCones), Packing qty. (PQty). Save → confirm.
+import { TruncText } from '@/src/components/ui/TruncText';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
@@ -14,8 +15,8 @@ const v = (x: any) => (x === null || x === undefined || x === '' ? '—' : Strin
 function Info({ k, val }: { k: string; val: any }) {
   return (
     <View style={c.infoRow}>
-      <Text style={c.infoK} numberOfLines={1}>{k}</Text>
-      <Text style={c.infoV} numberOfLines={2}>{v(val)}</Text>
+      <TruncText style={c.infoK} numberOfLines={1}>{k}</TruncText>
+      <TruncText style={c.infoV} numberOfLines={2}>{v(val)}</TruncText>
     </View>
   );
 }
@@ -23,8 +24,8 @@ function Info({ k, val }: { k: string; val: any }) {
 function Cell({ k, val, accent }: { k: string; val: any; accent?: string }) {
   return (
     <View style={c.cell}>
-      <Text style={c.cellK} numberOfLines={1}>{k}</Text>
-      <Text style={[c.cellV, accent ? { color: accent } : null]} numberOfLines={1}>{v(val)}</Text>
+      <TruncText style={c.cellK} numberOfLines={1}>{k}</TruncText>
+      <TruncText style={[c.cellV, accent ? { color: accent } : null]} numberOfLines={1}>{v(val)}</TruncText>
     </View>
   );
 }
@@ -36,10 +37,10 @@ function PCACard({ item, onSave }: { item: Row; onSave: (item: Row) => void }) {
         <View style={c.headIcon}><Icon name="task-alt" size={18} color={T.copper} /></View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={c.eyebrow}>PARTY</Text>
-          <Text style={c.title} numberOfLines={2}>{v(item.PartyNames)}</Text>
+          <TruncText style={c.title} numberOfLines={2}>{v(item.PartyNames)}</TruncText>
         </View>
         <View style={c.badge}>
-          <Text style={c.badgeText} numberOfLines={1}>{v(item.ProdType)}</Text>
+          <TruncText style={c.badgeText} numberOfLines={1}>{v(item.ProdType)}</TruncText>
         </View>
       </View>
 

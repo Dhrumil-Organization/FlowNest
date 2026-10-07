@@ -11,6 +11,7 @@
 //   POST /api/authpacking        { prptype, prpcode, yearno, strcode, uid, srno, isauth:1|2,
 //                                   txntype:'mob_packing_auth', remark }                   — approve (1) / reject (2)
 // AsyncStorage keys read: user_prptype (every call), yno (store list).
+import { TruncText } from '@/src/components/ui/TruncText';
 import { AppAlert } from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -239,7 +240,7 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
         <Text style={s.ctxText}>{selectedYear}</Text>
         <View style={s.ctxDot} />
         <Icon name="store" size={15} color={T.copper} />
-        <Text style={[s.ctxText, { flexShrink: 1 }]} numberOfLines={1}>{storeLabel}</Text>
+        <TruncText style={[s.ctxText, { flexShrink: 1 }]} numberOfLines={1} tapReveal={false}>{storeLabel}</TruncText>
         <Icon name="expand-more" size={18} color={T.muted} />
       </TouchableOpacity>
 
@@ -358,7 +359,7 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
 function Kpi({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View style={s.kpi}>
-      <Text style={s.kpiLabel} numberOfLines={1}>{label}</Text>
+      <TruncText style={s.kpiLabel} numberOfLines={1}>{label}</TruncText>
       <Text style={[s.kpiValue, { color }]}>{value}</Text>
     </View>
   );
@@ -369,7 +370,7 @@ function KV({ k, v, align = 'left', color, lines = 2 }: { k: string; v: any; ali
   return (
     <View style={[s.kv, { alignItems: a }]}>
       <Text style={s.kvK}>{k}</Text>
-      <Text style={[s.kvV, color ? { color } : null, { textAlign: align }]} numberOfLines={lines}>{v ?? ''}</Text>
+      <TruncText style={[s.kvV, color ? { color } : null, { textAlign: align }]} numberOfLines={lines}>{v ?? ''}</TruncText>
     </View>
   );
 }
@@ -387,18 +388,18 @@ function PackCard({
   return (
     <View style={[s.card, S.card, { borderLeftColor: col }]}>
       <View style={s.cardTop}>
-        <Text style={s.topDate} numberOfLines={1}>{item.voudate}</Text>
-        <Text style={s.topNo} numberOfLines={1}>{item.vouno}</Text>
+        <TruncText style={s.topDate} numberOfLines={1}>{item.voudate}</TruncText>
+        <TruncText style={s.topNo} numberOfLines={1}>{item.vouno}</TruncText>
       </View>
 
       <View style={s.body}>
         <View style={s.partyRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.parCode} numberOfLines={1}>{item.parcode}</Text>
-            <Text style={s.parName} numberOfLines={2}>{item.parname}</Text>
+            <TruncText style={s.parCode} numberOfLines={1}>{item.parcode}</TruncText>
+            <TruncText style={s.parName} numberOfLines={2}>{item.parname}</TruncText>
           </View>
           <View style={[s.badge, { borderColor: col, backgroundColor: `${col}14` }]}>
-            <Text style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.authstatus}</Text>
+            <TruncText style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.authstatus}</TruncText>
           </View>
         </View>
 
@@ -438,8 +439,8 @@ function PackCard({
             <ScrollView style={{ maxHeight: 170 }} nestedScrollEnabled showsVerticalScrollIndicator persistentScrollbar bounces={false}>
               {entries.map((p, idx) => (
                 <View key={idx} style={s.entryRow}>
-                  <Text style={s.entryL} numberOfLines={1}>{p?.vouddate}</Text>
-                  <Text style={s.entryR} numberOfLines={1}>{p?.vouno}</Text>
+                  <TruncText style={s.entryL} numberOfLines={1}>{p?.vouddate}</TruncText>
+                  <TruncText style={s.entryR} numberOfLines={1}>{p?.vouno}</TruncText>
                 </View>
               ))}
             </ScrollView>

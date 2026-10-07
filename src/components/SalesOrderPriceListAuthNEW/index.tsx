@@ -15,6 +15,7 @@
 //                           referrer:'dashboard', ARemark, aremark }   — approve (1) / reject (2)
 // AsyncStorage keys read: user_prptype, yno (every call).
 // No year/store selection in legacy (prpcode/strcode are hard-coded), so there is no filter sheet.
+import { TruncText } from '@/src/components/ui/TruncText';
 import { AppAlert } from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -224,7 +225,7 @@ export default function SalesOrderPriceListAuthNEW({ token, API }: Props) {
 function Kpi({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View style={s.kpi}>
-      <Text style={s.kpiLabel} numberOfLines={1}>{label}</Text>
+      <TruncText style={s.kpiLabel} numberOfLines={1}>{label}</TruncText>
       <Text style={[s.kpiValue, { color }]}>{value}</Text>
     </View>
   );
@@ -237,9 +238,9 @@ function KV({ k, v, align = 'left', color, lines = 2, bold }: {
   return (
     <View style={[s.kv, { alignItems: a }]}>
       <Text style={s.kvK}>{k}</Text>
-      <Text style={[s.kvV, color ? { color } : null, bold ? { fontWeight: '900' } : null, { textAlign: align }]} numberOfLines={lines}>
+      <TruncText style={[s.kvV, color ? { color } : null, bold ? { fontWeight: '900' } : null, { textAlign: align }]} numberOfLines={lines}>
         {v ?? ''}
-      </Text>
+      </TruncText>
     </View>
   );
 }
@@ -258,18 +259,18 @@ function SOCard({
   return (
     <View style={[s.card, S.card, { borderLeftColor: col }]}>
       <View style={s.cardTop}>
-        <Text style={s.topNo} numberOfLines={1}>{item.SONo}</Text>
-        <Text style={s.topDate} numberOfLines={1}>{item.SODate}</Text>
+        <TruncText style={s.topNo} numberOfLines={1}>{item.SONo}</TruncText>
+        <TruncText style={s.topDate} numberOfLines={1}>{item.SODate}</TruncText>
       </View>
 
       <View style={s.body}>
         <View style={s.partyRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.kvK}>Party Name</Text>
-            <Text style={s.parName} numberOfLines={2}>{item.ParName || '-'}</Text>
+            <TruncText style={s.parName} numberOfLines={2}>{item.ParName || '-'}</TruncText>
           </View>
           <View style={[s.badge, { borderColor: col, backgroundColor: `${col}14` }]}>
-            <Text style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.AuthStatus}</Text>
+            <TruncText style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.AuthStatus}</TruncText>
           </View>
         </View>
 
@@ -307,7 +308,7 @@ function SOCard({
                 return (
                   <View key={idx} style={[s.itemCard, low && s.itemLow]}>
                     <View style={s.itemHead}>
-                      <Text style={s.itemTitle} numberOfLines={2}>{d.ItmName}</Text>
+                      <TruncText style={s.itemTitle} numberOfLines={2}>{d.ItmName}</TruncText>
                       <View style={s.srBadge}><Text style={s.srText}>#{d.SrNo}</Text></View>
                     </View>
                     <View style={s.row}>

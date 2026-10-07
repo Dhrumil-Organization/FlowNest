@@ -20,6 +20,7 @@
 //     Approve (isauth 1), no confirmation (as legacy). On success: message + list reload.
 //   - History cards: remark (aremark), Auth By / Date / Time; no actions.
 //   - Card border green when authstatus "authorised", red when "rejected".
+import { TruncText } from '@/src/components/ui/TruncText';
 import AppAlert from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -176,7 +177,7 @@ export default function ProductionMergeAuthNEW({ token, API }: Props) {
       {loadError ? (
         <View style={s.errBox}>
           <Icon name="error-outline" size={16} color={T.red} />
-          <Text style={s.errText} numberOfLines={3}>{loadError}</Text>
+          <TruncText style={s.errText} numberOfLines={3}>{loadError}</TruncText>
         </View>
       ) : null}
     </View>
@@ -249,8 +250,8 @@ function KV({ k, v, align = 'left', strong }: { k: string; v: any; align?: 'left
   const a = align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start';
   return (
     <View style={[s.kvItem, { alignItems: a }]}>
-      <Text style={s.kvK} numberOfLines={1}>{k}</Text>
-      <Text style={[s.kvV, strong && { fontWeight: '800', color: T.nav }, { textAlign: align }]} numberOfLines={2}>{dash(v)}</Text>
+      <TruncText style={s.kvK} numberOfLines={1}>{k}</TruncText>
+      <TruncText style={[s.kvV, strong && { fontWeight: '800', color: T.nav }, { textAlign: align }]} numberOfLines={2}>{dash(v)}</TruncText>
     </View>
   );
 }
@@ -267,12 +268,12 @@ function MergeCard({ item, history, remark, onRemark, busy, locked, onReject, on
       {/* title row: sub merge code + name, status badge */}
       <View style={s.cardHead}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={s.eyebrow} numberOfLines={1}>SUB MERGE · {dash(item.submercode)}</Text>
-          <Text style={s.title} numberOfLines={2}>{dash(item.submername)}</Text>
+          <TruncText style={s.eyebrow} numberOfLines={1}>SUB MERGE · {dash(item.submercode)}</TruncText>
+          <TruncText style={s.title} numberOfLines={2}>{dash(item.submername)}</TruncText>
         </View>
         {item.authstatus ? (
           <View style={[s.badge, { backgroundColor: meta.bg, borderColor: meta.color }]}>
-            <Text style={[s.badgeText, { color: meta.color }]} numberOfLines={1}>{String(item.authstatus)}</Text>
+            <TruncText style={[s.badgeText, { color: meta.color }]} numberOfLines={1}>{String(item.authstatus)}</TruncText>
           </View>
         ) : null}
       </View>

@@ -11,6 +11,7 @@
 // AsyncStorage keys read: 'user_prptype'.
 // Flow: on mount (token) → properties + auto-load with user_prptype (only when set);
 // card Save → confirm → insert → alert(message) → reload with the same prptype.
+import { TruncText } from '@/src/components/ui/TruncText';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { T } from '@/src/theme';
@@ -335,7 +336,7 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
 function Kpi({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <View style={s.kpi}>
-      <Text style={s.kpiLabel} numberOfLines={1}>{label}</Text>
+      <TruncText style={s.kpiLabel} numberOfLines={1}>{label}</TruncText>
       <Text style={[s.kpiValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </View>
   );
@@ -344,7 +345,7 @@ function Kpi({ label, value, color }: { label: string; value: string; color: str
 function KV({ k, v, full }: { k: string; v: any; full?: boolean }) {
   return (
     <View style={[s.kvItem, full && { width: '100%' }]}>
-      <Text style={s.kvK} numberOfLines={1}>{k}</Text>
+      <TruncText style={s.kvK} numberOfLines={1}>{k}</TruncText>
       <Text style={s.kvV}>{v === null || v === undefined || v === '' ? '—' : String(v)}</Text>
     </View>
   );

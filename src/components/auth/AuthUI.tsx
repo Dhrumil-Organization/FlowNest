@@ -2,8 +2,7 @@
 // FILE: src/components/auth/AuthUI.tsx
 //
 // Shared, presentation-only building blocks for the pre-ERP auth flow:
-//   Landing → Signup → ERP (New / Legacy) select → Legacy login
-//                                              → New ERP property → New ERP login
+//   Landing → Signup → ERP property → ERP login
 //
 // Everything here uses the canonical NEW ERP theme (`@/src/theme`) so the
 // auth screens look like the New ERP app (navy header, cream panel, copper
@@ -38,6 +37,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { T } from '@/src/theme';
+import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import flownestLogo from '../../../assets/images/logo.png';
 
 // Navy shades already used by the New ERP desktop sidebar.
@@ -105,7 +105,7 @@ const DEFAULT_HIGHLIGHTS: Highlight[] = [
 ];
 
 type AuthShellProps = {
-  /** Small copper label above the title (e.g. "NEW ERP SYSTEM"). */
+  /** Small copper label above the title (e.g. "MADHUSUDHAN FABRICS"). */
   eyebrow?: string;
   /** Screen / form title, e.g. "Sign in". */
   title: string;
@@ -196,7 +196,10 @@ export function AuthShell({
             showsVerticalScrollIndicator={false}
           >
             <View style={{ width: '100%', maxWidth }}>
-              {backButton ? <View style={{ marginBottom: 18 }}>{backButton}</View> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                {backButton ?? <View />}
+                <ThemeToggleButton size={34} label />
+              </View>
               <View style={styles.card}>
                 {cardHeader}
                 {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
@@ -230,7 +233,10 @@ export function AuthShell({
             <View style={column}>
               <View style={styles.heroTop}>
                 {backButton ?? <View />}
-                <BrandMark size={isTablet ? 32 : 28} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <ThemeToggleButton onDark size={32} />
+                  <BrandMark size={isTablet ? 32 : 28} />
+                </View>
               </View>
               {eyebrow ? <Eyebrow style={{ marginTop: 26 }}>{eyebrow}</Eyebrow> : <View style={{ height: 22 }} />}
               <Text style={[styles.heroTitle, isTablet && { fontSize: 36, lineHeight: 42 }]}>{title}</Text>

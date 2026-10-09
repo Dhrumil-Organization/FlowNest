@@ -290,6 +290,9 @@
 //   }
 // });
 
+// Dark-theme render hook + saved theme: must be the first import of the app.
+import '@/src/core/theme/installTheme';
+import { installCrashGuard, RouteErrorFallback, screenGuard } from '@/src/core/crash/ScreenErrorBoundary';
 import { initAPI, initAPIForPrinterList, initAPIForSticker } from '@/common/API/dynamicAPI';
 import { NotificationProvider } from '@/common/context/NotificationContext';
 import { initDB } from '@/common/utils/chatDB';
@@ -306,12 +309,19 @@ import { AppCoreProvider } from '@/src/core/AppCoreProvider';
 import AppUpdateGate from '@/src/core/appUpdate/AppUpdateGate';
 import { getLoginSource, isWeb } from '@/src/platform/runtime';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
+import { ensureSingleErp } from '@/src/core/singleErp';
+import { loadThemeMode } from '@/src/core/theme/themeMode';
 import * as Device from 'expo-device';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
+
+// Crash protection (Android / iOS): an error outside drawing is logged and
+// the app stays open; an error while drawing shows a "Try again" card.
+installCrashGuard();
+export { RouteErrorFallback as ErrorBoundary };
 
 export default function RootLayout() {
   const router = useRouter();
@@ -402,9 +412,9 @@ export default function RootLayout() {
     initializeDatabasesEvent();
   }, [token, getUsertype]);
 
-  // Top-level authentication boundary. Platform selection never grants access
-  // to a dashboard. Only a stored authenticated session can enter a protected
-  // Legacy/New ERP route on app bootstrap.
+  // Top-level authentication boundary. There is one ERP (/new): only a stored
+  // authenticated session can enter it on app bootstrap, everyone else lands
+  // on the public landing screen.
   useEffect(() => {
     if (embedded) return;
     if (!isReady || !isAllowed || isLoggedIn === null) return;
@@ -414,12 +424,7 @@ export default function RootLayout() {
       return;
     }
 
-    if (lookupPlatform === 'NEW') {
-      router.replace('/new');
-      return;
-    }
-
-    router.replace('/(tabs)');
+    router.replace('/new');
   }, [embedded, isReady, isAllowed, isLoggedIn, lookupPlatform, router]);
 
   useEffect(() => {
@@ -432,6 +437,13 @@ export default function RootLayout() {
         await AsyncStorage.setItem('cache_deviceId', deviceId);
 
         setIsAllowed(true);
+
+        // Saved theme (Light / Dark / System) before the first screen is drawn.
+        await loadThemeMode();
+
+        // One ERP: a session left over from the old platform is cleared once
+        // (the user signs in again) and the platform key is fixed to NEW.
+        await ensureSingleErp();
 
         const storedToken = await AsyncStorage.getItem('access_token');
         const storedUser = await AsyncStorage.getItem('user_details');
@@ -484,7 +496,7 @@ export default function RootLayout() {
       <AppCoreProvider>
         <SalesOrderProvider>
           <View style={styles.rootContainer}>
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack screenOptions={{ headerShown: false }} screenLayout={screenGuard}>
               {isAllowed ? (
                 <>
                   <Stack.Screen name="(tabs)" />

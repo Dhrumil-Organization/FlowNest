@@ -12,6 +12,7 @@
 //                                 replaced by res.data.response.data / d1 (legacy does not re-browse)
 // AsyncStorage keys read: user_prptype, yno (every call).
 // Legacy has no year/store selector (year comes from AsyncStorage yno), so there is no filter sheet.
+import { TruncText } from '@/src/components/ui/TruncText';
 import { AppAlert } from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -231,7 +232,7 @@ export default function PurchaseImportAuthNEW({ token, API }: Props) {
 function Kpi({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View style={s.kpi}>
-      <Text style={s.kpiLabel} numberOfLines={1}>{label}</Text>
+      <TruncText style={s.kpiLabel} numberOfLines={1}>{label}</TruncText>
       <Text style={[s.kpiValue, { color }]}>{value}</Text>
     </View>
   );
@@ -242,7 +243,7 @@ function KV({ k, v, align = 'left', color, lines = 2 }: { k: string; v: any; ali
   return (
     <View style={[s.kv, { alignItems: a }]}>
       <Text style={s.kvK}>{k}</Text>
-      <Text style={[s.kvV, color ? { color } : null, { textAlign: align }]} numberOfLines={lines}>{v ?? ''}</Text>
+      <TruncText style={[s.kvV, color ? { color } : null, { textAlign: align }]} numberOfLines={lines}>{v ?? ''}</TruncText>
     </View>
   );
 }
@@ -252,7 +253,7 @@ function LineCard({ d }: { d: Row }) {
   return (
     <View style={[s.line, over && s.lineOver]}>
       <View style={s.lineHead}>
-        <Text style={s.lineTitle} numberOfLines={2}>{d.itmname}</Text>
+        <TruncText style={s.lineTitle} numberOfLines={2}>{d.itmname}</TruncText>
         <View style={s.srBadge}><Text style={s.srText}>#{d.srno}</Text></View>
       </View>
 
@@ -291,18 +292,18 @@ function PurchaseCard({
   return (
     <View style={[s.card, S.card, { borderLeftColor: col }]}>
       <View style={s.cardTop}>
-        <Text style={s.topNo} numberOfLines={1}>{item.inwno}</Text>
-        <Text style={s.topDate} numberOfLines={1}>{item.inwdate}</Text>
+        <TruncText style={s.topNo} numberOfLines={1}>{item.inwno}</TruncText>
+        <TruncText style={s.topDate} numberOfLines={1}>{item.inwdate}</TruncText>
       </View>
 
       <View style={s.body}>
         <View style={s.partyRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.parCode} numberOfLines={1}>{item.parcode}</Text>
-            <Text style={s.parName} numberOfLines={2}>{item.parname}</Text>
+            <TruncText style={s.parCode} numberOfLines={1}>{item.parcode}</TruncText>
+            <TruncText style={s.parName} numberOfLines={2}>{item.parname}</TruncText>
           </View>
           <View style={[s.badge, { borderColor: col, backgroundColor: `${col}14` }]}>
-            <Text style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.authstatus}</Text>
+            <TruncText style={[s.badgeText, { color: col }]} numberOfLines={1}>{item.authstatus}</TruncText>
           </View>
         </View>
 

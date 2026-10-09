@@ -150,7 +150,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
 // outstanding-days-request, party-dashboard, design-authorization,
 // production-report, warehouse, yarn-management-system, feedback,
 // yarn-manufacturing, doff-entry, price-list, event, ...) need no entry here —
-// they resolve directly. Weft Carton Issue and Yarn Sales Order stay Legacy-only.
+// they resolve directly. Yarn Sales Order uses the same route name in New (yarn-sales-order).
 const NEW_ROUTE_ALIASES: Record<string, string> = {
     'credit-limit': 'credit-limit-request',
     'receivables': 'receivables-screen',

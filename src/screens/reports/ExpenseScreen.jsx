@@ -1674,11 +1674,51 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
     sud230: basisTotals('sud_230', groups.sud_230),
     waterjet: basisTotals('waterjet', groups.waterjet),
   };
+  /*
+   * Claude allocation rule:
+   *   shared Warping + Misc = machine-count allocation over 126 looms.
+   *
+   * Backend already gives the authoritative section shares:
+   *   B = 86/126 (48 M Weaves + 38 S. Rapier 190)
+   *   A = 40/126 (10 S. Rapier 230 + 30 Waterjet)
+   *
+   * Split only inside the already-authoritative section allocation here.
+   * This avoids recalculating A/B from raw meters in React.
+   */
+  const sharedBForMW = r => n(alloc(r, 'shared_b_kwh')) * (48 / 86);
+  const sharedBForS190 = r => n(alloc(r, 'shared_b_kwh')) * (38 / 86);
+  const sharedAForS230 = r => n(alloc(r, 'shared_a_kwh')) * (10 / 40);
+  const sharedAForWaterjet = r => n(alloc(r, 'shared_a_kwh')) * (30 / 40);
+
   const groupData = [
-    { key:'mw', section:'B', title:'M Weaves', range:'R01–R48', color:'#534AB7', machines:n(groups.mw?.machines||counts.mw_rapier), prod:bt.mw.mtr, weighted:bt.mw.weighted, picks:bt.mw.avg, kwh:sum(r=>alloc(r,'mw_to_b_kwh')), amount:sumCost(r=>alloc(r,'mw_to_b_kwh')), sources:[['Looms meter',r=>r?.mw_rapier_looms],['Luwa (humid.) meter',r=>r?.mw_rapier_luwa]] },
-    { key:'sud190', section:'B', title:'S. Rapier (190 cm)', range:'R49–R74 · R85–R96', color:'#534AB7', machines:n(groups.sud_190?.machines||counts.sud_rapier_190), prod:bt.sud190.mtr, weighted:bt.sud190.weighted, picks:bt.sud190.avg, kwh:sum(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), sources:[['Looms meter',r=>r?.sud_190_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_b_kwh')],['Warping + misc share',r=>alloc(r,'shared_b_kwh')]] },
-    { key:'sud230', section:'A', title:'S. Rapier (230 cm)', range:'R75–R84', color:'#185FA5', machines:n(groups.sud_230?.machines||counts.sud_rapier_230), prod:bt.sud230.mtr, weighted:bt.sud230.weighted, picks:bt.sud230.avg, kwh:sum(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), sources:[['Own sub-meter',r=>r?.sud_230_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_a_kwh')],['Warping + misc share',r=>alloc(r,'shared_a_kwh')]] },
-    { key:'waterjet', section:'A', title:'Waterjet', range:'W01–W30', color:'#185FA5', machines:n(groups.waterjet?.machines||counts.waterjet), prod:bt.waterjet.mtr, weighted:bt.waterjet.weighted, picks:bt.waterjet.avg, kwh:sum(r=>alloc(r,'waterjet_to_a_kwh')), amount:sumCost(r=>alloc(r,'waterjet_to_a_kwh')), sources:[['Looms meter',r=>r?.sip_waterjet_looms]] },
+    {
+      key:'mw', section:'B', title:'M Weaves', range:'R01–R48', color:'#534AB7',
+      machines:n(groups.mw?.machines||counts.mw_rapier), prod:bt.mw.mtr, weighted:bt.mw.weighted, picks:bt.mw.avg,
+      kwh:sum(r=>n(alloc(r,'mw_to_b_kwh'))+sharedBForMW(r)),
+      amount:sumCost(r=>n(alloc(r,'mw_to_b_kwh'))+sharedBForMW(r)),
+      sources:[['Looms meter',r=>r?.mw_rapier_looms],['Luwa (humid.) meter',r=>r?.mw_rapier_luwa],['Warping + misc share',sharedBForMW]],
+    },
+    {
+      key:'sud190', section:'B', title:'S. Rapier (190 cm)', range:'R49–R74 · R85–R96', color:'#534AB7',
+      machines:n(groups.sud_190?.machines||counts.sud_rapier_190), prod:bt.sud190.mtr, weighted:bt.sud190.weighted, picks:bt.sud190.avg,
+      kwh:sum(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+sharedBForS190(r)),
+      amount:sumCost(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+sharedBForS190(r)),
+      sources:[['Looms meter',r=>r?.sud_190_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_b_kwh')],['Warping + misc share',sharedBForS190]],
+    },
+    {
+      key:'sud230', section:'A', title:'S. Rapier (230 cm)', range:'R75–R84', color:'#185FA5',
+      machines:n(groups.sud_230?.machines||counts.sud_rapier_230), prod:bt.sud230.mtr, weighted:bt.sud230.weighted, picks:bt.sud230.avg,
+      kwh:sum(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+sharedAForS230(r)),
+      amount:sumCost(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+sharedAForS230(r)),
+      sources:[['Own sub-meter',r=>r?.sud_230_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_a_kwh')],['Warping + misc share',sharedAForS230]],
+    },
+    {
+      key:'waterjet', section:'A', title:'Waterjet', range:'W01–W30', color:'#185FA5',
+      machines:n(groups.waterjet?.machines||counts.waterjet), prod:bt.waterjet.mtr, weighted:bt.waterjet.weighted, picks:bt.waterjet.avg,
+      kwh:sum(r=>n(alloc(r,'waterjet_to_a_kwh'))+sharedAForWaterjet(r)),
+      amount:sumCost(r=>n(alloc(r,'waterjet_to_a_kwh'))+sharedAForWaterjet(r)),
+      sources:[['Looms meter',r=>r?.sip_waterjet_looms],['Warping + misc share',sharedAForWaterjet]],
+    },
   ];
   const pickQty = g => n(g.weighted) || g.prod*g.picks;
   const costPick = g => pickQty(g)>0 ? g.amount/pickQty(g) : 0;
@@ -1690,7 +1730,7 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
   const dateText=meterDates.length?`${fmtYmd(meterDates[0])} – ${fmtYmd(meterDates[meterDates.length-1])}`:'meter-reading dates';
 
   const Metric=({label,value,sub})=><View style={S.artMetric}><Text style={S.artMetricLabel}>{label}</Text><Text style={S.artMetricValue}>{value}</Text>{!!sub&&<Text style={S.artMetricSub}>{sub}</Text>}</View>;
-  const Group=({g})=><View style={[S.artGroup,{borderLeftColor:g.color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>■ {g.title} <Text style={S.artRange}>{g.range} · {g.machines} mc</Text></Text><Text style={[S.artCount,{color:g.color}]}>counts in {g.section}</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(g.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(g.amount)} sub={g.prod>0?`${fINR(g.amount/g.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(g.prod)} m`}/><Metric label="PICKS" value={`${(pickQty(g)/1e5).toFixed(2)} L`} sub={`${f2(g.picks)} PPI`}/></View><View style={[S.artCostPick,{borderColor:`${g.color}44`,backgroundColor:`${g.color}09`}]}><Text style={[S.artCostPickLabel,{color:g.color}]}>COST / PICK</Text><Text style={[S.artCostPickValue,{color:g.color}]}>₹{f4(costPick(g))}</Text><Text style={S.artCostFormula}>{fINR(g.amount)} ÷ {(pickQty(g)/1e5).toFixed(2)} L picks</Text></View>{g.sources.map(([label,fn])=>{const k=sum(fn),a=sumCost(fn);return <View key={label} style={S.artSourceRow}><Text style={S.artSourceLabel}>{label}</Text><Text style={S.artSourceValue}>{fN(k)} kWh · {fINR(a)}</Text></View>})}</View>;
+  const Group=({g})=><View style={[S.artGroup,{borderLeftColor:g.color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>■ {g.title} <Text style={S.artRange}>{g.range} · {g.machines} mc</Text></Text><Text style={[S.artCount,{color:g.color}]}>counts in {g.section}</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(g.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(g.amount)} sub={g.prod>0?`${fINR(g.amount/g.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(g.prod)} m`}/><Metric label="PICKS" value={`${(pickQty(g)/1e5).toFixed(2)} L`} sub={`${f2(g.picks)} PPI`}/></View><View style={[S.artCostPick,{borderColor:`${g.color}44`,backgroundColor:`${g.color}09`}]}><Text style={[S.artCostPickLabel,{color:g.color}]}>COST / PICK</Text><Text style={[S.artCostPickValue,{color:g.color}]}>₹{f4(costPick(g))}</Text><Text style={S.artCostFormula}>{fINR(g.amount)} ÷ {(pickQty(g)/1e5).toFixed(2)} L picks</Text></View>{g.sources.map(([label,fn])=>{const k=sum(fn),a=sumCost(fn),pk=pickQty(g),cpp=pk>0?a/pk:0;return <View key={label} style={S.artSourceRow}><Text style={S.artSourceLabel}>{label}</Text><Text style={S.artSourceValue}>{fN(k)} kWh · {fINR(a)} · {pk>0?`₹${f4(cpp)}/pk`:'—'}</Text></View>})}</View>;
   const SectionTotal=({tag,x,color,sub})=><View style={[S.artSectionTotal,{borderTopColor:color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}><Text style={{color}}>{tag}</Text> · Section {tag} total</Text><Text style={S.artCount}>{x.machines} mc</Text></View><Text style={S.artRange}>{sub}</Text><View style={S.artMetricRow}><Metric label="UNITS" value={fN(x.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(x.amount)} sub={x.prod>0?`${fINR(x.amount/x.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(x.prod)} m`}/><Metric label="PICKS" value={`${(x.pickQty/1e5).toFixed(2)} L`} sub={`${f2(x.picks)} PPI`}/></View><View style={S.artSectionCpp}><Text style={S.artCostPickLabel}>COST / PICK</Text><Text style={S.artCostPickValue}>₹{f4(x.cpp)}</Text></View></View>;
 
   return <View style={S.artUtility}>
@@ -4096,13 +4136,13 @@ import {
   Alert,
   Dimensions,
   Modal,
-  useWindowDimensions,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from "react-native-svg";
@@ -4116,11 +4156,10 @@ import { T } from "../../theme";
 // the rest of this screen. See AvgPicksSection.js for the full logic (it
 // mirrors Salary.js + AvgPicksCalendar.jsx from the web app 1:1).
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-import AvgPicksSection, { AvgPicksTab } from "./AvgPicksSection";
 import InteractiveDailyTrendChart from "../dashboard/employ/components/InteractiveDailyTrendChart";
+import AvgPicksSection from "./AvgPicksSection";
 // Responsive layout helpers (UI only) — phone 1 col / tablet 2 / desktop 3.
-import { ReportContainer, ResponsiveGrid, SplitPane, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
-import { DASH_GAP } from "@/src/components/dashboard/DashboardGrid";
+import { ReportContainer, ResponsiveGrid, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
 // Crash protection: a failing block shows a small "Retry" note instead of
 // taking the screen (or the app) down.
 import { SafeBlock, ScreenErrorBoundary } from "@/src/core/crash/ScreenErrorBoundary";

@@ -1488,7 +1488,8 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
                         {yarn.main_yarn_code || yarn.m_itm_code
                             ? ` · Main ${yarn.main_yarn_code || yarn.m_itm_code}`
                             : ''}
-                        {yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
+                        //{yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
+						{yarn.cnt ? ` · ${yarn.cnt} ${yarn.sys || ''}` : ''}
                     </Text>
                 </View>
                 {type === 'warp' && (

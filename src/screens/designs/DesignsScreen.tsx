@@ -1489,7 +1489,7 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
                             ? ` · Main ${yarn.main_yarn_code || yarn.m_itm_code}`
                             : ''}
                         //{yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
-						{yarn.cnt ? ` · ${yarn.cnt} ${yarn.sys || ''}` : ''}
+                        {yarn.cnt ? ` · ${yarn.cnt} ${yarn.sys || ''}` : ''}
                     </Text>
                 </View>
                 {type === 'warp' && (
@@ -5467,7 +5467,8 @@ function YarnsTab() {
             // count = actual numeric count value.
             const mainParts = String(main?.maincode || '').trim().match(/^([^/\s]+)\/([^\s]+)\s*(.*)$/);
             const countNo = String(main?.count ?? mainParts?.[1] ?? '');
-            const plyValue = String(mainParts?.[2] ?? main?.WPly ?? '');
+            // const plyValue = String(mainParts?.[2] ?? main?.WPly ?? '');
+            const plyValue = String(main?.WPly ?? mainParts?.[2] ?? '').trim();
 
             const countTypeId = String(main?.counttype ?? main?.CountTypeId ?? main?.WCounttype ?? '');
             const countTypeName = String(main?.CountType ?? main?.counttypeName ?? '');
@@ -5480,11 +5481,22 @@ function YarnsTab() {
                 findByIdOrName(countMaster, countTypeName) ||
                 { id: countTypeId, name: countTypeName || countTypeId, formula: '' };
 
+            // const plyObj =
+            //     (plyData || []).find(p =>
+            //         String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue
+            //     ) ||
+            //     { id: plyValue, ply: plyValue };
+
+
             const plyObj =
                 (plyData || []).find(p =>
-                    String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue
+                    String(p?.ply ?? '').trim() === plyValue
                 ) ||
-                { id: plyValue, ply: plyValue };
+                (plyData || []).find(p =>
+                    String(p?.id ?? '').trim() === plyValue
+                ) ||
+                { id: plyValue, ply: plyValue, name: plyValue };
+
 
             let blendItems = Array.isArray(main?.BlendDisplay)
                 ? main.BlendDisplay.map((b: any) => ({
@@ -6520,14 +6532,14 @@ function YarnsTab() {
                     <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
                 </View>
 
-                    <TouchableOpacity
-                        style={ym2.headerAddBtn}
-                        onPress={() => openSubCreate(browseParent)}
-                    >
-                        <Ionicons name="add" size={18} color="#fff" />
-                        <Text style={ym2.headerAddText}>Create</Text>
-                    </TouchableOpacity>
-                    
+                <TouchableOpacity
+                    style={ym2.headerAddBtn}
+                    onPress={() => openSubCreate(browseParent)}
+                >
+                    <Ionicons name="add" size={18} color="#fff" />
+                    <Text style={ym2.headerAddText}>Create</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
                 </TouchableOpacity>

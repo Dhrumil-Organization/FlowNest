@@ -1674,11 +1674,51 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
     sud230: basisTotals('sud_230', groups.sud_230),
     waterjet: basisTotals('waterjet', groups.waterjet),
   };
+  /*
+   * Claude allocation rule:
+   *   shared Warping + Misc = machine-count allocation over 126 looms.
+   *
+   * Backend already gives the authoritative section shares:
+   *   B = 86/126 (48 M Weaves + 38 S. Rapier 190)
+   *   A = 40/126 (10 S. Rapier 230 + 30 Waterjet)
+   *
+   * Split only inside the already-authoritative section allocation here.
+   * This avoids recalculating A/B from raw meters in React.
+   */
+  const sharedBForMW = r => n(alloc(r, 'shared_b_kwh')) * (48 / 86);
+  const sharedBForS190 = r => n(alloc(r, 'shared_b_kwh')) * (38 / 86);
+  const sharedAForS230 = r => n(alloc(r, 'shared_a_kwh')) * (10 / 40);
+  const sharedAForWaterjet = r => n(alloc(r, 'shared_a_kwh')) * (30 / 40);
+
   const groupData = [
-    { key:'mw', section:'B', title:'M Weaves', range:'R01–R48', color:'#534AB7', machines:n(groups.mw?.machines||counts.mw_rapier), prod:bt.mw.mtr, weighted:bt.mw.weighted, picks:bt.mw.avg, kwh:sum(r=>alloc(r,'mw_to_b_kwh')), amount:sumCost(r=>alloc(r,'mw_to_b_kwh')), sources:[['Looms meter',r=>r?.mw_rapier_looms],['Luwa (humid.) meter',r=>r?.mw_rapier_luwa]] },
-    { key:'sud190', section:'B', title:'S. Rapier (190 cm)', range:'R49–R74 · R85–R96', color:'#534AB7', machines:n(groups.sud_190?.machines||counts.sud_rapier_190), prod:bt.sud190.mtr, weighted:bt.sud190.weighted, picks:bt.sud190.avg, kwh:sum(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+n(alloc(r,'shared_b_kwh'))), sources:[['Looms meter',r=>r?.sud_190_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_b_kwh')],['Warping + misc share',r=>alloc(r,'shared_b_kwh')]] },
-    { key:'sud230', section:'A', title:'S. Rapier (230 cm)', range:'R75–R84', color:'#185FA5', machines:n(groups.sud_230?.machines||counts.sud_rapier_230), prod:bt.sud230.mtr, weighted:bt.sud230.weighted, picks:bt.sud230.avg, kwh:sum(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), amount:sumCost(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+n(alloc(r,'shared_a_kwh'))), sources:[['Own sub-meter',r=>r?.sud_230_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_a_kwh')],['Warping + misc share',r=>alloc(r,'shared_a_kwh')]] },
-    { key:'waterjet', section:'A', title:'Waterjet', range:'W01–W30', color:'#185FA5', machines:n(groups.waterjet?.machines||counts.waterjet), prod:bt.waterjet.mtr, weighted:bt.waterjet.weighted, picks:bt.waterjet.avg, kwh:sum(r=>alloc(r,'waterjet_to_a_kwh')), amount:sumCost(r=>alloc(r,'waterjet_to_a_kwh')), sources:[['Looms meter',r=>r?.sip_waterjet_looms]] },
+    {
+      key:'mw', section:'B', title:'M Weaves', range:'R01–R48', color:'#534AB7',
+      machines:n(groups.mw?.machines||counts.mw_rapier), prod:bt.mw.mtr, weighted:bt.mw.weighted, picks:bt.mw.avg,
+      kwh:sum(r=>n(alloc(r,'mw_to_b_kwh'))+sharedBForMW(r)),
+      amount:sumCost(r=>n(alloc(r,'mw_to_b_kwh'))+sharedBForMW(r)),
+      sources:[['Looms meter',r=>r?.mw_rapier_looms],['Luwa (humid.) meter',r=>r?.mw_rapier_luwa],['Warping + misc share',sharedBForMW]],
+    },
+    {
+      key:'sud190', section:'B', title:'S. Rapier (190 cm)', range:'R49–R74 · R85–R96', color:'#534AB7',
+      machines:n(groups.sud_190?.machines||counts.sud_rapier_190), prod:bt.sud190.mtr, weighted:bt.sud190.weighted, picks:bt.sud190.avg,
+      kwh:sum(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+sharedBForS190(r)),
+      amount:sumCost(r=>n(alloc(r,'sud_190_to_b_kwh'))+n(alloc(r,'sud_luwa_b_kwh'))+sharedBForS190(r)),
+      sources:[['Looms meter',r=>r?.sud_190_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_b_kwh')],['Warping + misc share',sharedBForS190]],
+    },
+    {
+      key:'sud230', section:'A', title:'S. Rapier (230 cm)', range:'R75–R84', color:'#185FA5',
+      machines:n(groups.sud_230?.machines||counts.sud_rapier_230), prod:bt.sud230.mtr, weighted:bt.sud230.weighted, picks:bt.sud230.avg,
+      kwh:sum(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+sharedAForS230(r)),
+      amount:sumCost(r=>n(alloc(r,'sud_230_to_a_kwh'))+n(alloc(r,'sud_luwa_a_kwh'))+sharedAForS230(r)),
+      sources:[['Own sub-meter',r=>r?.sud_230_looms],['S. Rapier Luwa share',r=>alloc(r,'sud_luwa_a_kwh')],['Warping + misc share',sharedAForS230]],
+    },
+    {
+      key:'waterjet', section:'A', title:'Waterjet', range:'W01–W30', color:'#185FA5',
+      machines:n(groups.waterjet?.machines||counts.waterjet), prod:bt.waterjet.mtr, weighted:bt.waterjet.weighted, picks:bt.waterjet.avg,
+      kwh:sum(r=>n(alloc(r,'waterjet_to_a_kwh'))+sharedAForWaterjet(r)),
+      amount:sumCost(r=>n(alloc(r,'waterjet_to_a_kwh'))+sharedAForWaterjet(r)),
+      sources:[['Looms meter',r=>r?.sip_waterjet_looms],['Warping + misc share',sharedAForWaterjet]],
+    },
   ];
   const pickQty = g => n(g.weighted) || g.prod*g.picks;
   const costPick = g => pickQty(g)>0 ? g.amount/pickQty(g) : 0;
@@ -1690,12 +1730,12 @@ function ClaudeArtifactUtilities({ d, setTrendSheet }) {
   const dateText=meterDates.length?`${fmtYmd(meterDates[0])} – ${fmtYmd(meterDates[meterDates.length-1])}`:'meter-reading dates';
 
   const Metric=({label,value,sub})=><View style={S.artMetric}><Text style={S.artMetricLabel}>{label}</Text><Text style={S.artMetricValue}>{value}</Text>{!!sub&&<Text style={S.artMetricSub}>{sub}</Text>}</View>;
-  const Group=({g})=><View style={[S.artGroup,{borderLeftColor:g.color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>■ {g.title} <Text style={S.artRange}>{g.range} · {g.machines} mc</Text></Text><Text style={[S.artCount,{color:g.color}]}>counts in {g.section}</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(g.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(g.amount)} sub={g.prod>0?`${fINR(g.amount/g.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(g.prod)} m`}/><Metric label="PICKS" value={`${(pickQty(g)/1e5).toFixed(2)} L`} sub={`${f2(g.picks)} PPI`}/></View><View style={[S.artCostPick,{borderColor:`${g.color}44`,backgroundColor:`${g.color}09`}]}><Text style={[S.artCostPickLabel,{color:g.color}]}>COST / PICK</Text><Text style={[S.artCostPickValue,{color:g.color}]}>₹{f4(costPick(g))}</Text><Text style={S.artCostFormula}>{fINR(g.amount)} ÷ {(pickQty(g)/1e5).toFixed(2)} L picks</Text></View>{g.sources.map(([label,fn])=>{const k=sum(fn),a=sumCost(fn);return <View key={label} style={S.artSourceRow}><Text style={S.artSourceLabel}>{label}</Text><Text style={S.artSourceValue}>{fN(k)} kWh · {fINR(a)}</Text></View>})}</View>;
+  const Group=({g})=><View style={[S.artGroup,{borderLeftColor:g.color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}>■ {g.title} <Text style={S.artRange}>{g.range} · {g.machines} mc</Text></Text><Text style={[S.artCount,{color:g.color}]}>counts in {g.section}</Text></View><View style={S.artMetricRow}><Metric label="UNITS" value={fN(g.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(g.amount)} sub={g.prod>0?`${fINR(g.amount/g.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(g.prod)} m`}/><Metric label="PICKS" value={`${(pickQty(g)/1e5).toFixed(2)} L`} sub={`${f2(g.picks)} PPI`}/></View><View style={[S.artCostPick,{borderColor:`${g.color}44`,backgroundColor:`${g.color}09`}]}><Text style={[S.artCostPickLabel,{color:g.color}]}>COST / PICK</Text><Text style={[S.artCostPickValue,{color:g.color}]}>₹{f4(costPick(g))}</Text><Text style={S.artCostFormula}>{fINR(g.amount)} ÷ {(pickQty(g)/1e5).toFixed(2)} L picks</Text></View>{g.sources.map(([label,fn])=>{const k=sum(fn),a=sumCost(fn),pk=pickQty(g),cpp=pk>0?a/pk:0;return <View key={label} style={S.artSourceRow}><Text style={S.artSourceLabel}>{label}</Text><Text style={S.artSourceValue}>{fN(k)} kWh · {fINR(a)} · {pk>0?`₹${f4(cpp)}/pk`:'—'}</Text></View>})}</View>;
   const SectionTotal=({tag,x,color,sub})=><View style={[S.artSectionTotal,{borderTopColor:color}]}><View style={S.artGroupHead}><Text style={S.artGroupTitle}><Text style={{color}}>{tag}</Text> · Section {tag} total</Text><Text style={S.artCount}>{x.machines} mc</Text></View><Text style={S.artRange}>{sub}</Text><View style={S.artMetricRow}><Metric label="UNITS" value={fN(x.kwh)} sub="kWh"/><Metric label="ELEC. COST" value={fINR(x.amount)} sub={x.prod>0?`${fINR(x.amount/x.prod)}/m`:'₹0.00/m'}/><Metric label="PRODUCTION" value={`${fN(x.prod)} m`}/><Metric label="PICKS" value={`${(x.pickQty/1e5).toFixed(2)} L`} sub={`${f2(x.picks)} PPI`}/></View><View style={S.artSectionCpp}><Text style={S.artCostPickLabel}>COST / PICK</Text><Text style={S.artCostPickValue}>₹{f4(x.cpp)}</Text></View></View>;
 
   return <View style={S.artUtility}>
     <TouchableOpacity style={S.artUtilityHead} onPress={()=>setOpen(v=>!v)} activeOpacity={0.72}>
-      <View style={{flex:1}}><Text style={S.artUtilityTitle}>⚡  Utilities / units consumed</Text><Text style={S.artUtilitySub}>{fN(d.kwh_total)} kWh @ {fINR(d.unit_rate)}</Text></View>
+      <View style={{flex:1}}><Text style={S.artUtilityTitle}>⚡  Utilities / units consumed</Text><Text style={S.artUtilitySub}>{fN(d.kwh_total)} kWh @ {Number(d.unit_rate || 0) > 0 ? fINR(d.unit_rate) : 'tariff pending'}</Text></View>
       <Text style={S.artUtilityAmount}>{fINR(d.elec_total)}</Text><Text style={{fontSize:13,color:'#6b7280',marginLeft:10}}>{open?'▴':'▾'}</Text>
     </TouchableOpacity>
     {open && <>
@@ -2122,25 +2162,43 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
       <View style={S.clBreakGrid}>
         <View>
           {extended ? <ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
-          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:'View daily ›'} onEdit={extended?undefined:()=>setView('daily-salary')}>
-            {extended ? <>
-              <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_salary,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
-              <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_salary)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_salary,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
-              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.sal_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.sal_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
-            </> : <>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.sal_rapier)}</Text></View>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.sal_wjet)}</Text></View>
-            </>}
+          <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:"View daily ›"} onEdit={extended?undefined:()=>setView('daily-salary')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_salary:d.sal_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_salary:d.sal_wjet)}</Text></View>
           </ExpBlock>
           <ExpBlock icon="▣" iconColor="#1D9E75" iconBg="#EAF8F3" title="Production-linked expenses" sub={extended?'Stores & spares · ERP-derived A/B':'Stores & spares'} amt={fINR(d.store_total)}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_stores:d.store_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_stores:d.store_wjet)}</Text></View>
+            {extended ? <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_stores)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_stores,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_stores)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_stores,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.store_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.store_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            </> : <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.store_rapier)}</Text></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.store_wjet)}</Text></View>
+            </>}
           </ExpBlock>
         </View>
         <View>
-          {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · Common" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)}</Text></ExpBlock>}
-          {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct / indirect · A/B/Common" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}><View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text></View><Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)}</Text></ExpBlock>}
-          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
-            {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total],...(extended?[['Maintenance',d.maintenance_total],['Other',d.other_total]]:[])].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}<View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total cost</Text><Text style={[S.clABValue,{color:'#B77932'}]}>{fINR(d.total)}</Text></View>
+          {extended && <ExpBlock icon="🔧" iconColor="#534AB7" iconBg="#F0EDFF" title="Maintenance" sub="Section A · Section B · common (by effective machine count)" amt={fINR(d.maintenance_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-maint')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>A — Waterjet ({machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier (230 cm) ({machineCountShort(d.section_machine_counts?.sud_rapier_230)})</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_maintenance)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_maintenance,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>B — Rapier (190 cm): {machineCountLabel(d.section_machine_counts?.section_b)} · M Weaves: {machineCountShort(d.section_machine_counts?.mw_rapier)} · S. Rapier: {machineCountShort(d.section_machine_counts?.sud_rapier_190)}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_maintenance)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_maintenance,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+            <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.maintenance_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.maintenance_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            <Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)} · allocated by the effective A:B machine count for each entry date.</Text>
+          </ExpBlock>}
+          {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct A/B · common allocated by effective machine count" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}>
+            <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_other,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_other,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+            <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.other_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.other_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
+            <Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)} · direct A/B remains direct.</Text>
+          </ExpBlock>}
+          <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} avg picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
+            {extended ? <>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_a_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_a_cpp)}/pk · ${f2(d.section_a_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_b_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_b_cpp)}/pk · ${f2(d.section_b_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total · A + B</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800',color:'#B77932'}]}>{costingReady?fINR(d.total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.cpp_total)}/pk · ${f2(d.avg_pick_tot)} picks`:'pending'}</Text></View></View>
+              <Text style={[S.clSmallMuted,{marginTop:8}]}>Derived from Electricity + Salary + Stores + Maintenance + Other. A and B use their own weighted production picks.</Text>
+            </> : <>
+              {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total]].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total cost</Text><Text style={[S.clABValue,{color:'#B77932'}]}>{fINR(d.total)}</Text></View>
+            </>}
           </ExpBlock>
         </View>
       </View>
@@ -4809,17 +4867,15 @@ function DailyTrendSheet({ open, onClose, d, trend }) {
       if (safeTrend.prodKey === 'sud_190') return gm(r,'sud_190');
       if (safeTrend.prodKey === 'sud_230') return gm(r,'sud_230');
       if (safeTrend.prodKey === 'waterjet') return gm(r,'waterjet');
-      if (safeTrend.prodKey === 'rapier') return gm(r,'sud_190') + gm(r,'sud_230');
+      if (safeTrend.prodKey === 'rapier') return gm(r,'mw') + gm(r,'sud_190') + gm(r,'sud_230');
       if (safeTrend.prodKey === 'total') return gm(r,'mw') + gm(r,'sud_190') + gm(r,'sud_230') + gm(r,'waterjet');
       return 0;
     };
     return source.map(r => {
-      const explicit = r?.meter_daily?.[safeTrend.key];
-      const kwh = explicit ? n(explicit.kwh) : n(r?.[safeTrend.key]);
-      const production_mtr = explicit ? n(explicit.production_mtr) : productionFor(r);
-      const amount = explicit ? n(explicit.amount) : kwh * n(r?.unit_rate);
-      const cost_per_mtr = explicit ? n(explicit.cost_per_mtr) : (production_mtr>0?amount/production_mtr:0);
-      return {...r,key:safeTrend.key,kwh,production_mtr,amount,cost_per_mtr};
+      const kwh = n(r?.[safeTrend.key]);
+      const production_mtr = productionFor(r);
+      const amount = kwh * n(r?.unit_rate);
+      return {...r,key:safeTrend.key,kwh,production_mtr,amount,cost_per_mtr:production_mtr>0?amount/production_mtr:0};
     }).filter(r => r.kwh > 0 || r.production_mtr > 0);
   };
   const configuredUtilityRows = isUtility ? (d.utility_daily_trend || []).filter(r => r.key === safeTrend.key) : [];

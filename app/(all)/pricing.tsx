@@ -11,8 +11,13 @@ import { useRouter } from 'expo-router';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '@/components/theme';
+import { useTheme } from '@/src/core/theme/themeMode';
 
 export default function PricingScreen() {
+    // Theme: this page is outside the NEW ERP navigator, so it listens to the
+    // theme itself — on a change the whole page is drawn again in the new
+    // colours (nothing typed on the page is lost).
+    useTheme();
 
     const router = useRouter();
 

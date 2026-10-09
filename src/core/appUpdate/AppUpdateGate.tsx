@@ -137,8 +137,8 @@ function StoreUpdateModal() {
           <Text style={n.text}>
             {res.message ||
               (force
-                ? `Is version ko use karne ke liye app update karna zaroori hai. ${store} se latest version install karein.`
-                : `FlowNest ka naya version ${store} par available hai.`)}
+                ? `This version is no longer supported. Please update the app to the latest version from the ${store} to continue using FlowNest.`
+                : `A new version of FlowNest is available on the ${store}. Update now to get the latest improvements and features.`)}
           </Text>
           <View style={n.versions}>
             <View style={n.vCol}>

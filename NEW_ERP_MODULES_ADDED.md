@@ -6,7 +6,7 @@
 |---|---|---|
 | Already in New | 43 | Credit Limit Request, Receivables (+Sudamo), Collection, Yarn Purchase Order, Production Order Tracking, Monthly Expense Report, Snap View, Payable, Daily Collection Report, Sales Order Tracking, Daily Payment Report, Inquiry, Inquiry Report, Sudamo Production Order, Yarn Stock Verification, Fabric Stock Verification, Sales Order (Inactive), Purchase Order Tracking, Item Authorization, Process Complete Auth, Febric Stock, Checking Scanner, Packing Grade Auth, Production Merge Auth, Creel Management System, Creel Issue Return, Beam Gaiting, Beam Close, Weft Issue, Weft Issue Return, Doff Entry, Event, Sales Order, Price List, Sales Order Price List Auth, Poy Rate Entry, Purchase Grade Auth, Purchase Import Auth, Purchase Rate Auth, Profile, Sales Order Entry (= `orders`), Employ Dashboard (= Home dashboard), Sales Order Dashboard (= designs / costing / reports / orders) |
 | **Added now** | 10 | New Account Request, Outstanding Days Request, Party Dashboard, Design Authorization, Production Report, Warehouse, Yarn Management System, Quarter Summary, Feedback, Yarn Manufacturing |
-| Stay Legacy only | 2 | Weft Carton Issue, Yarn Sales Order |
+| Stay Legacy only | 0 | — (Weft Carton Issue and Yarn Sales Order were added later, see section 8) |
 | Not ported | 1 | Sudamo Sales Order Entry — no route file exists in Legacy either |
 | Hidden in Legacy | — | Sales Analysis (commented out of Legacy Home) — not ported |
 
@@ -66,3 +66,49 @@ login / app start). Until a role is granted them, only super-admin sees the new 
 - Independent second review of each port against Legacy for endpoints, payloads, validations and calculations.
 - NOT done: running the app on device / web — `npm install` is blocked in the build sandbox. Please run it once
   on Android + web and test each screen with a real login before release.
+
+## 8. Yarn Sales Order added (6 Oct 2026)
+
+| Module | New route (`app/new/(tabs)/`) | Permission | Component (`src/components/`) |
+|---|---|---|---|
+| Yarn Sales Order | `yarn-sales-order` | `production.yarn_sales_order` | `YarnSalesOrderNEW` |
+
+Same pattern as section 2: permission child + `{ nav, screen }` pair in `production.module.ts`, wrapper
+`src/screens/production/YarnSalesOrderScreen.tsx` (`ErpSessionGate`), route file guarded by `PermissionRouteGuard`.
+The route name equals the Legacy one, so the same push payload opens it on both ERPs. Legacy screens untouched.
+
+- Endpoints, payloads and response paths: `YarnSalesOrderNEW/api.ts`. Rules (row merge, validation, save payload):
+  `YarnSalesOrderNEW/model.ts`.
+- "Legacy behaviour kept as-is" and "Deliberate differences from legacy": header comment of `YarnSalesOrderNEW/index.tsx`.
+- Checked: the save / row-merge / details rules give byte-identical output to the Legacy functions (3,000+ generated
+  cases), and the whole flow was run in a browser against a mock API (requests compared with Legacy params).
+  NOT done: a run on a device / against the real server.
+
+Still Legacy only after this: Yarn Management System (its New screen and route file exist, but the permission and
+menu entries are commented out in `production.module.ts`), Sudamo Sales Order Entry (no route file in Legacy either),
+Sales Analysis (hidden in Legacy Home).
+
+## 9. Legacy selection removed, dark theme, Settings (6 Oct 2026)
+
+See `THEME_AND_SETTINGS.md`.
+
+## 10. Receivables / Receivables Sudamo / Payable rebuilt (7 Oct 2026)
+
+| Screen | Route (`app/new/(tabs)/`) | Permission | Component (`src/components/OutstandingNEW/`) |
+|---|---|---|---|
+| Receivables (Rayons login) | `receivables-screen` | `production.receivables` | `Receivables.tsx` |
+| Receivables Sudamo (Sudamo / Knits login) | `receivables-screen` (same menu entry) | `production.receivables` | `ReceivablesSudamo.tsx` |
+| Payable | `Payable-Screen` | `production.payable` | `Payable.tsx` |
+
+- One engine for the three screens: `OutstandingView.tsx` (flow), `api.ts` (endpoints), `model.ts` (payloads, number
+  formats, columns, totals, cumulative), `FilterSheet.tsx`, `SummaryPanel.tsx`, `DetailPanel.tsx`, `ui.tsx`.
+- Receivables is property-wise, same rule as the Legacy Home (`prp === 'sudamo_knits' ? 'receivables-sudamo' : 'receivables'`):
+  `src/screens/production/ReceivablesScreen.tsx` picks the screen from the logged-in property.
+  `receivables-screen-sudamo` redirects to `receivables-screen`.
+- Removed: `src/components/ReceivablesNew/`, `src/components/PayableNew/` (the earlier New screens). Permissions, menu
+  entries and Legacy screens are untouched.
+- "Flow kept exactly as legacy" and "Deliberate differences from legacy": header comment of `OutstandingView.tsx`.
+- Checked: payloads (keys, values, key order), amounts, totals, column order, search and the cumulative balance give the
+  same output as the Legacy expressions (94,000 generated cases + the Legacy sample response); the three screens were
+  run in a browser against a mock API at phone / tablet / desktop widths (a small DOM stand-in for React Native, not
+  the real app). NOT done: a run on a device / against the real server.

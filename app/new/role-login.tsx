@@ -169,11 +169,11 @@ function AutoOrManualGate({ property, info, support, onManual, onBack }: GatePro
 
   return (
     <AuthShell
-      eyebrow="NEW ERP SYSTEM"
+      eyebrow="MADHUSUDHAN FABRICS"
       title="Welcome back"
       subtitle="A saved login was found on this device. How would you like to sign in?"
       onBack={onBack}
-      brandTitle="Welcome back to the New ERP"
+      brandTitle="Welcome back to the ERP"
       brandSubtitle="Your saved login is encrypted on this device and only opens after your device lock confirms it's you."
       highlights={[
         { icon: 'lock', title: 'Locked to this device', desc: 'Encrypted with the phone Keychain / Keystore, or an encrypted browser cookie.' },

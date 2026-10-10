@@ -131,6 +131,47 @@ export default function CheckingScannerModule({ token, API }: Props) {
   // ---- manual state (legacy FormState.values)
   const [fv, setFv] = useState<Record<string, any>>({});
   const handleChange = (key: string, value: any) => setFv((p) => ({ ...p, [key]: value }));
+
+  // Split API TakaNo into locked prefix and editable last 3 digits
+  const getTakaParts = (value: any) => {
+    const text = String(value ?? '');
+    const lastSlash = text.lastIndexOf('/');
+
+    if (lastSlash === -1) {
+      return {
+        prefix: '',
+        suffix: text.replace(/\D/g, '').slice(0, 3),
+      };
+    }
+
+    return {
+      prefix: text.slice(0, lastSlash + 1),
+      suffix: text.slice(lastSlash + 1).replace(/\D/g, '').slice(0, 3),
+    };
+  };
+
+  // Pad the last part to exactly 3 digits
+  const formatTakaNo = (value: any) => {
+    const { prefix, suffix } = getTakaParts(value);
+
+    return prefix + (suffix ? suffix.padStart(3, '0') : '');
+  };
+
+  // Only allow editing the final 3 digits
+  const handleTakaSuffixChange = (raw: string) => {
+    const { prefix } = getTakaParts(fv.TakaNo);
+    const suffix = raw.replace(/\D/g, '').slice(0, 3);
+
+    handleChange('TakaNo', prefix + suffix);
+  };
+
+  // Add leading zeros when editing is finished
+  const handleTakaSuffixBlur = () => {
+    if (!fv.TakaNo) return;
+
+    handleChange('TakaNo', formatTakaNo(fv.TakaNo));
+  };
+
   const [manualBeams, setManualBeams] = useState<any[]>([]);
   const [selectedBeam, setSelectedBeam] = useState<any>(null);
   const [manualDesigns, setManualDesigns] = useState<any[]>([]); // getdesigndata
@@ -479,7 +520,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
         txntype: TXN_SCAN,
         referrer: 'dashboard',
         scannedString: {
-          prpcode: beam.PrpCode, prptype: pt, beamuid: beam.BeamUId, beamno: beam.BeamNo, takano: '',
+          prpcode: beam.PrpCode, prptype: pt, beamuid: beam.BeamUId, beamno: beam.BeamNo, takano: String(fv.TakaNo ?? ''),
           isfirsttaka: beam.isfirsttaka || 0, islasttaka: beam.islasttaka || 1, yearno: getCurrentFinancialYear(),
         },
         prpcode: beam.PrpCode,
@@ -507,7 +548,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
     }
   };
 
-  const manualDesignSelect = async (item: any) => {
+  const manualDesignSelect = async (item: any, currentTakaNo: any) => {
     const v = fv;
     setManualLoading(true);
     try {
@@ -948,7 +989,69 @@ export default function CheckingScannerModule({ token, API }: Props) {
             label="Beam No" required value={selectedBeam ? str(selectedBeam.BeamNo) : ''} sub={selectedBeam ? `${str(selectedBeam.MacName || selectedBeam.MacCode)}` : null}
             placeholder="Select Beam No" onPress={() => setPick('beam')} icon="expand-more"
           />
-          <Field label="Taka No" required value={str(fv.TakaNo)} onChangeText={(t) => handleChange('TakaNo', t)} maxLength={20} />
+          {/* <Field label="Taka No" required value={str(fv.TakaNo)} onChangeText={(t) => handleChange('TakaNo', t)} maxLength={20} /> */}
+
+
+          <View style={{ marginBottom: 12 }}>
+            <Text style={s.label}>
+              Taka No <Text style={{ color: T.red }}>*</Text>
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                minHeight: 46,
+                borderWidth: 1,
+                borderColor: T.border,
+                borderRadius: 10,
+                backgroundColor: T.surface,
+                overflow: 'hidden',
+              }}
+            >
+              <Text
+                style={{
+                  paddingLeft: 12,
+                  color: T.muted,
+                  fontSize: 14,
+                  fontWeight: '700',
+                }}
+              >
+                {getTakaParts(fv.TakaNo).prefix}
+              </Text>
+
+              <TextInput
+                value={getTakaParts(fv.TakaNo).suffix}
+                onChangeText={(raw) => {
+                  const { prefix } = getTakaParts(fv.TakaNo);
+                  const digits = raw.replace(/\D/g, '').slice(0, 3);
+                  handleChange('TakaNo', prefix + digits);
+                }}
+                onBlur={() => {
+                  const { prefix, suffix } = getTakaParts(fv.TakaNo);
+                  if (suffix) {
+                    handleChange('TakaNo', prefix + suffix.padStart(3, '0'));
+                  }
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+                editable={!!fv.BeamNo}
+                selectTextOnFocus
+                placeholder="001"
+                placeholderTextColor={T.muted}
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 8,
+                  paddingVertical: 10,
+                  fontSize: 14,
+                  fontWeight: '800',
+                  color: T.ink,
+                }}
+              />
+            </View>
+          </View>
+
+
           <SelectBox
             label="Design" required value={selectedDesign ? str(selectedDesign.dsnname) : ''} sub={selectedDesign ? `Code ${str(selectedDesign.dsncode)}` : null}
             placeholder="Choose Design..." onPress={() => setPick('mdesign')} icon="expand-more"

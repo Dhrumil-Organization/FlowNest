@@ -63,7 +63,7 @@ function WebUpdateBanner() {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={w.title}>New update available · v{info.version}</Text>
           <Text style={w.sub} numberOfLines={2}>
-            {info.notes || 'Latest features & fixes ke liye page refresh karein.'}
+            {info.notes || 'Latest features and improvements are available. Please refresh the page to get the latest version.'}
           </Text>
         </View>
         <TouchableOpacity style={w.later} onPress={() => setHiddenFor(key)} accessibilityLabel="Later">

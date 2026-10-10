@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import AppAlert from '@/common/utils/appAlert';
 
 export type JobWorkParty = {
   acc_code: string;
@@ -21,14 +22,32 @@ export type DyeingDesign = {
   id: string;
   code: string;
   dsn_code?: string | null;
+  category?: string | null;
+  type?: string | null;
 };
 
 export type DyeingPartyShade = {
   id?: string | number | null;
+  design_shade_id?: string | null;
   party_acc_code: string;
   party_name: string;
   party_shade_no: string;
+  party_shade_name?: string | null;
   erp_shade_code?: string | number | null;
+};
+
+export type DyeingColourDesign = {
+  design_shade_id: string;
+  main_design_id: string;
+  design_code: string;
+  dsn_code?: string | null;
+  shade_name?: string | null;
+};
+
+export type DyeingColourYarn = {
+  mi_id: string;
+  name: string;            // e.g. "55 Lea", "1/21 EXCEL/ LINEN 60"
+  side: 'warp' | 'weft';
 };
 
 export type DyeingColour = {
@@ -36,7 +55,27 @@ export type DyeingColour = {
   code?: string | null;
   name: string;
   hex?: string | null;
+  erp_shade_code?: number | null;
+  designs?: DyeingColourDesign[];
   maps?: DyeingPartyShade[];
+  yarns?: DyeingColourYarn[];   // yarns this shade is used on (from saved colourways)
+  colourways?: string[];        // colourway / sub-design codes using this shade
+};
+
+type MillMapping = {
+  id?: string | null;
+  party_acc_code: string;
+  party_name: string;
+  party_shade_no: string;
+  party_shade_name?: string | null;
+};
+
+// Shade Colour, Main Shade and Reference Name are hidden in the form.
+// They stay optional in the API, so the backend keeps its own defaults.
+export type DyeingColourPayload = {
+  name: string;
+  main_design_ids: string[];
+  mappings: MillMapping[];
 };
 
 export type DyeingMasterApi = {
@@ -44,24 +83,17 @@ export type DyeingMasterApi = {
   searchMainShades: (search: string) => Promise<MainErpShade[]>;
   searchDesigns: (search: string) => Promise<DyeingDesign[]>;
   searchJobWorkParties: (search: string) => Promise<JobWorkParty[]>;
-  saveColour: (payload: {
-    name: string;
-    hex: string;
-    main_shade_code?: number | null;
-    main_design_id?: string | null;
-    design_shade_name?: string | null;
-    mappings: Array<{
-      party_acc_code: string;
-      party_name: string;
-      party_shade_no: string;
-    }>;
-  }) => Promise<any>;
+  saveColour: (payload: DyeingColourPayload) => Promise<any>;
+  updateColour: (id: string, payload: DyeingColourPayload) => Promise<any>;
+  deleteColour: (id: string) => Promise<any>;
 };
 
 type DraftRow = {
   key: string;
   party: JobWorkParty | null;
   partyShadeNo: string;
+  mapId?: string | null;            // existing row (edit)
+  partyShadeName?: string | null;   // kept as-is on edit
 };
 
 const P = {
@@ -78,10 +110,94 @@ const P = {
 
 const rowKey = () => `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-function normalizeHex(v: string) {
-  const x = v.trim().toUpperCase();
-  if (/^#[0-9A-F]{6}$/.test(x)) return x;
-  return '#3A568A';
+// Exact message from the backend (message + validation errors). Falls back to a
+// clear text for timeout / no network / route-or-method-not-found / HTML errors.
+export const apiErrorText = (e: any, fallback: string): string => {
+  const res = e?.response;
+  const data = res?.data;
+  const status: number | undefined = res?.status;
+
+  if (data && typeof data === 'object') {
+    const parts: string[] = [];
+    const msg = typeof data.message === 'string' ? data.message.trim() : '';
+    if (msg) parts.push(msg);
+    if (data.errors && typeof data.errors === 'object') {
+      Object.values(data.errors).flat().forEach((x: any) => {
+        const t = String(x ?? '').trim();
+        if (t && !parts.some(p => p.includes(t))) parts.push(t);
+      });
+    }
+    if (!parts.length && typeof data.error === 'string') parts.push(data.error);
+    if (parts.length) {
+      const text = parts.join('\n');
+      // Laravel "method/route not found" → say which API is missing on the server
+      if ((status === 404 || status === 405 || status === 500) &&
+          /does not exist|not supported for route|could not be found|not found/i.test(text) &&
+          /method|route/i.test(text)) {
+        const api = `${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
+        return `${text}\n\nServer par ye API abhi nahi hai: ${api}`;
+      }
+      return text;
+    }
+  }
+
+  if (e?.code === 'ECONNABORTED' || /timeout/i.test(String(e?.message || ''))) {
+    return `${fallback}\nServer ne 30 sec mein jawab nahi diya (DB busy / locked). List refresh karke check karein.`;
+  }
+  if (!res) return `${fallback}\nServer se connection nahi hua (network).`;
+  if (status === 404) return `${fallback}\nAPI not found (404): ${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
+  if (status === 405) return `${fallback}\nMethod not allowed (405): ${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
+  return `${fallback}${status ? ` (HTTP ${status})` : ''}`;
+};
+
+const errMsg = apiErrorText;
+const okMsg = (res: any, fallback: string): string => {
+  const m = res?.data?.message;
+  return typeof m === 'string' && m.trim() ? m.trim() : fallback;
+};
+
+// ── accurate list search ──────────────────────────────────────
+// Searches shade, code, ERP code, designs, mill name / code / shade no.,
+// the YARNS the shade is used on (55 Lea, 1/21 EXCEL…) and colourway codes.
+// Every typed word must match the START of a word (so "55" finds "55 Lea",
+// not "155 Lea"); parts after - or / count as words too ("45" finds "N-45").
+// Exact match ranks first, then starts-with, then the rest.
+const norm = (v: unknown) => String(v ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+function colourFields(c: DyeingColour): string[] {
+  const out: unknown[] = [c.name, c.code, c.erp_shade_code];
+  (c.designs || []).forEach(d => out.push(d.design_code, d.dsn_code));
+  (c.maps || []).forEach(m => out.push(m.party_name, m.party_acc_code, m.party_shade_no, m.party_shade_name));
+  (c.yarns || []).forEach(y => out.push(y.name));
+  (c.colourways || []).forEach(code => out.push(code));
+  return out.map(norm).filter(Boolean);
+}
+
+function fieldWords(fields: string[]): string[] {
+  const words: string[] = [];
+  fields.forEach(f => f.split(' ').forEach(w => {
+    if (!w) return;
+    words.push(w);
+    w.split(/[-/]+/).forEach(p => { if (p && p !== w) words.push(p); });
+  }));
+  return words;
+}
+
+function searchColours(list: DyeingColour[], query: string): DyeingColour[] {
+  const q = norm(query);
+  if (!q) return list;
+  const tokens = q.split(' ');
+  return list
+    .map(c => {
+      const fields = colourFields(c);
+      const words = fieldWords(fields);
+      if (!tokens.every(t => words.some(w => w.startsWith(t)))) return null;
+      const rank = fields.some(f => f === q) ? 0 : fields.some(f => f.startsWith(q)) ? 1 : 2;
+      return { c, rank };
+    })
+    .filter((x): x is { c: DyeingColour; rank: number } => !!x)
+    .sort((a, b) => a.rank - b.rank || norm(a.c.name).localeCompare(norm(b.c.name)))
+    .map(x => x.c);
 }
 
 function JobWorkPartyPicker({
@@ -181,23 +297,19 @@ function JobWorkPartyPicker({
   );
 }
 
-function SearchPicker<T>({
-  visible, title, subtitle, placeholder, valueLabel, search, keyOf, primary, secondary, onClose, onPick,
+// Multi-select design picker: tap to tick / untick, "Done" applies.
+function DesignMultiPicker({
+  visible, selected, search, onClose, onDone,
 }: {
   visible: boolean;
-  title: string;
-  subtitle: string;
-  placeholder: string;
-  valueLabel?: string | null;
-  search: (text: string) => Promise<T[]>;
-  keyOf: (item: T) => string;
-  primary: (item: T) => string;
-  secondary: (item: T) => string | null;
+  selected: DyeingDesign[];
+  search: (text: string) => Promise<DyeingDesign[]>;
   onClose: () => void;
-  onPick: (item: T) => void;
+  onDone: (designs: DyeingDesign[]) => void;
 }) {
   const [q, setQ] = useState('');
-  const [items, setItems] = useState<T[]>([]);
+  const [items, setItems] = useState<DyeingDesign[]>([]);
+  const [picked, setPicked] = useState<DyeingDesign[]>([]);
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
 
@@ -205,7 +317,8 @@ function SearchPicker<T>({
     if (!visible) return;
     setQ('');
     setItems([]);
-  }, [visible]);
+    setPicked(selected);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!visible) return;
@@ -224,36 +337,60 @@ function SearchPicker<T>({
     return () => clearTimeout(timer);
   }, [q, visible, search]);
 
+  const isPicked = (d: DyeingDesign) => picked.some(x => x.id === d.id);
+  const toggle = (d: DyeingDesign) =>
+    setPicked(old => old.some(x => x.id === d.id) ? old.filter(x => x.id !== d.id) : [...old, d]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
         <Pressable style={s.partySheet} onPress={() => {}}>
           <View style={s.sheetHead}>
             <View style={{ flex: 1 }}>
-              <Text style={s.sheetTitle}>{title}</Text>
-              <Text style={s.sheetSub}>{subtitle}</Text>
+              <Text style={s.sheetTitle}>Select Yarn-Dyed Designs</Text>
+              <Text style={s.sheetSub}>Tick one or more YD designs for this shade</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={s.closeBtn}><Text style={s.closeText}>×</Text></TouchableOpacity>
           </View>
-          <TextInput autoFocus value={q} onChangeText={setQ} placeholder={placeholder} placeholderTextColor="#A49D94" style={s.input} />
-          {valueLabel ? <View style={s.currentParty}><Text style={s.currentPartyText}>Current: {valueLabel}</Text></View> : null}
+          <TextInput autoFocus value={q} onChangeText={setQ} placeholder="Search design name or code" placeholderTextColor="#A49D94" style={s.input} />
+          {picked.length ? (
+            <View style={[s.chipWrap, { marginTop: 8 }]}>
+              {picked.map(d => (
+                <TouchableOpacity key={d.id} style={s.chip} onPress={() => toggle(d)}>
+                  <Text style={s.chipText}>{d.code}</Text>
+                  <Text style={s.chipX}>×</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
           {loading ? <View style={s.loader}><ActivityIndicator color={P.copper} /></View> : (
             <FlatList
               data={items}
               keyboardShouldPersistTaps="handled"
-              keyExtractor={keyOf}
-              style={{ maxHeight: 380 }}
-              ListEmptyComponent={<Text style={s.empty}>No matching record found.</Text>}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={s.partyRow} onPress={() => { onPick(item); onClose(); }} activeOpacity={0.7}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.partyName}>{primary(item)}</Text>
-                    {secondary(item) ? <Text style={s.partySub}>{secondary(item)}</Text> : null}
-                  </View>
-                </TouchableOpacity>
-              )}
+              keyExtractor={(x) => x.id}
+              style={{ maxHeight: 340 }}
+              ListEmptyComponent={<Text style={s.empty}>No matching design found.</Text>}
+              renderItem={({ item }) => {
+                const on = isPicked(item);
+                return (
+                  <TouchableOpacity style={s.partyRow} onPress={() => toggle(item)} activeOpacity={0.7}>
+                    <View style={[s.check, on && s.checkOn]}>
+                      {on ? <Text style={s.checkTick}>✓</Text> : null}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.partyName}>{item.code}</Text>
+                      <Text style={s.partySub}>
+                        {[item.category, item.type || 'YD'].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
             />
           )}
+          <TouchableOpacity style={[s.saveBtn, { marginTop: 10 }]} onPress={() => { onDone(picked); onClose(); }}>
+            <Text style={s.saveText}>Done{picked.length ? ` (${picked.length})` : ''}</Text>
+          </TouchableOpacity>
         </Pressable>
       </Pressable>
     </Modal>
@@ -266,17 +403,19 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
-  const [hex, setHex] = useState('#3A568A');
-  const [mainShade, setMainShade] = useState<MainErpShade | null>(null);
-  const [design, setDesign] = useState<DyeingDesign | null>(null);
-  const [designShadeName, setDesignShadeName] = useState('');
-  const [mainShadePicker, setMainShadePicker] = useState(false);
+  const [designs, setDesigns] = useState<DyeingDesign[]>([]);
   const [designPicker, setDesignPicker] = useState(false);
   const [rows, setRows] = useState<DraftRow[]>([
     { key: rowKey(), party: null, partyShadeNo: '' },
   ]);
   const [partyRowKey, setPartyRowKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | number | null>(null);
+  const [editing, setEditing] = useState<DyeingColour | null>(null);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [query, setQuery] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+
+  const visibleColours = useMemo(() => searchColours(colours, query), [colours, query]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -304,47 +443,103 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
 
   const reset = () => {
     setName('');
-    setHex('#3A568A');
-    setMainShade(null);
-    setDesign(null);
-    setDesignShadeName('');
-    setMainShadePicker(false);
+    setDesigns([]);
     setDesignPicker(false);
     setRows([{ key: rowKey(), party: null, partyShadeNo: '' }]);
     setCreating(false);
     setPartyRowKey(null);
+    setEditing(null);
+  };
+
+  // Edit = same Add form, pre-filled, in edit mode.
+  const startEdit = (c: DyeingColour) => {
+    setEditing(c);
+    setName(c.name || '');
+    setDesigns((c.designs || []).map(d => ({
+      id: d.main_design_id,
+      code: d.design_code,
+      dsn_code: d.dsn_code ?? null,
+    })));
+    const maps = c.maps || [];
+    setRows(maps.length ? maps.map(m => ({
+      key: rowKey(),
+      party: { acc_code: m.party_acc_code, name: m.party_name },
+      partyShadeNo: m.party_shade_no || '',
+      mapId: m.id != null ? String(m.id) : null,
+      partyShadeName: m.party_shade_name ?? null,
+    })) : [{ key: rowKey(), party: null, partyShadeNo: '' }]);
+    setCreating(true);
+    setPartyRowKey(null);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const removeColour = (c: DyeingColour) => {
+    AppAlert.alert(
+      'Delete shade?',
+      `${c.name}${c.code ? ` (${c.code})` : ''} will be permanently deleted` +
+      `${c.erp_shade_code ? ` (ERP shade ${c.erp_shade_code} too)` : ''}. ` +
+      'Shades used in a colourway cannot be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(c.id);
+            try {
+              const res = await api.deleteColour(String(c.id));
+              if (editing && String(editing.id) === String(c.id)) reset();
+              if (expanded === c.id) setExpanded(null);
+              await refresh();
+              AppAlert.alert('Deleted', okMsg(res, `${c.name} deleted.`));
+            } catch (e: any) {
+              if (e?.response?.status === 404) await refresh();   // already gone → update list
+              AppAlert.alert('Delete failed', errMsg(e, 'Unable to delete shade.'));
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Dyeing', 'Enter Shade Name.');
+      AppAlert.alert('Dyeing', 'Enter Shade Name.');
       return;
     }
     if (!validRows.length) {
-      Alert.alert('Dyeing', 'Select a Dyeing Mill and enter its shade number.');
+      AppAlert.alert('Dyeing', 'Select a Dyeing Mill and enter its shade number.');
       return;
     }
-    if (validRows.some(r => !r.party)) return;
+
+    const payload: DyeingColourPayload = {
+      name: name.trim(),
+      main_design_ids: designs.map(d => d.id),
+      mappings: validRows.map(r => ({
+        id: r.mapId ?? null,
+        party_acc_code: r.party!.acc_code,
+        party_name: r.party!.name,
+        party_shade_no: r.partyShadeNo.trim(),
+        party_shade_name: r.partyShadeName ?? null,
+      })),
+    };
 
     setSaving(true);
     try {
-      await api.saveColour({
-        name: name.trim(),
-        hex: normalizeHex(hex),
-        main_shade_code: mainShade?.shd_code ?? null,
-        main_design_id: design?.id ?? null,
-        design_shade_name: design ? (designShadeName.trim() || name.trim()) : null,
-        mappings: validRows.map(r => ({
-          party_acc_code: r.party!.acc_code,
-          party_name: r.party!.name,
-          party_shade_no: r.partyShadeNo.trim(),
-        })),
-      });
+      const res = editing
+        ? await api.updateColour(String(editing.id), payload)
+        : await api.saveColour(payload);
+      const wasEditing = !!editing;
       reset();
+      setQuery('');            // an old search must not hide the shade just saved
       await refresh();
-      Alert.alert('Dyeing', 'Shade saved.');
+      AppAlert.alert(wasEditing ? 'Updated' : 'Saved', okMsg(res, wasEditing ? 'Shade updated.' : 'Shade saved.'));
     } catch (e: any) {
-      Alert.alert('Dyeing', e?.response?.data?.message || e?.message || 'Unable to save shade.');
+      if (e?.code === 'ECONNABORTED') refresh();   // may have saved late on the server
+      AppAlert.alert(editing ? 'Update failed' : 'Save failed',
+        errMsg(e, editing ? 'Unable to update shade.' : 'Unable to save shade.'));
     } finally {
       setSaving(false);
     }
@@ -353,6 +548,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
   return (
     <View style={s.screen}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={s.content}
         keyboardShouldPersistTaps="handled"
       >
@@ -375,6 +571,14 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
 
         {creating ? (
           <View style={s.card}>
+            {editing ? (
+              <View style={s.editBanner}>
+                <Text style={s.editBannerText}>
+                  Edit: {editing.name}{editing.code ? ` · ${editing.code}` : ''}
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={s.label}>Shade Name</Text>
             <TextInput
               value={name}
@@ -385,58 +589,32 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
               style={s.input}
             />
 
-            <Text style={[s.label, { marginTop: 12 }]}>Shade Colour</Text>
-            <View style={s.hexRow}>
-              <View style={[s.swatchLarge, { backgroundColor: normalizeHex(hex) }]} />
-              <TextInput
-                value={hex}
-                onChangeText={setHex}
-                autoCapitalize="characters"
-                maxLength={7}
-                placeholder="#3A568A"
-                placeholderTextColor="#AAA39A"
-                style={[s.input, { flex: 1 }]}
-              />
-            </View>
-
-            <Text style={[s.label, { marginTop: 14 }]}>Main Shade (Optional)</Text>
-            <Text style={s.help}>Optional reference to an existing ERP main shade.</Text>
-            <TouchableOpacity style={s.select} onPress={() => setMainShadePicker(true)} activeOpacity={0.7}>
-              <View style={{ flex: 1 }}>
-                <Text style={mainShade ? s.selectValue : s.selectPlaceholder}>
-                  {mainShade ? mainShade.shd_name : 'Select Main Shade (Optional)'}
-                </Text>
-                {mainShade ? <Text style={s.selectCode}>{mainShade.shd_code}{mainShade.short_name ? ` · ${mainShade.short_name}` : ''}</Text> : null}
-              </View>
-              <Text style={s.chev}>⌄</Text>
-            </TouchableOpacity>
-
-            <Text style={[s.label, { marginTop: 14 }]}>Design (Optional)</Text>
+            <Text style={[s.label, { marginTop: 14 }]}>Designs (Optional)</Text>
+            <Text style={s.help}>Select one or more designs. No design = available for every design.</Text>
             <TouchableOpacity style={s.select} onPress={() => setDesignPicker(true)} activeOpacity={0.7}>
               <View style={{ flex: 1 }}>
-                <Text style={design ? s.selectValue : s.selectPlaceholder}>
-                  {design ? design.code : 'Search Design (Optional)'}
+                <Text style={designs.length ? s.selectValue : s.selectPlaceholder}>
+                  {designs.length ? `${designs.length} design${designs.length === 1 ? '' : 's'} selected` : 'Search Designs (Optional)'}
                 </Text>
-                {design ? <Text style={s.selectCode}>{design.dsn_code ? `${design.dsn_code}` : design.id}</Text> : null}
               </View>
               <Text style={s.chev}>⌄</Text>
             </TouchableOpacity>
-
-            <Text style={[s.label, { marginTop: 12 }]}>Reference Name (Optional)</Text>
-            <Text style={s.help}>Used only when a Design is selected.</Text>
-            <TextInput
-              editable={!!design}
-              value={designShadeName}
-              onChangeText={setDesignShadeName}
-              placeholder={design ? (name.trim() ? `${name.trim()} for this design` : 'Optional') : 'Select a Design to add a reference name'}
-              placeholderTextColor="#AAA39A"
-              style={s.input}
-            />
+            {designs.length ? (
+              <View style={[s.chipWrap, { marginTop: 8 }]}>
+                {designs.map(d => (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={s.chip}
+                    onPress={() => setDesigns(old => old.filter(x => x.id !== d.id))}
+                  >
+                    <Text style={s.chipText}>{d.code}</Text>
+                    <Text style={s.chipX}>×</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
 
             <Text style={[s.label, { marginTop: 14 }]}>Mill Shade Numbers</Text>
-            <Text style={s.help}>
-              
-            </Text>
 
             {rows.map((r, index) => (
               <View key={r.key} style={s.mappingCard}>
@@ -473,7 +651,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
                   style={s.removeBtn}
                   onPress={() => setRows(old =>
                     old.length === 1
-                      ? [{ ...old[0], party: null, partyShadeNo: '' }]
+                      ? [{ key: old[0].key, party: null, partyShadeNo: '' }]
                       : old.filter(x => x.key !== r.key)
                   )}
                 >
@@ -499,9 +677,37 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
             >
               {saving
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={s.saveText}>Save Shade</Text>}
+                : <Text style={s.saveText}>{editing ? 'Update Shade' : 'Save Shade'}</Text>}
             </TouchableOpacity>
           </View>
+        ) : null}
+
+        {/* While Add / Edit form is open, the list is hidden (avoids confusion). */}
+        {!creating ? (<>
+        {!loading && colours.length > 0 ? (
+          <View style={s.searchWrap}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search shade, yarn (55 Lea), design, colourway, mill or mill shade no."
+              placeholderTextColor="#AAA39A"
+              autoCorrect={false}
+              autoCapitalize="none"
+              style={[s.input, { flex: 1 }]}
+            />
+            {query ? (
+              <TouchableOpacity style={s.clearBtn} onPress={() => setQuery('')}>
+                <Text style={s.removeText}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+        {!loading && colours.length > 0 ? (
+          <Text style={s.searchCount}>
+            {query.trim() ? `${visibleColours.length} of ` : ''}{colours.length} shades
+            {' · '}{new Set(colours.flatMap(c => (c.designs || []).map(d => d.main_design_id))).size} designs linked
+            {' · '}{colours.reduce((n, c) => n + (c.maps || []).length, 0)} mill shades
+          </Text>
         ) : null}
 
         {loading ? (
@@ -510,24 +716,79 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
           <View style={s.emptyCard}>
             <Text style={s.empty}>No yarn shades yet.</Text>
           </View>
-        ) : colours.map(c => {
+        ) : visibleColours.length === 0 ? (
+          <View style={s.emptyCard}>
+            <Text style={s.empty}>No shade matches "{query.trim()}".</Text>
+          </View>
+        ) : visibleColours.map(c => {
           const isOpen = expanded === c.id;
+          const dCount = (c.designs || []).length;
+          const mCount = (c.maps || []).length;
           return (
             <View key={String(c.id)} style={s.colourCard}>
-              <TouchableOpacity
-                style={s.colourHead}
-                onPress={() => setExpanded(isOpen ? null : c.id)}
-              >
-                <View style={[s.swatch, { backgroundColor: c.hex || '#D7D2CA' }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.colourName}>{c.name}</Text>
-                  <Text style={s.colourSub}>
-                    {(c.maps || []).length} mill shade{(c.maps || []).length === 1 ? '' : 's'}
-                  </Text>
+              <View style={s.colourHead}>
+                <TouchableOpacity
+                  style={s.colourHeadMain}
+                  onPress={() => setExpanded(isOpen ? null : c.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.swatch, { backgroundColor: c.hex || '#D7D2CA' }]} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.colourName} numberOfLines={1}>{c.name}</Text>
+                    <Text style={s.colourSub} numberOfLines={2}>
+                      {c.code ? `${c.code} · ` : ''}
+                      {mCount} mill shade{mCount === 1 ? '' : 's'}
+                      {dCount ? ` · ${dCount} design${dCount === 1 ? '' : 's'}` : ' · all designs'}
+                      {dCount ? <Text style={s.colourDesigns}>{'  ·  '}{(c.designs || []).map(d => d.design_code).join(', ')}</Text> : null}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.actionBtn} onPress={() => startEdit(c)} disabled={saving}>
+                  <Text style={s.actionText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.actionBtn, s.actionDanger]}
+                  onPress={() => removeColour(c)}
+                  disabled={deletingId === c.id}
+                >
+                  {deletingId === c.id
+                    ? <ActivityIndicator size="small" color={P.danger} />
+                    : <Text style={[s.actionText, { color: P.danger }]}>Delete</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.colourHeadEnd}
+                  onPress={() => setExpanded(isOpen ? null : c.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.chev}>{isOpen ? '⌃' : '⌄'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {isOpen ? (
+                <View style={s.detailBar}>
+                  <View style={{ flex: 1 }}>
+                    {dCount ? (
+                      <View style={s.chipWrap}>
+                        {(c.designs || []).map(d => (
+                          <View key={d.design_shade_id} style={s.chipStatic}>
+                            <Text style={s.chipText}>{d.design_code}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={s.partySub}>All designs</Text>
+                    )}
+                    {(c.yarns || []).length ? (
+                      <Text style={[s.partySub, { marginTop: 6 }]}>
+                        Used on: {(c.yarns || []).map(y => `${y.name} (${y.side === 'warp' ? 'Warp' : 'Weft'})`).join(' · ')}
+                      </Text>
+                    ) : null}
+                    {(c.colourways || []).length ? (
+                      <Text style={s.partySub}>Colourways: {(c.colourways || []).join(', ')}</Text>
+                    ) : null}
+                  </View>
                 </View>
-                {c.code ? <Text style={s.colourCode}>{c.code}</Text> : null}
-                <Text style={s.chev}>{isOpen ? '⌃' : '⌄'}</Text>
-              </TouchableOpacity>
+              ) : null}
 
               {isOpen ? (c.maps || []).map(m => (
                 <View
@@ -550,34 +811,15 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
             </View>
           );
         })}
+        </>) : null}
       </ScrollView>
 
-      <SearchPicker<MainErpShade>
-        visible={mainShadePicker}
-        title="Select Main Shade"
-        subtitle="Optional reference to an existing ERP main shade"
-        placeholder="Search shade name or code"
-        valueLabel={mainShade ? `${mainShade.shd_name} · ${mainShade.shd_code}` : null}
-        search={api.searchMainShades}
-        keyOf={(x) => `${x.prp_code}_${x.shd_code}`}
-        primary={(x) => x.shd_name}
-        secondary={(x) => `${x.shd_code}${x.short_name ? ` · ${x.short_name}` : ''}`}
-        onClose={() => setMainShadePicker(false)}
-        onPick={setMainShade}
-      />
-
-      <SearchPicker<DyeingDesign>
+      <DesignMultiPicker
         visible={designPicker}
-        title="Select Design"
-        subtitle="Optional design association for this shade"
-        placeholder="Search design name or code"
-        valueLabel={design ? design.code : null}
+        selected={designs}
         search={api.searchDesigns}
-        keyOf={(x) => x.id}
-        primary={(x) => x.code}
-        secondary={(x) => x.dsn_code ? `${x.dsn_code}` : null}
         onClose={() => setDesignPicker(false)}
-        onPick={setDesign}
+        onDone={setDesigns}
       />
 
       <JobWorkPartyPicker
@@ -627,7 +869,10 @@ const s = StyleSheet.create({
   emptyCard: { backgroundColor: P.surface, borderWidth: 1, borderColor: P.border, borderRadius: 12, padding: 28 },
   empty: { color: P.muted, textAlign: 'center', fontSize: 12 },
   colourCard: { backgroundColor: P.surface, borderWidth: 1, borderColor: P.border, borderRadius: 12, overflow: 'hidden', marginBottom: 8 },
-  colourHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  colourHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: 12 },
+  colourHeadMain: { flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  colourDesigns: { fontFamily: 'monospace', color: P.muted },
+  colourHeadEnd: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 4 },
   swatch: { width: 28, height: 28, borderRadius: 7, borderWidth: 1, borderColor: P.border },
   colourName: { color: P.ink, fontSize: 13, fontWeight: '800' },
   colourSub: { color: P.muted, fontSize: 9.5, marginTop: 2 },
@@ -649,4 +894,21 @@ const s = StyleSheet.create({
   currentPartyText: { flex: 1, color: P.muted, fontSize: 10.5 },
   codeText: { color: P.copper, fontSize: 10.5, fontWeight: '800' },
   partyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: P.border },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  clearBtn: { width: 34, height: 44, alignItems: 'center', justifyContent: 'center' },
+  searchCount: { color: P.muted, fontSize: 10.5, marginBottom: 8 },
+  detailBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, paddingVertical: 9, borderTopWidth: 1, borderTopColor: P.border, backgroundColor: P.soft },
+  actionBtn: { borderWidth: 1, borderColor: P.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: P.surface, minWidth: 64, alignItems: 'center' },
+  actionDanger: { borderColor: '#E3C5C5' },
+  actionText: { color: P.ink, fontSize: 11.5, fontWeight: '800' },
+  editBanner: { backgroundColor: P.soft, borderRadius: 9, padding: 10, marginBottom: 12 },
+  editBannerText: { color: P.ink, fontSize: 12, fontWeight: '800' },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: P.soft, borderWidth: 1, borderColor: P.border, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  chipStatic: { backgroundColor: P.surface, borderWidth: 1, borderColor: P.border, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  chipText: { color: P.ink, fontSize: 11, fontWeight: '700' },
+  chipX: { color: P.danger, fontSize: 14, fontWeight: '700' },
+  check: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: P.border, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: P.nav, borderColor: P.nav },
+  checkTick: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });

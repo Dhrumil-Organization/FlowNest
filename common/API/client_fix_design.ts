@@ -72,6 +72,7 @@ export interface YarnLine {
     name: string;
     sys: string;
     cnt: number;
+    ply?: number;          // number of plies; cnt is the single-yarn count
     base_price?: number;
     price?: number;
 
@@ -347,6 +348,7 @@ export const DesignAPI = {
                 per_page: perPage,
                 limit: perPage,
                 category: params.category,
+                type: (params as any).type,      // optional: 'YD' / 'PD' (server filter)
                 search: params.search,
             },
         });

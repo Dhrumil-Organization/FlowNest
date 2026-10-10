@@ -34,7 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
-import DyeingMasterTab, { type DyeingMasterApi } from './DyeingMasterTab';
+import DyeingMasterTab, { apiErrorText, type DyeingMasterApi } from './DyeingMasterTab';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -89,14 +89,26 @@ type DesignOptions = { shades: DesignOptionShade[]; blend_options: string[] };
 // SHARED FABRIC MATH — mirrors app/Services/CostingEngine.php
 // ═══════════════════════════════════════════════════════════════
 
-// grams of yarn per metre of yarn — matches YarnMaster::gpm()
-const GPM = (sys: string, cnt: number): number => {
+// Ply of a yarn line. Missing / 0 / invalid → 1 (single), so old data behaves as before.
+const PLY = (y: any): number => {
+    const p = Number(y?.ply ?? y?.w_ply);
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+};
+
+// grams of yarn per metre of yarn — matches TextileYarnService::gramsPerMetre()
+// Backend (TextileYarnService::resolve) sends:
+//   Ne / Lea : cnt = SINGLE-yarn count (WCount), ply separate → weight × ply
+//              e.g. 20/2 Ne → 2 × 0.5905/20
+//   Den / Dtx: cnt = TOTAL denier/dtex already incl. ply (WDenier, or WCount×WPly)
+//              → ply must NOT be applied again.
+const GPM = (sys: string, cnt: number, ply: number = 1): number => {
     if (!cnt || cnt <= 0) return 0;
+    const p = ply >= 1 ? ply : 1;
     switch (sys) {
-        case 'Lea': return 1.6535 / cnt;        // Linen
-        case 'Ne': return 0.5905 / cnt;         // Cotton / blends
-        case 'Den': return cnt / 9000;          // Filament
-        case 'Dtx': return (cnt * 0.9) / 9000;  // Dtex
+        case 'Lea': return (1.6535 / cnt) * p;        // Linen  (single count × ply)
+        case 'Ne': return (0.5905 / cnt) * p;         // Cotton / blends (single count × ply)
+        case 'Den': return cnt / 9000;                // Filament — total denier
+        case 'Dtx': return (cnt * 0.9) / 9000;        // Dtex — total dtex
         default: return 0;
     }
 };
@@ -155,7 +167,7 @@ function calcSpec(d: any) {
         warpGSM +=
             effectiveEpi *
             IN_PER_M *
-            GPM(yarn.sys, Number(yarn.cnt)) *
+            GPM(yarn.sys, Number(yarn.cnt), PLY(yarn)) *
             warpTakeUp;
     });
 
@@ -166,7 +178,7 @@ function calcSpec(d: any) {
         weftGSM +=
             effectivePpi *
             IN_PER_M *
-            GPM(yarn.sys, Number(yarn.cnt));
+            GPM(yarn.sys, Number(yarn.cnt), PLY(yarn));
     });
 
     const greigGSM = !greigeWidthMissing ? (warpGSM + weftGSM) : 0;
@@ -288,7 +300,7 @@ function calcSpec(d: any) {
                 (Number(yarn.epi) || 0) *
                 warpMultiplier *
                 IN_PER_M *
-                GPM(yarn.sys, Number(yarn.cnt));
+                GPM(yarn.sys, Number(yarn.cnt), PLY(yarn));
             add(yarn, mass);
         });
 
@@ -297,7 +309,7 @@ function calcSpec(d: any) {
                 (Number(yarn.ppi) || 0) *
                 weftMultiplier *
                 IN_PER_M *
-                GPM(yarn.sys, Number(yarn.cnt));
+                GPM(yarn.sys, Number(yarn.cnt), PLY(yarn));
             add(yarn, mass);
         });
 
@@ -643,11 +655,12 @@ function LiveSpecPanel({ design }: { design: any }) {
             {showFormula && (
                 <View style={ls.formulaBox}>
                     <Text style={ls.formulaTxt}>
-                        Reed Space and Greige Width are independent widths. Greige Width must be entered as the actual off-loom measurement; Reed × (1 − Warp Shrink) is suggestion only and is never substituted as the measured Greige Width. Warp Shrink is length take-up:
+                        Reed Space and Greige Width are independent widths. Greige Width must be entered as the actual off-loom measurement and is never derived from Warp Shrink. Warp Shrink is length take-up:
                         warp mass × (1 + warp shrink), not a greige-width formula. Greige EPI = Loom EPI × Reed / Greige Width;
                         Greige PPI = Loom PPI + 2. Greige GSM is calculated from effective warp/weft yarn mass and Greige GLM
                         = Greige GSM × Greige Width(m). Finished GLM = Greige GLM ÷ (1 − Finish Shrink);
                         Finished EPI = body ends ÷ Finished Width and Finished PPI = Greige PPI ÷ (1 − Finish Shrink).
+                        Yarn g/m: Ne / Lea use single count × ply (20/2 Ne = 2 × 0.5905 ÷ 20); Denier / Dtex already include ply.
                     </Text>
                 </View>
             )}
@@ -1478,6 +1491,20 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
 }) {
     const key = type === 'warp' ? 'epi' : type === 'weft' ? 'ppi' : 'ends';
     const lbl = type === 'warp' ? 'EPI' : type === 'weft' ? 'PPI' : 'ENDS';
+    // Keep the typed text so "52." / "52.5" / empty can be typed; the number goes to the form.
+    const [txt, setTxt] = useState<string>(String(yarn[key] ?? 0));
+    useEffect(() => {
+        const n = Number(yarn[key]) || 0;
+        setTxt(t => ((parseFloat(t) || 0) === n ? t : String(n)));
+    }, [yarn[key]]); // eslint-disable-line react-hooks/exhaustive-deps
+    const onNum = (v: string) => {
+        let clean = v.replace(',', '.').replace(/[^0-9.]/g, '');
+        const dot = clean.indexOf('.');
+        if (dot >= 0) clean = clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '');
+        setTxt(clean);
+        onChange(key, parseFloat(clean) || 0);
+    };
+    const zero = !(Number(yarn[key]) > 0) && type !== 'selvedge';
     return (
         <View style={yl.card}>
             <View style={yl.row}>
@@ -1488,8 +1515,7 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
                         {yarn.main_yarn_code || yarn.m_itm_code
                             ? ` · Main ${yarn.main_yarn_code || yarn.m_itm_code}`
                             : ''}
-                        //{yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
-                        {yarn.cnt ? ` · ${yarn.cnt} ${yarn.sys || ''}` : ''}
+                        {yarn.cnt ? ` · ${yarn.cnt}${PLY(yarn) > 1 ? `/${PLY(yarn)}` : ''} ${yarn.sys || ''}` : ''}
                     </Text>
                 </View>
                 {type === 'warp' && (
@@ -1499,8 +1525,10 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
                     </TouchableOpacity>
                 )}
                 <View style={yl.epiWrap}>
-                    <TextInput value={String(yarn[key] ?? '')}
-                        onChangeText={v => onChange(key, parseFloat(v) || 0)} keyboardType="numeric" style={yl.epiInput} />
+                    <TextInput value={txt}
+                        onChangeText={onNum} keyboardType="decimal-pad" selectTextOnFocus
+                        onBlur={() => setTxt(String(Number(yarn[key]) || 0))}
+                        style={[yl.epiInput, zero ? { borderWidth: 1, borderColor: T.copper } : null]} />
                     <Text style={yl.epiLabel}>{lbl}</Text>
                 </View>
                 <TouchableOpacity onPress={onRemove} style={{ paddingLeft: 8 }}><Text style={{ color: T.pd, fontSize: 18 }}>✕</Text></TouchableOpacity>
@@ -1533,8 +1561,195 @@ const yl = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // TAB 1 — CATALOG
 // ═══════════════════════════════════════════════════════════════
-function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Design) => void; onEditDesign: (d: Design) => void; }) {
-    const { yearno } = useERP();
+// ═══════════════════════════════════════════════════════════════
+// SAVED COLOURWAY HELPERS — read a saved sub_design (from GET /designs/{id})
+// sub_designs[].warp_patterns / weft_patterns (repeat counts) with a
+// fallback to warp_colors / weft_colors.
+// ═══════════════════════════════════════════════════════════════
+type SavedBand = {
+    side: 'warp' | 'weft';
+    mi_id: string;
+    blend_ratio: string | null;
+    shade: string;
+    color_name: string;
+    hex: string;
+    thread_count: number | null;
+    sort_order: number;
+};
+
+const cwArr = (sub: any, snake: string, camel: string): any[] =>
+    Array.isArray(sub?.[snake]) ? sub[snake] : Array.isArray(sub?.[camel]) ? sub[camel] : [];
+
+function savedBands(sub: any, side: 'warp' | 'weft'): SavedBand[] {
+    const patterns = cwArr(sub, `${side}_patterns`, `${side}Patterns`);
+    const colors = cwArr(sub, `${side}_colors`, `${side}Colors`);
+    const src = patterns.length ? patterns : colors;
+    return src
+        .map((r: any, i: number): SavedBand => ({
+            side,
+            mi_id: String(r?.mi_id ?? '').trim(),
+            blend_ratio: r?.blend_ratio != null && String(r.blend_ratio).trim() !== '' ? String(r.blend_ratio).trim() : null,
+            shade: String(r?.shade ?? '').trim(),
+            color_name: String(r?.color_name ?? '').trim(),
+            hex: /^#[0-9A-Fa-f]{6}$/.test(String(r?.hex || '')) ? String(r.hex) : '#808080',
+            thread_count: r?.thread_count != null && r.thread_count !== '' ? Number(r.thread_count) : null,
+            sort_order: Number.isFinite(Number(r?.sort_order)) ? Number(r.sort_order) : i,
+        }))
+        .sort((a: SavedBand, b: SavedBand) => a.sort_order - b.sort_order);
+}
+
+// "4 Navy · 2 White" — repeat count per colour (warp first, weft if no warp)
+function cwSummary(sub: any): string {
+    const bands = savedBands(sub, 'warp');
+    const src = bands.length ? bands : savedBands(sub, 'weft');
+    const order: string[] = [];
+    const total: Record<string, number> = {};
+    src.forEach(b => {
+        const name = b.color_name || b.shade || '—';
+        if (!(name in total)) { order.push(name); total[name] = 0; }
+        total[name] += b.thread_count ?? 1;
+    });
+    return order.map(n => `${total[n]} ${n}`).join(' · ');
+}
+
+// Colourway delete from Catalog is switched off for now (frontend only).
+const CW_DELETE_ENABLED = false;
+
+function CatalogColourwayCard({ sub, design, onEdit, onDelete, deleting }: {
+    sub: any;
+    design: any;
+    onEdit: () => void;
+    onDelete: () => void;
+    deleting: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const warp = savedBands(sub, 'warp');
+    const weft = savedBands(sub, 'weft');
+    const stripe = (warp.length ? warp : weft).slice(0, 24);
+    const sync = String(sub?.erp_sync_status || '').toUpperCase();
+    const summary = cwSummary(sub);
+
+    const yarnName = (side: 'warp' | 'weft', miId: string) => {
+        const list: any[] = side === 'warp' ? (design?.warp_yarns ?? []) : (design?.weft_yarns ?? []);
+        const y = list.find(x => String(x?.mi_id ?? '').trim() === miId);
+        return y?.name || `Item ${miId}`;
+    };
+
+    const renderSide = (label: string, side: 'warp' | 'weft', bands: SavedBand[]) => {
+        if (!bands.length) return null;
+        const groups: { key: string; mi_id: string; blend: string | null; bands: SavedBand[] }[] = [];
+        bands.forEach(b => {
+            const k = `${b.mi_id}|${b.blend_ratio ?? ''}`;
+            const last = groups[groups.length - 1];
+            if (last && last.key === k) last.bands.push(b);
+            else groups.push({ key: k, mi_id: b.mi_id, blend: b.blend_ratio, bands: [b] });
+        });
+        return (
+            <View style={{ marginTop: 8 }}>
+                <Text style={cwc.sideLabel}>{label}</Text>
+                {groups.map((g, gi) => (
+                    <View key={`${g.key}_${gi}`} style={cwc.yarnRow}>
+                        <Text style={cwc.yarnName}>
+                            {yarnName(side, g.mi_id)}{g.blend ? `  · ${g.blend}` : ''}
+                        </Text>
+                        {g.bands.map((b, bi) => (
+                            <View key={bi} style={cwc.bandRow}>
+                                <View style={[cwc.dot, { backgroundColor: b.hex }]} />
+                                <Text style={cwc.bandName} numberOfLines={1}>{b.color_name || b.shade || '—'}</Text>
+                                <Text style={cwc.muted}>
+                                    {/^\d+$/.test(b.shade) ? `ERP ${b.shade}` : b.shade}
+                                    {b.thread_count != null ? `  ·  ${b.thread_count}` : ''}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                ))}
+            </View>
+        );
+    };
+
+    return (
+        <View style={cwc.card}>
+            <View style={cwc.head}>
+                <TouchableOpacity style={cwc.main} onPress={() => setOpen(v => !v)} activeOpacity={0.7}>
+                    <View style={cwc.swatch}>
+                        {stripe.length
+                            ? stripe.map((b, i) => <View key={i} style={{ flex: Math.max(1, b.thread_count ?? 1), backgroundColor: b.hex }} />)
+                            : <View style={{ flex: 1, backgroundColor: T.sub }} />}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={cwc.code} numberOfLines={1}>{sub?.code}</Text>
+                        <Text style={cwc.muted} numberOfLines={2}>
+                            {summary || (sub?.commercial_name ? sub.commercial_name : 'No yarn shades')}
+                        </Text>
+                        {sync && sync !== 'SYNCED' ? (
+                            <Text style={[cwc.muted, { color: T.copper, fontWeight: '700' }]}>ERP {sync}</Text>
+                        ) : null}
+                    </View>
+                </TouchableOpacity>
+                <View style={cwc.actions}>
+                    <TouchableOpacity style={cwc.actionBtn} onPress={onEdit} disabled={deleting}>
+                        <Text style={cwc.actionText}>Edit</Text>
+                    </TouchableOpacity>
+                    {/* Colourway Delete — TEMPORARILY DISABLED. To enable again set CW_DELETE_ENABLED = true. */}
+                    <TouchableOpacity
+                        style={[cwc.actionBtn, cwc.actionDanger, !CW_DELETE_ENABLED && { opacity: 0.35 }]}
+                        onPress={CW_DELETE_ENABLED ? onDelete : undefined}
+                        disabled={!CW_DELETE_ENABLED || deleting}>
+                        {deleting
+                            ? <ActivityIndicator size="small" color={T.red} />
+                            : <Text style={[cwc.actionText, { color: T.red }]}>Delete</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setOpen(v => !v)} style={{ paddingHorizontal: 4 }}>
+                        <Text style={cwc.chev}>{open ? '⌃' : '⌄'}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {open ? (
+                <View style={cwc.detail}>
+                    {sub?.commercial_name ? <Text style={cwc.muted}>Commercial name: {sub.commercial_name}</Text> : null}
+                    {sub?.shade_code ? <Text style={cwc.muted}>ERP shade: {sub.shade_code}{sync ? ` · ${sync}` : ''}</Text> : null}
+                    {renderSide('WARP', 'warp', warp)}
+                    {renderSide('WEFT', 'weft', weft)}
+                    {!warp.length && !weft.length ? <Text style={cwc.muted}>No yarn shades stored.</Text> : null}
+                    {sync && sync !== 'SYNCED' && sub?.erp_sync_message
+                        ? <Text style={[cwc.muted, { marginTop: 6 }]}>ERP: {sub.erp_sync_message}</Text>
+                        : null}
+                </View>
+            ) : null}
+        </View>
+    );
+}
+
+const cwc = StyleSheet.create({
+    card: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 10, marginTop: 8, overflow: 'hidden' },
+    head: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: 10 },
+    main: { flex: 1, minWidth: 180, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    swatch: { width: 42, height: 42, borderRadius: 7, overflow: 'hidden', flexDirection: 'row', borderWidth: 1, borderColor: T.border },
+    code: { fontSize: 14, fontWeight: '800', color: T.ink },
+    muted: { fontSize: 11, color: T.muted, marginTop: 2 },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 'auto' },
+    actionBtn: { borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, minWidth: 60, alignItems: 'center', backgroundColor: T.surface },
+    actionDanger: { borderColor: T.red + '55' },
+    actionText: { fontSize: 12, fontWeight: '800', color: T.ink },
+    chev: { fontSize: 15, color: T.muted },
+    detail: { borderTopWidth: 1, borderTopColor: T.border, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: T.bg },
+    sideLabel: { fontSize: 9.5, fontWeight: '900', color: T.muted, letterSpacing: 0.6, marginBottom: 2 },
+    yarnRow: { borderTopWidth: 1, borderTopColor: T.sub, paddingTop: 6, marginTop: 4 },
+    yarnName: { fontSize: 12, fontWeight: '800', color: T.ink, marginBottom: 2 },
+    bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+    dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: T.border },
+    bandName: { flex: 1, fontSize: 12, color: T.ink, fontWeight: '700' },
+});
+
+function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
+    onSelectDesign: (d: Design) => void;
+    onEditDesign: (d: Design) => void;
+    onEditColourway?: (d: Design, sub: any) => void;
+}) {
+    const { yearno, prpcode, strcode } = useERP();
+    const [deletingCw, setDeletingCw] = useState<string | null>(null);
     const [designs, setDesigns] = useState<Design[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -1684,6 +1899,51 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
             setExpandedDetail({ ...d, ...res.data.data });
         } catch { setExpandedDetail(d); }
         finally { setDetailLoading(false); }
+    };
+
+    // Re-read the open design after a colourway change (count + list stay accurate).
+    const reloadExpanded = async (d: Design) => {
+        try {
+            const res = await DesignAPI.get(d.id);
+            const full = { ...d, ...res.data.data };
+            setExpandedDetail(full);
+            const subs = Array.isArray((full as any).sub_designs) ? (full as any).sub_designs : null;
+            if (subs) {
+                setDesigns(prev => prev.map(x => x.id === d.id ? ({ ...x, cw_count: subs.length } as any) : x));
+            }
+        } catch { /* keep current view */ }
+    };
+
+    const deleteColourway = (d: Design, sub: any) => {
+        AppAlert.alert(
+            'Delete colourway?',
+            `${sub.code} will be removed from ${d.code}.` +
+            (sub.shade_code ? ` ERP shade ${sub.shade_code} stays in ERP.` : ''),
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDeletingCw(String(sub.id));
+                        try {
+                            const res: any = await client.delete(`/design-colourways/${encodeURIComponent(String(sub.id))}`, {
+                                params: { yearno, prpcode, strcode },
+                            });
+                            await reloadExpanded(d);
+                            AppAlert.alert('Deleted', res?.data?.message ? `${sub.code}: ${res.data.message}` : `${sub.code} deleted.`);
+                        } catch (e: any) {
+                            if (e?.response?.status === 404 && /already deleted/i.test(String(e?.response?.data?.message || ''))) {
+                                await reloadExpanded(d);
+                            }
+                            AppAlert.alert('Delete failed', apiErrorText(e, 'Unable to delete colourway.'));
+                        } finally {
+                            setDeletingCw(null);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     if (loading) return <View style={s.center}><ActivityIndicator color={T.copper} /></View>;
@@ -1851,21 +2111,41 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                                                         <Text style={ct.latestCostVal}>{r0(det.latest_cost)}/m</Text>
                                                     </View>
                                                 )}
-                                                <View style={ct.cwRow}>
-                                                    <Text style={ct.cwTitle}>COLOURWAYS ({det.cw_count ?? 0})</Text>
-                                                    <TouchableOpacity style={ct.cwAddBtn} onPress={() => onSelectDesign(det)}>
-                                                        <Text style={ct.cwAddTxt}>+ Add Sub Design</Text>
-                                                    </TouchableOpacity>
-
-                                                    <TouchableOpacity
-                                                        style={[ct.cwAddBtn]}
-                                                        onPress={() => onEditDesign(det)}
-                                                    >
-                                                        <Text style={ct.cwAddTxt}>
-                                                            Update Design
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                </View>
+                                                {(() => {
+                                                    const subs: any[] = Array.isArray((det as any).sub_designs) ? (det as any).sub_designs : [];
+                                                    const count = Array.isArray((det as any).sub_designs) ? subs.length : (det.cw_count ?? 0);
+                                                    return (
+                                                        <>
+                                                            <View style={ct.cwRow}>
+                                                                <Text style={ct.cwTitle}>COLOURWAYS ({count})</Text>
+                                                                <View style={ct.cwBtns}>
+                                                                    {String(det.type).toUpperCase() === 'YD' ? (
+                                                                        <TouchableOpacity style={ct.cwAddBtn} onPress={() => onSelectDesign(det)}>
+                                                                            <Text style={ct.cwAddTxt}>+ Add colourway</Text>
+                                                                        </TouchableOpacity>
+                                                                    ) : null}
+                                                                    <TouchableOpacity style={[ct.cwAddBtn]} onPress={() => onEditDesign(det)}>
+                                                                        <Text style={ct.cwAddTxt}>Update Design</Text>
+                                                                    </TouchableOpacity>
+                                                                </View>
+                                                            </View>
+                                                            {subs.length === 0 ? (
+                                                                count > 0
+                                                                    ? null
+                                                                    : <Text style={ct.cwEmpty}>No colourway yet.</Text>
+                                                            ) : subs.map((sub: any) => (
+                                                                <CatalogColourwayCard
+                                                                    key={String(sub.id)}
+                                                                    sub={sub}
+                                                                    design={det}
+                                                                    deleting={deletingCw === String(sub.id)}
+                                                                    onEdit={() => onEditColourway?.(det, sub)}
+                                                                    onDelete={() => deleteColourway(det, sub)}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    );
+                                                })()}
                                             </>
                                         );
                                     })() : null}
@@ -1931,7 +2211,9 @@ const ct = StyleSheet.create({
     latestCostRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, backgroundColor: T.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: T.border },
     latestCostTxt: { fontSize: 12, color: T.muted, fontWeight: '600' },
     latestCostVal: { fontSize: 14, fontWeight: '800', color: T.copper },
-    cwRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border },
+    cwRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border },
+    cwBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    cwEmpty: { fontSize: 11, color: T.muted, marginTop: 8 },
     cwTitle: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.4 },
     cwAddBtn: { backgroundColor: T.copper + '22', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
     cwAddTxt: { fontSize: 12, fontWeight: '700', color: T.copper },
@@ -1997,6 +2279,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             name: y.name,
             sys: y.sys,
             cnt: y.cnt,
+            ply: PLY(y),
             base_price: y.price,
             blend_ratio: (y as any).blend_ratio || null,// Preserve authoritative ERP fibre metadata from Yarn Help.
             fibre: (y as any).fibre || null,
@@ -2006,7 +2289,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             w_blend: (y as any).w_blend || '',
             w_blend_per: (y as any).w_blend_per || '',
 
-            ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
+            ...(type === 'warp' ? { epi: 0, sizing: false } : type === 'weft' ? { ppi: 0 } : { ends: 0 }),   // user enters EPI / PPI
         }]);
     };
     const updateYarn = (type: string, idx: number, k: string, v: any) => {
@@ -2044,6 +2327,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
         if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
             AppAlert.alert('Validation', 'At least one weft yarn is required.');
+            return;
+        }
+
+        // EPI / PPI start at 0 — every warp / weft yarn needs its own value before saving.
+        const noEpi = form.warp_yarns.filter((y: any) => !(Number(y.epi) > 0)).map((y: any) => y.name || y.mi_id);
+        const noPpi = form.weft_yarns.filter((y: any) => !(Number(y.ppi) > 0)).map((y: any) => y.name || y.mi_id);
+        if (noEpi.length || noPpi.length) {
+            AppAlert.alert('EPI / PPI required', [
+                noEpi.length ? `Enter EPI for warp yarn: ${noEpi.join(', ')}` : '',
+                noPpi.length ? `Enter PPI for weft yarn: ${noPpi.join(', ')}` : '',
+            ].filter(Boolean).join('\n'));
             return;
         }
 
@@ -2450,29 +2744,11 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         }}
                         keyboardType="decimal-pad"
                         style={[fm.input, { flex: 1 }]}
-                        placeholder={(() => {
-                            const reed = Number(form.reed_space) || 0;
-                            const shrink = (Number(form.warp_shrink) || 0) / 100;
-                            return reed > 0 && shrink >= 0 && shrink < 1
-                                ? (reed * (1 - shrink)).toFixed(2)
-                                : 'Enter greige width';
-                        })()}
+                        placeholder="Enter measured greige width"
                         placeholderTextColor={T.muted}
                     />
                     <Text style={fm.unit}>"</Text>
                 </View>
-                {(() => {
-                    const reed = Number(form.reed_space) || 0;
-                    const shrink = (Number(form.warp_shrink) || 0) / 100;
-                    const suggested = reed > 0 && shrink >= 0 && shrink < 1
-                        ? reed * (1 - shrink)
-                        : 0;
-                    return suggested > 0 ? (
-                        <Text style={[fm.hint, { marginTop: 4 }]}>
-                            Suggested only: {suggested.toFixed(2)}" = Reed Space × (1 − Warp Shrink). Enter the actual measured Greige Width.
-                        </Text>
-                    ) : null;
-                })()}
 
                 <Text style={fm.label}>WARP YARNS</Text>
                 {(form.warp_yarns ?? []).map((y: any, i: number) => (
@@ -2605,34 +2881,51 @@ const fm = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // TAB 3 — SUB DESIGN / COLOURWAY
 // ═══════════════════════════════════════════════════════════════
-function DesignPickerModal({ visible, onSelect, onClose }: {
+function DesignPickerModal({ visible, onSelect, onClose, onlyType }: {
     visible: boolean;
     onSelect: (d: Design) => void;
     onClose: () => void;
+    onlyType?: 'YD' | 'PD';          // Colourway passes 'YD' → only yarn-dyed designs
 }) {
     const { yearno } = useERP();
     const [designs, setDesigns] = useState<Design[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
+    const seq = useRef(0);
 
+    useEffect(() => { if (!visible) setSearch(''); }, [visible]);
+
+    // Server search (debounced) so designs beyond the first 200 are found too.
     useEffect(() => {
         if (!visible) return;
-        setLoading(true);
-        DesignAPI.list({ page: 1, per_page: 200, limit: 200, yearno: yearno } as any)
-            .then(r => {
-                const envelope: any = r.data.data;
-                setDesigns(Array.isArray(envelope) ? envelope : (envelope?.data ?? []));
-            })
-            .catch(() => setDesigns([]))
-            .finally(() => setLoading(false));
-    }, [visible]);
+        const mySeq = ++seq.current;
+        const timer = setTimeout(() => {
+            setLoading(true);
+            DesignAPI.list({
+                page: 1, per_page: 200, limit: 200, yearno,
+                type: onlyType || undefined,
+                search: search.trim() || undefined,
+            } as any)
+                .then(r => {
+                    if (mySeq !== seq.current) return;
+                    const envelope: any = r.data.data;
+                    setDesigns(Array.isArray(envelope) ? envelope : (envelope?.data ?? []));
+                })
+                .catch(() => { if (mySeq === seq.current) setDesigns([]); })
+                .finally(() => { if (mySeq === seq.current) setLoading(false); });
+        }, search.trim() ? 350 : 0);
+        return () => clearTimeout(timer);
+    }, [visible, search, onlyType, yearno]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return !q ? designs : designs.filter(d =>
+        const byType = onlyType
+            ? designs.filter(d => String(d.type || '').toUpperCase() === onlyType)
+            : designs;
+        return !q ? byType : byType.filter(d =>
             d.code.toLowerCase().includes(q) || String(d.category || '').toLowerCase().includes(q)
         );
-    }, [designs, search]);
+    }, [designs, search, onlyType]);
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -2640,7 +2933,7 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
                     <View style={yp.header}>
-                        <Text style={yp.title}>Select Main Design</Text>
+                        <Text style={yp.title}>{onlyType === 'YD' ? 'Select Yarn-Dyed Design' : 'Select Main Design'}</Text>
                         <TouchableOpacity onPress={onClose} style={yp.closeBtn}><Text style={yp.closeTxt}>✕</Text></TouchableOpacity>
                     </View>
                     <View style={yp.searchWrap}>
@@ -2651,6 +2944,10 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
                             <FlatList
                                 data={filtered}
                                 keyExtractor={d => d.id}
+                                keyboardShouldPersistTaps="handled"
+                                ListEmptyComponent={<Text style={[yp.yarnSub, { padding: 18, textAlign: 'center' }]}>
+                                    {onlyType === 'YD' ? 'No yarn-dyed (YD) design found.' : 'No design found.'}
+                                </Text>}
                                 renderItem={({ item }) => (
                                     <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}>
                                         <Text style={yp.yarnName}>{item.code}</Text>
@@ -2871,11 +3168,44 @@ function YarnShadeBlock({ yarn, direction, bands, onChange }: {
     );
 }
 
-function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; onNavigateToCatalog: () => void }) {
+function ColourwayTab({ design, onNavigateToCatalog, editSub = null, onEditDone, onClear }: {
+    design: Design | null;
+    onNavigateToCatalog: () => void;
+    editSub?: any | null;                       // saved colourway opened from Catalog → Edit
+    onEditDone?: (saved: boolean) => void;
+    onClear?: () => void;                       // clear the selected design everywhere
+}) {
+    const { prpcode, strcode, yearno } = useERP();
     const [baseDesign, setBaseDesign] = useState<Design | null>(design);
+    const prefilledFor = useRef<string | null>(null);
     const [showDesignPicker, setShowDesignPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [subCode, setSubCode] = useState('');
+    const [codeError, setCodeError] = useState('');
+
+    // Default code = next free "<DESIGN>-NN" (not always -01, which fails once -01 is saved).
+    // Only replaces the code if the user has not typed / edit-mode has not filled another one.
+    const applyDefaultCode = useCallback((d: Design | null) => {
+        setCodeError('');
+        if (!d?.code) return;
+        const base = d.code.replace(/\s+/g, '-');
+        const first = `${base}-01`;
+        setSubCode(first);
+        client.get(`/designs/${d.id}/colourways`, { params: { prpcode, strcode, yearno } })
+            .then(r => {
+                const rows: any[] = Array.isArray(r.data?.data) ? r.data.data : [];
+                const used = new Set(rows.map(x => String(x?.code ?? '').trim().toUpperCase()));
+                const esc = base.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = new RegExp(`^${esc}-(\\d+)$`);
+                let max = 0;
+                used.forEach(c => { const m = c.match(re); if (m) max = Math.max(max, Number(m[1])); });
+                let n = max + 1;
+                let next = `${base}-${String(n).padStart(2, '0')}`;
+                while (used.has(next.toUpperCase())) { n += 1; next = `${base}-${String(n).padStart(2, '0')}`; }
+                setSubCode(prev => (prev === first ? next : prev));
+            })
+            .catch(() => { /* keep -01; backend will suggest a free code if it clashes */ });
+    }, [prpcode, strcode, yearno]);
     const [commercialName, setCommercialName] = useState('');
     const [warpBands, setWarpBands] = useState<Record<string, ShadeBand[]>>({});
     const [weftBands, setWeftBands] = useState<Record<string, ShadeBand[]>>({});
@@ -2889,10 +3219,19 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
         }
     }, []);
 
+    // Selection cleared from outside (Clear button) → back to the blank form.
+    useEffect(() => {
+        if (design) return;
+        setBaseDesign(null);
+        setSubCode(''); setCommercialName('');
+        setWarpBands({}); setWeftBands({});
+        prefilledFor.current = null;
+    }, [design]);
+
     useEffect(() => {
         if (!design) return;
         loadFull(design);
-        setSubCode(`${design.code.replace(/\s+/g, '-')}-01`);
+        applyDefaultCode(design);
         setWarpBands({}); setWeftBands({}); setCommercialName('');
     }, [design?.id, loadFull]);
 
@@ -2900,6 +3239,69 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     const weftYarns = baseDesign?.weft_yarns ?? [];
     const allWarp = Object.values(warpBands).flat();
     const allWeft = Object.values(weftBands).flat();
+    const editing = !!editSub?.id;
+
+    // EDIT MODE: fill the same form with the saved colourway (once per colourway).
+    useEffect(() => {
+        if (!editSub?.id) { prefilledFor.current = null; return; }
+        if (!baseDesign || String(baseDesign.id) !== String(editSub.md_id ?? baseDesign.id)) return;
+        if (prefilledFor.current === String(editSub.id)) return;
+        if (warpYarns.length + weftYarns.length === 0) return;   // wait until design yarns are loaded
+        prefilledFor.current = String(editSub.id);
+
+        let unmatched = 0;
+        const build = (side: 'warp' | 'weft', yarns: any[]) => {
+            const out: Record<string, ShadeBand[]> = {};
+            savedBands(editSub, side).forEach((b, i) => {
+                let idx = yarns.findIndex(y => String(y?.mi_id ?? '').trim() === b.mi_id
+                    && String(y?.blend_ratio ?? '').trim() === String(b.blend_ratio ?? ''));
+                if (idx < 0) idx = yarns.findIndex(y => String(y?.mi_id ?? '').trim() === b.mi_id);
+                if (idx < 0) { unmatched += 1; return; }
+                const y = yarns[idx];
+                const key = `${y.mi_id}|${y.blend_ratio ?? ''}|${idx}`;
+                const numeric = /^\d+$/.test(b.shade);
+                (out[key] = out[key] || []).push({
+                    key: `S:${side}:${i}`,
+                    source: numeric ? 'dyeing' : 'legacy',
+                    mapping_id: null,
+                    shd_code: numeric ? Number(b.shade) : 0,
+                    shd_name: b.color_name || b.shade,
+                    color_name: b.color_name || b.shade,
+                    hex: b.hex,
+                    shade_no: b.shade,
+                    legacy: !numeric,
+                    mi_id: y.mi_id,
+                    blend_ratio: y.blend_ratio ?? null,
+                    thread_count: Math.max(1, Math.round(b.thread_count ?? 1)),
+                });
+            });
+            return out;
+        };
+
+        setSubCode(String(editSub.code || ''));
+        setCommercialName(String(editSub.commercial_name || ''));
+        setWarpBands(build('warp', warpYarns));
+        setWeftBands(build('weft', weftYarns));
+        if (unmatched > 0) {
+            AppAlert.alert('Check shades', `${unmatched} saved shade row(s) no longer match a yarn of this design and were not loaded.`);
+        }
+    }, [editSub, baseDesign, warpYarns, weftYarns]);
+
+    // One button: forget the selected design + everything typed → blank form.
+    const clearAll = () => {
+        prefilledFor.current = null;
+        setBaseDesign(null);
+        setSubCode(''); setCommercialName('');
+        setWarpBands({}); setWeftBands({});
+        onClear?.();
+    };
+
+    const cancelEdit = () => {
+        prefilledFor.current = null;
+        setWarpBands({}); setWeftBands({}); setCommercialName('');
+        if (baseDesign) applyDefaultCode(baseDesign);
+        onEditDone?.(false);
+    };
 
     const save = async () => {
         if (!baseDesign) { AppAlert.alert('Main Design required'); return; }
@@ -2924,30 +3326,65 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
 
         setSaving(true);
         try {
+            // Saved legacy text shades (e.g. "MLL 2113") have shd_code 0 → keep their text.
+            const shadeValue = (r: ShadeBand) => (r.shd_code > 0 ? String(r.shd_code) : String(r.shade_no || ''));
             const toColors = (rows: ShadeBand[]) => rows.map(r => ({
                 mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
-                shade: String(r.shd_code), color_name: r.shd_name || r.color_name, hex: r.hex,
+                shade: shadeValue(r), color_name: r.shd_name || r.color_name, hex: r.hex,
             }));
             const toPatterns = (rows: ShadeBand[]) => rows.map(r => ({
                 mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
-                shade: String(r.shd_code), color_name: r.shd_name || r.color_name, hex: r.hex,
+                shade: shadeValue(r), color_name: r.shd_name || r.color_name, hex: r.hex,
                 thread_count: r.thread_count,
             }));
 
-            await DesignAPI.addColourway(baseDesign.id, {
+            const body = {
                 code: subCode.trim(),
                 commercial_name: commercialName.trim() || undefined,
                 warp_colors: toColors(allWarp),
                 weft_colors: toColors(allWeft),
                 warp_patterns: toPatterns(allWarp),
                 weft_patterns: toPatterns(allWeft),
-            } as any);
+            };
 
-            AppAlert.alert('Saved', 'Sub Design saved successfully.');
+            if (editing) {
+                // Backend route: PUT /design-colourways/{sdId}
+                const res: any = await client.put(`/design-colourways/${encodeURIComponent(String(editSub.id))}`, body, {
+                    params: { yearno, prpcode, strcode },
+                });
+                AppAlert.alert('Updated', res?.data?.message || 'Sub Design updated successfully.');
+                prefilledFor.current = null;
+                setWarpBands({}); setWeftBands({}); setCommercialName('');
+                applyDefaultCode(baseDesign);
+                onEditDone?.(true);
+                return;
+            }
+
+            const res: any = await DesignAPI.addColourway(baseDesign.id, body as any);
+            const d: any = res?.data ?? {};
+            const sync = String(d.erp_sync_status || '').toUpperCase();
+            const msg = [
+                `${body.code}: ${d.message || 'Sub Design saved successfully.'}`,
+                d.shade_code ? `ERP shade: ${d.shade_code}` : '',
+                sync && sync !== 'SYNCED' && d.erp_sync_message ? `ERP: ${d.erp_sync_message}` : '',
+            ].filter(Boolean).join('\n');
+            AppAlert.alert(sync && sync !== 'SYNCED' ? 'Saved (ERP pending)' : 'Saved', msg);
             setWarpBands({}); setWeftBands({});
-            setSubCode(`${baseDesign.code.replace(/\s+/g, '-')}-01`);
+            applyDefaultCode(baseDesign);
         } catch (e: any) {
-            AppAlert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
+            const data = e?.response?.data;
+            const codeErr = Array.isArray(data?.errors?.code) ? String(data.errors.code[0] || '') : '';
+            if (codeErr) setCodeError(codeErr);
+            const suggested = typeof data?.suggested_code === 'string' ? data.suggested_code.trim() : '';
+            if (suggested && !editing) {
+                setSubCode(suggested);
+                AppAlert.alert('Code already used',
+                    `${codeErr || apiErrorText(e, 'Sub Design code already exists.')}\n\n` +
+                    `Naya code ${suggested} bhar diya hai — shades waise hi hain, Save dobara dabao.`);
+            } else {
+                AppAlert.alert(editing ? 'Update failed' : 'Save failed',
+                    apiErrorText(e, editing ? 'Unable to update Sub Design' : 'Unable to save Sub Design'));
+            }
         } finally { setSaving(false); }
     };
 
@@ -2955,12 +3392,28 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
         <>
             <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
                 <View style={cw3.intro}>
-                    <Text style={cw3.introTitle}>NEW SUB DESIGN</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <Text style={[cw3.introTitle, { flex: 1 }]}>
+                            {editing ? `EDIT SUB DESIGN · ${editSub.code}` : 'NEW SUB DESIGN'}
+                        </Text>
+                        {editing ? (
+                            <TouchableOpacity onPress={cancelEdit} style={cw3.cancelEditBtn}>
+                                <Text style={cw3.cancelEditText}>Cancel edit</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
                     <Text style={cw3.introText}>Construction stays in Main Design. This screen stores yarn-wise shades and repeat counts only.</Text>
                 </View>
 
-                <Text style={cw3.label}>MAIN DESIGN</Text>
-                <TouchableOpacity style={cw3.picker} onPress={() => setShowDesignPicker(true)}>
+                <View style={cw3.labelRow}>
+                    <Text style={[cw3.label, { flex: 1 }]}>MAIN DESIGN · YARN-DYED</Text>
+                    {baseDesign && !editing ? (
+                        <TouchableOpacity onPress={clearAll} style={cw3.clearBtn}>
+                            <Text style={cw3.clearText}>✕ Clear</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+                <TouchableOpacity style={[cw3.picker, editing && { opacity: 0.6 }]} disabled={editing} onPress={() => setShowDesignPicker(true)}>
                     <Text style={cw3.pickerText}>{baseDesign ? `${baseDesign.code} · ${baseDesign.type}` : 'Select Main Design'}</Text>
                     <Text>▾</Text>
                 </TouchableOpacity>
@@ -2968,7 +3421,12 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                 {baseDesign && (
                     <>
                         <Text style={cw3.label}>SUB DESIGN CODE</Text>
-                        <TextInput value={subCode} onChangeText={setSubCode} style={cw3.input} placeholder="e.g. RIB-145-NAVY" placeholderTextColor={T.muted} />
+                        <TextInput value={subCode} onChangeText={v => { setSubCode(v); if (codeError) setCodeError(''); }}
+                            style={[cw3.input, codeError ? { borderColor: T.red } : null]}
+                            placeholder="e.g. RIB-145-NAVY" placeholderTextColor={T.muted} />
+                        {codeError ? (
+                            <Text style={{ color: T.red, fontSize: 11, fontWeight: '700', marginTop: 4 }}>{codeError}</Text>
+                        ) : null}
 
                         {baseDesign.type === 'YD' ? (
                             <>
@@ -3030,7 +3488,7 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                         )}
 
                         <TouchableOpacity style={[cw3.save, saving && { opacity: 0.5 }]} disabled={saving} onPress={save}>
-                            <Text style={cw3.saveText}>{saving ? 'Saving…' : 'Save Sub Design'}</Text>
+                            <Text style={cw3.saveText}>{saving ? 'Saving…' : editing ? 'Update Sub Design' : 'Save Sub Design'}</Text>
                         </TouchableOpacity>
                     </>
                 )}
@@ -3039,8 +3497,9 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
             </ScrollView>
 
             <DesignPickerModal
+                onlyType="YD"
                 visible={showDesignPicker}
-                onSelect={d => { loadFull(d); setSubCode(`${d.code.replace(/\s+/g, '-')}-01`); setWarpBands({}); setWeftBands({}); }}
+                onSelect={d => { loadFull(d); applyDefaultCode(d); setWarpBands({}); setWeftBands({}); }}
                 onClose={() => setShowDesignPicker(false)}
             />
         </>
@@ -3088,6 +3547,11 @@ const cw3 = StyleSheet.create({
     pdPreviewText: { color: T.muted, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
     save: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
     saveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+    labelRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+    clearBtn: { borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6, backgroundColor: T.surface },
+    clearText: { fontSize: 11, fontWeight: '800', color: T.muted },
+    cancelEditBtn: { borderWidth: 1, borderColor: T.copper + '77', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: T.surface },
+    cancelEditText: { fontSize: 11, fontWeight: '800', color: T.copper },
 });// Design Picker Modal (Isolated for AliasesTab)
 // function AliasesDesignPickerModal({
 //     visible,
@@ -6866,6 +7330,7 @@ export function DesignsScreen() {
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
     const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+    const [editColourway, setEditColourway] = useState<any | null>(null);   // Catalog → colourway Edit
 
     // One permission-aware source drives the tab header and tab content.
     // A developer only adds a tab to DESIGN_TABS and the registry definition.
@@ -6924,6 +7389,7 @@ export function DesignsScreen() {
     };
 
     const handleAddSubDesign = async (d: Design) => {
+        setEditColourway(null);
         setSelected(d);
         try {
             const res = await DesignAPI.get(d.id);
@@ -6932,6 +7398,27 @@ export function DesignsScreen() {
             setDetail(d);
         }
         openTab('Colourway');
+    };
+
+    // Catalog → Edit colourway: open the Colourway form pre-filled (edit mode).
+    const handleEditColourway = (d: Design, sub: any) => {
+        setSelected(d);
+        setDetail(d);
+        setEditColourway(sub);
+        openTab('Colourway');
+    };
+
+    const handleColourwayEditDone = (saved: boolean) => {
+        setEditColourway(null);
+        if (saved) setCatalogRefreshKey(v => v + 1);
+        openTab('Catalog');
+    };
+
+    // One button: clear the selected design / colourway edit for all tabs.
+    const handleClearSelection = () => {
+        setSelected(null);
+        setDetail(null);
+        setEditColourway(null);
     };
 
     const handleCancelEdit = () => {
@@ -6974,16 +7461,27 @@ export function DesignsScreen() {
             return response.data?.data ?? [];
         },
 
+        // Same design list as Colourway → "Select Yarn-Dyed Design" (GET /designs, YD only).
         searchDesigns: async (search: string) => {
-            const response = await client.get('/design-dyeing/designs', {
-                params: {
-                    prpcode: context.prpcode,
-                    strcode: context.strcode,
-                    yearno: context.yearno,
-                    search: search.trim(),
-                },
-            });
-            return response.data?.data ?? [];
+            const r = await DesignAPI.list({
+                page: 1, per_page: 200, limit: 200, yearno: context.yearno,
+                type: 'YD',
+                search: search.trim() || undefined,
+            } as any);
+            const envelope: any = r.data?.data;
+            const rows: any[] = Array.isArray(envelope) ? envelope : (envelope?.data ?? []);
+            const q = search.trim().toLowerCase();
+            return rows
+                .filter(d => String(d?.type || '').toUpperCase() === 'YD')
+                .filter(d => !q || String(d.code || '').toLowerCase().includes(q)
+                    || String(d.category || '').toLowerCase().includes(q))
+                .map(d => ({
+                    id: String(d.id),
+                    code: String(d.code || ''),
+                    dsn_code: d.dsn_code != null ? String(d.dsn_code) : null,
+                    category: d.category ?? null,
+                    type: 'YD',
+                }));
         },
 
         searchJobWorkParties: async (search: string) => {
@@ -7012,13 +7510,45 @@ export function DesignsScreen() {
                 yearno: context.yearno,
             });
         },
+
+        updateColour: async (id, payload) => {
+            return client.put(`/design-dyeing/colours/${encodeURIComponent(id)}`, {
+                ...payload,
+                prpcode: context.prpcode,
+                strcode: context.strcode,
+                yearno: context.yearno,
+            });
+        },
+
+        deleteColour: async (id) => {
+            return client.delete(`/design-dyeing/colours/${encodeURIComponent(id)}`, {
+                params: {
+                    prpcode: context.prpcode,
+                    strcode: context.strcode,
+                    yearno: context.yearno,
+                },
+            });
+        },
     }), [context.prpcode, context.strcode, context.yearno]);
     return (
         <ERPContext.Provider value={context}>
             <View style={{ flex: 1, backgroundColor: T.bg }}>
+              <View style={s.column}>
                 {visibleTabs.length > 0 ? (
                     <>
                         <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
+                        {selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
+                            <View style={s.selBar}>
+                                <Text style={s.selText} numberOfLines={1}>
+                                    Selected: <Text style={s.selCode}>{selectedDesign.code}</Text>
+                                    {selectedDesign.type ? `  ·  ${selectedDesign.type}` : ''}
+                                    {editColourway?.code ? `  ·  editing ${editColourway.code}` : ''}
+                                </Text>
+                                <TouchableOpacity onPress={handleClearSelection} style={s.selBtn}>
+                                    <Text style={s.selBtnText}>✕ Clear</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
                         <View style={{ flex: 1 }}>
                             {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
                             {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
@@ -7027,6 +7557,7 @@ export function DesignsScreen() {
                                     key={catalogRefreshKey}
                                     onSelectDesign={handleAddSubDesign}
                                     onEditDesign={handleSelectDesign}
+                                    onEditColourway={handleEditColourway}
                                 />
                             )}
                             {tab === 'Design' && canAccess('designs.design') && (
@@ -7040,6 +7571,9 @@ export function DesignsScreen() {
                                 <ColourwayTab
                                     design={detailDesign}
                                     onNavigateToCatalog={() => openTab('Catalog')}
+                                    editSub={editColourway}
+                                    onEditDone={handleColourwayEditDone}
+                                    onClear={handleClearSelection}
                                 />
                             )}
                             {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
@@ -7053,6 +7587,7 @@ export function DesignsScreen() {
                         <Text style={s.empty}>You do not have access to any Design tab.</Text>
                     </View>
                 )}
+              </View>
             </View>
         </ERPContext.Provider>
     );
@@ -7066,6 +7601,14 @@ const hdr = StyleSheet.create({
 });
 
 const s = StyleSheet.create({
+    // Wide screens: content stays in a centred column with side gutters (like the
+    // ERP Designing reference). Phones / small tablets: full width.
+    column: { flex: 1, width: '100%', maxWidth: 1120, alignSelf: 'center' },
+    selBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: T.copper + '14', borderBottomWidth: 1, borderBottomColor: T.copper + '44' },
+    selText: { flex: 1, fontSize: 12, color: T.ink },
+    selCode: { fontWeight: '800', color: T.ink },
+    selBtn: { borderWidth: 1, borderColor: T.copper + '77', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: T.surface },
+    selBtnText: { fontSize: 11, fontWeight: '800', color: T.copper },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
     empty: { fontSize: 13, color: T.muted, textAlign: 'center' },
 });

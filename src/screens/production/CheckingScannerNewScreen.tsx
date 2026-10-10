@@ -3,7 +3,7 @@ import React from 'react';
 // legacy Checking Scanner can be tested from the same New ERP menu / permission.
 // To go back to the new screen: uncomment the NEW lines and remove the OLD lines.
 // import Module from '../checkingScannerNew/CheckingScannerModule';            // NEW
-import CheckingScanner from '@/components/CheckingScanner';                     // OLD (legacy)
+import CheckingScanner from '@/components/CheckingScanner'; // OLD (legacy)
 import { ErpSessionGate } from '../../core/session/erpSession';
 // NEW ERP — Checking Scanner: QR / manual taka checking entry, scanner list, faults, sticker print. Token + API host from ErpSessionGate.
 export function CheckingScannerNewScreen() {

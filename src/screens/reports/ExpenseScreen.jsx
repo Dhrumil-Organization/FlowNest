@@ -741,13 +741,12 @@ function DailyUnitsView({ d, onBack }) {
 
   const allocationRows = (r) => [
     ["Waterjet → A", r.section_ab?.allocation?.waterjet_to_a_kwh],
-    ["SUD 230 → A", r.section_ab?.allocation?.sud_230_to_a_kwh],
-    ["SUD Luwa → A", r.section_ab?.allocation?.sud_luwa_a_kwh],
-    ["Warping + Misc → A", r.section_ab?.allocation?.shared_a_kwh],
-    ["MW + MW Luwa → B", r.section_ab?.allocation?.mw_to_b_kwh],
-    ["SUD 190 → B", r.section_ab?.allocation?.sud_190_to_b_kwh],
-    ["SUD Luwa → B", r.section_ab?.allocation?.sud_luwa_b_kwh],
-    ["Warping + Misc → B", r.section_ab?.allocation?.shared_b_kwh],
+    ["S. Rapier (230 cm) → A", r.section_ab?.allocation?.sud_230_to_a_kwh],
+    ["Warping + Misc · 1/3 → A", r.section_ab?.allocation?.shared_a_kwh],
+    ["MW Rapier + MW Luwa → B", r.section_ab?.allocation?.mw_to_b_kwh],
+    ["S. Rapier (190 cm) → B", r.section_ab?.allocation?.sud_190_to_b_kwh],
+    ["S. Rapier Luwa → B", r.section_ab?.allocation?.sud_luwa_b_kwh],
+    ["Warping + Misc · 2/3 → B", r.section_ab?.allocation?.shared_b_kwh],
   ];
 
   const legacyRows = (r) => [
@@ -786,7 +785,7 @@ function DailyUnitsView({ d, onBack }) {
               <View style={[DLY.tag, { backgroundColor: "#EAF3FB" }]}>
                 <Text style={[DLY.tagText, { color: "#185FA5" }]}>A</Text>
               </View>
-              <Text style={DLY.sectionTitle}>Section A · {machineCountLabel(aCount, "mc")}</Text>
+              <Text style={DLY.sectionTitle}>{secLbl(d, 'A')}</Text>
             </View>
             <Text style={DLY.sectionSub}>
               Waterjet ({machineCountShort(counts.waterjet)}) + S. Rapier 230 cm ({machineCountShort(counts.sud_rapier_230)})
@@ -798,7 +797,7 @@ function DailyUnitsView({ d, onBack }) {
               <View style={[DLY.tag, { backgroundColor: "#F0EDFF" }]}>
                 <Text style={[DLY.tagText, { color: "#534AB7" }]}>B</Text>
               </View>
-              <Text style={DLY.sectionTitle}>Section B · {machineCountLabel(bCount, "mc")}</Text>
+              <Text style={DLY.sectionTitle}>{secLbl(d, 'B')}</Text>
             </View>
             <Text style={DLY.sectionSub}>
               M Weaves ({machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm ({machineCountShort(counts.sud_rapier_190)})
@@ -972,7 +971,7 @@ function DailySalaryView({ d, onBack, fill = false }) {
               <View style={[DLY.tag, { backgroundColor: "#EAF3FB" }]}>
                 <Text style={[DLY.tagText, { color: "#185FA5" }]}>A</Text>
               </View>
-              <Text style={DLY.sectionTitle}>Section A · {machineCountLabel(counts.section_a, "mc")}</Text>
+              <Text style={DLY.sectionTitle}>{secLbl(d, 'A')}</Text>
             </View>
             <Text style={DLY.sectionSub}>
               Waterjet ({machineCountShort(counts.waterjet)}) + Rapier 230 cm share ({machineCountShort(counts.sud_rapier_230)})
@@ -984,7 +983,7 @@ function DailySalaryView({ d, onBack, fill = false }) {
               <View style={[DLY.tag, { backgroundColor: "#F0EDFF" }]}>
                 <Text style={[DLY.tagText, { color: "#534AB7" }]}>B</Text>
               </View>
-              <Text style={DLY.sectionTitle}>Section B · {machineCountLabel(counts.section_b, "mc")}</Text>
+              <Text style={DLY.sectionTitle}>{secLbl(d, 'B')}</Text>
             </View>
             <Text style={DLY.sectionSub}>
               Rapier 190 cm ({machineCountShort(counts.rapier_190)}) · M Weaves {machineCountShort(counts.mw_rapier)} · S. Rapier {machineCountShort(counts.sud_rapier_190)}
@@ -1530,26 +1529,26 @@ function ClaudeProductionAuto({ d }) {
   const sectionRows = [
     {
       tag: 'A',
-      title: 'Section A',
-      sub: `Waterjet (${machineCountShort(counts.waterjet)}) + S. Rapier 230 cm (${machineCountShort(counts.sud_rapier_230)})`,
+      title: secLbl(d, 'A'),
+      sub: secGroups(d, 'A'),
       prod: d.section_a_prod,
       picks: d.section_a_avg_picks,
       color: '#185FA5',
       children: [
-        ['Waterjet', groups.waterjet, counts.waterjet],
-        ['S. Rapier 230 cm', groups.sud_230, counts.sud_rapier_230],
+        ['Waterjet (W01–W30)', groups.waterjet, counts.waterjet],
+        ['S. Rapier (230 cm) (R75–R84)', groups.sud_230, counts.sud_rapier_230],
       ],
     },
     {
       tag: 'B',
-      title: 'Section B',
-      sub: `M Weaves (${machineCountShort(counts.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(counts.sud_rapier_190)})`,
+      title: secLbl(d, 'B'),
+      sub: secGroups(d, 'B'),
       prod: d.section_b_prod,
       picks: d.section_b_avg_picks,
       color: '#534AB7',
       children: [
-        ['M Weaves', groups.mw, counts.mw_rapier],
-        ['S. Rapier 190 cm', groups.sud_190, counts.sud_rapier_190],
+        ['M Weaves (R01–R48)', groups.mw, counts.mw_rapier],
+        ['S. Rapier (190 cm) (R49–R74, R85–R96)', groups.sud_190, counts.sud_rapier_190],
       ],
     },
   ];
@@ -1619,7 +1618,7 @@ function ClaudeProductionAuto({ d }) {
       ))}
 
       <View style={S.clProdTotal}>
-        <Text style={S.clProdTotalLabel}>Total · {machineCountLabel(counts.total_section)}</Text>
+        <Text style={S.clProdTotalLabel}>{secLbl(d, 'T')}</Text>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={S.clProdTotalValue}>{f2(Number(d.prod_total || 0) / 1e5)} L m</Text>
           <Text style={S.clProdPicks}>{f2(d.avg_pick_tot)} pk</Text>
@@ -2118,12 +2117,13 @@ function ExpenseDataIntegrityNotice({ d }) {
   );
 }
 
-function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setTrendSheet, pastOpen, togglePast }) {
+function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setTrendSheet, pastOpen, togglePast, settingsValue, onSettingsChange, onSettingsReset }) {
   const extended = d.section_ab_active === true;
   const inputCount = (arr) => Array.isArray(arr) ? arr.length : 0;
   const costingReady = !extended || d.total_cost_complete === true;
   return (
     <View style={S.clDashboard}>
+      {extended ? <SafeBlock name="Section header"><ArtSectionHeaderCards d={d} /></SafeBlock> : null}
       <KPIGrid d={d} label={m.fullLabel} cols={isLarge ? 3 : 1} />
       <ExpenseCompletenessNotice d={d} />
       <ExpenseDataIntegrityNotice d={d} />
@@ -2144,15 +2144,15 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
 
       <View style={[S.clPair, isLarge && { flexDirection: 'row' }]}>
         <View style={isLarge?{flex:1.2}:undefined}><ClaudeProductionAuto d={d}/></View>
-        <View style={isLarge?{flex:.8}:undefined}><MonthSettings d={d}/></View>
+        <View style={isLarge?{flex:.8}:undefined}><MonthSettings d={d} value={settingsValue} onChange={onSettingsChange} onReset={onSettingsReset}/></View>
       </View>
 
       <Text style={S.clSectionHeading}>Management summary</Text>
       <View style={[S.clMgmtGrid, isLarge && { flexDirection: 'row' }]}>
         {extended ? <>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section A · ${machineCountLabel(d.section_machine_counts?.section_a)}`} subtitle={`Waterjet (${machineCountShort(d.section_machine_counts?.waterjet)}) + S. Rapier 230 cm (${machineCountShort(d.section_machine_counts?.sud_rapier_230)})`} accent="#185FA5" prod={d.section_a_prod} picks={d.section_a_avg_picks} elec={d.section_a_elec} sal={d.section_a_salary} store={d.section_a_stores} maintenance={d.section_a_maintenance} other={d.section_a_other} cpp={d.section_a_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'A',title:'Section A · daily trend'})}/></View>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={`Section B · ${machineCountLabel(d.section_machine_counts?.section_b)}`} subtitle={`M Weaves (${machineCountShort(d.section_machine_counts?.mw_rapier)}) + S. Rapier 190 cm (${machineCountShort(d.section_machine_counts?.sud_rapier_190)})`} accent="#534AB7" prod={d.section_b_prod} picks={d.section_b_avg_picks} elec={d.section_b_elec} sal={d.section_b_salary} store={d.section_b_stores} maintenance={d.section_b_maintenance} other={d.section_b_other} cpp={d.section_b_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'B',title:'Section B · daily trend'})}/></View>
-          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Total · Section A + B" subtitle={machineCountLabel(d.section_machine_counts?.total_section)} accent="#0D1B2A" prod={d.prod_total} picks={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} maintenance={d.maintenance_total} other={d.other_total} cpp={d.cpp_total} extended onTrend={()=>setTrendSheet({kind:'section',section:'T',title:'Total · daily trend'})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={secLbl(d,'A')} subtitle={secGroups(d,'A')} accent="#185FA5" prod={d.section_a_prod} picks={d.section_a_avg_picks} elec={d.section_a_elec} sal={d.section_a_salary} store={d.section_a_stores} maintenance={d.section_a_maintenance} other={d.section_a_other} cpp={d.section_a_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'A',title:`${secLbl(d,'A')} · daily trend`})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={secLbl(d,'B')} subtitle={secGroups(d,'B')} accent="#534AB7" prod={d.section_b_prod} picks={d.section_b_avg_picks} elec={d.section_b_elec} sal={d.section_b_salary} store={d.section_b_stores} maintenance={d.section_b_maintenance} other={d.section_b_other} cpp={d.section_b_cpp} extended onTrend={()=>setTrendSheet({kind:'section',section:'B',title:`${secLbl(d,'B')} · daily trend`})}/></View>
+          <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name={secLbl(d,'T')} subtitle={secGroups(d,'T')} accent="#0D1B2A" prod={d.prod_total} picks={d.avg_pick_tot} elec={d.elec_total} sal={d.sal_total} store={d.store_total} maintenance={d.maintenance_total} other={d.other_total} cpp={d.cpp_total} extended onTrend={()=>setTrendSheet({kind:'section',section:'T',title:'Total · daily trend'})}/></View>
         </> : <>
           <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Rapier" subtitle="MW + SIP" accent="#B77932" prod={d.prod_rapier} picks={d.avg_pick_mw} elec={d.elec_rapier} sal={d.sal_rapier} store={d.store_rapier} cpp={d.cpp_rapier}/></View>
           <View style={isLarge?{flex:1}:undefined}><ClaudeManagementCard name="Waterjet" subtitle="Legacy division" accent="#185FA5" prod={d.prod_wjet} picks={d.avg_pick_wjet} elec={d.elec_wjet} sal={d.sal_wjet} store={d.store_wjet} cpp={d.cpp_wjet}/></View>
@@ -2160,12 +2160,17 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
         </>}
       </View>
 
+      {extended && Array.isArray(d.electricity_daily) && d.electricity_daily.length > 0 ? <>
+        <Text style={S.clSectionHeading}>Section-wise electricity + store · cost per pick</Text>
+        <SafeBlock name="Section electricity"><SeniorSectionCards d={d} isLarge={isLarge} onTrend={setTrendSheet} /></SafeBlock>
+      </> : null}
+
       <Text style={S.clSectionHeading}>Expense breakdown</Text>
       <View style={S.clBreakGrid}>
         <View>
-          {extended ? <SafeBlock name="Utilities"><ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /></SafeBlock> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
+          {extended && Array.isArray(d.electricity_daily) && d.electricity_daily.length > 0 ? <SafeBlock name="Utilities"><SeniorUtilities d={d} onTrend={setTrendSheet} monthLabel={m.fullLabel} /></SafeBlock> : extended ? <SafeBlock name="Utilities"><ClaudeArtifactUtilities d={d} setTrendSheet={setTrendSheet} /></SafeBlock> : <ExpBlock icon="⚡" iconColor="#185FA5" iconBg="#EAF3FB" title="Utilities / units consumed" sub={`${fN(d.kwh_total)} kWh @ ${fINR(d.unit_rate)}`} amt={fINR(d.elec_total)} editLabel="View daily ›" onEdit={()=>setView('daily-units')}><View style={S.clABLine}><Text style={S.clABLabel}>Rapier</Text><Text style={S.clABValue}>{fINR(d.elec_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>Waterjet</Text><Text style={S.clABValue}>{fINR(d.elec_wjet)}</Text></View></ExpBlock>}
           <ExpBlock icon="₹" iconColor="#C2823A" iconBg="#FFF4E8" title="Salaries / wages" sub={extended?'Section A + Section B':'Rapier + Waterjet'} amt={fINR(d.sal_total)} editLabel={extended?undefined:"View daily ›"} onEdit={extended?undefined:()=>setView('daily-salary')}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section A':'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_salary:d.sal_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?'Section B':'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_salary:d.sal_wjet)}</Text></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>{extended?secLbl(d,'A'):'Rapier'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_a_salary:d.sal_rapier)}</Text></View><View style={S.clABLine}><Text style={S.clABLabel}>{extended?secLbl(d,'B'):'Waterjet'}</Text><Text style={S.clABValue}>{fINR(extended?d.section_b_salary:d.sal_wjet)}</Text></View>
           </ExpBlock>
           <ExpBlock icon="▣" iconColor="#1D9E75" iconBg="#EAF8F3" title="Production-linked expenses" sub={extended?'Stores & spares · ERP-derived A/B':'Stores & spares'} amt={fINR(d.store_total)}>
             {extended ? <>
@@ -2186,16 +2191,16 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
             <Text style={S.clSmallMuted}>Common entered {fINR(d.maintenance_common)} · allocated by the effective A:B machine count for each entry date.</Text>
           </ExpBlock>}
           {extended && <ExpBlock icon="+" iconColor="#BA7517" iconBg="#FFF6E6" title="Other expenses" sub="Direct A/B · common allocated by effective machine count" amt={fINR(d.other_total)} editLabel="Daily entry ›" onEdit={()=>setView('daily-other')}>
-            <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_other,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
-            <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_other,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>{secLbl(d,'A')}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_a_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_a_other,d.section_a_prod,d.section_a_avg_picks))}/pk</Text></View></View>
+            <View style={S.clABLine}><Text style={S.clABLabel}>{secLbl(d,'B')}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{fINR(d.section_b_other)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.section_b_other,d.section_b_prod,d.section_b_avg_picks))}/pk</Text></View></View>
             <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800'}]}>{fINR(d.other_total)}</Text><Text style={S.clSmallMuted}>₹{f3(safePerPick(d.other_total,d.prod_total,d.avg_pick_tot))}/pk</Text></View></View>
             <Text style={S.clSmallMuted}>Common entered {fINR(d.other_common)} · direct A/B remains direct.</Text>
           </ExpBlock>}
           <ExpBlock icon="∑" iconColor="#B77932" iconBg="#FFF4E8" title="Final derived costing" sub={costingReady ? `₹${f3(d.cpp_total)}/pick · ${f2(d.avg_pick_tot)} avg picks` : 'Expense source data pending'} amt={costingReady ? `₹${f3(d.cpp_total)}/pk` : '—'}>
             {extended ? <>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Section A</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_a_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_a_cpp)}/pk · ${f2(d.section_a_avg_picks)} picks`:'pending'}</Text></View></View>
-              <View style={S.clABLine}><Text style={S.clABLabel}>Section B</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_b_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_b_cpp)}/pk · ${f2(d.section_b_avg_picks)} picks`:'pending'}</Text></View></View>
-              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>Total · A + B</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800',color:'#B77932'}]}>{costingReady?fINR(d.total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.cpp_total)}/pk · ${f2(d.avg_pick_tot)} picks`:'pending'}</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>{secLbl(d,'A')}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_a_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_a_cpp)}/pk · ${f2(d.section_a_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={S.clABLine}><Text style={S.clABLabel}>{secLbl(d,'B')}</Text><View style={{alignItems:'flex-end'}}><Text style={S.clABValue}>{costingReady?fINR(d.section_b_total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.section_b_cpp)}/pk · ${f2(d.section_b_avg_picks)} picks`:'pending'}</Text></View></View>
+              <View style={[S.clABLine,{borderTopWidth:1,borderTopColor:'#E5DED4',marginTop:4,paddingTop:8}]}><Text style={[S.clABLabel,{fontWeight:'800'}]}>{secLbl(d,'T')}</Text><View style={{alignItems:'flex-end'}}><Text style={[S.clABValue,{fontWeight:'800',color:'#B77932'}]}>{costingReady?fINR(d.total):'—'}</Text><Text style={S.clSmallMuted}>{costingReady?`₹${f3(d.cpp_total)}/pk · ${f2(d.avg_pick_tot)} picks`:'pending'}</Text></View></View>
               <Text style={[S.clSmallMuted,{marginTop:8}]}>Derived from Electricity + Salary + Stores + Maintenance + Other. A and B use their own weighted production picks.</Text>
             </> : <>
               {[['Electricity',d.elec_total],['Salary',d.sal_total],['Stores',d.store_total]].map(([label,value])=><View key={label} style={S.clABLine}><Text style={S.clABLabel}>{label}</Text><Text style={S.clABValue}>{fINR(value)}</Text></View>)}
@@ -2205,6 +2210,7 @@ function ClaudeDashboardV4({ d, m, months, states, prevD, isLarge, setView, setT
         </View>
       </View>
 
+      {extended ? <><Text style={S.clSectionHeading}>Section conversion rates · A / B</Text><SafeBlock name="Conversion rates"><SectionConversionRates d={d} isLarge={isLarge} /></SafeBlock></> : null}
       <Text style={S.clSectionHeading}>Comparative analytics · 6 months</Text>
       <View style={[S.clPair, isLarge && { flexDirection:'row' }]}>
         <View style={isLarge?{flex:1.35}:undefined}><SafeBlock name="6 month chart"><ClaudeComparativeChart months={months} states={states}/></SafeBlock></View>
@@ -4130,7 +4136,11 @@ function ProfessionalExpenseDashboard({
 // Complete rebuild matching all 14 screenshots
 
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SeniorSectionCards, SeniorUtilities, SeniorTrendSheet, ArtSectionHeaderCards, SectionConversionRates, SecTag } from "./ExpenseSeniorBlocks";
+import { applyMonthSettings, erpSettingsOf, settingsChanged, MONTH_SETTINGS_STORAGE_KEY } from "./expenseMonthSettings";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secLbl, secGroups } from "./expenseSeniorCalc";
 import {
   ActivityIndicator,
   Alert,
@@ -5919,35 +5929,96 @@ function PastRow({ month, st, open, onToggle }) {
 }
 
 // ── Month Settings ────────────────────────────────────────────────
-function MonthSettings({ d }) {
-  const rows = d.section_ab_active
-    ? [
-        ["Unit rate (₹/kWh)", fINR(d.unit_rate)],
-        ["Working days", String(num(d.days))],
-        ["Stores — Section A", fINR(d.section_a_stores)],
-        ["Stores — Section B", fINR(d.section_b_stores)],
-      ]
-    : [
-        ["Unit rate (₹/kWh)", fINR(d.unit_rate)],
-        ["Working days", String(num(d.days))],
-        ["Stores — Rapier", fINR(d.store_rapier)],
-        ["Stores — Waterjet", fINR(d.store_wjet)],
-      ];
+// Artifact "MONTH SETTINGS": Unit rate, Working days, Stores A, Stores B are
+// editable for Section A/B months. Every number below (management summary,
+// utilities, ₹/pick, trends, conversion rates, KPIs) recomputes live from the
+// edited values — see expenseMonthSettings.js. Values are kept on this device
+// per month; "ERP values" resets them. Nothing is written to the ERP.
+const msNum = (v) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? String(Math.round(x * 100) / 100) : '0';
+};
+function MonthSettings({ d, value, onChange, onReset }) {
+  if (!d.section_ab_active) {
+    const rows = [
+      ["Unit rate (₹/kWh)", fINR(d.unit_rate)],
+      ["Working days", String(num(d.days))],
+      ["Stores — Rapier", fINR(d.store_rapier)],
+      ["Stores — Waterjet", fINR(d.store_wjet)],
+    ];
+    return (
+      <View style={S.settingsCard}>
+        <Text style={S.clEyebrow}>MONTH SETTINGS · ERP DERIVED</Text>
+        {rows.map(([label, v]) => (
+          <View key={label} style={S.settingsRow}>
+            <Text style={S.settingsLabel}>{label}</Text>
+            <Text style={S.settingsValue}>{v}</Text>
+          </View>
+        ))}
+        <Text style={S.settingsNote}>Read-only historical ERP values (before Section A/B, 1 Oct 2026).</Text>
+      </View>
+    );
+  }
+
+  const erp = erpSettingsOf(d);
+  const ov = value || {};
+  const edited = settingsChanged(d, ov);
+  const shown = (k, fallback) => (ov[k] !== undefined && ov[k] !== null ? String(ov[k]) : fallback);
+  const clean = (v, decimals) => {
+    let x = String(v || '').replace(decimals ? /[^0-9.]/g : /[^0-9]/g, '');
+    if (decimals) {
+      const k = x.indexOf('.');
+      if (k >= 0) x = x.slice(0, k + 1) + x.slice(k + 1).replace(/\./g, '');
+    }
+    return x;
+  };
+  const isChanged = (k) => {
+    const v = ov[k];
+    if (v === undefined || v === null || String(v).trim() === '' || !Number.isFinite(Number(v))) return false;
+    return Math.abs(Number(v) - erp[k]) > (k === 'storeA' || k === 'storeB' ? 0.004 : 1e-9);
+  };
+  const rows = [
+    { k: 'rate', label: 'Unit rate (₹/kWh)', dec: true, kb: 'decimal-pad', fallback: msNum(erp.rate), erpText: fINR(erp.rate) },
+    { k: 'days', label: 'Working days', dec: false, kb: 'number-pad', fallback: String(Math.round(erp.days)), erpText: String(Math.round(erp.days)) },
+    { k: 'storeA', tag: 'A', label: 'Stores — Section A (₹/mo)', dec: true, kb: 'decimal-pad', fallback: msNum(erp.storeA), erpText: fINR(erp.storeA) },
+    { k: 'storeB', tag: 'B', label: 'Stores — Section B (₹/mo)', dec: true, kb: 'decimal-pad', fallback: msNum(erp.storeB), erpText: fINR(erp.storeB) },
+  ];
 
   return (
     <View style={S.settingsCard}>
-      <Text style={S.clEyebrow}>MONTH SETTINGS · ERP DERIVED</Text>
-      {rows.map(([label, value]) => (
-        <View key={label} style={S.settingsRow}>
-          <Text style={S.settingsLabel}>{label}</Text>
-          <Text style={S.settingsValue}>{value}</Text>
+      <View style={S.msHead}>
+        <Text style={[S.clEyebrow, { marginBottom: 0, flex: 1 }]}>MONTH SETTINGS</Text>
+        {edited ? (
+          <TouchableOpacity onPress={onReset} style={S.msReset} activeOpacity={0.75}>
+            <Text style={S.msResetText}>↺ ERP values</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {rows.map((r) => (
+        <View key={r.k} style={S.msRow}>
+          <View style={S.msLabelWrap}>
+            {r.tag ? <SecTag s={r.tag} size={8.5} /> : null}
+            <View style={{ flexShrink: 1 }}>
+              <Text style={S.msLabel}>{r.label}</Text>
+              {isChanged(r.k) ? <Text style={S.msErp}>ERP: {r.erpText}</Text> : null}
+            </View>
+          </View>
+          <TextInput
+            value={shown(r.k, r.fallback)}
+            onChangeText={(t) => onChange(r.k, clean(t, r.dec))}
+            keyboardType={r.kb}
+            inputMode={r.dec ? 'decimal' : 'numeric'}
+            selectTextOnFocus
+            style={[S.msInput, isChanged(r.k) && S.msInputEdited]}
+            placeholder={r.fallback}
+            placeholderTextColor="#9CA3AF"
+          />
         </View>
       ))}
-
       <Text style={S.settingsNote}>
-        {d.section_ab_active
-          ? "Read-only ERP values. Unit rate and working days come from ExpCosting; Stores A/B are derived from the proven ERP Stores source."
-          : "Read-only historical ERP values."}
+        {edited
+          ? 'Edited values — every figure below is recalculated live (electricity ₹ = kWh × this rate, stores re-spread day-wise). Kept on this device only; ERP is not changed. Tap "ERP values" to go back.'
+          : 'ERP values (ExpCosting rate & working days, ERP Stores A/B). Edit any box — the whole report below recalculates.'}
       </Text>
     </View>
   );
@@ -6219,13 +6290,63 @@ export default function ExpenseScreen({ token, apiBase }) {
   const [trendSheet, setTrendSheet] = useState(null);
   const scrollRef = useRef(null);
 
+  // Month settings overrides (artifact: editable Unit rate / Working days /
+  // Stores A / Stores B). Kept per month on this device; applied to the
+  // month data before anything renders so every block recalculates.
+  const [monthSettings, setMonthSettings] = useState({});
+  const monthSettingsLoaded = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(MONTH_SETTINGS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (alive && parsed && typeof parsed === 'object') setMonthSettings(parsed);
+      } catch (e) {
+        // storage unavailable -> ERP values only
+      } finally {
+        monthSettingsLoaded.current = true;
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (!monthSettingsLoaded.current) return;
+    AsyncStorage.setItem(MONTH_SETTINGS_STORAGE_KEY, JSON.stringify(monthSettings)).catch(() => {});
+  }, [monthSettings]);
+
+  const effStates = useMemo(() => {
+    const out = {};
+    Object.keys(states || {}).forEach((key) => {
+      const s0 = states[key];
+      const ov = monthSettings[key];
+      out[key] = s0?.data && ov ? { ...s0, data: applyMonthSettings(s0.data, ov) } : s0;
+    });
+    return out;
+  }, [states, monthSettings]);
+
   const m = months[activeTab];
-  const st = states[m?.key];
+  const st = effStates[m?.key];
   const d = st?.data;
   const utilityRows = buildUtilityRateRows(d);
 
   const prevM = months[activeTab + 1];
-  const prevD = prevM ? states[prevM?.key]?.data : null;
+  const prevD = prevM ? effStates[prevM?.key]?.data : null;
+
+  const onSettingsChange = useCallback((k, v) => {
+    const key = months[activeTab]?.key;
+    if (!key) return;
+    setMonthSettings((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [k]: v } }));
+  }, [months, activeTab]);
+  const onSettingsReset = useCallback(() => {
+    const key = months[activeTab]?.key;
+    if (!key) return;
+    setMonthSettings((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, [months, activeTab]);
 
   const togglePast = useCallback(
     (i) => setPastOpen((p) => ({ ...p, [i]: !p[i] })),
@@ -6300,7 +6421,9 @@ export default function ExpenseScreen({ token, apiBase }) {
   // ── Main report ───────────────────────────────────────────────
   return (
     <View style={S.safe}>
-      <SafeBlock name="Daily trend"><DailyTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} /></SafeBlock>
+      <SafeBlock name="Daily trend">{trendSheet?.kind === 'senior'
+        ? <SeniorTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} />
+        : <DailyTrendSheet open={!!trendSheet} onClose={() => setTrendSheet(null)} d={d || {}} trend={trendSheet} />}</SafeBlock>
       <ScrollView
         style={S.body}
         showsVerticalScrollIndicator={false}
@@ -6374,13 +6497,16 @@ export default function ExpenseScreen({ token, apiBase }) {
             d={d}
             m={m}
             months={months}
-            states={states}
+            states={effStates}
             prevD={prevD}
             isLarge={isLargeScreen}
             setView={setView}
             setTrendSheet={setTrendSheet}
             pastOpen={pastOpen}
             togglePast={togglePast}
+            settingsValue={monthSettings[m.key]}
+            onSettingsChange={onSettingsChange}
+            onSettingsReset={onSettingsReset}
           /></ScreenErrorBoundary>
         )}
         </ReportContainer>
@@ -6441,7 +6567,7 @@ const S = StyleSheet.create({
   clFootPick: { marginTop: 2, fontSize: 14, fontWeight: '800', color: '#111827' },
   clBreakGrid: { gap: 10 },
   clABLine: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#F1ECE5' },
-  clABLabel: { fontSize: 10.5, color: '#111827' },
+  clABLabel: { flex: 1, flexShrink: 1, fontSize: 10.5, lineHeight: 15, color: '#111827' },
   clABValue: { fontSize: 10.5, fontWeight: '700', color: '#111827' },
   clSmallMuted: { marginTop: 6, fontSize: 9.5, color: '#8A8177', lineHeight: 14 },
   clChartCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5DED4', borderRadius: 12, padding: 14 },
@@ -7066,6 +7192,19 @@ const S = StyleSheet.create({
   completenessText: { fontSize: 10.5, color: "#4b5563", lineHeight: 15 },
   settingsValue: { fontSize: 13, fontWeight: "600", color: "#111827", textAlign: "right" },
   settingsNote: { fontSize: 10.5, color: "#6b7280", lineHeight: 15, marginTop: 8 },
+  msHead: { flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 8 },
+  msReset: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#C2823A66", backgroundColor: "#FFF4E8" },
+  msResetText: { fontSize: 10, fontWeight: "800", color: "#B77932" },
+  msRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 5 },
+  msLabelWrap: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 },
+  msLabel: { fontSize: 11.5, color: "#111827" },
+  msErp: { fontSize: 9.5, color: "#8A8177", marginTop: 1 },
+  msInput: {
+    width: 84, minWidth: 72, textAlign: "right", borderWidth: 1, borderColor: "#E5DED4", borderRadius: 7,
+    paddingHorizontal: 8, paddingVertical: Platform.OS === "web" ? 6 : 5, fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", color: "#111827", backgroundColor: "#fff",
+  },
+  msInputEdited: { borderColor: "#C2823A", backgroundColor: "#FFF8EF" },
   expNote: { fontSize: 10.5, color: "#6b7280", lineHeight: 15, marginTop: 7 },
   emptyDailyCard: {
     backgroundColor: "#fff",

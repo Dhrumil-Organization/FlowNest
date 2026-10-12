@@ -485,6 +485,15 @@ registerPermissionArea({
           type: 'screen',
           displayOrder: 157,
           actions: [{ key: 'view', name: 'View' }],
+        },
+        // Sales Order Entry — new order · auth (approve / reject / edit / delete) · tracking · summary
+        // (moved from the legacy ERP; legacy route sales-order-entry stays as-is)
+        {
+          key: 'sales_order_entry',
+          name: 'Sales Order Entry',
+          type: 'screen',
+          displayOrder: 158,
+          actions: [{ key: 'view', name: 'View' }],
         }
         // <-- add your new feature's resource object here (step 1)
       ],
@@ -1578,6 +1587,25 @@ registerUiNodes([
     permission: 'production.yarn_sales_order',
     action: 'view',
     order: 157,
+  },
+  // Sales Order Entry (new order · auth · tracking · summary) — moved from the legacy ERP
+  {
+    id: 'nav.sales_order_entry',
+    kind: 'navigation',
+    title: 'Sales Order Entry',
+    permission: 'production.sales_order_entry',
+    action: 'view',
+    route: 'sales-order-entry',
+    icon: 'shopping-cart-checkout',
+    order: 158,
+  },
+  {
+    id: 'screen.sales_order_entry',
+    kind: 'screen',
+    title: 'Sales Order Entry',
+    permission: 'production.sales_order_entry',
+    action: 'view',
+    order: 158,
   }
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

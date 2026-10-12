@@ -39,6 +39,18 @@ import DyeingMasterTab, { apiErrorText, type DyeingMasterApi } from './DyeingMas
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
 const r0 = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+
+// ERP design code (DAPDesign DsnCode) shown with the design name everywhere.
+const dsnCodeOf = (d: any): string => {
+    const v = String(d?.dsn_code ?? '').trim();
+    return v && v !== '0' && v.toLowerCase() !== 'null' ? v : '';
+};
+/** "RIB STOP 145 · 1234" — design name with its ERP code (name only if not synced yet). */
+const designLabel = (d: any): string => {
+    const name = String(d?.code ?? '').trim();
+    const code = dsnCodeOf(d);
+    return code ? `${name} · ${code}` : name;
+};
 const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 
 const DESIGN_TABS = [
@@ -468,6 +480,17 @@ function TypeBadge({ type }: { type: 'YD' | 'PD' }) {
     return (
         <View style={{ backgroundColor: isYD ? T.yd + '20' : T.pd + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: isYD ? T.yd : T.pd }}>{type}</Text>
+        </View>
+    );
+}
+
+// ── DsnCodeBadge: ERP design code next to the design name ──────
+function DsnCodeBadge({ design }: { design: any }) {
+    const code = dsnCodeOf(design);
+    if (!code) return null;
+    return (
+        <View style={{ borderWidth: 1, borderColor: T.border, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: T.muted }}>Code {code}</Text>
         </View>
     );
 }
@@ -1917,7 +1940,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
     const deleteColourway = (d: Design, sub: any) => {
         AppAlert.alert(
             'Delete colourway?',
-            `${sub.code} will be removed from ${d.code}.` +
+            `${sub.code} will be removed from ${designLabel(d)}.` +
             (sub.shade_code ? ` ERP shade ${sub.shade_code} stays in ERP.` : ''),
             [
                 { text: 'Cancel', style: 'cancel' },
@@ -1981,6 +2004,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Text style={ct.rowCode}>{d.code}</Text>
                                         <TypeBadge type={d.type} />
+                                        <DsnCodeBadge design={d} />
                                     </View>
                                     <Text style={ct.rowSub}>
                                         {SHORT(d.category)} ·
@@ -2647,7 +2671,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 {design?.id && (
                     <View style={fm.editBanner}>
                         <Text style={fm.editTxt}>
-                            <Text style={{ fontWeight: '800' }}>Editing {design.code}</Text> — owner mode.
+                            <Text style={{ fontWeight: '800' }}>Editing {designLabel(design)}</Text> — owner mode.
                             Changes update the existing design; saved costings keep their snapshots,
                             and the next costing version picks up the new recipe automatically.
                         </Text>
@@ -2924,6 +2948,7 @@ function DesignPickerModal({ visible, onSelect, onClose, onlyType }: {
             : designs;
         return !q ? byType : byType.filter(d =>
             d.code.toLowerCase().includes(q) || String(d.category || '').toLowerCase().includes(q)
+            || dsnCodeOf(d).toLowerCase().includes(q)
         );
     }, [designs, search, onlyType]);
 
@@ -2950,7 +2975,7 @@ function DesignPickerModal({ visible, onSelect, onClose, onlyType }: {
                                 </Text>}
                                 renderItem={({ item }) => (
                                     <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}>
-                                        <Text style={yp.yarnName}>{item.code}</Text>
+                                        <Text style={yp.yarnName}>{designLabel(item)}</Text>
                                         <Text style={yp.yarnSub}>{item.category} · {item.type}</Text>
                                     </TouchableOpacity>
                                 )}
@@ -3414,7 +3439,7 @@ function ColourwayTab({ design, onNavigateToCatalog, editSub = null, onEditDone,
                     ) : null}
                 </View>
                 <TouchableOpacity style={[cw3.picker, editing && { opacity: 0.6 }]} disabled={editing} onPress={() => setShowDesignPicker(true)}>
-                    <Text style={cw3.pickerText}>{baseDesign ? `${baseDesign.code} · ${baseDesign.type}` : 'Select Main Design'}</Text>
+                    <Text style={cw3.pickerText}>{baseDesign ? `${designLabel(baseDesign)} · ${baseDesign.type}` : 'Select Main Design'}</Text>
                     <Text>▾</Text>
                 </TouchableOpacity>
 
@@ -5163,7 +5188,7 @@ function AliasesDesignPickerModal({
                                         style={styles.modalRow}
                                         onPress={() => { onSelect(item); close(); }}
                                     >
-                                        <Text style={styles.modalRowName}>{item.code}</Text>
+                                        <Text style={styles.modalRowName}>{designLabel(item)}</Text>
                                         <Text style={styles.modalRowSub}>{item.category} · {item.type}</Text>
                                     </TouchableOpacity>
                                 )}
@@ -5379,7 +5404,7 @@ function AliasesTab({ design }: { design: Design | null }) {
                     <Text style={styles.headerTitle}>ALIASES FOR DESIGN</Text>
                     <TouchableOpacity style={styles.picker} onPress={() => setShowDesignPicker(true)}>
                         <Text style={styles.pickerText} numberOfLines={1}>
-                            {selectedDesign ? `${selectedDesign.code} (${selectedDesign.type})` : 'Select Main Design'}
+                            {selectedDesign ? `${designLabel(selectedDesign)} (${selectedDesign.type})` : 'Select Main Design'}
                         </Text>
                         <Text style={styles.pickerArrow}>▾</Text>
                     </TouchableOpacity>
@@ -7284,7 +7309,7 @@ function DyeingTab({ design }: { design: Design | null }) {
     const unique = all.filter((y, i, arr) => arr.findIndex(x => x.mi_id === y.mi_id) === i);
     return (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
-            <Text style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}>Dyeing cost history for {design.code} yarns (YD)</Text>
+            <Text style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}>Dyeing cost history for {designLabel(design)} yarns (YD)</Text>
             {unique.map(y => {
                 const d = dyeData[y.mi_id];
                 return (
@@ -7349,7 +7374,7 @@ export function DesignsScreen() {
     // needs to reach it, via the shared extras store.
     useFocusEffect(
         useCallback(() => {
-            setHeaderExtras({ subtitle: selectedDesign ? `Selected: ${selectedDesign.code}` : null });
+            setHeaderExtras({ subtitle: selectedDesign ? `Selected: ${designLabel(selectedDesign)}` : null });
             return () => clearHeaderExtras();
         }, [selectedDesign, setHeaderExtras, clearHeaderExtras]),
     );
@@ -7474,7 +7499,8 @@ export function DesignsScreen() {
             return rows
                 .filter(d => String(d?.type || '').toUpperCase() === 'YD')
                 .filter(d => !q || String(d.code || '').toLowerCase().includes(q)
-                    || String(d.category || '').toLowerCase().includes(q))
+                    || String(d.category || '').toLowerCase().includes(q)
+                    || dsnCodeOf(d).toLowerCase().includes(q))
                 .map(d => ({
                     id: String(d.id),
                     code: String(d.code || ''),
@@ -7540,7 +7566,7 @@ export function DesignsScreen() {
                         {selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
                             <View style={s.selBar}>
                                 <Text style={s.selText} numberOfLines={1}>
-                                    Selected: <Text style={s.selCode}>{selectedDesign.code}</Text>
+                                    Selected: <Text style={s.selCode}>{designLabel(selectedDesign)}</Text>
                                     {selectedDesign.type ? `  ·  ${selectedDesign.type}` : ''}
                                     {editColourway?.code ? `  ·  editing ${editColourway.code}` : ''}
                                 </Text>

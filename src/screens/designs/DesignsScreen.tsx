@@ -5569,7 +5569,16 @@ const styles = StyleSheet.create({
 //   export { AliasesTab };
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 4 — YARNS
+// TAB 4 — YARNS  (Blend → Ply → Items expandable list)
+// Paste this in place of the old YarnsTab + ym2 in DesignsScreen.tsx
+// (the new `yt` StyleSheet is at the bottom).
+//
+// CHANGES IN THIS VERSION
+//  1. Card now shows Count + Count Type (counttypename)
+//  2. Blend / Ply rows look like the Designs list rows:
+//     icon box on the left, title + subtitle, count pill + chevron on the right
+//  3. Expanded state is clearly visible: highlighted row, copper left border,
+//     filled icon box, filled chevron circle (chevron-down), copper outline on the blend card
 // ═══════════════════════════════════════════════════════════════
 
 function YarnsTab() {
@@ -5588,6 +5597,10 @@ function YarnsTab() {
     const [selectedBrowseItem, setSelectedBrowseItem] = useState<any>(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // expand/collapse state for Blend -> Ply tree
+    const [openBlends, setOpenBlends] = useState<Record<string, boolean>>({});
+    const [openPlys, setOpenPlys] = useState<Record<string, boolean>>({});
 
     const [context, setContext] = useState({
         prpcode: defaultPrpcode || 'SIP',
@@ -5646,6 +5659,8 @@ function YarnsTab() {
     } | null>(null);
 
     const gridColumns = screenWidth >= 1500 ? 4 : screenWidth >= 1050 ? 3 : screenWidth >= 700 ? 2 : 1;
+    // columns of item cards inside the Blend/Ply tree
+    const treeCols = screenWidth >= 1500 ? 3 : screenWidth >= 1000 ? 2 : 1;
 
     const apiGet = useCallback(async (path: string, params: Record<string, any> = {}) => {
         return client.get(path, { params });
@@ -5957,7 +5972,6 @@ function YarnsTab() {
             // count = actual numeric count value.
             const mainParts = String(main?.maincode || '').trim().match(/^([^/\s]+)\/([^\s]+)\s*(.*)$/);
             const countNo = String(main?.count ?? mainParts?.[1] ?? '');
-            // const plyValue = String(mainParts?.[2] ?? main?.WPly ?? '');
             const plyValue = String(main?.WPly ?? mainParts?.[2] ?? '').trim();
 
             const countTypeId = String(main?.counttype ?? main?.CountTypeId ?? main?.WCounttype ?? '');
@@ -5971,13 +5985,6 @@ function YarnsTab() {
                 findByIdOrName(countMaster, countTypeName) ||
                 { id: countTypeId, name: countTypeName || countTypeId, formula: '' };
 
-            // const plyObj =
-            //     (plyData || []).find(p =>
-            //         String(p?.ply ?? '') === plyValue || String(p?.id ?? '') === plyValue
-            //     ) ||
-            //     { id: plyValue, ply: plyValue };
-
-
             const plyObj =
                 (plyData || []).find(p =>
                     String(p?.ply ?? '').trim() === plyValue
@@ -5986,7 +5993,6 @@ function YarnsTab() {
                     String(p?.id ?? '').trim() === plyValue
                 ) ||
                 { id: plyValue, ply: plyValue, name: plyValue };
-
 
             let blendItems = Array.isArray(main?.BlendDisplay)
                 ? main.BlendDisplay.map((b: any) => ({
@@ -6490,11 +6496,15 @@ function YarnsTab() {
 
     const filtered = useMemo(() => {
         const q = normalizeYarnSearchText(search);
-        if (!q) return items;
+
+        // ✅ Only show items where ply > 0 (hides ply 0 / empty items)
+        const validItems = items.filter(item => Number(item?.WPly) > 0);
+
+        if (!q) return validItems;
 
         const queryVariants = getYarnSearchVariants(q);
 
-        return items.filter(item => {
+        return validItems.filter(item => {
             // Keep the old behaviour: every property of the item remains searchable.
             const searchableText = Object.values(item || {})
                 .map(v => normalizeYarnSearchText(v))
@@ -6517,6 +6527,51 @@ function YarnsTab() {
         return partyItems.filter(item => Object.values(item || {}).some(v => String(v ?? '').toLowerCase().includes(q)));
     }, [partyItems, search]);
 
+    // ═══════════════════════════════════════════════════════════
+    // Blend -> Ply -> Items grouping (built from `filtered`
+    //    so search keeps working)
+    // ═══════════════════════════════════════════════════════════
+    // "COTTON, LINEN" -> "Cotton Linen"
+    const toTitle = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+    const blendLabelOf = (item: any) => {
+        const names = String(item?.BlendNames || '')
+            .split(',')
+            .map(x => x.trim())
+            .filter(Boolean);
+        if (names.length) return names.map(toTitle).join(' ');
+        return String(item?.WBlend || '').trim() || 'Unknown';
+    };
+
+    const blendGroups = useMemo(() => {
+        const map = new Map<string, { key: string; label: string; total: number; plys: Map<string, any[]> }>();
+
+        filtered.forEach((item: any) => {
+            const label = blendLabelOf(item);
+            const key = label.toUpperCase();
+            const ply = String(item?.WPly ?? '').trim() || '-';
+
+            if (!map.has(key)) map.set(key, { key, label, total: 0, plys: new Map() });
+            const g = map.get(key)!;
+            g.total += 1;
+            if (!g.plys.has(ply)) g.plys.set(ply, []);
+            g.plys.get(ply)!.push(item);
+        });
+
+        return Array.from(map.values())
+            .map(g => ({
+                key: g.key,
+                label: g.label,
+                total: g.total,
+                plys: Array.from(g.plys.entries())
+                    .sort((a, b) => Number(a[0]) - Number(b[0]) || a[0].localeCompare(b[0]))
+                    .map(([ply, plyItems]) => ({ ply, items: plyItems })),
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+    }, [filtered]);
+
+    const toggleBlend = (key: string) => setOpenBlends(p => ({ ...p, [key]: !p[key] }));
+    const togglePly = (key: string) => setOpenPlys(p => ({ ...p, [key]: !p[key] }));
 
     const field = (
         label: string,
@@ -6581,42 +6636,46 @@ function YarnsTab() {
         return blendNames.length > 1;
     };
 
-    const renderCard = ({ item, index }: { item: any; index: number }) => {
+    // Small label + value block used inside the cards
+    const statCell = (label: string, value: any, wide = false, lines = 1) => (
+        <View style={[yc.stat, wide && yc.statWide]}>
+            <Text style={yc.statLabel}>{label}</Text>
+            <Text numberOfLines={lines} style={yc.statValue}>{String(value ?? '').trim() || '-'}</Text>
+        </View>
+    );
+
+    // `inTree` — inside the Blend/Ply tree the card fills its grid cell
+    const renderCard = ({ item, index, inTree }: { item: any; index?: number; inTree?: boolean }) => {
         const hasMultipleBlend = getHasMultipleBlend(item);
 
         return (
-            <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
-                <View style={ym2.cardHeader}>
+            <View style={[yc.card, inTree ? { flex: 1 } : (gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` })]}>
+                <View style={yc.cardTop}>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
-                        <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+                        <Text numberOfLines={2} style={yc.title}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
+                        <Text style={yc.code}>#{item.itmcode || '-'}</Text>
                     </View>
-                    <View style={ym2.badge}><Text style={ym2.badgeText}>{activeTab === 'Spun' ? 'SPUN' : 'FILAMENT'}</Text></View>
+                    <View style={yc.badge}><Text style={yc.badgeText}>{activeTab === 'Spun' ? 'SPUN' : 'FILAMENT'}</Text></View>
                 </View>
-                <View style={ym2.divider} />
-                <View style={ym2.infoGrid}>
-                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Blend</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.BlendNames || item.WBlend || '-'}</Text></View>
-                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
-                    <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || '-'}</Text></View>
+
+                <View style={yc.statGrid}>
+                    {statCell('Blend', item.BlendNames || item.WBlend, true, 2)}
+                    {statCell('Count', item.WCount || item.count)}
+                    {statCell('Count Type', item.counttypename)}
+                    {statCell('Ply', item.WPly)}
+                    {statCell('Other', item.WOther, false, 2)}
                 </View>
-                <View style={ym2.cardActions}><TouchableOpacity style={ym2.outlineBtn} onPress={() => openModifyMain(item)}>
-                    <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
-                </TouchableOpacity>
-                    <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'MAIN')}>
-                        <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
+
+                <View style={yc.actions}>
+                    <TouchableOpacity style={yc.btn} onPress={() => openModifyMain(item)}>
+                        <Ionicons name="create-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Modify</Text>
                     </TouchableOpacity>
-
-                    {/* <TouchableOpacity style={ym2.outlineBtn} onPress={() => loadSubList(item)}>
-                    <Ionicons name="git-branch-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Sub Items</Text>
-                </TouchableOpacity> */}
-
+                    <TouchableOpacity style={[yc.btn, yc.btnDanger]} onPress={() => requestDelete(item, 'MAIN')}>
+                        <Ionicons name="trash-outline" size={15} color="#B42318" /><Text style={[yc.btnText, { color: '#B42318' }]}>Delete</Text>
+                    </TouchableOpacity>
                     {hasMultipleBlend && (
-                        <TouchableOpacity
-                            style={ym2.outlineBtn}
-                            onPress={() => loadSubList(item)}
-                        >
-                            <Ionicons name="git-branch-outline" size={16} color={T.ink} />
-                            <Text style={ym2.outlineText}>Sub Items</Text>
+                        <TouchableOpacity style={yc.btn} onPress={() => loadSubList(item)}>
+                            <Ionicons name="git-branch-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Sub Items</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -6626,29 +6685,31 @@ function YarnsTab() {
 
 
     const renderSubCard = ({ item }: { item: any }) => (
-        <View style={[ym2.itemCard, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
-            <View style={ym2.cardHeader}>
+        <View style={[yc.card, { marginBottom: 10 }, gridColumns > 1 && { flex: 1, maxWidth: `${100 / gridColumns - 1}%` }]}>
+            <View style={yc.cardTop}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={2} style={ym2.itemTitle}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
-                    <Text style={ym2.itemCode}>{item.itmcode || '-'}</Text>
+                    <Text numberOfLines={2} style={yc.title}>{item.WNameCode || item.itmname || item.ItmName || item.itmcode || '-'}</Text>
+                    <Text style={yc.code}>#{item.itmcode || '-'}</Text>
                 </View>
-                <View style={ym2.badge}><Text style={ym2.badgeText}>SUB ITEM</Text></View>
+                <View style={yc.badge}><Text style={yc.badgeText}>SUB ITEM</Text></View>
             </View>
-            <View style={ym2.divider} />
-            <View style={ym2.infoGrid}>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Count</Text><Text style={ym2.infoValue}>{item.WCount || item.count || '-'}</Text></View>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Ply</Text><Text style={ym2.infoValue}>{item.WPly || '-'}</Text></View>
-                <View style={ym2.infoCell}><Text style={ym2.infoLabel}>Other</Text><Text numberOfLines={2} style={ym2.infoValue}>{item.WOther || item.other || '-'}</Text></View>
+
+            <View style={yc.statGrid}>
+                {statCell('Count', item.WCount || item.count)}
+                {statCell('Count Type', item.counttypename)}
+                {statCell('Ply', item.WPly)}
+                {statCell('Other', item.WOther || item.other, false, 2)}
             </View>
-            <View style={ym2.cardActions}>
-                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openSubModify(item)}>
-                    <Ionicons name="create-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Modify</Text>
+
+            <View style={yc.actions}>
+                <TouchableOpacity style={yc.btn} onPress={() => openSubModify(item)}>
+                    <Ionicons name="create-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Modify</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={ym2.outlineBtnDanger} onPress={() => requestDelete(item, 'SUB')}>
-                    <Ionicons name="trash-outline" size={16} color="#B42318" /><Text style={ym2.outlineTextDanger}>Delete</Text>
+                <TouchableOpacity style={[yc.btn, yc.btnDanger]} onPress={() => requestDelete(item, 'SUB')}>
+                    <Ionicons name="trash-outline" size={15} color="#B42318" /><Text style={[yc.btnText, { color: '#B42318' }]}>Delete</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={ym2.outlineBtn} onPress={() => openParty(item)}>
-                    <Ionicons name="people-outline" size={16} color={T.ink} /><Text style={ym2.outlineText}>Party Items</Text>
+                <TouchableOpacity style={yc.btn} onPress={() => openParty(item)}>
+                    <Ionicons name="people-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Party Items</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -6881,15 +6942,6 @@ function YarnsTab() {
                         </Text>
                         {subErrors.blend ? <Text style={ym2.validationText}>{subErrors.blend}</Text> : null}
 
-                        {/* {selectField(
-                            'Count Type',
-                            subForm.count || '',
-                            () => openPicker('count', 'Select Count Type', countData, false, selectedCount, true),
-                            false,
-                            true,
-                            subErrors.count,
-                        )} */}
-
                         {field(
                             'Count *',
                             subForm.count_no,
@@ -6940,7 +6992,6 @@ function YarnsTab() {
                             v => setSubForm((p: any) => ({ ...p, linkitmcode: v })),
                             false,
                             false,
-                            // subErrors.name,
                         )}
 
                         {field(
@@ -7022,14 +7073,6 @@ function YarnsTab() {
                     <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
                 </View>
 
-                {/* <TouchableOpacity
-                    style={ym2.headerAddBtn}
-                    onPress={() => openSubCreate(browseParent)}
-                >
-                    <Ionicons name="add" size={18} color="#fff" />
-                    <Text style={ym2.headerAddText}>Create</Text>
-                </TouchableOpacity> */}
-
                 <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
                 </TouchableOpacity>
@@ -7081,17 +7124,98 @@ function YarnsTab() {
                                     </TouchableOpacity>
                                 </View>
                                 {loading && <View style={ym2.loadingBar}><ActivityIndicator size="small" color={T.copper} /><Text style={ym2.loadingText}>Loading yarn management data...</Text></View>}
+
+                                {/* Blend -> Ply -> Items tree (Designs-style rows) */}
                                 <ScrollView contentContainerStyle={ym2.content} keyboardShouldPersistTaps="handled">
-                                    <FlatList
-                                        key={`main-grid-${activeTab}-${gridColumns}`}
-                                        data={filtered}
-                                        keyExtractor={(item, i) => `${item?.itmcode || item?.id || i}`}
-                                        numColumns={gridColumns}
-                                        scrollEnabled={false}
-                                        columnWrapperStyle={gridColumns > 1 ? ym2.gridRow : undefined}
-                                        renderItem={renderCard}
-                                        ListEmptyComponent={<View style={ym2.emptyCard}><Ionicons name="layers-outline" size={32} color={T.muted} /><Text style={ym2.emptyTitle}>{loading ? 'Loading...' : 'No items yet'}</Text><Text style={ym2.emptySub}>Add one to get started.</Text></View>}
-                                    />
+                                    {blendGroups.length === 0 ? (
+                                        <View style={ym2.emptyCard}>
+                                            <Ionicons name="layers-outline" size={32} color={T.muted} />
+                                            <Text style={ym2.emptyTitle}>{loading ? 'Loading...' : 'No items yet'}</Text>
+                                            <Text style={ym2.emptySub}>Add one to get started.</Text>
+                                        </View>
+                                    ) : (
+                                        blendGroups.map(group => {
+                                            const blendOpen = !!openBlends[group.key];
+                                            return (
+                                                <View key={group.key} style={[yt.blendWrap, blendOpen && yt.blendWrapOpen]}>
+                                                    {/* LEVEL 1: BLEND */}
+                                                    <TouchableOpacity
+                                                        style={[yt.blendRow, blendOpen && yt.blendRowOpen]}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => toggleBlend(group.key)}
+                                                    >
+                                                        <View style={[yt.iconBox, blendOpen && yt.iconBoxOpen]}>
+                                                            <Ionicons
+                                                                name={blendOpen ? 'folder-open-outline' : 'layers-outline'}
+                                                                size={20}
+                                                                color={blendOpen ? T.copper : T.muted}
+                                                            />
+                                                        </View>
+                                                        <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                                                            <Text numberOfLines={1} style={yt.blendTitle}>{group.label.toUpperCase()}</Text>
+                                                            <Text numberOfLines={1} style={yt.blendSub}>
+                                                                BLEND · {group.plys.length} ply · {group.total} items
+                                                            </Text>
+                                                        </View>
+                                                        <View style={[yt.countPill, blendOpen && yt.countPillOpen]}>
+                                                            <Text style={[yt.countPillText, blendOpen && yt.countPillTextOpen]}>{group.total}</Text>
+                                                        </View>
+                                                        <View style={[yt.chevBox, blendOpen && yt.chevBoxOpen]}>
+                                                            <Ionicons
+                                                                name={blendOpen ? 'chevron-down' : 'chevron-forward'}
+                                                                size={16}
+                                                                color={blendOpen ? '#fff' : T.muted}
+                                                            />
+                                                        </View>
+                                                    </TouchableOpacity>
+
+                                                    {blendOpen && group.plys.map(p => {
+                                                        const plyKey = `${group.key}|${p.ply}`;
+                                                        const plyOpen = !!openPlys[plyKey];
+                                                        return (
+                                                            <View key={plyKey}>
+                                                                {/* LEVEL 2: PLY */}
+                                                                <TouchableOpacity
+                                                                    style={[yt.plyRow, plyOpen && yt.plyRowOpen]}
+                                                                    activeOpacity={0.7}
+                                                                    onPress={() => togglePly(plyKey)}
+                                                                >
+                                                                    <View style={[yt.plyIconBox, plyOpen && yt.plyIconBoxOpen]}>
+                                                                        <Text style={[yt.plyIconText, plyOpen && yt.plyIconTextOpen]}>{p.ply}</Text>
+                                                                    </View>
+                                                                    <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                                                                        <Text style={yt.plyTitle}>PLY {p.ply}</Text>
+                                                                        <Text style={yt.plySub}>{p.items.length} items</Text>
+                                                                    </View>
+                                                                    <View style={[yt.countPill, plyOpen && yt.countPillOpen]}>
+                                                                        <Text style={[yt.countPillText, plyOpen && yt.countPillTextOpen]}>{p.items.length}</Text>
+                                                                    </View>
+                                                                    <View style={[yt.chevBox, plyOpen && yt.chevBoxOpen]}>
+                                                                        <Ionicons
+                                                                            name={plyOpen ? 'chevron-down' : 'chevron-forward'}
+                                                                            size={15}
+                                                                            color={plyOpen ? '#fff' : T.muted}
+                                                                        />
+                                                                    </View>
+                                                                </TouchableOpacity>
+
+                                                                {/* LEVEL 3: DATA (cards in a grid) */}
+                                                                {plyOpen && (
+                                                                    <View style={yt.itemsWrap}>
+                                                                        {p.items.map((it: any, i: number) => (
+                                                                            <View key={`${it?.itmcode || i}`} style={[yt.itemCell, { width: `${100 / treeCols}%` } as any]}>
+                                                                                {renderCard({ item: it, index: i, inTree: true })}
+                                                                            </View>
+                                                                        ))}
+                                                                    </View>
+                                                                )}
+                                                            </View>
+                                                        );
+                                                    })}
+                                                </View>
+                                            );
+                                        })
+                                    )}
                                 </ScrollView>
                             </View>
                         );
@@ -7195,6 +7319,7 @@ function YarnsTab() {
 
     return <>{body}{pickerModal}{deleteModal}{deleteResultModal}</>;
 }
+
 const ym2 = StyleSheet.create({
     page: { flex: 1, backgroundColor: T.bg },
     topTabs: { flexDirection: 'row', backgroundColor: T.surface, borderBottomWidth: 1, borderBottomColor: T.border, paddingHorizontal: 14 },
@@ -7288,8 +7413,66 @@ const ym2 = StyleSheet.create({
     deleteInfo: { marginTop: 16, padding: 12, backgroundColor: T.sub, borderRadius: 10, borderWidth: 1, borderColor: T.border },
     deleteWarning: { marginTop: 12, fontSize: 11, color: '#B42318', textAlign: 'center' },
     dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#C0392B', borderRadius: 8, paddingHorizontal: 13, paddingVertical: 10 },
-
 });
+
+// ✅ Styles for the Blend -> Ply -> Items tree
+const yt = StyleSheet.create({
+    // ── Blend card ──
+    blendWrap: { backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+    blendWrapOpen: { borderColor: T.copper + '77' },
+    blendRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, borderLeftWidth: 4, borderLeftColor: 'transparent', backgroundColor: T.surface },
+    blendRowOpen: { borderLeftColor: T.copper, backgroundColor: T.copper + '0F', borderBottomWidth: 1, borderBottomColor: T.border },
+    blendTitle: { fontSize: 15, fontWeight: '800', color: T.ink, letterSpacing: 0.2 },
+    blendSub: { fontSize: 11, color: T.muted, marginTop: 2 },
+
+    // ── Left icon box ──
+    iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
+    iconBoxOpen: { backgroundColor: T.copper + '22', borderColor: T.copper + '66' },
+
+    // ── Right side: count + chevron ──
+    countPill: { minWidth: 30, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: T.sub, alignItems: 'center', marginRight: 10 },
+    countPillOpen: { backgroundColor: T.copper + '22' },
+    countPillText: { fontSize: 12, fontWeight: '800', color: T.ink },
+    countPillTextOpen: { color: T.copper },
+    chevBox: { width: 28, height: 28, borderRadius: 14, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
+    chevBoxOpen: { backgroundColor: T.copper, borderColor: T.copper },
+
+    // ── Ply row ──
+    plyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 18, paddingRight: 14, borderTopWidth: 1, borderTopColor: T.border, borderLeftWidth: 4, borderLeftColor: 'transparent', backgroundColor: T.surface },
+    plyRowOpen: { borderLeftColor: T.copper, backgroundColor: T.sub },
+    plyIconBox: { width: 30, height: 30, borderRadius: 15, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
+    plyIconBoxOpen: { backgroundColor: T.copper, borderColor: T.copper },
+    plyIconText: { fontSize: 12, fontWeight: '800', color: T.ink },
+    plyIconTextOpen: { color: '#fff' },
+    plyTitle: { fontSize: 13, fontWeight: '700', color: T.ink },
+    plySub: { fontSize: 11, color: T.muted, marginTop: 2 },
+
+    // ── Items grid inside an opened ply ──
+    itemsWrap: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: T.bg, padding: 7, borderTopWidth: 1, borderTopColor: T.border },
+    itemCell: { padding: 5 },
+});
+
+// ✅ Styles for the item cards (main + sub items)
+const yc = StyleSheet.create({
+    card: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14 },
+    cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    title: { fontSize: 14, fontWeight: '800', color: T.ink },
+    code: { fontSize: 10.5, color: T.muted, marginTop: 3 },
+    badge: { backgroundColor: T.sub, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+    badgeText: { fontSize: 9, fontWeight: '800', color: T.muted, letterSpacing: 0.5 },
+    statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12, backgroundColor: T.sub, borderRadius: 10, padding: 10 },
+    stat: { flexGrow: 1, flexBasis: '22%', minWidth: 72 },
+    statWide: { flexBasis: '100%' },
+    statLabel: { fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+    statValue: { fontSize: 12, fontWeight: '700', color: T.ink },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    btn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: T.surface },
+    btnText: { fontSize: 11, fontWeight: '700', color: T.ink },
+    btnDanger: { borderColor: '#F3C4C0', backgroundColor: '#FFF8F7' },
+});
+
+
+
 
 function DyeingTab({ design }: { design: Design | null }) {
     const [dyeData, setDyeData] = useState<Record<string, { average: number; recent: any[] }>>({});

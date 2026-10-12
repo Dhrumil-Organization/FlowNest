@@ -5876,6 +5876,7 @@ function YarnsTab() {
             AppAlert.alert('Error', 'Main item code not found.');
             return;
         }
+        setSearch('');
         setLoading(true);
         try {
             const ctx = context.prptype ? context : await loadContext();
@@ -6072,7 +6073,7 @@ function YarnsTab() {
         if (!parent?.itmcode) {
             return AppAlert.alert('Error', 'Main item code not found.');
         }
-
+        setSearch('');
         setLoading(true);
         try {
             const ctx = context.prptype ? context : await loadContext();
@@ -6996,13 +6997,11 @@ function YarnsTab() {
                     <Text style={ym2.subHeaderSub}>{browseParent?.WNameCode || browseParent?.itmcode || '-'}</Text>
                 </View>
 
-                <TouchableOpacity
-                    style={ym2.headerAddBtn}
-                    onPress={() => openSubCreate(browseParent)}
-                >
+                {/* <TouchableOpacity
+                    style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" />
                     <Text style={ym2.headerAddText}>Create</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
 
                 <TouchableOpacity style={ym2.headerAddBtn} onPress={() => openSubCreate(browseParent)}>
                     <Ionicons name="add" size={18} color="#fff" /><Text style={ym2.headerAddText}>Create</Text>
@@ -7533,61 +7532,61 @@ export function DesignsScreen() {
     return (
         <ERPContext.Provider value={context}>
             <View style={{ flex: 1, backgroundColor: T.bg }}>
-              <View style={s.column}>
-                {visibleTabs.length > 0 ? (
-                    <>
-                        <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
-                        {selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
-                            <View style={s.selBar}>
-                                <Text style={s.selText} numberOfLines={1}>
-                                    Selected: <Text style={s.selCode}>{selectedDesign.code}</Text>
-                                    {selectedDesign.type ? `  ·  ${selectedDesign.type}` : ''}
-                                    {editColourway?.code ? `  ·  editing ${editColourway.code}` : ''}
-                                </Text>
-                                <TouchableOpacity onPress={handleClearSelection} style={s.selBtn}>
-                                    <Text style={s.selBtnText}>✕ Clear</Text>
-                                </TouchableOpacity>
+                <View style={s.column}>
+                    {visibleTabs.length > 0 ? (
+                        <>
+                            <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
+                            {selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
+                                <View style={s.selBar}>
+                                    <Text style={s.selText} numberOfLines={1}>
+                                        Selected: <Text style={s.selCode}>{selectedDesign.code}</Text>
+                                        {selectedDesign.type ? `  ·  ${selectedDesign.type}` : ''}
+                                        {editColourway?.code ? `  ·  editing ${editColourway.code}` : ''}
+                                    </Text>
+                                    <TouchableOpacity onPress={handleClearSelection} style={s.selBtn}>
+                                        <Text style={s.selBtnText}>✕ Clear</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+                            <View style={{ flex: 1 }}>
+                                {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
+                                {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
+                                {tab === 'Catalog' && canAccess('designs.catalog') && (
+                                    <CatalogTab
+                                        key={catalogRefreshKey}
+                                        onSelectDesign={handleAddSubDesign}
+                                        onEditDesign={handleSelectDesign}
+                                        onEditColourway={handleEditColourway}
+                                    />
+                                )}
+                                {tab === 'Design' && canAccess('designs.design') && (
+                                    <DesignTab
+                                        design={detailDesign}
+                                        onRefresh={handleDesignSaved}
+                                        onCancelEdit={handleCancelEdit}
+                                    />
+                                )}
+                                {tab === 'Colourway' && canAccess('designs.colourway') && (
+                                    <ColourwayTab
+                                        design={detailDesign}
+                                        onNavigateToCatalog={() => openTab('Catalog')}
+                                        editSub={editColourway}
+                                        onEditDone={handleColourwayEditDone}
+                                        onClear={handleClearSelection}
+                                    />
+                                )}
+                                {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
+                                {tab === 'Dyeing' && canAccess('designs.dyeing') && (
+                                    <DyeingMasterTab api={dyeingMasterApi} />
+                                )}
                             </View>
-                        ) : null}
-                        <View style={{ flex: 1 }}>
-                            {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
-                            {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
-                            {tab === 'Catalog' && canAccess('designs.catalog') && (
-                                <CatalogTab
-                                    key={catalogRefreshKey}
-                                    onSelectDesign={handleAddSubDesign}
-                                    onEditDesign={handleSelectDesign}
-                                    onEditColourway={handleEditColourway}
-                                />
-                            )}
-                            {tab === 'Design' && canAccess('designs.design') && (
-                                <DesignTab
-                                    design={detailDesign}
-                                    onRefresh={handleDesignSaved}
-                                    onCancelEdit={handleCancelEdit}
-                                />
-                            )}
-                            {tab === 'Colourway' && canAccess('designs.colourway') && (
-                                <ColourwayTab
-                                    design={detailDesign}
-                                    onNavigateToCatalog={() => openTab('Catalog')}
-                                    editSub={editColourway}
-                                    onEditDone={handleColourwayEditDone}
-                                    onClear={handleClearSelection}
-                                />
-                            )}
-                            {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
-                            {tab === 'Dyeing' && canAccess('designs.dyeing') && (
-                                <DyeingMasterTab api={dyeingMasterApi} />
-                            )}
+                        </>
+                    ) : (
+                        <View style={s.center}>
+                            <Text style={s.empty}>You do not have access to any Design tab.</Text>
                         </View>
-                    </>
-                ) : (
-                    <View style={s.center}>
-                        <Text style={s.empty}>You do not have access to any Design tab.</Text>
-                    </View>
-                )}
-              </View>
+                    )}
+                </View>
             </View>
         </ERPContext.Provider>
     );

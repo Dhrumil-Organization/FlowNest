@@ -108,6 +108,13 @@ const P = {
   soft: '#F8F5F0',
 };
 
+/** "RIB STOP 145 · 1234" — design name with its ERP code. */
+const dLabel = (name?: string | null, code?: string | number | null) => {
+  const n = String(name ?? '').trim();
+  const c = String(code ?? '').trim();
+  return c && c !== '0' && c.toLowerCase() !== 'null' ? `${n} · ${c}` : n;
+};
+
 const rowKey = () => `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 // Exact message from the backend (message + validation errors). Falls back to a
@@ -357,7 +364,7 @@ function DesignMultiPicker({
             <View style={[s.chipWrap, { marginTop: 8 }]}>
               {picked.map(d => (
                 <TouchableOpacity key={d.id} style={s.chip} onPress={() => toggle(d)}>
-                  <Text style={s.chipText}>{d.code}</Text>
+                  <Text style={s.chipText}>{dLabel(d.code, d.dsn_code)}</Text>
                   <Text style={s.chipX}>×</Text>
                 </TouchableOpacity>
               ))}
@@ -378,7 +385,7 @@ function DesignMultiPicker({
                       {on ? <Text style={s.checkTick}>✓</Text> : null}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.partyName}>{item.code}</Text>
+                      <Text style={s.partyName}>{dLabel(item.code, item.dsn_code)}</Text>
                       <Text style={s.partySub}>
                         {[item.category, item.type || 'YD'].filter(Boolean).join(' · ')}
                       </Text>
@@ -607,7 +614,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
                     style={s.chip}
                     onPress={() => setDesigns(old => old.filter(x => x.id !== d.id))}
                   >
-                    <Text style={s.chipText}>{d.code}</Text>
+                    <Text style={s.chipText}>{dLabel(d.code, d.dsn_code)}</Text>
                     <Text style={s.chipX}>×</Text>
                   </TouchableOpacity>
                 ))}
@@ -739,7 +746,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
                       {c.code ? `${c.code} · ` : ''}
                       {mCount} mill shade{mCount === 1 ? '' : 's'}
                       {dCount ? ` · ${dCount} design${dCount === 1 ? '' : 's'}` : ' · all designs'}
-                      {dCount ? <Text style={s.colourDesigns}>{'  ·  '}{(c.designs || []).map(d => d.design_code).join(', ')}</Text> : null}
+                      {dCount ? <Text style={s.colourDesigns}>{'  ·  '}{(c.designs || []).map(d => dLabel(d.design_code, d.dsn_code)).join(', ')}</Text> : null}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -771,7 +778,7 @@ export default function DyeingMasterTab({ api }: { api: DyeingMasterApi }) {
                       <View style={s.chipWrap}>
                         {(c.designs || []).map(d => (
                           <View key={d.design_shade_id} style={s.chipStatic}>
-                            <Text style={s.chipText}>{d.design_code}</Text>
+                            <Text style={s.chipText}>{dLabel(d.design_code, d.dsn_code)}</Text>
                           </View>
                         ))}
                       </View>

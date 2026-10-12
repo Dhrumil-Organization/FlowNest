@@ -905,7 +905,9 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           coverage_daily: daily,
           expense_daily_trend: expenseDaily,
           utility_daily_trend: utilityDaily,
-          electricity_daily: electricityDaily,
+          electricity_daily: electricityDaily,
+          // Day-wise checking production by machine group (Expense report daily cost / pick).
+          production_daily: prodDaily,
           trend_meta: payload.trends || {},
           conversion_rates: payload.conversion_rates || null,
           coverage: payload.period,

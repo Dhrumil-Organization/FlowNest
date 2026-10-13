@@ -49,3 +49,24 @@ Shape A above, plus `total` and `context`. Period is applied on the beam's **las
 `beamShortageApi.ts` → `USE_MOCK = true` serves `beamShortageMockData.ts` (16 beams over FY 25-26 and
 FY 26-27, three of them shared between two designs) in exactly the controller's response shape; the
 screen shows a "MOCK DATA" tag. To go live follow the 3 steps at the top of `beamShortageApi.ts`.
+
+## Drill-down — taka-wise checking entries (3rd level)
+
+    POST /api/reports/beam_shortage/takas
+    { "prptype": "S", "prpcode": "SIP", "yearno": 27, "beamuid": -1325009173, "dsncode": "123" }
+
+Opened from either second page: Design › Beam (tap a beam) or Beam › Design (tap a design).
+`dsncode` = the line's design ("" = Design not linked; omit for every design of the beam).
+Design per checking row uses the same rule as the report, so Σ taka metres = the line's produced.
+
+    { "success": true, "data": {
+        "beam": { beamuid, beamno, prpcode, warplen, warpingdate, ecmode, dsncode, yearno },
+        "takas": [ { chkuid, chksrno, takano, chkdate, shfcode, qty, wt, avgwt, grdcode, grdname,
+                     chkcode, chkname, wvrname, supname, oprname, remarks, remarkc, remarkd,
+                     issample, ismending, islasttaka, orderno, trackid,
+                     entrydate, entrytime, maccode, macname, gaittingdate, dsncode, dsnname, graded } ],
+        "summary": { takas, qty, wt, graded, notgraded, samples, mending, lasttaka } } }
+
+`graded = 1` when the checking entry has a grade (GRYProcessC.GrdCode not blank / 0) — the GRADE column.
+The grade-wise summary on the taka page (takas · metres · share of metres per grade, "Not graded" last)
+is built on the screen from these rows (beamTakaModel.gradeSummary) — no extra API.

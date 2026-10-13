@@ -1637,6 +1637,8 @@ function cwSummary(sub: any): string {
 
 // Colourway delete from Catalog is switched off for now (frontend only).
 const CW_DELETE_ENABLED = false;
+// Design Delete (Catalog + Design tab) — TEMPORARILY DISABLED. To enable again set DESIGN_DELETE_ENABLED = true.
+const DESIGN_DELETE_ENABLED = false;
 
 function CatalogColourwayCard({ sub, design, onEdit, onDelete, deleting }: {
     sub: any;
@@ -1773,6 +1775,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
 }) {
     const { yearno, prpcode, strcode } = useERP();
     const [deletingCw, setDeletingCw] = useState<string | null>(null);
+    const [deletingDesign, setDeletingDesign] = useState<string | null>(null);
     const [designs, setDesigns] = useState<Design[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -2151,6 +2154,22 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
                                                                     <TouchableOpacity style={[ct.cwAddBtn]} onPress={() => onEditDesign(det)}>
                                                                         <Text style={ct.cwAddTxt}>Update Design</Text>
                                                                     </TouchableOpacity>
+                                                                    <TouchableOpacity
+                                                                        style={[ct.cwDelBtn, (!DESIGN_DELETE_ENABLED || deletingDesign === String(det.id)) && { opacity: DESIGN_DELETE_ENABLED ? 0.5 : 0.35 }]}
+                                                                        disabled={!DESIGN_DELETE_ENABLED || deletingDesign === String(det.id)}
+                                                                        onPress={() => askDeleteDesign(
+                                                                            det,
+                                                                            { yearno, prpcode, strcode },
+                                                                            (busy) => setDeletingDesign(busy ? String(det.id) : null),
+                                                                            () => {
+                                                                                setDesigns(prev => prev.filter(x => String(x.id) !== String(det.id)));
+                                                                                setExpandedId(null);
+                                                                                setExpandedDetail(null);
+                                                                            },
+                                                                        )}
+                                                                    >
+                                                                        <Text style={ct.cwDelTxt}>{deletingDesign === String(det.id) ? 'Deleting…' : 'Delete'}</Text>
+                                                                    </TouchableOpacity>
                                                                 </View>
                                                             </View>
                                                             {subs.length === 0 ? (
@@ -2241,6 +2260,8 @@ const ct = StyleSheet.create({
     cwTitle: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.4 },
     cwAddBtn: { backgroundColor: T.copper + '22', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
     cwAddTxt: { fontSize: 12, fontWeight: '700', color: T.copper },
+    cwDelBtn: { backgroundColor: '#FDF1EF', borderWidth: 1, borderColor: T.red + '66', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+    cwDelTxt: { fontSize: 12, fontWeight: '700', color: T.red },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -2257,6 +2278,47 @@ const EMPTY_FORM = {
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
 
+// PERMANENT delete of a design (DELETE /designs/{id}) — used by the Design tab
+// and the Catalog card. The server refuses (409) and deletes nothing when the
+// design / its aliases / colourway shades are already used anywhere in the ERP.
+function askDeleteDesign(
+    design: any,
+    erp: { yearno: string; prpcode: string; strcode: string },
+    setBusy: (v: boolean) => void,
+    onDeleted: () => void,
+) {
+    if (!design?.id) return;
+    const label = designLabel(design);
+    AppAlert.alert(
+        'Delete design permanently?',
+        `${label} will be removed from the database for ever — its yarn recipe, colourways, costings, ` +
+        `ERP design code (with its aliases) and colourway shade codes. This cannot be undone.\n\n` +
+        `If the design is already used in any order, production or other ERP entry, it will NOT be deleted.`,
+        [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete permanently',
+                style: 'destructive',
+                onPress: async () => {
+                    setBusy(true);
+                    try {
+                        const res: any = await client.delete(`/designs/${encodeURIComponent(String(design.id))}`, {
+                            params: { ...erp, confirm: String(design.code || '').trim() },
+                            timeout: 120000, // usage check + delete in two databases
+                        });
+                        AppAlert.alert('Deleted', res?.data?.message || `${label} deleted permanently.`);
+                        onDeleted();
+                    } catch (e: any) {
+                        AppAlert.alert('Not deleted', apiErrorText(e, 'Unable to delete design.'));
+                    } finally {
+                        setBusy(false);
+                    }
+                },
+            },
+        ]
+    );
+}
+
 function DesignTab({ design, onRefresh, onCancelEdit }: {
     design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
 }) {
@@ -2264,6 +2326,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const { prpcode, strcode, yearno } = useERP();
 
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
@@ -2664,6 +2727,8 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         </TouchableOpacity>
     );
 
+    const deleteDesign = () => askDeleteDesign(design, { yearno, prpcode, strcode }, setDeleting, onRefresh);
+
     return (
         <>
             <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
@@ -2847,6 +2912,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
+
+                {/* Permanent delete — only while editing an existing design */}
+                {design?.id ? (
+                    <TouchableOpacity
+                        style={[fm.delBtn, (!DESIGN_DELETE_ENABLED || deleting || saving) && { opacity: DESIGN_DELETE_ENABLED ? 0.5 : 0.35 }]}
+                        onPress={DESIGN_DELETE_ENABLED ? deleteDesign : undefined}
+                        disabled={!DESIGN_DELETE_ENABLED || deleting || saving}
+                    >
+                        <Text style={fm.delTxt}>{deleting ? 'Deleting…' : 'Delete design permanently'}</Text>
+                    </TouchableOpacity>
+                ) : null}
             </ScrollView>
             <YarnPickerModal
                 visible={pickerFor !== null}
@@ -2900,6 +2976,8 @@ const fm = StyleSheet.create({
     addBtnTxt: { fontSize: 14, fontWeight: '700', color: T.copper },
     saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
     saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    delBtn: { borderWidth: 1.5, borderColor: T.red, backgroundColor: '#FDF1EF', borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 10 },
+    delTxt: { color: T.red, fontSize: 14, fontWeight: '800' },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -7823,4 +7901,4 @@ const s = StyleSheet.create({
     empty: { fontSize: 13, color: T.muted, textAlign: 'center' },
 });
 
-export default DesignsScreen;
+export default DesignsScreen;

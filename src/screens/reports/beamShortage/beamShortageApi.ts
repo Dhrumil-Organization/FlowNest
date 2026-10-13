@@ -14,6 +14,7 @@
 
 import { BeamShortageAPI } from '../../../api/legacyClient';
 import { mockBeamShortage } from './beamShortageMockData';
+import { mockBeamTakas, TakaRequest } from './beamTakaModel';
 
 export const USE_MOCK = false;
 
@@ -32,5 +33,10 @@ export const BeamShortageService = {
     // LIVE API:
     if (!USE_MOCK) return BeamShortageAPI.report(body);
     return mockBeamShortage(body);
+  },
+  /** Taka-wise checking entries of one beam × design (POST /reports/beam_shortage/takas). */
+  takas: (body: TakaRequest, mockProduced = 0): Promise<any> => {
+    if (!USE_MOCK) return BeamShortageAPI.takas(body);
+    return mockBeamTakas(body, mockProduced);
   },
 };

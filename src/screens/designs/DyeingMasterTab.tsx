@@ -142,16 +142,16 @@ export const apiErrorText = (e: any, fallback: string): string => {
           /does not exist|not supported for route|could not be found|not found/i.test(text) &&
           /method|route/i.test(text)) {
         const api = `${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
-        return `${text}\n\nServer par ye API abhi nahi hai: ${api}`;
+        return `${text}\n\nThis API is not available on the server yet: ${api}`;
       }
       return text;
     }
   }
 
   if (e?.code === 'ECONNABORTED' || /timeout/i.test(String(e?.message || ''))) {
-    return `${fallback}\nServer ne 30 sec mein jawab nahi diya (DB busy / locked). List refresh karke check karein.`;
+    return `${fallback}\nThe server did not respond in time (database busy). Please refresh the list and check.`;
   }
-  if (!res) return `${fallback}\nServer se connection nahi hua (network).`;
+  if (!res) return `${fallback}\nCould not connect to the server (network).`;
   if (status === 404) return `${fallback}\nAPI not found (404): ${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
   if (status === 405) return `${fallback}\nMethod not allowed (405): ${String(e?.config?.method || '').toUpperCase()} /api${e?.config?.url || ''}`;
   return `${fallback}${status ? ` (HTTP ${status})` : ''}`;

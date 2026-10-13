@@ -28,6 +28,9 @@ export type BeamLine = {
   item: string;
   type: string; // 'YD' | 'PD' | '' (only when the backend sends it)
   beamNo: string;
+  /** GRYBTrans.UId + ERP year no. of the beam — used by the taka-wise drill-down */
+  beamUId: string;
+  yearNo: string;
   machine: string;
   warpDate: string; // YYYY-MM-DD or ''
   gaitDate: string;
@@ -227,6 +230,8 @@ const finishLine = (d: Draft, warped: number, shortage: number, shared: boolean,
     item: str(r, F.item),
     type: typeOf(r),
     beamNo: str(r, F.beamNo) || str(r, F.beamId),
+    beamUId: str(r, F.beamId),
+    yearNo: str(r, F.yearNo),
     machine: str(r, F.machine),
     warpDate: parseAnyDate(pick(r, F.warpDate)),
     gaitDate: parseAnyDate(pick(r, F.gaitDate)),

@@ -18,6 +18,11 @@
 //     Beam › Design            beam list,   tap a beam   -> its designs
 //   Both views are built from the same lines, so their totals are identical.
 //
+//   3rd level — taka-wise checking entries (BeamTakaPage):
+//     Design › Beam : design page -> tap a BEAM row   -> its takas for that design
+//     Beam › Design : beam page   -> tap a DESIGN row -> its takas on that beam
+//   metres · grade · checking date · checker · grade-wise summary
+//
 // Rules (beamShortageModel.ts): completed beams only (last taka entered);
 // shortage is the beam's (warped − produced) and is distributed over the
 // designs the beam ran in the ratio of produced metres; warped = produced +
@@ -78,6 +83,7 @@ import {
   yearNoFor,
 } from './beamShortage/beamShortageModel';
 import { BeamShortageService, USE_MOCK } from './beamShortage/beamShortageApi';
+import BeamTakaPage from './beamShortage/BeamTakaPage';
 
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" });
 const fm = (v: number) => Math.round(v || 0).toLocaleString('en-IN');
@@ -130,6 +136,8 @@ export default function BeamShortageScreen() {
   // API source filter: Creel is the default as requested.
   const [beamSource, setBeamSource] = useState<BeamSource>('creel');
   const [bsel, setBsel] = useState<string | null>(null);
+  // 3rd level: the beam × design line whose taka-wise checking entries are open
+  const [tsel, setTsel] = useState<BeamLine | null>(null);
 
   const reqId = useRef(0);
 
@@ -169,15 +177,18 @@ export default function BeamShortageScreen() {
   rangeRef.current = range;
   useFocusEffect(useCallback(() => { void load(rangeRef.current); }, [load]));
 
-  // Android hardware back: detail page -> list (instead of leaving the report)
+  // Android hardware back: taka page -> detail page -> list (instead of leaving the report)
   useFocusEffect(useCallback(() => {
-    if (!dsel && !bsel) return undefined;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setDsel(null); setBsel(null); return true; });
+    if (!dsel && !bsel && !tsel) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (tsel) { setTsel(null); return true; }
+      setDsel(null); setBsel(null); return true;
+    });
     return () => sub.remove();
-  }, [dsel, bsel]));
+  }, [dsel, bsel, tsel]));
 
   /** The flip: design-first <-> beam-first. Filters, period and sort order stay. */
-  const flipTo = (next: ViewMode) => { setView(next); setDsel(null); setBsel(null); };
+  const flipTo = (next: ViewMode) => { setView(next); setDsel(null); setBsel(null); setTsel(null); };
 
   /** Keeps the range inside ONE financial year; the end the user touched wins. */
   const setRange = (from: string, to: string, anchor: 'from' | 'to') => {
@@ -229,6 +240,22 @@ export default function BeamShortageScreen() {
     return <View style={st.loading}><ActivityIndicator color={T.copper} /></View>;
   }
 
+  /* ------------------------- taka-wise (3rd level) ------------------------ */
+  if (tsel) {
+    // back goes to the page the line was opened from: design page (beams) or beam page (designs)
+    const backLabel = dsel ? (data.lines.find((l) => l.designKey === dsel)?.dsnName || dsel) : `Beam ${tsel.beamNo}`;
+    return (
+      <BeamTakaPage
+        key={tsel.key}
+        line={tsel}
+        backLabel={backLabel}
+        onBack={() => setTsel(null)}
+        prptype={prpGroup}
+        prpcode={prpCode}
+      />
+    );
+  }
+
   /* ------------------------------- beam-wise ------------------------------ */
   if (dsel) {
     // the beam page follows the design-list filters except the text search,
@@ -245,7 +272,7 @@ export default function BeamShortageScreen() {
           <Text style={st.title}>{head?.dsnName || dsel}</Text>
           <Text style={st.sub}>
             Completed beams of this design between {fmtD(range.from)} and {fmtD(range.to)} — last piece entered.
-            Shortage = warped − produced.
+            Shortage = warped − produced. Tap a beam for its taka-wise checking entries.
           </Text>
         </View>
 
@@ -265,7 +292,7 @@ export default function BeamShortageScreen() {
               <Text style={[st.num, st.head, { width: WB.short }]}>SHORTAGE</Text>
             </View>
             {L2.length === 0 && <Text style={st.emptyRow}>No completed beams for this design in this period.</Text>}
-            {L2.map((l) => <BeamRow key={l.key} l={l} />)}
+            {L2.map((l) => <BeamRow key={l.key} l={l} onPress={() => setTsel(l)} />)}
             {L2.length > 0 && (
               <View style={[st.row, st.totalRow]}>
                 <Text style={[st.first, st.totalLabel]}>GRAND TOTAL · {plural(T2.beams, 'beam')}</Text>
@@ -309,7 +336,7 @@ export default function BeamShortageScreen() {
           <Text style={st.title}>Beam {head?.beamNo || ''}</Text>
           <Text style={st.sub}>
             {[warpD ? `Warped ${fmtD(warpD)}` : '', doneD ? `last piece ${fmtD(doneD)}` : ''].filter(Boolean).join(' · ') || 'Completed beam'}
-            {' — '}designs this beam ran. Shortage = warped − produced.
+            {' — '}designs this beam ran. Shortage = warped − produced. Tap a design for its taka-wise checking entries.
           </Text>
         </View>
 
@@ -329,7 +356,7 @@ export default function BeamShortageScreen() {
               <Text style={[st.num, st.head, { width: WB.short }]}>SHORTAGE</Text>
             </View>
             {L3.length === 0 && <Text style={st.emptyRow}>No design of this beam matches the filters in this period.</Text>}
-            {L3.map((l) => <BeamDesignRow key={l.key} l={l} />)}
+            {L3.map((l) => <BeamDesignRow key={l.key} l={l} onPress={() => setTsel(l)} />)}
             {L3.length > 0 && (
               <View style={[st.row, st.totalRow]}>
                 <Text style={[st.first, st.totalLabel]}>BEAM TOTAL · {plural(L3.length, 'design')}</Text>
@@ -703,13 +730,13 @@ function BeamListLine({ b, onPress }: { b: BeamSummary; onPress: () => void }) {
 }
 
 /** One design of a beam (beam -> designs page). */
-function BeamDesignRow({ l }: { l: BeamLine }) {
+function BeamDesignRow({ l, onPress }: { l: BeamLine; onPress?: () => void }) {
   const p = l.warped > 0 ? (l.shortage / l.warped) * 100 : 0;
   const info = [l.item, typeLabel(l.type), l.gaitDate ? `gaited ${fmtD(l.gaitDate)}` : '', l.machine].filter(Boolean).join(' · ');
-  return (
+  const Body = (
     <View style={[st.row, st.line]}>
       <View style={st.first}>
-        <Text style={[st.designName, { color: T.ink }]} numberOfLines={2}>{l.dsnName}</Text>
+        <Text style={[st.designName, !onPress && { color: T.ink }]} numberOfLines={2}>{l.dsnName}{onPress ? ' ›' : ''}</Text>
         {!!info && <Text style={st.designMeta} numberOfLines={2}>{info}</Text>}
       </View>
       <Text style={[st.num, st.mono, { width: WB.warped }]}>{fm(l.warped)}</Text>
@@ -719,17 +746,19 @@ function BeamDesignRow({ l }: { l: BeamLine }) {
       </Text>
     </View>
   );
+  if (!onPress) return Body;
+  return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{Body}</TouchableOpacity>;
 }
 
-function BeamRow({ l }: { l: BeamLine }) {
+function BeamRow({ l, onPress }: { l: BeamLine; onPress?: () => void }) {
   const p = l.warped > 0 ? (l.shortage / l.warped) * 100 : 0;
   const when = l.doneDate || l.warpDate;
   const info = [when ? fmtD(when) : '', l.machine].filter(Boolean).join(' · ');
-  return (
+  const Body = (
     <View style={[st.row, st.line]}>
       <View style={st.first}>
         <Text style={[st.mono, st.beamNo]} numberOfLines={2}>
-          <Text style={st.bold}>{l.beamNo}</Text>{info ? <Text style={st.beamInfo}>  {info}</Text> : null}
+          <Text style={[st.bold, !!onPress && { color: T.copper }]}>{l.beamNo}{onPress ? ' ›' : ''}</Text>{info ? <Text style={st.beamInfo}>  {info}</Text> : null}
         </Text>
         {l.shared && (
           <View style={st.tags}><Text style={[st.tag, { color: '#1C567A', backgroundColor: '#E3EEF5' }]}>SHARED BEAM</Text></View>
@@ -742,6 +771,8 @@ function BeamRow({ l }: { l: BeamLine }) {
       </Text>
     </View>
   );
+  if (!onPress) return Body;
+  return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{Body}</TouchableOpacity>;
 }
 
 function Picker({

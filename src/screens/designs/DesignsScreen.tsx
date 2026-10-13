@@ -35,6 +35,7 @@ import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 import DyeingMasterTab, { apiErrorText, type DyeingMasterApi } from './DyeingMasterTab';
+import ChartScreen from './chartscreen';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -5659,8 +5660,11 @@ const styles = StyleSheet.create({
 //     filled icon box, filled chevron circle (chevron-down), copper outline on the blend card
 // ═══════════════════════════════════════════════════════════════
 
-function YarnsTab() {
-    const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = useERP();
+type ChartPayload = { item: any; d1Item: any; token: string };
+function YarnsTab({ onOpenChart }: { onOpenChart?: (p: ChartPayload) => void }) {
+    const erp: any = useERP();
+    const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = erp;
+    // const router = useRouter(); // ⚠️ add at top of file: import { useRouter } from 'expo-router';
     const { width: screenWidth } = useWindowDimensions(); type YarnItem = any;
     type Option = { id: string | number; name?: string;[key: string]: any };
     type PartyOption = { acccode: string; accountname: string;[key: string]: any };
@@ -5750,6 +5754,45 @@ function YarnsTab() {
     const getPrpType = useCallback(async () => {
         return (await AsyncStorage.getItem('user_prptype')) || '';
     }, []);
+
+    // 📊 Chart button — same navigation as the Purchase Order screen.
+    // Sends the clicked card's itmcode / strcode + yearno, prpcode default 'SIP', uid & parcode blank.
+    const openChart = async (card: any) => {
+        const prpcode = '';
+        const itmcode = String(card?.itmcode || card?.mitmcode || '');
+        const strcode = String(card?.strcode || context.strcode || '');
+        const yearno = String(context.yearno || '');
+        if (!itmcode) return AppAlert.alert('Error', 'Item code not found.');
+
+        // same keys as the PO screen (PrpCode / yearno / StrCode / UId / ParCode) — lowercase copies added for safety
+        const itemPayload = {
+            PrpCode: prpcode, prpcode,
+            yearno, YearNo: yearno,
+            StrCode: strcode, strcode,
+            UId: '', uid: '',
+            ParCode: '', parcode: '',
+        };
+        const chartItem = {
+            ...card,
+            ItmCode: itmcode, itmcode,
+            ItmName: card?.WNameCode || card?.itmname || '',
+            StrCode: strcode, strcode,
+        };
+
+        // ⚠️ token: adjust the storage key if your app saves it under another name
+        const token = String(erp?.token || (await AsyncStorage.getItem('token')) || '');
+
+        // router.push({
+        //     pathname: '/designs/chartscreen',
+        //     params: {
+        //         item: JSON.stringify(itemPayload),
+        //         d1Item: JSON.stringify(chartItem),
+        //         token,
+        //     },
+        // });
+        console.log('OPEN CHART', { itmcode, strcode, yearno, tokenLen: token.length, hasCb: !!onOpenChart });
+        onOpenChart?.({ item: itemPayload, d1Item: chartItem, token });
+    };
 
     const loadContext = useCallback(async () => {
         const prptype = await getPrpType();
@@ -6751,6 +6794,9 @@ function YarnsTab() {
                     <TouchableOpacity style={[yc.btn, yc.btnDanger]} onPress={() => requestDelete(item, 'MAIN')}>
                         <Ionicons name="trash-outline" size={15} color="#B42318" /><Text style={[yc.btnText, { color: '#B42318' }]}>Delete</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity style={[yc.btn, yc.btnChart]} onPress={() => openChart(item)}>
+                        <Ionicons name="bar-chart-outline" size={15} color={T.copper} /><Text style={[yc.btnText, { color: T.copper }]}>Chart</Text>
+                    </TouchableOpacity>
                     {hasMultipleBlend && (
                         <TouchableOpacity style={yc.btn} onPress={() => loadSubList(item)}>
                             <Ionicons name="git-branch-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Sub Items</Text>
@@ -6788,6 +6834,9 @@ function YarnsTab() {
                 </TouchableOpacity>
                 <TouchableOpacity style={yc.btn} onPress={() => openParty(item)}>
                     <Ionicons name="people-outline" size={15} color={T.ink} /><Text style={yc.btnText}>Party Items</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[yc.btn, yc.btnChart]} onPress={() => openChart(item)}>
+                    <Ionicons name="bar-chart-outline" size={15} color={T.copper} /><Text style={[yc.btnText, { color: T.copper }]}>Chart</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -7547,7 +7596,9 @@ const yc = StyleSheet.create({
     btn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: T.surface },
     btnText: { fontSize: 11, fontWeight: '700', color: T.ink },
     btnDanger: { borderColor: '#F3C4C0', backgroundColor: '#FFF8F7' },
+    btnChart: { borderColor: T.copper + '66', backgroundColor: T.copper + '0F' },
 });
+
 
 
 
@@ -7617,7 +7668,8 @@ export function DesignsScreen() {
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
     const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
-    const [editColourway, setEditColourway] = useState<any | null>(null);   // Catalog → colourway Edit
+    const [editColourway, setEditColourway] = useState<any | null>(null);
+    const [chartPayload, setChartPayload] = useState<ChartPayload | null>(null);  // Catalog → colourway Edit
 
     // One permission-aware source drives the tab header and tab content.
     // A developer only adds a tab to DESIGN_TABS and the registry definition.
@@ -7838,37 +7890,49 @@ export function DesignsScreen() {
                                 </View>
                             ) : null}
                             <View style={{ flex: 1 }}>
-                                {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
-                                {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
-                                {tab === 'Catalog' && canAccess('designs.catalog') && (
-                                    <CatalogTab
-                                        key={catalogRefreshKey}
-                                        onSelectDesign={handleAddSubDesign}
-                                        onEditDesign={handleSelectDesign}
-                                        onEditColourway={handleEditColourway}
+                                <View style={{ flex: 1, display: chartPayload ? 'none' : 'flex' }}>
+                                    {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
+                                    {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
+                                    {tab === 'Catalog' && canAccess('designs.catalog') && (
+                                        <CatalogTab
+                                            key={catalogRefreshKey}
+                                            onSelectDesign={handleAddSubDesign}
+                                            onEditDesign={handleSelectDesign}
+                                            onEditColourway={handleEditColourway}
+                                        />
+                                    )}
+                                    {tab === 'Design' && canAccess('designs.design') && (
+                                        <DesignTab
+                                            design={detailDesign}
+                                            onRefresh={handleDesignSaved}
+                                            onCancelEdit={handleCancelEdit}
+                                        />
+                                    )}
+                                    {tab === 'Colourway' && canAccess('designs.colourway') && (
+                                        <ColourwayTab
+                                            design={detailDesign}
+                                            onNavigateToCatalog={() => openTab('Catalog')}
+                                            editSub={editColourway}
+                                            onEditDone={handleColourwayEditDone}
+                                            onClear={handleClearSelection}
+                                        />
+                                    )}
+                                    {/* {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />} */}
+                                    {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab onOpenChart={setChartPayload} />}
+                                    {tab === 'Dyeing' && canAccess('designs.dyeing') && (
+                                        <DyeingMasterTab api={dyeingMasterApi} />
+                                    )}
+                                </View>
+                                {chartPayload ? (
+                                    <ChartScreen
+                                        item={chartPayload.item}
+                                        d1Item={chartPayload.d1Item}
+                                        token={chartPayload.token}
+                                        onBack={() => setChartPayload(null)}
                                     />
-                                )}
-                                {tab === 'Design' && canAccess('designs.design') && (
-                                    <DesignTab
-                                        design={detailDesign}
-                                        onRefresh={handleDesignSaved}
-                                        onCancelEdit={handleCancelEdit}
-                                    />
-                                )}
-                                {tab === 'Colourway' && canAccess('designs.colourway') && (
-                                    <ColourwayTab
-                                        design={detailDesign}
-                                        onNavigateToCatalog={() => openTab('Catalog')}
-                                        editSub={editColourway}
-                                        onEditDone={handleColourwayEditDone}
-                                        onClear={handleClearSelection}
-                                    />
-                                )}
-                                {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
-                                {tab === 'Dyeing' && canAccess('designs.dyeing') && (
-                                    <DyeingMasterTab api={dyeingMasterApi} />
-                                )}
+                                ) : null}
                             </View>
+
                         </>
                     ) : (
                         <View style={s.center}>
@@ -7901,4 +7965,4 @@ const s = StyleSheet.create({
     empty: { fontSize: 13, color: T.muted, textAlign: 'center' },
 });
 
-export default DesignsScreen;
+export default DesignsScreen;

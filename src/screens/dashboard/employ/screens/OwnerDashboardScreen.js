@@ -2931,6 +2931,7 @@ export default function OwnerDashboardScreen({
       params: {
         date: dateString,
         production: JSON.stringify(production),
+        prptype: getUserPrptype,
       },
     });
   };

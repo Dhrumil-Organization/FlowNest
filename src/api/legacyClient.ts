@@ -399,6 +399,7 @@ export const LEGACY_ROUTES = {
   costingVariance: '/costing/variance',
   realCostingDashboard: '/real-costing-chain/dashboard',
   beamShortageReport: '/reports/beam_shortage',
+  beamShortageTakas: '/reports/beam_shortage/takas',
 } as const;
 
 export const DesignAPI = {
@@ -736,6 +737,8 @@ export const DyeingAPI = {
 // differently, change only LEGACY_ROUTES.beamShortageReport.
 export const BeamShortageAPI = {
   report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.beamShortageReport, body),
+  /** taka-wise checking entries of one beam (× design) — the drill-down below the beam / design page */
+  takas: (body: Record<string, any>) => client.post(LEGACY_ROUTES.beamShortageTakas, body),
 };
 
 export const GreyPackingAPI = {

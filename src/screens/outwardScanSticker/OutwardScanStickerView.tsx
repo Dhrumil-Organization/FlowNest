@@ -70,6 +70,14 @@ import {
 
 const RES = 'production.outward_scan_sticker';
 const DRAFT_KEY = 'oss:draft:v1:';
+const SEL_KEY = 'oss:sel:v1:'; // + group — last property / year picked on this device
+
+type PropOpt = { code: string; name: string; short: string; type: string; years: { yearno: string; name: string }[] };
+/** list out of a sendResponse body ({ response: { data } } / { data }) */
+const listOf = (res: any): any[] => {
+  const d = res?.data?.response?.data ?? res?.data?.data ?? res?.data;
+  return Array.isArray(d) ? d : [];
+};
 const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
 
 const emptyHeader = (): Header => ({ inwdate: isoToday(), billno: '', billdate: isoToday(), strsr: '', remark: '', acccode: '', enttype: '', gruid: '', grsrno: '' });
@@ -80,7 +88,7 @@ type Flash = { kind: 'ok' | 'warn' | 'err'; text: string } | null;
 /* ================================================================================================= */
 
 export function OutwardScanStickerView() {
-  const { prpCode, yearNo } = useBusinessContext();
+  const { prpCode, yearNo, prpGroup } = useBusinessContext();
   const { canDo } = usePermission();
   const canAdd = canDo(RES, 'add');
   const canEdit = canDo(RES, 'edit');
@@ -135,7 +143,100 @@ export function OutwardScanStickerView() {
 
   /* ------------------------------ context + masters ------------------------------ */
 
+  /*
+   * Property + year: the user picks them on this screen (combo), from the properties assigned to the login
+   * (GenUserProps · GENPropDBs). Default = last choice on this device, else the header's property / year.
+   */
+  const [props, setProps] = useState<PropOpt[]>([]);
+  const [propsErr, setPropsErr] = useState('');
+  const [sel, setSel] = useState<{ prpcode: string; yearno: string } | null>(null);
+  const selRef = useRef(sel);
+  const grpRef = useRef('');
+  const draftKeyRef = useRef('');
+  const draftOwner = useRef(''); // the property / year the takas on screen belong to — only that draft is written
+  selRef.current = sel;
+  // the list = properties of the header's group (Sudamo / Knits toggle) assigned to the login, like every other
+  // screen (get_criterion fetch=prp); reloads when the group changes in the header
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let grp = String(prpGroup || '').trim().toUpperCase();
+      try { if (!grp) grp = String((await AsyncStorage.getItem('user_prptype')) || '').trim().toUpperCase(); } catch { /* storage unavailable */ }
+      let list: PropOpt[] = [];
+      setPropsErr('');
+      try {
+        list = unwrap(await GreyScanInwardAPI.properties({ prptype: grp }))?.properties || [];
+      } catch {
+        list = [];
+      }
+      if (!list.length) {
+        // older server (no grey_scan_inward/properties route) — same lists as the other screens:
+        // get_criterion fetch=prp (GENProp.PrpOf = group, GenUserProps) + getyear per property
+        try {
+          const raw = listOf(await GreyScanInwardAPI.criterionProps(grp));
+          const base = raw
+            .map((r: any) => ({ code: String(r.PrpCode || '').trim(), name: String(r.LngName || r.PrpName || r.PrpCode || '').trim(), short: String(r.ShtName || '').trim(), type: String(r.PrpOf || '').trim() }))
+            .filter((r) => r.code && (!grp || !r.type || r.type.toUpperCase() === grp));
+          const withYears = await Promise.all(base.map(async (b) => {
+            let ys: any[] = [];
+            try { ys = listOf(await GreyScanInwardAPI.years(b.code)); } catch { ys = []; }
+            const years = ys
+              .map((y: any) => ({ yearno: String(parseInt(String(y.YearNo ?? ''), 10) || ''), name: String(y.YearName || '').trim() }))
+              .filter((y) => y.yearno)
+              .map((y) => ({ yearno: y.yearno, name: y.name || 'FY ' + y.yearno }))
+              .sort((a, b2) => Number(b2.yearno) - Number(a.yearno));
+            return { ...b, years: years.filter((y, i) => years.findIndex((z) => z.yearno === y.yearno) === i) } as PropOpt;
+          }));
+          list = withYears.filter((p) => p.years.length);
+        } catch (err) {
+          if (alive) setPropsErr(errText(err, 'Property list not available.'));
+        }
+      }
+      if (!alive) return;
+      setProps(list);
+      let saved: any = null;
+      try { saved = JSON.parse((await AsyncStorage.getItem(SEL_KEY + grp)) || 'null'); } catch { saved = null; }
+      const hdrPrp = String(prpCode || '').toUpperCase();
+      const hdrYear = String(yearNo || '');
+      const pickYear = (p: PropOpt | undefined, want: string) =>
+        p ? (p.years.find((y) => y.yearno === want)?.yearno || p.years[0]?.yearno || '') : want;
+      const p = list.find((x) => x.code === saved?.prpcode) || list.find((x) => x.code === hdrPrp) || list[0];
+      const cur = selRef.current;
+      let next: { prpcode: string; yearno: string };
+      if (cur && cur.prpcode && list.some((x) => x.code === cur.prpcode)) next = cur; // still in the group — keep it
+      else if (p) next = { prpcode: p.code, yearno: pickYear(p, p.code === saved?.prpcode ? String(saved?.yearno || '') : hdrYear) || hdrYear };
+      else if (hdrPrp && hdrYear) next = { prpcode: hdrPrp, yearno: hdrYear };
+      else next = { prpcode: '', yearno: '' };
+      grpRef.current = grp;
+      if (!cur || cur.prpcode !== next.prpcode || cur.yearno !== next.yearno) setSel(next);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prpGroup]);
+
+  const changeSel = (next: { prpcode: string; yearno: string }) => {
+    if (!selRef.current || (next.prpcode === selRef.current.prpcode && next.yearno === selRef.current.yearno)) return;
+    const go = () => {
+      // keep this property's unsaved takas right now (the 0.6 s auto-save may not have run yet)
+      if (draftKeyRef.current && draftOwner.current === draftKeyRef.current && !editUid) {
+        const v = entries.length ? JSON.stringify({ party, hdr, entries }) : '';
+        (v ? AsyncStorage.setItem(draftKeyRef.current, v) : AsyncStorage.removeItem(draftKeyRef.current)).catch(() => undefined);
+      }
+      setSel(next);
+      AsyncStorage.setItem(SEL_KEY + grpRef.current, JSON.stringify(next)).catch(() => undefined);
+    };
+    if (entries.length && !editUid) {
+      AppAlert.alert('Change property / year?', `${entries.length} scanned taka(s) of ${selRef.current.prpcode} stay saved as a draft for ${selRef.current.prpcode} · FY ${selRef.current.yearno} and come back when you switch back.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change', onPress: go },
+      ]);
+      return;
+    }
+    go();
+  };
+
   const resolveCtx = useCallback(async () => {
+    if (sel && sel.prpcode && sel.yearno) return { prpcode: sel.prpcode.toUpperCase(), yearno: sel.yearno };
     let prpcode = String(prpCode || '').trim();
     let yearno = String(yearNo || '').trim();
     try {
@@ -145,7 +246,7 @@ export function OutwardScanStickerView() {
       // storage unavailable
     }
     return { prpcode: prpcode.toUpperCase(), yearno };
-  }, [prpCode, yearNo]);
+  }, [prpCode, yearNo, sel]);
 
   const body = useCallback((extra: Record<string, any> = {}) => ({ ...(ctx || {}), ...extra }), [ctx]);
 
@@ -154,7 +255,8 @@ export function OutwardScanStickerView() {
     setMetaErr('');
     try {
       const c = await resolveCtx();
-      if (!c.prpcode || !c.yearno) throw new Error('Property / year not found in the login — please log in again.');
+      if (!c.prpcode || !c.yearno) throw new Error('Select the property and year.');
+      if (!ctx || ctx.prpcode !== c.prpcode || ctx.yearno !== c.yearno) setMeta(null); // never show the old property's lists
       setCtx(c);
       const m: Meta = unwrap(await GreyScanInwardAPI.meta(c));
       setMeta(m);
@@ -171,24 +273,27 @@ export function OutwardScanStickerView() {
     } finally {
       setLoading(false);
     }
-  }, [resolveCtx]);
+  }, [resolveCtx, ctx]);
 
   const keyRef = useRef('');
   useFocusEffect(useCallback(() => {
-    const k = `${prpCode}|${yearNo}`;
+    if (!sel) return; // property list still loading
+    const k = `${sel.prpcode}|${sel.yearno}`;
     if (keyRef.current !== k) {
       keyRef.current = k;
       void loadMeta();
     }
-  }, [loadMeta, prpCode, yearNo]));
+  }, [loadMeta, sel]));
 
   /* draft: the unsaved new inward survives an app restart (per property / year) */
   const draftKey = ctx ? DRAFT_KEY + ctx.prpcode + '|' + ctx.yearno : '';
+  draftKeyRef.current = draftKey;
   const draftLoaded = useRef('');
   useEffect(() => {
     if (!draftKey || draftLoaded.current === draftKey) return;
     const first = draftLoaded.current === '';
     draftLoaded.current = draftKey;
+    draftOwner.current = '';
     if (!first) {
       // property / year switched: the takas on screen belong to the old one — start clean for the new one
       setEditUid(''); setEditNo(''); setParty(''); setEntries([]); setHdr(emptyHeader()); setGrns([]);
@@ -207,13 +312,16 @@ export function OutwardScanStickerView() {
       } catch {
         // no draft
       }
+      draftOwner.current = draftKey;
     })();
   }, [draftKey, say]);
   useEffect(() => {
-    if (!draftKey || draftLoaded.current !== draftKey || editUid) return;
+    if (!draftKey || draftOwner.current !== draftKey || editUid) return;
+    const key = draftKey;
     const t = setTimeout(() => {
+      if (draftOwner.current !== key) return; // switched property meanwhile
       const v = entries.length ? JSON.stringify({ party, hdr, entries }) : '';
-      (v ? AsyncStorage.setItem(draftKey, v) : AsyncStorage.removeItem(draftKey)).catch(() => undefined);
+      (v ? AsyncStorage.setItem(key, v) : AsyncStorage.removeItem(key)).catch(() => undefined);
     }, 600);
     return () => clearTimeout(t);
   }, [draftKey, party, hdr, entries, editUid]);
@@ -479,16 +587,41 @@ export function OutwardScanStickerView() {
 
   /* ------------------------------ render ------------------------------ */
 
-  if (loading && !meta) {
-    return <View style={st.center}><ActivityIndicator color={T.copper} /><Text style={st.muted}>Opening Outward Scan Sticker…</Text></View>;
-  }
+  const curProp = props.find((p) => p.code === sel?.prpcode);
+  const propOpts: Opt[] = props.map((p) => ({ value: p.code, label: `${p.code} — ${p.name}`, searchText: `${p.code} ${p.name} ${p.short}` }));
+  const yearOpts: Opt[] = (curProp?.years || []).map((y) => ({ value: y.yearno, label: y.name }));
+  const ctxBar = (
+    <View style={[st.ctxBar, !tablet && { width: '100%' }]}>
+      {props.length ? (
+        <>
+          <SelectField label="Property" value={sel?.prpcode || ''} options={propOpts} disabled={!!editUid} disabledHint={sel?.prpcode}
+            onChange={(v) => { const p = props.find((x) => x.code === v); if (p) changeSel({ prpcode: p.code, yearno: p.years.find((y) => y.yearno === sel?.yearno)?.yearno || p.years[0]?.yearno || '' }); }}
+            style={{ flexGrow: 2, flexShrink: 1, flexBasis: 0, minWidth: 0, maxWidth: tablet ? 320 : undefined }} />
+          <SelectField label="Year" value={sel?.yearno || ''} options={yearOpts} disabled={!!editUid}
+            onChange={(v) => sel && changeSel({ prpcode: sel.prpcode, yearno: v })}
+            style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, maxWidth: tablet ? 170 : undefined }} />
+        </>
+      ) : (
+        <Text style={st.ctxText} numberOfLines={1}>{(sel?.prpcode || prpCode) + ' · FY ' + (sel?.yearno || yearNo)}{propsErr ? ' · ' + propsErr : ''}</Text>
+      )}
+    </View>
+  );
+
   if (!meta) {
     return (
-      <View style={st.center}>
-        <Icon name="error-outline" size={34} color={T.red} />
-        <Text style={st.errTitle}>Could not open</Text>
-        <Text style={[st.muted, { maxWidth: 420 }]}>{metaErr}</Text>
-        <Btn label="Retry" icon="refresh" onPress={() => void loadMeta()} style={{ marginTop: 10 }} />
+      <View style={st.root}>
+        <View style={st.topBar}>{ctxBar}</View>
+        {loading || !sel ? (
+          <View style={st.center}><ActivityIndicator color={T.copper} /><Text style={st.muted}>Opening Outward Scan Sticker{sel?.prpcode ? ' · ' + sel.prpcode + ' · FY ' + sel.yearno : ''}…</Text></View>
+        ) : (
+          <View style={st.center}>
+            <Icon name="error-outline" size={34} color={T.red} />
+            <Text style={st.errTitle}>Could not open {sel?.prpcode}</Text>
+            <Text style={[st.muted, { maxWidth: 420 }]}>{metaErr}</Text>
+            <Text style={[st.muted, { maxWidth: 420 }]}>Pick another property / year above, or retry.</Text>
+            <Btn label="Retry" icon="refresh" onPress={() => void loadMeta()} style={{ marginTop: 10 }} />
+          </View>
+        )}
       </View>
     );
   }
@@ -508,7 +641,8 @@ export function OutwardScanStickerView() {
           <Text style={[st.tabText, tab === 'browse' && { color: '#fff' }]}>Browse</Text>
         </TouchableOpacity>
       </View>
-      <Text style={st.ctxText} numberOfLines={1}>{meta.prpcode} · FY {meta.yearno} · {meta.grey_store_name || 'Grey store'} ({meta.grey_store})</Text>
+      {ctxBar}
+      {wide ? <Text style={st.storeTag} numberOfLines={1}>{(meta.grey_store_name || 'Grey store') + ' (' + meta.grey_store + ')'}</Text> : null}
     </View>
   );
 
@@ -754,6 +888,7 @@ export function OutwardScanStickerView() {
         subtitle={partyName || ''}
         footer="Reads the checking scanner sticker (PRPCODE~UID~SRNO…). The taka is checked against this party's pending job outward before it is added."
         manualPlaceholder="Taka no. or QR text"
+        webCamera
         onClose={() => setScanOpen(false)}
         onScanned={(v) => { setScanOpen(false); void runScan(v); }}
       />
@@ -1248,6 +1383,8 @@ const st = StyleSheet.create({
   badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   ctxText: { flex: 1, minWidth: 160, textAlign: 'right', fontSize: 11, color: T.muted, fontWeight: '600' },
+  ctxBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginLeft: 'auto', flexGrow: 1, justifyContent: 'flex-end' },
+  storeTag: { fontSize: 10.5, color: T.muted, fontWeight: '700', alignSelf: 'flex-end', paddingBottom: 12 },
 
   flash: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
   flashOk: { backgroundColor: T.green },

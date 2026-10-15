@@ -400,6 +400,9 @@ export const LEGACY_ROUTES = {
   realCostingDashboard: '/real-costing-chain/dashboard',
   beamShortageReport: '/reports/beam_shortage',
   beamShortageTakas: '/reports/beam_shortage/takas',
+  yarnHubSummary: '/yarn_hub/summary',
+  yarnHubItem: '/yarn_hub/item',
+  greyScanInward: (action: string) => `/grey_scan_inward/${action}`,
 } as const;
 
 export const DesignAPI = {
@@ -696,6 +699,13 @@ export const DyeingAPI = {
   // { prptype, yearno, fromdate, todate } — returns history up to todate
   millHub: (body: Record<string, any>) =>
     client.post('/dyeing/mill_hub', body),
+  // Mill Hub from job outward / inward (DyeingMillHubController)
+  // POST /dyeing/mill_hub_report { prptype, yearno, fromdate, todate }
+  millHubReport: (body: Record<string, any>) =>
+    client.post('/dyeing/mill_hub_report', body),
+  // POST /dyeing/mill_hub_lot { prptype, yearno, outuid, outsrno } — on-click lot detail
+  millHubLot: (body: Record<string, any>) =>
+    client.post('/dyeing/mill_hub_lot', body),
 
   // Outward (challan) help for one chart + the lot nos already saved on it.
   // GET /dyeing/outward_details?prptype=S&chartno=CH-2-01&yearno=27
@@ -739,6 +749,30 @@ export const BeamShortageAPI = {
   report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.beamShortageReport, body),
   /** taka-wise checking entries of one beam (× design) — the drill-down below the beam / design page */
   takas: (body: Record<string, any>) => client.post(LEGACY_ROUTES.beamShortageTakas, body),
+};
+
+// Yarn Hub (YarnHubController) — read-only.
+//   summary: { prptype, yearno }          -> every main yarn: category, subs, stock, used, designs, latest rate
+//   item:    { prptype, yearno, itmcode } -> cartons, creel / weft issue rows, party-wise purchase rates
+export const YarnHubAPI = {
+  // stock SP + every yarn of the year: allow longer than the 30 s default
+  summary: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubSummary, body, { timeout: 180000 }),
+  item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubItem, body, { timeout: 120000 }),
+};
+
+// Outward Scan Sticker (GreyScanInwardController) — grey store job inward by scanning the fusion sticker.
+// Every body carries { prpcode, yearno }. save = add (uid 0) or modify (uid); remove = HARD delete.
+export const GreyScanInwardAPI = {
+  meta: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('meta'), body),
+  parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('parties'), body),
+  grn: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('grn'), body),
+  shades: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('shades'), body, { timeout: 60000 }),
+  scan: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('scan'), body),
+  pending: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('pending'), body),
+  save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('save'), body, { timeout: 120000 }),
+  browse: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('browse'), body),
+  show: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('show'), body),
+  remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('delete'), body, { timeout: 120000 }),
 };
 
 export const GreyPackingAPI = {

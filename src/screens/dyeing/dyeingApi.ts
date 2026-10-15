@@ -25,6 +25,7 @@ import {
   mockSavePriorityOrder,
 } from './dyeingMockData';
 import { SaveLotPayload, SaveStatusPayload } from './dyeingModel';
+import { HubLot, mockMillHubLot, mockMillHubReport } from './millHubModel';
 
 /** Flip to `true` to run the whole Dyeing module on the mock data. */
 export const USE_MOCK = false;
@@ -58,6 +59,14 @@ export const DyeingService = {
   /** Mill Hub tab — full history (up to `todate`) of every shade touched in the range. */
   millHub: (body: Ctx & { fromdate: string; todate: string }) =>
     (USE_MOCK ? mockDyeingMillHub(body) : DyeingAPI.millHub(body)),
+
+  /** Mill Hub tab — outward lots (job outward GRYOut) of the range with their inward / shortage. */
+  millHubReport: (body: Ctx & { fromdate: string; todate: string }) =>
+    (USE_MOCK ? mockMillHubReport(body) : DyeingAPI.millHubReport(body)),
+
+  /** Mill Hub — on-click detail of one outward lot (taka-wise out vs in, inward entries). */
+  millHubLot: (body: Ctx & { outuid: string | number; outsrno: string | number }, lot?: HubLot) =>
+    (USE_MOCK && lot ? mockMillHubLot(lot) : DyeingAPI.millHubLot(body)),
 
   /** Status sheet — outward (challan) lines of a chart (the "Select Outward" help, with ChalNo). */
   outwardDetails: (params: { prptype: string; chartno: string; yearno: string | number; shdcode?: string; shdname?: string; dsncode?: string; dsnname?: string }) =>

@@ -494,6 +494,30 @@ registerPermissionArea({
           type: 'screen',
           displayOrder: 158,
           actions: [{ key: 'view', name: 'View' }],
+        },
+        // Yarn Hub — yarns by category (Linen / Cotton / Polyester / Blends / Other) · in stock · used (creel + weft) ·
+        // designs (warp + weft) · party-wise price trend, via POST /api/yarn_hub/summary · /api/yarn_hub/item
+        {
+          key: 'yarn_hub',
+          name: 'Yarn Hub',
+          type: 'screen',
+          displayOrder: 159,
+          actions: [{ key: 'view', name: 'View' }],
+        },
+        // Outward Scan Sticker — grey store job inward by scanning the fusion (checking) sticker: party ->
+        // scan -> shade + qty (shortage / add to taka) -> GRYInw / D1 / D2; browse, modify, hard delete.
+        // POST /api/grey_scan_inward/* (GreyScanInwardController)
+        {
+          key: 'outward_scan_sticker',
+          name: 'Outward Scan Sticker',
+          type: 'screen',
+          displayOrder: 160,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'edit', name: 'Modify' },
+            { key: 'delete', name: 'Delete', dangerous: true },
+          ],
         }
         // <-- add your new feature's resource object here (step 1)
       ],
@@ -1606,6 +1630,44 @@ registerUiNodes([
     permission: 'production.sales_order_entry',
     action: 'view',
     order: 158,
+  },
+  // Yarn Hub (categories -> yarns -> yarn detail: stock, consumption, designs, price trend)
+  {
+    id: 'nav.yarn_hub',
+    kind: 'navigation',
+    title: 'Yarn Hub',
+    permission: 'production.yarn_hub',
+    action: 'view',
+    route: 'yarn-hub',
+    icon: 'grain',
+    order: 159,
+  },
+  {
+    id: 'screen.yarn_hub',
+    kind: 'screen',
+    title: 'Yarn Hub',
+    permission: 'production.yarn_hub',
+    action: 'view',
+    order: 159,
+  },
+  // Outward Scan Sticker (fusion sticker scan -> grey job inward; browse / modify / delete)
+  {
+    id: 'nav.outward_scan_sticker',
+    kind: 'navigation',
+    title: 'Outward Scan Sticker',
+    permission: 'production.outward_scan_sticker',
+    action: 'view',
+    route: 'outward-scan-sticker',
+    icon: 'qr-code-scanner',
+    order: 160,
+  },
+  {
+    id: 'screen.outward_scan_sticker',
+    kind: 'screen',
+    title: 'Outward Scan Sticker',
+    permission: 'production.outward_scan_sticker',
+    action: 'view',
+    order: 160,
   }
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

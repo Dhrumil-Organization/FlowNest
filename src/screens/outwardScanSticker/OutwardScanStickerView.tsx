@@ -55,6 +55,8 @@ import {
   lineId,
   Meta,
   newEntry,
+  normalizeMeta,
+  normalizeShow,
   num,
   Opt,
   payload,
@@ -258,7 +260,7 @@ export function OutwardScanStickerView() {
       if (!c.prpcode || !c.yearno) throw new Error('Select the property and year.');
       if (!ctx || ctx.prpcode !== c.prpcode || ctx.yearno !== c.yearno) setMeta(null); // never show the old property's lists
       setCtx(c);
-      const m: Meta = unwrap(await GreyScanInwardAPI.meta(c));
+      const m: Meta = normalizeMeta(unwrap(await GreyScanInwardAPI.meta(c)));
       setMeta(m);
       setHdr((h) => ({ ...h, enttype: m.ent_type?.code || '' })); // fixed GST — set by the server, not chosen here
       // shade master of THIS property (reloaded whenever the property / year changes)
@@ -519,13 +521,16 @@ export function OutwardScanStickerView() {
       const wasEdit = !!editUid;
       resetEntry(true);
       void loadGrn(party);
-      GreyScanInwardAPI.parties(body()).then((r) => { const p = unwrap(r)?.parties; if (p && meta) setMeta({ ...meta, parties: p }); }).catch(() => undefined);
+      GreyScanInwardAPI.parties(body()).then((r) => { const p = unwrap(r)?.parties; if (Array.isArray(p)) setMeta((m) => (m ? { ...m, parties: p } : m)); }).catch(() => undefined);
       setBrowseTick((n) => n + 1);
       AppAlert.alert(wasEdit ? 'Modified' : 'Saved', msg);
       say('ok', msg);
       if (wasEdit) setTab('browse');
     } catch (err: any) {
-      const m = errText(err, 'Save failed.');
+      const unreadable = !err?.response && String(err?.message || '').startsWith('The server sent');
+      const m = unreadable
+        ? 'The server answered, but the answer could not be read — the inward may already be saved. Open Browse and check before saving again.'
+        : errText(err, 'Save failed.');
       const stale: StaleRow[] | undefined = err?.response?.data?.code === 'stale' ? err.response.data.stale : undefined;
       if (stale && stale.length) {
         // someone else received these takas after they were scanned here: update balances, mark the cards, nothing was saved
@@ -693,7 +698,7 @@ export function OutwardScanStickerView() {
           onEdit={startEdit}
           onDeleted={(no) => {
             say('ok', `Inward ${no} deleted.`);
-            GreyScanInwardAPI.parties(body()).then((r) => { const p = unwrap(r)?.parties; if (p) setMeta((m) => (m ? { ...m, parties: p } : m)); }).catch(() => undefined);
+            GreyScanInwardAPI.parties(body()).then((r) => { const p = unwrap(r)?.parties; if (Array.isArray(p)) setMeta((m) => (m ? { ...m, parties: p } : m)); }).catch(() => undefined);
           }}
         />
       ) : (
@@ -1125,8 +1130,9 @@ function BrowsePane({ meta, body, tick, wide, tablet, cw, canEdit, canDelete, ed
     try {
       const d = unwrap(await GreyScanInwardAPI.browse(body({ fromdate: from, todate: to, parcode: party, search: q.trim(), page })));
       if (id !== req.current) return;
+      if (!d || !Array.isArray(d.rows)) throw new Error('The server sent an unexpected answer for the inward list. Deploy the latest GreyScanInwardController.php and retry.');
       setRows((r) => (page === 1 ? d.rows : [...r, ...d.rows]));
-      setInfo({ total: d.total, total_qty: d.total_qty ?? 0, total_takas: d.total_takas ?? 0, page: d.page, pages: d.pages });
+      setInfo({ total: Number(d.total) || 0, total_qty: d.total_qty ?? 0, total_takas: d.total_takas ?? 0, page: Number(d.page) || 1, pages: Number(d.pages) || 1 });
     } catch (e) {
       if (id === req.current) setErr(errText(e, 'Unable to load inwards.'));
     } finally {
@@ -1143,7 +1149,7 @@ function BrowsePane({ meta, body, tick, wide, tablet, cw, canEdit, canDelete, ed
     setDetail(null);
     setDetailErr('');
     try {
-      setDetail(unwrap(await GreyScanInwardAPI.show(body({ uid }))));
+      setDetail(normalizeShow(unwrap(await GreyScanInwardAPI.show(body({ uid })))));
     } catch (e) {
       setDetailErr(errText(e, 'Unable to open the inward.'));
     }
@@ -1175,14 +1181,14 @@ function BrowsePane({ meta, body, tick, wide, tablet, cw, canEdit, canDelete, ed
       ],
     );
 
-  const partyOpts: Opt[] = useMemo(() => [{ value: '', label: 'All parties' }, ...meta.parties.map((p) => ({ value: p.code, label: p.name, searchText: `${p.name} ${p.code}` }))], [meta]);
+  const partyOpts: Opt[] = useMemo(() => [{ value: '', label: 'All parties' }, ...(meta.parties || []).map((p) => ({ value: p.code, label: p.name, searchText: `${p.name} ${p.code}` }))], [meta]);
   const quick = [
     { l: 'Today', f: today, t: today },
     { l: '7 days', f: addDays(today, -6), t: today },
     { l: 'This month', f: today.slice(0, 8) + '01', t: today },
     { l: 'Year', f: meta.fy_from, t: today < meta.fy_to ? today : meta.fy_to },
   ];
-  const sum = rows.reduce((a, r) => ({ takas: a.takas + r.takas, qty: a.qty + r.qty, sht: a.sht + r.sht }), { takas: 0, qty: 0, sht: 0 });
+  const sum = (rows || []).reduce((a, r) => ({ takas: a.takas + r.takas, qty: a.qty + r.qty, sht: a.sht + r.sht }), { takas: 0, qty: 0, sht: 0 });
 
   return (
     <>

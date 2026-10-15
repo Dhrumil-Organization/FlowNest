@@ -1,16 +1,17 @@
 // FILE: src/components/PackingAutomationNEW/RouteStep.tsx
-// Step 1 — facility + route card. Scan first, typing as the fallback.
+// Step 1 — facility + route card picked from the list of cards open for packing.
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Btn as SheetBtn, SelectField, Sheet, useYearStore } from '../StockVerificationNEW/ui';
 import { fetchProperties } from '../StockVerificationNEW/verificationApi';
 import type { Api, Ctx, Row } from './api';
-import ScanSheet from './ScanSheet';
-import { Btn, ErrorText, Notice, PickerField, Section, TextField, tab, u } from './ui';
+import { ErrorText, LinkBtn, Notice, PickerField, Section, tab, u } from './ui';
 import type { Errors, Form } from './usePackingForm';
-import { routeView } from './usePackingForm';
+import { routeRowView, routeSearchText, routeView } from './usePackingForm';
+
+const LIST_LIMIT = 40;
 
 /** Property / year / store sheet — same sources as Production Orders' context bar. */
 export function FacilitySheet({ open, onClose, ctx, onApply, api, prptype }: {
@@ -35,31 +36,76 @@ export function FacilitySheet({ open, onClose, ctx, onApply, api, prptype }: {
   );
 }
 
-function Tile({ label, value, unit }: { label: string; value?: string; unit?: string }) {
+function Tile({ label, name, code }: { label: string; name?: string; code?: string }) {
+  const main = name || code;
   return (
     <View style={{ width: '50%', padding: 4 }}>
       <View style={{ backgroundColor: T.sub, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 }}>
         <Text style={{ fontSize: 12, fontWeight: '600', color: T.muted }}>{label}</Text>
-        <Text numberOfLines={1} style={[{ fontSize: 18, fontWeight: '800', color: T.ink, marginTop: 2 }, tab]}>{value || '—'}</Text>
-        {unit ? <Text numberOfLines={1} style={{ fontSize: 12.5, color: T.muted }}>{unit}</Text> : null}
+        <Text style={{ fontSize: 18, fontWeight: '800', color: T.ink, marginTop: 2 }}>{main || '—'}</Text>
+        {name && code && code !== name ? <Text style={[u.code, tab]}>{code}</Text> : null}
       </View>
     </View>
   );
 }
 
+/** One route card in the list: number + date on the left, item / shade / machine on the right. */
+function RouteRow({ row, selected, onPress }: { row: Row; selected: boolean; onPress: () => void }) {
+  const v = routeRowView(row);
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected }}
+      accessibilityLabel={`Route card ${v.routeNo}, item ${v.itmcode}, shade ${v.shdcode}`}
+      style={({ pressed }) => [
+        { flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1.5, borderColor: T.border, backgroundColor: T.surface, marginBottom: 8 },
+        selected && { borderColor: T.copper, backgroundColor: T.copper + '10' },
+        pressed && !selected && { backgroundColor: T.sub },
+      ]}>
+      <View style={{ width: 112 }}>
+        <Text style={[{ fontSize: 17, fontWeight: '800', color: T.ink }, tab]}>{v.routeNo || '—'}</Text>
+        {v.date ? <Text style={[{ fontSize: 12, color: T.muted, marginTop: 2 }, tab]}>{v.date}</Text> : null}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={{ fontSize: 15.5, fontWeight: '800', color: T.ink }}>{v.itmname || v.itmcode || '—'}</Text>
+        {v.itmname && v.itmcode ? <Text style={[u.code, tab]}>Item {v.itmcode}</Text> : null}
+        <Text style={{ fontSize: 13.5, fontWeight: '700', color: T.ink }}>
+          {v.shdname || v.shdcode}
+          {v.shdname && v.shdcode ? <Text style={[u.code, tab]}>{`  ${v.shdcode}`}</Text> : null}
+          {v.denier ? <Text style={[{ fontWeight: '600', color: T.muted }, tab]}>{`  ·  ${v.denier} D`}</Text> : null}
+          {v.machine ? <Text style={{ fontWeight: '600', color: T.muted }}>{`  ·  ${v.machine}`}</Text> : null}
+        </Text>
+        {v.subMerge ? (
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: T.ink }}>
+            Merge {v.subMerge}
+            {v.mainMerge && v.mainMerge !== v.subMerge ? <Text style={[u.code, tab]}>{`  main ${v.mainMerge}`}</Text> : null}
+          </Text>
+        ) : null}
+        {v.parname ? <Text style={{ fontSize: 13.5, fontWeight: '700', color: T.ink }}>{v.parname}</Text> : null}
+      </View>
+      <Icon name={selected ? 'check-circle' : 'chevron-right'} size={22} color={selected ? T.copper : T.muted} style={{ alignSelf: 'center' }} />
+    </Pressable>
+  );
+}
+
 export default function RouteStep({
-  f, ctx, facility, onFacility, busy, problem, errors, onRouteNo, onLookup,
+  f, ctx, facility, onFacility, routes, busy, problem, errors, onChoose, onReload,
 }: {
-  f: Form; ctx: Ctx; facility: string; onFacility: () => void;
-  busy: { route?: boolean; defaults?: boolean }; problem: { route?: string; defaults?: string };
-  errors: Errors; onRouteNo: (v: string) => void; onLookup: (no?: string) => Promise<boolean>;
+  f: Form; ctx: Ctx; facility: string; onFacility: () => void; routes: Row[];
+  busy: { routes?: boolean; defaults?: boolean }; problem: { routes?: string; defaults?: string };
+  errors: Errors; onChoose: (row: Row) => Promise<boolean> | boolean; onReload: () => void;
 }) {
-  const [scan, setScan] = useState(false);
-  const input = useRef<TextInput>(null);
+  const [q, setQ] = useState('');
+  const [browsing, setBrowsing] = useState(!f.route);
+  useEffect(() => { if (!f.route) setBrowsing(true); }, [f.route]);
   const r = routeView(f);
-  const found = !!f.route && !busy.route;
-  const canCamera = Platform.OS !== 'web';
   const ctxReady = !!(ctx.prpcode && ctx.yearno && ctx.strcode);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toUpperCase();
+    if (!s) return routes;
+    // Searches every field of the card: route no., date, machine, item, shade, main / sub merge, party…
+    return routes.filter((row) => routeSearchText(row).includes(s));
+  }, [routes, q]);
+  const shown = filtered.slice(0, LIST_LIMIT);
 
   return (
     <>
@@ -69,58 +115,73 @@ export default function RouteStep({
         {problem.defaults ? <ErrorText>{problem.defaults}</ErrorText> : null}
       </Section>
 
-      <Section title="Route card">
-        {canCamera ? (
-          <>
-            <Btn label="Scan route card" icon="qr-code-scanner" kind="copper" onPress={() => setScan(true)} disabled={!ctxReady || busy.defaults} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: T.border }} />
-              <Text style={{ fontSize: 13, color: T.muted }}>or type / use a scanner</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: T.border }} />
+      {f.route && !browsing ? (
+        <>
+          <Section title="Route card" right={<LinkBtn label="Change" icon="swap-horiz" onPress={() => setBrowsing(true)} />}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <Text style={[{ fontSize: 26, fontWeight: '800', color: T.ink }, tab]}>{r.routeNo}</Text>
+              <Text style={[{ fontSize: 13, color: T.muted }, tab]}>{[r.date, r.machine].filter(Boolean).join(' · ')}</Text>
             </View>
-          </>
-        ) : null}
-        <TextField
-          label=""
-          inputRef={input}
-          value={f.routeNo}
-          onChangeText={(v) => onRouteNo(v.trim())}
-          onSubmitEditing={() => onLookup()}
-          autoFocus={Platform.OS === 'web'}
-          editable={ctxReady && !busy.defaults}
-          placeholder="Route card no."
-          numeric
-          big
-          error={problem.route || errors.route}
-          hint={canCamera ? undefined : 'Type the number or scan with a USB / Bluetooth scanner, then press Enter.'}
-          right={
-            busy.route ? <Text style={u.hint}>Finding…</Text>
-              : found ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon name="check-circle" size={18} color={T.green} /><Text style={{ color: T.green, fontWeight: '800', fontSize: 13 }}>Found</Text></View>
-                : <Btn label="Find" kind="ghost" onPress={() => onLookup()} disabled={!f.routeNo || !ctxReady} style={{ height: 40, paddingHorizontal: 14 }} />
-          }
-        />
-      </Section>
+          </Section>
+          <Section title="Route details" right={<Text style={{ fontSize: 12, fontWeight: '800', color: T.green }}>Auto-filled</Text>}>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: T.ink }}>{r.itmname || r.itmcode || '—'}</Text>
+              {r.itmname && r.itmcode ? <Text style={[u.code, tab, { fontSize: 12.5, marginTop: 2 }]}>Item {r.itmcode}</Text> : null}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', margin: -4 }}>
+              <Tile label="Shade" name={r.shdname} code={r.shdcode} />
+              <Tile label="Denier" name={r.denier} />
+              <Tile label="Paper tube wt." name={r.cheeswt} />
+              <Tile label="Stock type" name={r.stkLabel} />
+            </View>
+          </Section>
+        </>
+      ) : (
+        <Section
+          title={busy.routes ? 'Route cards' : `Route cards · ${routes.length} open`}
+          right={f.route
+            ? <LinkBtn label="Cancel" onPress={() => { setBrowsing(false); setQ(''); }} />
+            : <LinkBtn label="Refresh" icon="refresh" onPress={onReload} />}>
+          <View style={[u.field, { marginBottom: 10 }]}>
+            <Icon name="search" size={20} color={T.muted} />
+            <TextInput
+              value={q}
+              onChangeText={setQ}
+              placeholder="Search route no., item, shade, merge, machine…"
+              placeholderTextColor={T.muted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              accessibilityLabel="Search route cards"
+              style={[u.input, { fontSize: 16 }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]}
+            />
+            {q ? <LinkBtn label="Clear" onPress={() => setQ('')} /> : null}
+          </View>
 
-      {f.route ? (
-        <Section title="Route details" right={<Text style={{ fontSize: 12, fontWeight: '800', color: T.green }}>Auto-filled</Text>}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-            <Text style={[{ fontSize: 24, fontWeight: '800', color: T.ink }, tab]}>{r.itmcode || '—'}</Text>
-            <Text style={{ fontSize: 15, color: T.muted, flexShrink: 1 }}>{r.itmname}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', margin: -4 }}>
-            <Tile label="Shade" value={r.shdcode} unit={r.shdname} />
-            <Tile label="Denier" value={r.denier} />
-            <Tile label="Paper tube wt." value={r.cheeswt} />
-            <Tile label="Stock type" value={r.stkLabel} />
-          </View>
+          {problem.routes ? <Notice tone="err" text={problem.routes} action={{ label: 'Retry', onPress: onReload }} /> : null}
+          {busy.routes || busy.defaults ? (
+            <View style={{ paddingVertical: 24, alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator color={T.copper} />
+              <Text style={u.hint}>Loading route cards…</Text>
+            </View>
+          ) : !ctxReady ? (
+            <Notice tone="info" text="Choose the facility first." />
+          ) : shown.length === 0 && !problem.routes ? (
+            <Notice tone="info" text={q ? `No route card matches “${q}”.` : 'No route cards are open for packing.'} />
+          ) : (
+            <>
+              {shown.map((row, i) => (
+                <RouteRow key={`${row.productionuid ?? ''}-${row.productionvouno ?? i}`} row={row}
+                  selected={!!f.route && f.route.productionuid === row.productionuid && f.route.productionvouno === row.productionvouno}
+                  onPress={async () => { if (await onChoose(row)) { setBrowsing(false); setQ(''); } }} />
+              ))}
+              {filtered.length > shown.length ? (
+                <Text style={[u.hint, { textAlign: 'center' }]}>{`Showing ${shown.length} of ${filtered.length}. Type to narrow the list.`}</Text>
+              ) : null}
+            </>
+          )}
+          <ErrorText>{errors.route}</ErrorText>
         </Section>
-      ) : !busy.route && !problem.route ? (
-        <Notice tone="info" text="Scan or type a route card to see its item, shade and denier." />
-      ) : null}
-
-      {canCamera ? (
-        <ScanSheet open={scan} onClose={() => setScan(false)} onScanned={(code) => { setScan(false); onLookup(code); }} />
-      ) : null}
+      )}
     </>
   );
 }

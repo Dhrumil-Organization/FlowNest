@@ -33,6 +33,7 @@ import { Ionicons } from '@expo/vector-icons';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppAlert from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import { useRouter } from 'expo-router';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 import DyeingMasterTab, { apiErrorText, type DyeingMasterApi } from './DyeingMasterTab';
 import ChartScreen from './chartscreen';
@@ -488,10 +489,11 @@ function TypeBadge({ type }: { type: 'YD' | 'PD' }) {
 // ── DsnCodeBadge: ERP design code next to the design name ──────
 function DsnCodeBadge({ design }: { design: any }) {
     const code = dsnCodeOf(design);
-    if (!code) return null;
+    const syncStatus = String(design?.erp_sync_status || '').trim().toUpperCase();
+    const label = code ? `Code ${code}` : syncStatus === 'FAILED' ? 'ERP sync failed' : syncStatus === 'PENDING' ? 'ERP code pending' : 'ERP code missing';
     return (
         <View style={{ borderWidth: 1, borderColor: T.border, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: T.muted }}>Code {code}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: code ? T.muted : T.pd }}>{label}</Text>
         </View>
     );
 }
@@ -750,6 +752,9 @@ type MainYarnHelpRow = {
     str_code: string;
     variant_count: number;
     available_blends: string[];
+    available_blend_details?: { ratio: string; fibre: string; label: string }[];
+    fibre?: string;
+    fibre_composition?: { id: number; name: string; percent: number | null }[];
     is_blended_family: boolean;
     requires_sub_item: boolean;
     direct_item: YarnItemHelpRow | null;
@@ -764,6 +769,21 @@ type YarnItemHelpRow = YarnMaster & {
     is_main_yarn_item?: boolean;
     blend_ratio?: string;
     w_blend_per?: string;
+};
+
+// Fibre identities come from the year-specific ERP FamItemWBlend mapping.
+// Do not infer Cotton/Linen/Tencel from count or an unexplained blend ratio.
+const yarnFibreLabel = (y: any): string => {
+    const components: any[] = Array.isArray(y?.fibre_composition) ? y.fibre_composition : [];
+    const detailed = components.map(component => {
+        const name = String(component?.name ?? '').trim();
+        if (!name || /^BLEND\s+\d+$/i.test(name)) return '';
+        const per = Number(component?.percent);
+        return `${name}${component?.percent != null && Number.isFinite(per) ? ` ${per}%` : ''}`;
+    }).filter(Boolean).join(' / ');
+    if (detailed) return detailed;
+    const generic = String(y?.fibre ?? '').trim();
+    return generic !== 'Other' && !/^BLEND\s+\d+$/i.test(generic) ? generic : '';
 };
 
 function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
@@ -1071,7 +1091,9 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                             </Text>
                             {selectedMain.available_blends?.length > 0 ? (
                                 <Text style={yp.mainSelectionBlend} numberOfLines={2}>
-                                    Available blends: {selectedMain.available_blends.join(' · ')}
+                                    Available blends: {selectedMain.available_blend_details?.length
+                                        ? selectedMain.available_blend_details.map(b => b.label).join(' · ')
+                                        : selectedMain.available_blends.join(' · ')}
                                 </Text>
                             ) : null}
                         </View>
@@ -1140,7 +1162,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                                 {item.name}
                                             </Text>
                                             <Text style={yp.yarnSub} numberOfLines={2}>
-                                                {item.main_yarn_code}
+                                                {item.main_yarn_code}{yarnFibreLabel(item) ? ` · ${yarnFibreLabel(item)}` : ''}
                                             </Text>
                                             <View style={yp.metaRow}>
                                                 <Text style={yp.metaText}>
@@ -1150,9 +1172,11 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                                 {item.available_blends?.length > 0 ? (
                                                     <Text
                                                         style={yp.blendPreview}
-                                                        numberOfLines={1}
+                                                        numberOfLines={3}
                                                     >
-                                                        {item.available_blends.join(' · ')}
+                                                        {item.available_blend_details?.length
+                                                            ? item.available_blend_details.map(b => b.label).join(' · ')
+                                                            : item.available_blends.join(' · ')}
                                                     </Text>
                                                 ) : null}
                                             </View>
@@ -1211,7 +1235,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                             </View>
 
                                             <Text style={yp.yarnSub} numberOfLines={2}>
-                                                {item.itm_code || item.mi_id}
+                                                {item.itm_code || item.mi_id}{yarnFibreLabel(item) ? ` · ${yarnFibreLabel(item)}` : ''}
                                             </Text>
 
                                             <View style={yp.metaRow}>
@@ -1557,12 +1581,20 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
                 </View>
                 <TouchableOpacity onPress={onRemove} style={{ paddingLeft: 8 }}><Text style={{ color: T.pd, fontSize: 18 }}>✕</Text></TouchableOpacity>
             </View>
-            <Text style={yl.blendLabel}>BLEND / SUB ITEM</Text>
-            <TextInput value={yarn.blend_ratio ?? ''}
-                onChangeText={v => onChange('blend_ratio', v.trim() || null)}
-                placeholder="Pure or ratio/sub-item, e.g. 65/35"
-                placeholderTextColor={T.muted} style={yl.blendInput}
-                editable={false} />
+            {/* Keep the authoritative fibre composition visible on the saved
+                Warp/Weft line as well as in the item picker. The ratio and
+                ItmCode remain the stored identities, not these display labels. */}
+            <Text style={yl.blendLabel}>FIBRE BLEND / SUB ITEM</Text>
+            <View style={yl.blendInput}>
+                <Text style={yl.blendValue}>
+                    {yarnFibreLabel(yarn) || (yarn.blend_ratio
+                        ? `Blend ratio ${yarn.blend_ratio}`
+                        : 'Fibre composition not maintained')}
+                </Text>
+                {yarn.blend_ratio && yarnFibreLabel(yarn) ? (
+                    <Text style={yl.blendRatio}>Ratio {yarn.blend_ratio}</Text>
+                ) : null}
+            </View>
         </View>
     );
 }
@@ -1579,7 +1611,9 @@ const yl = StyleSheet.create({
     epiInput: { backgroundColor: T.sub, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, color: T.ink, width: 56, textAlign: 'center' },
     epiLabel: { fontSize: 11, color: T.muted, fontWeight: '600' },
     blendLabel: { fontSize: 9, color: T.muted, fontWeight: '700', letterSpacing: 0.5, marginTop: 10, marginBottom: 6 },
-    blendInput: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: T.ink, fontSize: 12 },
+    blendInput: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, gap: 3 },
+    blendValue: { color: T.ink, fontSize: 12, fontWeight: '600' },
+    blendRatio: { color: T.copper, fontSize: 10, fontWeight: '700' },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1638,8 +1672,6 @@ function cwSummary(sub: any): string {
 
 // Colourway delete from Catalog is switched off for now (frontend only).
 const CW_DELETE_ENABLED = false;
-// Design Delete (Catalog + Design tab) — TEMPORARILY DISABLED. To enable again set DESIGN_DELETE_ENABLED = true.
-const DESIGN_DELETE_ENABLED = false;
 
 function CatalogColourwayCard({ sub, design, onEdit, onDelete, deleting }: {
     sub: any;
@@ -1776,7 +1808,6 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
 }) {
     const { yearno, prpcode, strcode } = useERP();
     const [deletingCw, setDeletingCw] = useState<string | null>(null);
-    const [deletingDesign, setDeletingDesign] = useState<string | null>(null);
     const [designs, setDesigns] = useState<Design[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -2155,22 +2186,6 @@ function CatalogTab({ onSelectDesign, onEditDesign, onEditColourway }: {
                                                                     <TouchableOpacity style={[ct.cwAddBtn]} onPress={() => onEditDesign(det)}>
                                                                         <Text style={ct.cwAddTxt}>Update Design</Text>
                                                                     </TouchableOpacity>
-                                                                    <TouchableOpacity
-                                                                        style={[ct.cwDelBtn, (!DESIGN_DELETE_ENABLED || deletingDesign === String(det.id)) && { opacity: DESIGN_DELETE_ENABLED ? 0.5 : 0.35 }]}
-                                                                        disabled={!DESIGN_DELETE_ENABLED || deletingDesign === String(det.id)}
-                                                                        onPress={() => askDeleteDesign(
-                                                                            det,
-                                                                            { yearno, prpcode, strcode },
-                                                                            (busy) => setDeletingDesign(busy ? String(det.id) : null),
-                                                                            () => {
-                                                                                setDesigns(prev => prev.filter(x => String(x.id) !== String(det.id)));
-                                                                                setExpandedId(null);
-                                                                                setExpandedDetail(null);
-                                                                            },
-                                                                        )}
-                                                                    >
-                                                                        <Text style={ct.cwDelTxt}>{deletingDesign === String(det.id) ? 'Deleting…' : 'Delete'}</Text>
-                                                                    </TouchableOpacity>
                                                                 </View>
                                                             </View>
                                                             {subs.length === 0 ? (
@@ -2261,12 +2276,10 @@ const ct = StyleSheet.create({
     cwTitle: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.4 },
     cwAddBtn: { backgroundColor: T.copper + '22', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
     cwAddTxt: { fontSize: 12, fontWeight: '700', color: T.copper },
-    cwDelBtn: { backgroundColor: '#FDF1EF', borderWidth: 1, borderColor: T.red + '66', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-    cwDelTxt: { fontSize: 12, fontWeight: '700', color: T.red },
 });
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 2 — DESIGN  (Reed Space input + calculated Greige Width + Live Spec)
+// TAB 2 — DESIGN  (Independent Reed Space and manual Greige Width + Live Spec)
 // ✅ save() logic below is the validated + verified version (from the
 //    second file) adapted to the new lightweight client, which does
 //    NOT inject yearno/prpcode/strcode automatically — so we add them
@@ -2276,49 +2289,8 @@ const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
     weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
     fin_width: 58, warp_wastage: 0, weft_wastage: 0,
-    warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
+    warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'greige',
 };
-
-// PERMANENT delete of a design (DELETE /designs/{id}) — used by the Design tab
-// and the Catalog card. The server refuses (409) and deletes nothing when the
-// design / its aliases / colourway shades are already used anywhere in the ERP.
-function askDeleteDesign(
-    design: any,
-    erp: { yearno: string; prpcode: string; strcode: string },
-    setBusy: (v: boolean) => void,
-    onDeleted: () => void,
-) {
-    if (!design?.id) return;
-    const label = designLabel(design);
-    AppAlert.alert(
-        'Delete design permanently?',
-        `${label} will be removed from the database for ever — its yarn recipe, colourways, costings, ` +
-        `ERP design code (with its aliases) and colourway shade codes. This cannot be undone.\n\n` +
-        `If the design is already used in any order, production or other ERP entry, it will NOT be deleted.`,
-        [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete permanently',
-                style: 'destructive',
-                onPress: async () => {
-                    setBusy(true);
-                    try {
-                        const res: any = await client.delete(`/designs/${encodeURIComponent(String(design.id))}`, {
-                            params: { ...erp, confirm: String(design.code || '').trim() },
-                            timeout: 120000, // usage check + delete in two databases
-                        });
-                        AppAlert.alert('Deleted', res?.data?.message || `${label} deleted permanently.`);
-                        onDeleted();
-                    } catch (e: any) {
-                        AppAlert.alert('Not deleted', apiErrorText(e, 'Unable to delete design.'));
-                    } finally {
-                        setBusy(false);
-                    }
-                },
-            },
-        ]
-    );
-}
 
 function DesignTab({ design, onRefresh, onCancelEdit }: {
     design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
@@ -2327,7 +2299,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const { prpcode, strcode, yearno } = useERP();
 
     const [saving, setSaving] = useState(false);
-    const [deleting, setDeleting] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
@@ -2343,7 +2314,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     useEffect(() => {
         if (design) setForm({
             ...EMPTY_FORM, ...design,
-            width_basis: (design as any).width_basis ?? 'reed',
+            width_basis: 'greige',
             greige_width: (design as any).greige_width ?? 0,
             selvedge_yarns: (design as any).selvedge_yarns ?? [],
             warp_wastage: (design as any).warp_wastage ?? 0,
@@ -2444,7 +2415,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 strcode,
                 StrCode: strcode,
 
-                width_basis: 'reed',
+                width_basis: 'greige',
                 reed_space: Number(form.reed_space) || 0,
                 greige_width: Number(form.greige_width) || 0,
                 warp_shrink: Number(form.warp_shrink) || 0,
@@ -2687,10 +2658,43 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 );
             }
 
-            AppAlert.alert(
-                'Saved',
-                `Design saved successfully.\n\nID: ${savedId}`
-            );
+            // Never show a successful save message when the verified width
+            // differs from the actual measurement submitted by the user.
+            // This is a read-back of the committed record, not optimistic UI.
+            const verifiedGreigeWidth = Number(verified?.greige_width);
+            if (
+                !Number.isFinite(verifiedGreigeWidth) ||
+                Math.abs(verifiedGreigeWidth - requiredGreigeWidth) > 0.011
+            ) {
+                throw new Error(
+                    `Greige Width did not pass save verification: entered ${requiredGreigeWidth}", ` +
+                    `but the server returned ${Number.isFinite(verifiedGreigeWidth) ? verifiedGreigeWidth + '"' : 'no value'}. ` +
+                    'Reopen the design and inspect the saved width before making further changes.'
+                );
+            }
+
+            // The engineering record and the ERP design-code sync are separate
+            // transactions in the current controller. Report their outcomes
+            // separately instead of concealing a missing ERP DsnCode.
+            const syncedCode = dsnCodeOf(verified);
+            const erpStatus = String(verified?.erp_sync_status ?? body?.erp_sync_status ?? '')
+                .trim().toUpperCase();
+            if (!syncedCode || erpStatus === 'FAILED' || erpStatus === 'PENDING') {
+                // Keep internal verification information out of user-facing alerts.
+                // An incomplete ERP sync is still reported, not presented as success.
+                const syncReason = String(body?.erp_sync_message || '').trim();
+                console.warn('DESIGN ERP SYNC NOT CONFIRMED', {
+                    savedId,
+                    erpStatus,
+                    syncReason,
+                });
+                AppAlert.alert(
+                    'Saved (ERP pending)',
+                    'Design saved, but ERP synchronization is not complete. Please contact your administrator if this continues.'
+                );
+            } else {
+                AppAlert.alert('Saved', 'Design saved successfully.');
+            }
 
             onRefresh();
         } catch (e: any) {
@@ -2727,8 +2731,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             <Text style={[fm.chipTxt, active && fm.chipTxtActive]}>{label}</Text>
         </TouchableOpacity>
     );
-
-    const deleteDesign = () => askDeleteDesign(design, { yearno, prpcode, strcode }, setDeleting, onRefresh);
 
     return (
         <>
@@ -2786,16 +2788,8 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <Text style={fm.label}>WEAVE / STRUCTURE</Text>
                 <TextInput value={form.weave ?? ''} onChangeText={v => set('weave', v)} placeholder="e.g. Dobby — fine dobby" placeholderTextColor={T.muted} style={fm.input} />
 
-                <Text style={fm.label}>WIDTH BASIS</Text>
-                <Text style={fm.hint}>Reed Space is the construction anchor. Greige Width is calculated automatically.</Text>
-                <View style={fm.chipRow}>
-                    <View style={[fm.chip, fm.chipActive]}>
-                        <Text style={[fm.chipTxt, fm.chipTxtActive]}>Reed space</Text>
-                    </View>
-                    <View style={[fm.chip, fm.chipDisabled]}>
-                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · entered</Text>
-                    </View>
-                </View>
+                <Text style={fm.label}>FABRIC WIDTH MEASUREMENTS</Text>
+                <Text style={fm.hint}>Enter Reed Space and actual measured Greige Width independently. Warp Shrink does not reduce Greige Width.</Text>
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={{ flex: 1 }}>
@@ -2905,7 +2899,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 {/* LIVE SPEC panel (updates as you type) */}
                 <LiveSpecPanel design={{
                     ...form,
-                    width_basis: 'reed',
+                    width_basis: 'greige',
                     reed_space: form.reed_space,
                     greige_width: form.greige_width,
                 }} />
@@ -2913,17 +2907,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
-
-                {/* Permanent delete — only while editing an existing design */}
-                {design?.id ? (
-                    <TouchableOpacity
-                        style={[fm.delBtn, (!DESIGN_DELETE_ENABLED || deleting || saving) && { opacity: DESIGN_DELETE_ENABLED ? 0.5 : 0.35 }]}
-                        onPress={DESIGN_DELETE_ENABLED ? deleteDesign : undefined}
-                        disabled={!DESIGN_DELETE_ENABLED || deleting || saving}
-                    >
-                        <Text style={fm.delTxt}>{deleting ? 'Deleting…' : 'Delete design permanently'}</Text>
-                    </TouchableOpacity>
-                ) : null}
             </ScrollView>
             <YarnPickerModal
                 visible={pickerFor !== null}
@@ -2977,8 +2960,6 @@ const fm = StyleSheet.create({
     addBtnTxt: { fontSize: 14, fontWeight: '700', color: T.copper },
     saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
     saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-    delBtn: { borderWidth: 1.5, borderColor: T.red, backgroundColor: '#FDF1EF', borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 10 },
-    delTxt: { color: T.red, fontSize: 14, fontWeight: '800' },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -5664,7 +5645,7 @@ type ChartPayload = { item: any; d1Item: any; token: string };
 function YarnsTab({ onOpenChart }: { onOpenChart?: (p: ChartPayload) => void }) {
     const erp: any = useERP();
     const { prpcode: defaultPrpcode, strcode: defaultStrcode, yearno: defaultYearno } = erp;
-    // const router = useRouter(); // ⚠️ add at top of file: import { useRouter } from 'expo-router';
+    const router = useRouter(); // ⚠️ add at top of file: import { useRouter } from 'expo-router';
     const { width: screenWidth } = useWindowDimensions(); type YarnItem = any;
     type Option = { id: string | number; name?: string;[key: string]: any };
     type PartyOption = { acccode: string; accountname: string;[key: string]: any };
@@ -7599,10 +7580,6 @@ const yc = StyleSheet.create({
     btnChart: { borderColor: T.copper + '66', backgroundColor: T.copper + '0F' },
 });
 
-
-
-
-
 function DyeingTab({ design }: { design: Design | null }) {
     const [dyeData, setDyeData] = useState<Record<string, { average: number; recent: any[] }>>({});
     const [loading, setLoading] = useState(false);
@@ -7668,8 +7645,8 @@ export function DesignsScreen() {
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
     const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
-    const [editColourway, setEditColourway] = useState<any | null>(null);
-    const [chartPayload, setChartPayload] = useState<ChartPayload | null>(null);  // Catalog → colourway Edit
+    const [editColourway, setEditColourway] = useState<any | null>(null);   // Catalog → colourway Edit
+    const [chartPayload, setChartPayload] = useState<ChartPayload | null>(null);   // Yarns → Chart button
 
     // One permission-aware source drives the tab header and tab content.
     // A developer only adds a tab to DESIGN_TABS and the registry definition.
@@ -7876,8 +7853,8 @@ export function DesignsScreen() {
                 <View style={s.column}>
                     {visibleTabs.length > 0 ? (
                         <>
-                            <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
-                            {selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
+                            {!chartPayload && <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />}
+                            {!chartPayload && selectedDesign && (tab === 'Aliases' || tab === 'Design' || tab === 'Colourway') ? (
                                 <View style={s.selBar}>
                                     <Text style={s.selText} numberOfLines={1}>
                                         Selected: <Text style={s.selCode}>{designLabel(selectedDesign)}</Text>
@@ -7932,7 +7909,6 @@ export function DesignsScreen() {
                                     />
                                 ) : null}
                             </View>
-
                         </>
                     ) : (
                         <View style={s.center}>

@@ -26,6 +26,9 @@ import {
   qty,
   RESULT_LABEL,
   stageStatusText,
+  NOT_NEEDED,
+  NOT_NEEDED_TEXT,
+  NOT_STARTED,
   STATUS_LEGEND,
   statusColor,
   ymd,
@@ -44,6 +47,7 @@ import {
   type TrackerOrdersData,
   type TrackerProductionOrder,
 } from './trackerModel';
+import { FONT } from './fonts';
 
 type Session = { API: string; token: string; prptype: string; date: string };
 
@@ -61,16 +65,14 @@ function useHardwareBack(onBack: () => void) {
   }, [onBack]);
 }
 
-/** One stage dot. Filled = done, half = in progress, ringed red = overdue, hollow = not started, dash = not needed. */
-function StageDot({ status, size = 14 }: { status: StageStatus | undefined; size?: number }) {
+/** One stage dot. Filled = done, half = in progress, ringed red = overdue, dark grey = not started, dashed blue ring = not needed. */
+export function StageDot({ status, size = 14 }: { status: StageStatus | undefined; size?: number }) {
   const c = statusColor(status);
   const r = size / 2;
 
   if (status === 'skip') {
     return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ width: size * 0.55, height: 2, borderRadius: 1, backgroundColor: T.border }} />
-      </View>
+      <View style={{ width: size, height: size, borderRadius: r, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c, backgroundColor: `${c}1A` }} />
     );
   }
   if (status === 'progress') {
@@ -90,11 +92,12 @@ function StageDot({ status, size = 14 }: { status: StageStatus | undefined; size
   if (status === 'ontime' || status === 'late') {
     return <View style={{ width: size, height: size, borderRadius: r, backgroundColor: c }} />;
   }
-  return <View style={{ width: size, height: size, borderRadius: r, borderWidth: 1.5, borderColor: '#CFC8C0', backgroundColor: T.alt }} />;
+  // not started (and anything else): solid dark grey dot
+  return <View style={{ width: size, height: size, borderRadius: r, backgroundColor: c }} />;
 }
 
 /** The 7 dots joined by a line. `labels` prints the short stage name under each dot (cards). */
-function StageStrip({ defs, stages, labels }: { defs: StageDef[]; stages: StageCell[] | undefined; labels?: boolean }) {
+export function StageStrip({ defs, stages, labels }: { defs: StageDef[]; stages: StageCell[] | undefined; labels?: boolean }) {
   const byKey = useMemo(() => {
     const map: Record<string, StageCell> = {};
     (stages || []).forEach((s) => (map[s.key] = s));
@@ -120,24 +123,24 @@ function StageStrip({ defs, stages, labels }: { defs: StageDef[]; stages: StageC
   );
 }
 
-function Pill({ text, color, strong }: { text: string; color: string; strong?: boolean }) {
+export function Pill({ text, color, strong }: { text: string; color: string; strong?: boolean }) {
   return (
     <View style={[st.pill, { backgroundColor: `${color}${strong ? '22' : '14'}`, borderColor: `${color}45` }]}>
-      <Text style={[st.pillText, { color }]} numberOfLines={1}>
+      <Text style={[st.pillText, { color: color === NOT_STARTED ? T.ink : color === NOT_NEEDED ? NOT_NEEDED_TEXT : color }]} numberOfLines={1}>
         {text}
       </Text>
     </View>
   );
 }
 
-const pillColor = (status: StageStatus | undefined) =>
-  status === 'ontime' ? T.green : status === 'late' ? T.pd : status === 'overdue' ? T.red : status === 'progress' ? T.yd : T.muted;
+export const pillColor = (status: StageStatus | undefined) =>
+  status === 'ontime' ? T.green : status === 'late' ? T.pd : status === 'overdue' ? T.red : status === 'progress' ? T.yd : status === 'pending' ? NOT_STARTED : status === 'skip' ? NOT_NEEDED : T.muted;
 
 function NowPill({ now }: { now: NowAt | undefined }) {
   return <Pill text={nowText(now)} color={pillColor(now?.status)} strong={now?.status === 'overdue'} />;
 }
 
-function Legend() {
+export function Legend() {
   return (
     <View style={st.legend}>
       {STATUS_LEGEND.map((l) => (
@@ -150,7 +153,7 @@ function Legend() {
   );
 }
 
-function StateBox({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
+export function StateBox({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
   if (loading) {
     return (
       <View style={st.stateBox}>
@@ -173,7 +176,7 @@ function StateBox({ loading, error, onRetry }: { loading: boolean; error: string
 
 /* ------------------------------ mini table ------------------------------ */
 
-type Col<R> = {
+export type Col<R> = {
   key: string;
   label: string;
   flex: number;
@@ -181,7 +184,7 @@ type Col<R> = {
   render: (row: R) => React.ReactNode;
 };
 
-function MiniTable<R>({
+export function MiniTable<R>({
   columns,
   rows,
   rowKey,
@@ -262,7 +265,7 @@ function MiniTable<R>({
   );
 }
 
-function Card({ title, meta, right, children }: { title?: string; meta?: string; right?: React.ReactNode; children: React.ReactNode }) {
+export function Card({ title, meta, right, children }: { title?: string; meta?: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <View style={st.card}>
       {title ? (
@@ -286,7 +289,7 @@ function Card({ title, meta, right, children }: { title?: string; meta?: string;
 }
 
 /** Collapsible section ("Show" / "Hide"). */
-function Fold({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+export function Fold({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <View style={st.card}>
@@ -308,7 +311,7 @@ function Fold({ title, children, defaultOpen = false }: { title: string; childre
   );
 }
 
-function Fact({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
+export function Fact({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
   return (
     <View style={st.fact}>
       <Text style={st.factLabel}>{label}</Text>
@@ -604,7 +607,19 @@ function SplitBar({ row }: { row: PlanActualRow }) {
 
 const resultColor = (r: PlanActualRow['result']) => (r === 'as_planned' ? T.green : r === 'more' ? T.pd : r === 'unplanned' ? T.red : T.blue);
 
-function ProductionOrderBlock({ po, defs, wide, showTitle }: { po: TrackerProductionOrder; defs: StageDef[]; wide: boolean; showTitle: boolean }) {
+export function ProductionOrderBlock({
+  po,
+  defs,
+  wide,
+  showTitle,
+  showFacts = true,
+}: {
+  po: TrackerProductionOrder;
+  defs: StageDef[];
+  wide: boolean;
+  showTitle: boolean;
+  showFacts?: boolean;
+}) {
   const stageCols = useMemo<Col<StageRow>[]>(
     () => [
       {
@@ -714,15 +729,17 @@ function ProductionOrderBlock({ po, defs, wide, showTitle }: { po: TrackerProduc
 
   return (
     <View style={{ gap: 12 }}>
-      <View style={st.poBar}>
-        <Fact label="Production order" value={po.no} />
-        <Fact label="Design" value={po.design} />
-        <Fact label="Item" value={po.item} />
-        <Fact label="Qty" value={qty(po.qty)} />
-        <Fact label="Beams" value={String(po.beams)} />
-        <Fact label="Woven" value={qty(po.woven)} />
-        <Fact label="Sold" value={qty(po.sold)} />
-      </View>
+      {showFacts ? (
+        <View style={st.poBar}>
+          <Fact label="Production order" value={po.no} />
+          <Fact label="Design" value={po.design} />
+          <Fact label="Item" value={po.item} />
+          <Fact label="Qty" value={qty(po.qty)} />
+          <Fact label="Beams" value={String(po.beams)} />
+          <Fact label="Woven" value={qty(po.woven)} />
+          <Fact label="Sold" value={qty(po.sold)} />
+        </View>
+      ) : null}
 
       <Card title={showTitle ? `Stage by stage · ${po.no}` : 'Stage by stage'}>
         {po.beams === 0 ? (
@@ -782,6 +799,113 @@ function ProductionOrderBlock({ po, defs, wide, showTitle }: { po: TrackerProduc
         ) : (
           <View style={st.empty}>
             <Text style={st.emptyText}>Beam plan could not be read for this production order.</Text>
+          </View>
+        )}
+      </Fold>
+    </View>
+  );
+}
+
+/** The four collapsible sections of a production order: Beam-wise dates, Outward and inward, Sales bills, Beam plan vs actual. */
+export type ProdFoldsData = {
+  beam_rows: BeamRow[];
+  out_in: OutInRow[];
+  bills: { available: boolean; rows: BillRow[] };
+  plan_actual: { available: boolean; unplanned_pct: number | null; rows: PlanActualRow[] };
+};
+
+export function ProductionOrderFolds({ data, defs }: { data: ProdFoldsData; defs: StageDef[] }) {
+  const beamCols = useMemo<Col<BeamRow>[]>(
+    () => [
+      { key: 'beam', label: 'Beam', flex: 1.1, render: (r) => r.beam },
+      { key: 'mac', label: 'Machine', flex: 1.3, render: (r) => r.machine || '—' },
+      { key: 'woven', label: 'Woven', flex: 0.8, align: 'right', render: (r) => qty(r.woven) },
+      ...defs.map<Col<BeamRow>>((d) => ({ key: d.key, label: d.short, flex: 1.25, render: (r) => <BeamCell stage={r.stages?.[d.key]} /> })),
+    ],
+    [defs],
+  );
+
+  const outInCols = useMemo<Col<OutInRow>[]>(
+    () => [
+      { key: 'beam', label: 'Beam', flex: 1, render: (r) => r.beam },
+      { key: 'onos', label: 'Outward nos', flex: 1.6, render: (r) => r.outward_nos || '—' },
+      { key: 'odt', label: 'Outward dates', flex: 1.6, render: (r) => r.outward_dates || '—' },
+      { key: 'oq', label: 'Out qty', flex: 0.8, align: 'right', render: (r) => (r.outward_qty > 0 ? qty(r.outward_qty) : '—') },
+      { key: 'inos', label: 'Inward nos', flex: 1.4, render: (r) => r.inward_nos || '—' },
+      { key: 'idt', label: 'Inward dates', flex: 1.4, render: (r) => r.inward_dates || '—' },
+      { key: 'iq', label: 'In qty', flex: 0.8, align: 'right', render: (r) => (r.inward_qty > 0 ? qty(r.inward_qty) : '—') },
+      { key: 'lot', label: 'Lot', flex: 1, render: (r) => r.lot || '—' },
+    ],
+    [],
+  );
+
+  const planCols = useMemo<Col<PlanActualRow>[]>(
+    () => [
+      { key: 'beam', label: 'Beam', flex: 1.1, render: (r) => r.beam },
+      { key: 'p', label: 'Planned', flex: 0.8, align: 'right', render: (r) => qty(r.planned) },
+      { key: 'a', label: 'Actual', flex: 0.8, align: 'right', render: (r) => qty(r.actual) },
+      { key: 'o', label: 'On plan', flex: 0.8, align: 'right', render: (r) => qty(r.on_plan) },
+      {
+        key: 'u',
+        label: 'Unplanned',
+        flex: 0.9,
+        align: 'right',
+        render: (r) => (r.unplanned > 0 ? <Text style={[st.tdStrong, { color: T.pd, textAlign: 'right' }]}>{qty(r.unplanned)}</Text> : '—'),
+      },
+      { key: 'n', label: 'Not made', flex: 0.8, align: 'right', render: (r) => qty(r.not_made) },
+      { key: 's', label: 'Split', flex: 1.6, render: (r) => <SplitBar row={r} /> },
+      { key: 'r', label: 'Result', flex: 1.4, render: (r) => <Pill text={RESULT_LABEL[r.result]} color={resultColor(r.result)} /> },
+    ],
+    [],
+  );
+
+  const billCols = useMemo<Col<BillRow>[]>(
+    () => [
+      { key: 'ch', label: 'Challan', flex: 1.2, render: (r) => r.challan_no || '—' },
+      { key: 'chd', label: 'Challan date', flex: 1.1, render: (r) => ymd(r.challan_ymd) || '—' },
+      { key: 'b', label: 'Bill no', flex: 1.2, render: (r) => r.bill_no || 'not billed' },
+      { key: 'bd', label: 'Bill date', flex: 1.1, render: (r) => ymd(r.bill_ymd) || '—' },
+      { key: 'q', label: 'Qty', flex: 0.9, align: 'right', render: (r) => qty(r.qty) },
+      {
+        key: 'a',
+        label: 'Amount',
+        flex: 1.2,
+        align: 'right',
+        render: (r) => `₹${Number(r.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+      },
+    ],
+    [],
+  );
+
+  const beams = data.beam_rows;
+  const pa = data.plan_actual;
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Fold title={`Beam-wise dates (${beams.length} beam${beams.length === 1 ? '' : 's'})`}>
+        <MiniTable columns={beamCols} rows={beams} rowKey={(r, i) => `${r.beam_uid || r.beam}-${i}`} minWidth={980} emptyText="No beam on this production order yet." />
+      </Fold>
+
+      <Fold title="Outward and inward">
+        <MiniTable columns={outInCols} rows={data.out_in} rowKey={(r, i) => `${r.beam}-${i}`} minWidth={940} emptyText="No outward or inward yet." />
+      </Fold>
+
+      <Fold title={`Sales bills${data.bills.rows.length ? ` (${data.bills.rows.length})` : ''}`}>
+        <MiniTable
+          columns={billCols}
+          rows={data.bills.rows}
+          rowKey={(r, i) => `${r.challan_no}-${r.bill_no}-${i}`}
+          minWidth={720}
+          emptyText={data.bills.available ? 'No sales recorded yet.' : 'No sales bill found.'}
+        />
+      </Fold>
+
+      <Fold title={pa.available && pa.unplanned_pct !== null ? `Beam plan vs actual · ${Math.round(pa.unplanned_pct)}% unplanned` : 'Beam plan vs actual'}>
+        {pa.available ? (
+          <MiniTable columns={planCols} rows={pa.rows} rowKey={(r, i) => `${r.beam}-${i}`} minWidth={900} emptyText="No beam plan found." />
+        ) : (
+          <View style={st.empty}>
+            <Text style={st.emptyText}>No beam plan found for this production order.</Text>
           </View>
         )}
       </Fold>
@@ -955,7 +1079,7 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
   },
-  stateText: { marginTop: 8, fontSize: 13, fontWeight: '700', color: T.muted },
+  stateText: { marginTop: 8, fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.muted },
 
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
@@ -969,11 +1093,11 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipText: { fontSize: 12, fontWeight: '800' },
+  chipText: { fontFamily: FONT, fontSize: 12, fontWeight: '800' },
 
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 6, paddingHorizontal: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendText: { fontSize: 11.5, fontWeight: '600', color: T.muted },
+  legendText: { fontFamily: FONT, fontSize: 11.5, fontWeight: '600', color: T.muted },
 
   warn: {
     flexDirection: 'row',
@@ -985,17 +1109,17 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${T.amber}40`,
   },
-  warnText: { flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '600', color: T.pd },
+  warnText: { flex: 1, fontFamily: FONT, fontSize: 12, lineHeight: 16, fontWeight: '600', color: T.pd },
 
   // stage strip
   strip: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, minWidth: 0 },
   stripLine: { position: 'absolute', left: '7%', right: '7%', top: 8, height: 2, backgroundColor: T.border },
   stripCell: { flex: 1, alignItems: 'center', minWidth: 0 },
   stripDotWrap: { height: 18, alignItems: 'center', justifyContent: 'center' },
-  stripLabel: { marginTop: 3, fontSize: 9.5, fontWeight: '700', color: T.muted },
+  stripLabel: { marginTop: 3, fontFamily: FONT, fontSize: 9.5, fontWeight: '700', color: T.muted },
 
   pill: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start', maxWidth: '100%' },
-  pillText: { fontSize: 11, fontWeight: '800' },
+  pillText: { fontFamily: FONT, fontSize: 11, fontWeight: '800' },
 
   // cards + table
   card: {
@@ -1018,9 +1142,10 @@ const st = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.hair,
   },
-  cardTitle: { fontSize: 13, fontWeight: '900', color: T.nav },
-  cardMeta: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
+  cardTitle: { fontFamily: FONT, fontSize: 13, fontWeight: '900', color: T.nav },
+  cardMeta: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
   cardNote: {
+    fontFamily: FONT,
     fontSize: 11,
     lineHeight: 15,
     fontWeight: '600',
@@ -1031,10 +1156,10 @@ const st = StyleSheet.create({
     borderTopColor: T.hair,
     backgroundColor: T.sub,
   },
-  foldAction: { fontSize: 12, fontWeight: '800', color: T.copper },
+  foldAction: { fontFamily: FONT, fontSize: 12, fontWeight: '800', color: T.copper },
 
   th: { flexDirection: 'row', minHeight: 36, backgroundColor: T.nav, alignItems: 'center' },
-  thText: { fontSize: 10.5, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  thText: { fontFamily: FONT, fontSize: 10.5, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
   tr: { flexDirection: 'row', minHeight: 46, alignItems: 'stretch', borderBottomWidth: 1, borderBottomColor: T.hair },
   trAlt: { backgroundColor: T.sub },
   trHi: { backgroundColor: `${T.copper}18` },
@@ -1042,14 +1167,14 @@ const st = StyleSheet.create({
   tdFirst: { paddingLeft: 14 },
   tdRight: { alignItems: 'flex-end' },
   tdCenter: { alignItems: 'center' },
-  tdText: { fontSize: 12.5, fontWeight: '600', color: T.ink },
-  tdTextFirst: { fontSize: 12.5, fontWeight: '900', color: T.nav },
-  tdStrong: { fontSize: 12.5, fontWeight: '800', color: T.ink },
-  sub: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
-  muted: { fontSize: 12, fontWeight: '600', color: T.muted },
+  tdText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.ink },
+  tdTextFirst: { fontFamily: FONT, fontSize: 12.5, fontWeight: '900', color: T.nav },
+  tdStrong: { fontFamily: FONT, fontSize: 12.5, fontWeight: '800', color: T.ink },
+  sub: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
+  muted: { fontFamily: FONT, fontSize: 12, fontWeight: '600', color: T.muted },
   empty: { paddingVertical: 24, paddingHorizontal: 14, alignItems: 'center' },
-  emptyText: { fontSize: 12.5, fontWeight: '600', color: T.muted, textAlign: 'center' },
-  footNote: { fontSize: 11, fontWeight: '600', color: T.muted, textAlign: 'center' },
+  emptyText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.muted, textAlign: 'center' },
+  footNote: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, textAlign: 'center' },
 
   // phone order card
   orderCard: {
@@ -1063,7 +1188,7 @@ const st = StyleSheet.create({
     elevation: 1,
   },
   orderTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  orderNo: { fontSize: 15, fontWeight: '900', color: T.nav },
+  orderNo: { fontFamily: FONT, fontSize: 15, fontWeight: '900', color: T.nav },
   orderFoot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1088,8 +1213,8 @@ const st = StyleSheet.create({
     paddingVertical: 12,
   },
   fact: { minWidth: 70, maxWidth: '100%', flexShrink: 1 },
-  factLabel: { fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  factValue: { fontSize: 13.5, fontWeight: '800', color: T.ink, marginTop: 2 },
+  factLabel: { fontFamily: FONT, fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  factValue: { fontFamily: FONT, fontSize: 13.5, fontWeight: '800', color: T.ink, marginTop: 2 },
   banner: {
     backgroundColor: T.surface,
     borderRadius: 12,
@@ -1100,7 +1225,7 @@ const st = StyleSheet.create({
     paddingVertical: 12,
     gap: 4,
   },
-  bannerText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: T.ink },
+  bannerText: { fontFamily: FONT, fontSize: 14, lineHeight: 20, fontWeight: '600', color: T.ink },
   bannerStrong: { fontWeight: '900', color: T.nav },
   stageName: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   stageCard: { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.hair },

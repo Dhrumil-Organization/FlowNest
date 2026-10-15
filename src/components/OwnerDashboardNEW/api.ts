@@ -314,7 +314,7 @@ export async function getCriterionExecutives(
 /* ------------------------------------------------------------------ */
 export type AssignItem = { code: string; name: string };
 export type AssignStage = { StageId: string; StageName: string };
-export type AssignRow = { ItemCode: string; ItemName: string | null; StageId: string; StageName: string; PersonId: string | number | null; IsActive: number | boolean };
+export type AssignRow = { ItemCode: string; ItemName: string | null; StageId: string; StageName: string; PersonId?: string | number | null; PersonName?: string | null; IsActive: number | boolean };
 
 const authHdr = (token: string) => ({ Authorization: `Bearer ${token}`, Accept: 'application/json' });
 const apiErr = (err: any, what: string) => {
@@ -362,7 +362,7 @@ export async function getItemStageAssignments(
 //   POST {API}/api/saveItemStageAssignments   (insert new + update changed + deactivate when PersonId = null)
 export async function saveItemStageAssignments(
   API: string, token: string,
-  body: { prpcode: string; yearno: string; items: { ItemCode: string; ItemName: string; assignments: { StageId: string; StageName: string; PersonId: number | null }[] }[] },
+  body: { prpcode: string; yearno: string; items: { ItemCode: string; ItemName: string; assignments: { StageId: string; StageName: string; PersonName: string | null }[] }[] },
 ) {
   try {
     const r = await axios.post(`${API}/api/saveItemStageAssignments`, body, { headers: authHdr(token) });
@@ -391,7 +391,7 @@ export async function deleteItemStageAssignments(
 //   POST {API}/api/bulkSaveItemStageAssignments   (All items row: the server applies each stage to EVERY distinct DAPDesign item, one transaction)
 export async function bulkSaveItemStageAssignments(
   API: string, token: string,
-  body: { prpcode: string; strcode: string; assignments: { StageId: string; StageName: string; PersonId: number }[] },
+  body: { prpcode: string; strcode: string; assignments: { StageId: string; StageName: string; PersonName: string }[] },
 ): Promise<{ items: number; inserted: number; updated: number }> {
   try {
     const r = await axios.post(`${API}/api/bulkSaveItemStageAssignments`, body, { headers: authHdr(token) });

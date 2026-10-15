@@ -10,7 +10,7 @@ import {
   ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import type { Form, Step } from './usePackingForm';
-import { routeView } from './usePackingForm';
+import { prodTypeName, routeView, tubeWt } from './usePackingForm';
 
 export const tab = { fontVariant: ['tabular-nums' as const] };
 type IconName = React.ComponentProps<typeof Icon>['name'];
@@ -113,10 +113,10 @@ export function PickerField({
         style={[u.field, !!error && { borderColor: T.red }, inactive && u.fieldOff]}>
         {icon ? <Icon name={icon} size={20} color={T.muted} /> : null}
         <View style={{ flex: 1, paddingVertical: 8 }}>
-          <Text numberOfLines={2} style={[u.fieldText, !value && { color: T.muted, fontWeight: '500' }]}>
+          <Text style={[u.fieldText, !value && { color: T.muted, fontWeight: '500' }]}>
             {value || placeholder || 'Choose'}
           </Text>
-          {sub ? <Text numberOfLines={1} style={[u.hint, { marginTop: 1 }]}>{sub}</Text> : null}
+          {sub ? <Text style={[u.code, tab, { marginTop: 2 }]}>{sub}</Text> : null}
         </View>
         {loading ? <ActivityIndicator size="small" color={T.copper} /> :
           <Icon name={locked ? 'lock-outline' : 'expand-more'} size={locked ? 18 : 22} color={T.muted} />}
@@ -261,12 +261,17 @@ export const LinkBtn = ({ label, onPress, icon }: { label: string; onPress: () =
 
 /* ------------------------------ selections so far ------------------------------ */
 
-function KV({ label, value, sub, wide }: { label: string; value?: string; sub?: string; wide?: boolean }) {
+/**
+ * One carried-forward value. Names are the big bold line and are never cut
+ * short; codes are the small grey line under them.
+ */
+function KV({ label, name, code, wide, half }: { label: string; name?: string; code?: string; wide?: boolean; half?: boolean }) {
+  const main = name || code;
   return (
-    <View style={{ width: wide ? '100%' : '33.33%', paddingRight: 10, marginBottom: 10 }}>
+    <View style={{ width: wide ? '100%' : half ? '50%' : '33.33%', paddingRight: 10, marginBottom: 10 }}>
       <Text style={u.kvLabel}>{label}</Text>
-      <Text numberOfLines={wide ? 2 : 1} style={[u.kvValue, tab, !value && { color: T.muted }]}>{value || '—'}</Text>
-      {sub ? <Text numberOfLines={1} style={u.hint}>{sub}</Text> : null}
+      <Text style={[u.kvValue, !main && { color: T.muted }]}>{main || '—'}</Text>
+      {name && code && code !== name ? <Text style={[u.code, tab]}>{code}</Text> : null}
     </View>
   );
 }
@@ -297,33 +302,33 @@ export function SelectionsCard({ f, facility, upTo, onEdit, style }: {
       <Group title="1 · Route" onEdit={edit(1)} first>
         <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
           <Icon name="business" size={16} color={T.muted} />
-          <Text numberOfLines={1} style={{ flex: 1, fontSize: 13.5, fontWeight: '700', color: T.ink }}>{facility}</Text>
+          <Text style={{ flex: 1, fontSize: 14, fontWeight: '800', color: T.ink }}>{facility}</Text>
         </View>
-        <KV label="Route card" value={r.routeNo} />
-        <KV label="Item" value={r.itmcode} sub={r.itmname} />
-        <KV label="Shade" value={r.shdcode} sub={r.shdname} />
-        <KV label="Denier" value={r.denier} />
-        <KV label="Paper tube wt." value={r.cheeswt} />
-        <KV label="Stock type" value={r.stkLabel} />
+        <KV label="Route card" name={r.routeNo} code={[r.date, r.machine].filter(Boolean).join(' · ')} half />
+        <KV label="Stock type" name={r.stkLabel} half />
+        <KV label="Item" name={r.itmname} code={r.itmcode} wide />
+        <KV label="Shade" name={r.shdname} code={r.shdcode} />
+        <KV label="Denier" name={r.denier} />
+        <KV label="Paper tube wt." name={f.party ? tubeWt(f) : r.cheeswt} />
       </Group>
       {upTo >= 2 ? (
         <Group title="2 · Details" onEdit={edit(2)}>
-          <KV label="Party" value={f.party?.parname} wide />
-          <KV label="Production type" value={f.prodtype} />
-          <KV label="Carton type" value={f.carton?.carname} />
-          <KV label="Empty carton wt." value={f.carwt} />
-          <KV label="Grade" value={f.grade?.name || f.grade?.code} />
-          <KV label="Merge (route)" value={f.merge?.name || f.merge?.code} />
-          <KV label="Print no." value={f.printno} />
-          <KV label="Shipping marka" value={f.smarka} wide />
+          <KV label="Party" name={f.party?.parname} code={f.party?.parcode} wide />
+          <KV label="Carton type" name={f.carton?.carname} code={f.carton?.carcode} wide />
+          <KV label="Production type" name={prodTypeName(f.prodtype, f) || f.prodtype} code={f.prodtype} />
+          <KV label="Empty carton wt." name={f.carwt} />
+          <KV label="Print no." name={f.printno} />
+          <KV label="Grade" name={f.grade?.name} code={f.grade?.code} />
+          <KV label="Merge (route)" name={f.merge?.name} code={f.merge?.code} />
+          <KV label="Shipping marka" name={f.smarka} />
         </Group>
       ) : null}
       {upTo >= 3 ? (
         <Group title="3 · Print">
-          <KV label="Cones" value={f.nocones} />
-          <KV label="Label copies" value={f.noprint} />
-          <KV label="Requir patti" value={f.rpatti === 'Y' ? 'Yes' : 'No'} />
-          <KV label="Printer" value={f.printer} wide />
+          <KV label="Cones" name={f.nocones} />
+          <KV label="Label copies" name={f.noprint} />
+          <KV label="Requir patti" name={f.rpatti === 'Y' ? 'Yes' : 'No'} />
+          <KV label="Printer" name={f.printer} wide />
         </Group>
       ) : null}
     </View>
@@ -355,5 +360,6 @@ export const u = StyleSheet.create({
   btn: { height: 56, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
   kvLabel: { fontSize: 11, fontWeight: '600', color: T.muted },
-  kvValue: { fontSize: 14.5, fontWeight: '800', color: T.ink, marginTop: 1 },
+  kvValue: { fontSize: 15.5, fontWeight: '800', color: T.ink, marginTop: 1 },
+  code: { fontSize: 11.5, fontWeight: '500', color: T.muted },
 });

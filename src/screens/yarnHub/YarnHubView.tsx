@@ -155,6 +155,64 @@ function Columns({ items, width }: { items: { key: string; weight: number; node:
   );
 }
 
+/* ===================================== filters ===================================== */
+
+/**
+ * Accurate search: every word typed must match (any order, any case), and a word matches the START of a word in the
+ * row — "40" finds 40/1 and 40s but not 140, "lin" finds LINEN, "1201" finds item 1201 but not 11201,
+ * "5110" finds carton C5110.
+ * A word with / - . (e.g. "40/1", "B-2140", "55/45") is matched as typed anywhere in the row.
+ */
+const matches = (hay: string, q: string) => {
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const h = hay.toLowerCase();
+  const raw = h.split(/[^a-z0-9]+/).filter(Boolean);
+  // "c5110" also answers to "5110" (carton / creel / beam numbers with a letter prefix)
+  const tokens = raw.concat(raw.map((t) => t.replace(/^[a-z]+(?=\d)/, '')).filter((t, i) => t !== raw[i]));
+  return words.every((w) => (/[^a-z0-9]/.test(w) ? h.includes(w) : tokens.some((t) => t.startsWith(w))));
+};
+
+/** search box + optional chips + "n of m" — used in every list of the hub */
+function FilterBar({ value, onChange, placeholder, chips, chip, onChip, shown, total, color }: {
+  value: string; onChange: (v: string) => void; placeholder: string;
+  chips?: { k: string; l: string }[]; chip?: string; onChip?: (k: string) => void;
+  shown?: number; total?: number; color: string;
+}) {
+  const active = !!value.trim() || (!!chips && !!chip && chip !== chips[0].k);
+  return (
+    <View style={st.fBar}>
+      <View style={st.fRow}>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={T.muted}
+          style={[st.fInp, !!value && { borderColor: color }]}
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {active ? (
+          <Text onPress={() => { onChange(''); if (chips && onChip) onChip(chips[0].k); }} style={[st.fClear, { color }]}>Clear</Text>
+        ) : null}
+      </View>
+      {chips && chips.length ? (
+        <View style={st.fChips}>
+          {chips.map((c) => {
+            const on = (chip || chips[0].k) === c.k;
+            return (
+              <Text key={c.k} onPress={() => onChip && onChip(c.k)} style={[st.fChip, on && { backgroundColor: color, borderColor: color, color: '#fff' }]}>
+                {c.l}
+              </Text>
+            );
+          })}
+        </View>
+      ) : null}
+      {active && total !== undefined ? <Text style={st.fCount}>{(shown ?? 0) + ' of ' + total + ' shown'}</Text> : null}
+    </View>
+  );
+}
+
 /* ===================================== screen ===================================== */
 
 export function YarnHubView() {
@@ -172,6 +230,10 @@ export function YarnHubView() {
   const loadDetailRef = useRef<((itm: string, fresh?: boolean) => Promise<void>) | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [q, setQ] = useState('');
+  // per-list search text / chip, keyed by list (+ yarn id): 'ds:1201', 'ds:1201:side', 'cat:Linen', …
+  const [filt, setFilt] = useState<Record<string, string>>({});
+  const fv = (k: string) => filt[k] || '';
+  const setF = (k: string, v: string) => setFilt((f) => ({ ...f, [k]: v }));
   const [exp, setExp] = useState<Record<string, boolean>>({});
   // long lists open in pages (cartons, issues, designs, yarns) so thousands of rows stay smooth
   const [lim, setLim] = useState<Record<string, number>>({});
@@ -315,8 +377,8 @@ export function YarnHubView() {
   /* ------------------------------ pieces ------------------------------ */
   const code = (id: string, dim?: boolean) => <Text style={[st.code, dim && { color: C.mut }]}>{id}</Text>;
 
-  const subTable = (it: YarnItem) => {
-    const subs = blendSubs(it);
+  const subTable = (it: YarnItem, q = '') => {
+    const subs = blendSubs(it).filter((s) => matches([s.id, s.label, s.ratioKey].join(' '), q));
     const fibres = it.blend;
     const inDesigns: Record<string, string[]> = {};
     it.designs.forEach((d) => { if (d.br) (inDesigns[d.br] = inDesigns[d.br] || []).push(d.code + ' ' + d.side); });
@@ -325,7 +387,7 @@ export function YarnHubView() {
     const orphan = Object.keys(inDesigns).filter((br) => !covered.has(br));
     const hasStock = subs.some((s) => s.stockKg > 0);
     if (subs.length === 0) {
-      return <Text style={st.note}>No sub items yet — add this yarn's blend ratios in Yarn Master (+ Sub item).</Text>;
+      return <Text style={st.note}>{q.trim() ? 'No sub item matches the filter.' : 'No sub items yet — add this yarn\'s blend ratios in Yarn Master (+ Sub item).'}</Text>;
     }
     return (
       <View>
@@ -534,22 +596,45 @@ export function YarnHubView() {
           <Text style={{ color: C.mut }}>{' · ' + ymsDateFull(r.date) + (r.kind === 'return' ? ' · ret ' + r.no : ' · iss ' + r.no)}</Text>
         </>
       ), ymsKg(r.kg));
-    const lots = ready ? ready.cartons : [];
-    const chees = lots.reduce((a, c) => a + c.chees, 0);
-    const consRows = ready ? [...ready.creel.map((r) => ({ r, s: 'creel' as const })), ...ready.weft.map((r) => ({ r, s: 'weft' as const }))].sort((a, b) => b.r.date.localeCompare(a.r.date)) : [];
+    const allLots = ready ? ready.cartons : [];
+    const chees = allLots.reduce((a, c) => a + c.chees, 0);
+    const lotsQ = fv('lots:' + it.id);
+    const lots = allLots.filter((c) => matches([c.cartno, c.mername, c.grdname, c.shdname, c.itmcode, c.itmname].join(' '), lotsQ));
+    const lotsKg = lots.reduce((a, c) => a + c.wt, 0);
+    const consAll = ready ? [...ready.creel.map((r) => ({ r, s: 'creel' as const })), ...ready.weft.map((r) => ({ r, s: 'weft' as const }))].sort((a, b) => b.r.date.localeCompare(a.r.date)) : [];
+    const consQ = fv('cons:' + it.id);
+    const consK = fv('cons:' + it.id + ':kind') || 'all';
+    const consRows = consAll.filter((x) =>
+      (consK === 'all' || (consK === 'creel' && x.s === 'creel') || (consK === 'weft' && x.s === 'weft') || (consK === 'ret' && x.r.kind === 'return'))
+      && matches([x.r.creelid, x.r.beamno, x.r.design, x.r.no, x.r.issno || '', x.r.machine, x.r.itmcode, x.s, x.r.kind, ymsDateFull(x.r.date), x.r.date].join(' '), consQ));
+    const consKg = consRows.reduce((a, x) => a + x.r.kg, 0);
     const consKey = 'cons:' + it.id;
     const cons = consRows.slice(0, limitOf(consKey, 20));
     const lotsKey = 'lots:' + it.id;
     const lotsShown = lots.slice(0, limitOf(lotsKey, 8));
+    const dsQ = fv('ds:' + it.id);
+    const dsSide = fv('ds:' + it.id + ':side') || 'all';
+    const dsList = it.designs.filter((d) => (dsSide === 'all' || d.side === dsSide) && matches([d.code, d.side, d.br, d.category].join(' '), dsQ));
     const dsKey = 'ds:' + it.id;
-    const dsShown = it.designs.slice(0, limitOf(dsKey, 30));
+    const dsShown = dsList.slice(0, limitOf(dsKey, 30));
+    const prQ = fv('pr:' + it.id);
+    const prP = fv('pr:' + it.id + ':period') || 'all';
+    const prFrom = prP === 'all' ? '' : (() => { const d = new Date(); d.setMonth(d.getMonth() - (prP === '6m' ? 6 : prP === '1y' ? 12 : 24)); return d.toISOString().slice(0, 10); })();
+    const prices = ready ? ready.prices.filter((p) => (!prFrom || p.date >= prFrom) && matches([p.party, p.inwno, p.itmcode, p.parcode].join(' '), prQ)) : [];
 
     const widgets = [
       {
         key: 'price', weight: 11,
         node: (
           <Widget icon="₹" title="Price trend" accent={T.copper}>
-            {ready ? <YarnPriceChart points={ready.prices} height={220} title={'Price trend · ' + it.id + ' · ' + it.mainItem} /> : pending}
+            {ready && ready.prices.length > 0 && (
+              <FilterBar value={prQ} onChange={(v) => setF('pr:' + it.id, v)} placeholder="Party, inward no. or item code…" color={T.copper}
+                chips={[{ k: 'all', l: 'All' }, { k: '2y', l: '2 years' }, { k: '1y', l: '1 year' }, { k: '6m', l: '6 months' }]}
+                chip={prP} onChip={(k) => setF('pr:' + it.id + ':period', k)} shown={prices.length} total={ready.prices.length} />
+            )}
+            {!ready ? pending : prices.length === 0 && ready.prices.length > 0
+              ? <Text style={st.note}>No purchase rate matches the filter.</Text>
+              : <YarnPriceChart key={prQ + prP} points={prices} height={220} title={'Price trend · ' + it.id + ' · ' + it.mainItem} />}
           </Widget>
         ),
       },
@@ -557,8 +642,15 @@ export function YarnHubView() {
         key: 'designs', weight: 2 + dsShown.length * 0.8,
         node: (
           <Widget icon="◳" title="Designs using this yarn" accent={C.owner}>
+            {it.designs.length > 0 && (
+              <FilterBar value={dsQ} onChange={(v) => setF('ds:' + it.id, v)} placeholder="Design code, blend or category…" color={C.owner}
+                chips={[{ k: 'all', l: 'All' }, { k: 'warp', l: 'Warp' }, { k: 'weft', l: 'Weft' }]}
+                chip={dsSide} onChip={(k) => setF('ds:' + it.id + ':side', k)} shown={dsList.length} total={it.designs.length} />
+            )}
             {it.designs.length === 0 ? (
               <Text style={st.note}>Not used in any design yet.</Text>
+            ) : dsList.length === 0 ? (
+              <Text style={st.note}>No design matches the filter.</Text>
             ) : (
               dsShown.map((d, i) =>
                 line('d' + i, (
@@ -570,7 +662,7 @@ export function YarnHubView() {
                 ), d.val ? d.val + (d.side === 'warp' ? ' EPI' : ' PPI') : '—'),
               )
             )}
-            {moreRow(dsKey, 30, it.designs.length, C.owner, 'design lines')}
+            {moreRow(dsKey, 30, dsList.length, C.owner, 'design lines')}
           </Widget>
         ),
       },
@@ -579,11 +671,16 @@ export function YarnHubView() {
         node: (
           <Widget icon="▩" title="Stock lots" accent={C.bill}>
             <TotRow items={[
-              { label: 'Cartons', value: ready ? String(lots.length) : '…' },
+              { label: 'Cartons', value: ready ? String(allLots.length) : '…' },
               { label: 'In stock', value: fmtKg(it.stockKg), sub: kgExact(it.stockKg), color: C.bill },
               { label: 'Cheeses', value: ready ? chees.toLocaleString('en-IN') : '…' },
             ]} />
-            {!ready ? pending : lots.length === 0 ? <Text style={st.note}>No cartons in stock.</Text> : null}
+            {ready && allLots.length > 0 && (
+              <FilterBar value={lotsQ} onChange={(v) => setF('lots:' + it.id, v)} placeholder="Carton no., merge, grade, shade or item code…" color={C.bill}
+                shown={lots.length} total={allLots.length} />
+            )}
+            {ready && lotsQ.trim() && lots.length > 0 ? <Text style={st.fSum}>{'Filtered: ' + lots.length + (lots.length === 1 ? ' carton · ' : ' cartons · ') + ymsKg(lotsKg)}</Text> : null}
+            {!ready ? pending : allLots.length === 0 ? <Text style={st.note}>No cartons in stock.</Text> : lots.length === 0 ? <Text style={st.note}>No carton matches the filter.</Text> : null}
             {lotsShown.map((c, i) =>
               line('c' + i, (
                 <>
@@ -606,7 +703,13 @@ export function YarnHubView() {
               { label: 'As weft', value: fmtKg(it.weftKg), sub: kgExact(it.weftKg) },
               { label: 'Last used', value: it.lastUsed ? ymsDateLbl(it.lastUsed) : '—' },
             ]} />
-            {!ready ? pending : consRows.length === 0 ? <Text style={st.note}>No creel or weft issues recorded.</Text> : null}
+            {ready && consAll.length > 0 && (
+              <FilterBar value={consQ} onChange={(v) => setF('cons:' + it.id, v)} placeholder="Creel id, beam no., design, voucher no. or date…" color={C.prod}
+                chips={[{ k: 'all', l: 'All' }, { k: 'creel', l: 'Creel' }, { k: 'weft', l: 'Weft' }, { k: 'ret', l: 'Returns' }]}
+                chip={consK} onChip={(k) => setF('cons:' + it.id + ':kind', k)} shown={consRows.length} total={consAll.length} />
+            )}
+            {ready && (consQ.trim() || consK !== 'all') && consRows.length > 0 ? <Text style={st.fSum}>{'Filtered net: ' + ymsKg(consKg) + ' in ' + consRows.length + (consRows.length === 1 ? ' line' : ' lines')}</Text> : null}
+            {!ready ? pending : consAll.length === 0 ? <Text style={st.note}>No creel or weft issues recorded.</Text> : consRows.length === 0 ? <Text style={st.note}>No issue or return matches the filter.</Text> : null}
             {cons.map((x, i) => issueLine(x.r, x.s, i))}
             {moreRow(consKey, 20, consRows.length, C.prod, 'issues & returns')}
           </Widget>
@@ -618,7 +721,11 @@ export function YarnHubView() {
         key: 'subs', weight: 2 + blendSubs(it).length * 1.4,
         node: (
           <Widget icon="≡" title={'Sub items · blend split · ' + blendSubs(it).length} accent={T.copper}>
-            {subTable(it)}
+            {blendSubs(it).length > 3 && (
+              <FilterBar value={fv('subs:' + it.id)} onChange={(v) => setF('subs:' + it.id, v)} placeholder="Sub item code, name or split (e.g. 55/45)…" color={T.copper}
+                shown={blendSubs(it).filter((x) => matches([x.id, x.label, x.ratioKey].join(' '), fv('subs:' + it.id))).length} total={blendSubs(it).length} />
+            )}
+            {subTable(it, fv('subs:' + it.id))}
           </Widget>
         ),
       });
@@ -675,8 +782,14 @@ export function YarnHubView() {
   /* ------------------------------ category ------------------------------ */
   function renderCat(k: CatKey) {
     const cat = YMS_CATS.find((c) => c.k === k) || YMS_CATS[0];
-    const list = byCat(cat.k);
-    const t = totals(list);
+    const all = byCat(cat.k);
+    const t = totals(all);
+    const cq = fv('cat:' + cat.k);
+    const cs = fv('cat:' + cat.k + ':show') || 'all';
+    const list = all
+      .filter((x) => matches(searchText(x), cq))
+      .filter((x) => cs === 'all' || (cs === 'stock' && x.stockKg > 0) || (cs === 'used' && x.usedKg > 0) || (cs === 'unused' && x.usedKg <= 0) || (cs === 'designs' && x.nDesigns > 0))
+      .sort(cs === 'stock' ? (a, b) => b.stockKg - a.stockKg : byScore);
     return (
       <View>
         {crumbs([{ lbl: 'Yarn hub', on: () => go({ kind: 'hub' }) }, { lbl: cat.lbl }], () => go({ kind: 'hub' }))}
@@ -694,11 +807,14 @@ export function YarnHubView() {
             <StatCard label="Designs" value={String(t.designs)} color={C.owner} />
           </View>
         </Card>
-        <Card style={{ paddingTop: 4, paddingHorizontal: 8, paddingBottom: 6, marginBottom: 12 }}>
+        <Card style={{ paddingTop: 8, paddingHorizontal: 8, paddingBottom: 6, marginBottom: 12 }}>
+          <FilterBar value={cq} onChange={(v) => setF('cat:' + cat.k, v)} placeholder={'Search ' + cat.lbl.toLowerCase() + ' yarns — code, count, blend, sub item…'} color={cat.color}
+            chips={[{ k: 'all', l: 'All' }, { k: 'stock', l: 'In stock' }, { k: 'used', l: 'Used this FY' }, { k: 'unused', l: 'Not used' }, { k: 'designs', l: 'In designs' }]}
+            chip={cs} onChip={(k) => setF('cat:' + cat.k + ':show', k)} shown={list.length} total={all.length} />
           {yarnHead('Yarn')}
           {list.slice(0, limitOf('cat:' + cat.k, PAGE)).map(yarnRow)}
           {moreRow('cat:' + cat.k, PAGE, list.length, cat.color, 'yarns')}
-          {list.length === 0 && <Text style={st.empty}>No yarns in this category.</Text>}
+          {list.length === 0 && <Text style={st.empty}>{all.length ? 'No yarn matches the filter.' : 'No yarns in this category.'}</Text>}
         </Card>
       </View>
     );
@@ -707,7 +823,14 @@ export function YarnHubView() {
   /* ------------------------------ hub ------------------------------ */
   function renderHub() {
     const ql = q.trim().toLowerCase();
-    const found = ql ? items.filter((x) => searchText(x).includes(ql)).sort((a, b) => b.score - a.score) : [];
+    const hs = fv('hub:show') || 'all';
+    const filtering = !!ql || hs !== 'all';
+    const found = filtering
+      ? items
+        .filter((x) => matches(searchText(x) + ' ' + x.cat.k + ' ' + structure(x), ql))
+        .filter((x) => hs === 'all' || (hs === 'stock' && x.stockKg > 0) || (hs === 'used' && x.usedKg > 0) || (hs === 'unused' && x.usedKg <= 0) || (hs === 'filament' && x.kind === 'filament') || (hs === 'spun' && x.kind === 'spun'))
+        .sort(hs === 'stock' ? (a, b) => b.stockKg - a.stockKg : (a, b) => b.score - a.score)
+      : [];
     return (
       <View>
         <Card style={{ padding: 14, marginBottom: 12 }}>
@@ -725,15 +848,11 @@ export function YarnHubView() {
             <StatCard label={'Used · ' + monthLbl} value={fmtKg(tAll.used)} sub={kgExact(tAll.used)} color={C.prod} />
             <StatCard label="Designs" value={String(tAll.designs)} color={C.owner} />
           </View>
-          <TextInput
-            value={q}
-            onChangeText={setQ}
-            placeholder="Search item code, yarn, blend or sub item…"
-            placeholderTextColor={T.muted}
-            style={st.inp}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+          <View style={{ marginTop: 12 }}>
+            <FilterBar value={q} onChange={setQ} placeholder="Search item code, yarn, count, blend, category or sub item…" color={C.prod}
+              chips={[{ k: 'all', l: 'All' }, { k: 'stock', l: 'In stock' }, { k: 'used', l: 'Used this FY' }, { k: 'unused', l: 'Not used' }, { k: 'spun', l: 'Spun' }, { k: 'filament', l: 'Filament' }]}
+              chip={hs} onChip={(k) => setF('hub:show', k)} shown={found.length} total={items.length} />
+          </View>
           {!!error && <Text style={[st.errTxt, { marginTop: 8 }]}>{error}</Text>}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 6 }}>
             {!!diag && (
@@ -747,11 +866,11 @@ export function YarnHubView() {
             <Text key={i} style={st.diag}>{l}</Text>
           ))}
         </Card>
-        {ql ? (
+        {filtering ? (
           <Card style={{ paddingTop: 4, paddingHorizontal: 8, paddingBottom: 6, marginBottom: 12 }}>
             {yarnHead(found.length + ' match' + (found.length !== 1 ? 'es' : ''))}
-            {found.slice(0, limitOf('q:' + ql, PAGE)).map(yarnRow)}
-            {moreRow('q:' + ql, PAGE, found.length, C.prod, 'matches')}
+            {found.slice(0, limitOf('q:' + ql + hs, PAGE)).map(yarnRow)}
+            {moreRow('q:' + ql + hs, PAGE, found.length, C.prod, 'matches')}
             {found.length === 0 && <Text style={st.empty}>No yarn matches.</Text>}
           </Card>
         ) : (
@@ -894,6 +1013,20 @@ const st = StyleSheet.create({
   lineL: { flex: 1, minWidth: 0, fontSize: 11.5, color: C.ink },
   lineR: { fontFamily: MF, fontSize: 11.5, color: C.ink },
 
+  fBar: { paddingTop: 2, paddingBottom: 6, gap: 6 },
+  fRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  fInp: {
+    flex: 1, minWidth: 0, backgroundColor: T.surface, borderWidth: 1.5, borderColor: T.border, borderRadius: 9,
+    paddingHorizontal: 11, paddingVertical: 8, fontSize: 12.5, color: T.ink,
+  },
+  fClear: { fontSize: 11, fontWeight: '800', paddingHorizontal: 4 },
+  fChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  fChip: {
+    fontSize: 10.5, fontWeight: '800', color: C.ink, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+    borderWidth: 1, borderColor: C.bd, backgroundColor: T.surface, overflow: 'hidden',
+  },
+  fCount: { fontSize: 9.5, color: C.mut, fontFamily: MF },
+  fSum: { fontSize: 10.5, color: C.ink, fontWeight: '700', paddingBottom: 4 },
   inp: {
     marginTop: 12, backgroundColor: T.surface, borderWidth: 1.5, borderColor: T.border, borderRadius: 9,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: T.ink,

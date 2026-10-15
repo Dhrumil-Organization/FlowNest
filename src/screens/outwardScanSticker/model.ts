@@ -28,7 +28,9 @@ export type Piece = {
 };
 
 export type Line = { id: string; shdcode: string; shdname: string; qty: string; remark: string };
-export type Entry = Piece & { lines: Line[]; shortage: boolean; addedAt: number };
+/** stale: set when the server says the taka was received elsewhere after it was scanned here */
+export type Entry = Piece & { lines: Line[]; shortage: boolean; addedAt: number; stale?: 'used' | 'changed'; note?: string };
+export type StaleRow = { key: string; status?: 'ok' | 'changed' | 'used' | 'missing' | 'party'; bal: number; seen: number | null; inwno?: string; inwdate?: string; user?: string; takano?: string };
 
 export type Header = {
   inwdate: string; billno: string; billdate: string; strsr: string; remark: string;
@@ -38,10 +40,11 @@ export type Header = {
 export type BrowseRow = {
   uid: string; inwno: string; inwdate: string; parcode: string; parname: string; billno: string;
   takas: number; qty: number; sht: number; remark: string; shade: string; shades: number; lock: string;
+  source?: string; modified?: boolean;
 };
 
 export type ShowData = {
-  uid: string; lock: string;
+  uid: string; lock: string; source?: string; updated?: string;
   header: {
     inwno: string; inwdate: string; parcode: string; parname: string; acccode: string; accname: string; enttype: string; entname: string;
     strsr: string; billno: string; billdate: string; remark: string; jobtype: string; dptcode: string; dptname: string; stktype: string;
@@ -165,6 +168,8 @@ export function validate(meta: Meta | null, party: string, h: Header, entries: E
   if (!entries.length) out.push({ text: 'Scan at least one taka.' });
   entries.forEach((e) => {
     const tk = `Taka ${e.takano}`;
+    if (e.stale === 'used') out.push({ key: e.key, text: `${tk}: already received in another inward — remove it.` });
+    if (e.stale === 'changed') out.push({ key: e.key, text: `${tk}: balance changed to ${q3(e.bal)} — check the kg (edit it or tick Shortage).` });
     e.lines.forEach((l, i) => {
       const where = i ? `${tk} · add line ${i}` : tk;
       if (!qtyOk(l.qty)) out.push({ key: e.key, text: `${where}: enter the qty.` });
@@ -183,6 +188,7 @@ export function payload(uid: string, party: string, h: Header, entries: Entry[])
     header: { ...h, parcode: party, strsr: h.strsr.trim(), billno: h.billno.trim(), remark: h.remark.trim() },
     pieces: entries.map((e) => ({
       outuid: e.outuid, outsrno: e.outsrno, outsubsr: e.outsubsr, shortage: e.shortage,
+      bal: r3(e.bal), // the balance shown on this phone — the server refuses the save if it changed meanwhile
       lines: e.lines.map((l) => ({ shdcode: l.shdcode, qty: r3(num(l.qty)), remark: l.remark.trim() })),
     })),
   };

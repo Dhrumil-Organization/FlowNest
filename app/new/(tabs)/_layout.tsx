@@ -1,6 +1,5 @@
 import { NotificationProvider } from '@/common/context/NotificationContext';
 import { AppHeader } from '@/src/components/layout/AppHeader';
-import { ScreenErrorBoundary } from '@/src/core/crash/ScreenErrorBoundary';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { TopInsetHandled } from '@/src/core/layout/topInset';
 import { APP_NAVIGATION } from '@/src/core/navigation';
@@ -15,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ScreenErrorBoundary } from '@/src/core/crash/ScreenErrorBoundary';
 import {
   Animated,
   Keyboard,
@@ -70,7 +70,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Dyeing' },
   datalog: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Datalog' },
   'production-order-tracking': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Production Order Tracking' },
-  'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order Auth' },
+  'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order' },
   'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
   // 'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
   'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
@@ -112,7 +112,6 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'beam-close': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Open/Close' },
   'beam-gaiting/index': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Gaiting' },
   'weft-carton-issue-new': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Weft Carton Issue' },
-   'taka-history': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Taka History' },
 };
 
 // FEATURE: bottom tab bar caps at this many real tabs; anything beyond it

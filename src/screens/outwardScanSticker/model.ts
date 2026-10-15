@@ -9,7 +9,7 @@ export const MAX_EXCESS_FACTOR_DEFAULT = 2;
 
 export type Opt = { value: string; label: string; searchText?: string };
 
-export type Party = { code: string; name: string; pieces: number; bal: number; last_out: string };
+export type Party = { code: string; name: string; pieces: number; bal: number; last_out: string; in_master?: boolean };
 export type Grn = {
   key: string; uid: string; srno: number; grno: string; grdate: string; parcode: string; acccode: string; accname: string;
   docno: string; docdate: string; dptcode: string; trpcode: string; vehno: string; qty: number; pcs: number; itmname: string; status: string;
@@ -17,7 +17,9 @@ export type Grn = {
 export type Meta = {
   prpcode: string; yearno: string; grey_store: string; grey_store_name: string; fy_from: string; fy_to: string; today: string;
   require_grn: boolean; max_excess_factor: number;
-  ent_types: { code: string; name: string }[]; job_accounts: { code: string; name: string }[]; parties: Party[];
+  /** Entry Type is fixed on the server (GST) — not chosen on the screen */
+  ent_type?: { code: string; name: string } | null; ent_type_error?: string;
+  ent_types: { code: string; name: string }[]; departments?: { code: string; name: string }[]; job_accounts: { code: string; name: string }[]; parties: Party[];
 };
 
 /** an outward piece (GRYOutD2) as the server sends it */
@@ -34,7 +36,7 @@ export type StaleRow = { key: string; status?: 'ok' | 'changed' | 'used' | 'miss
 
 export type Header = {
   inwdate: string; billno: string; billdate: string; strsr: string; remark: string;
-  acccode: string; enttype: string; gruid: string; grsrno: string;
+  acccode: string; enttype: string; dptcode: string; gruid: string; grsrno: string;
 };
 
 export type BrowseRow = {
@@ -158,7 +160,9 @@ export function validate(meta: Meta | null, party: string, h: Header, entries: E
   if (!party) out.push({ text: 'Select the party.' });
   if (meta?.require_grn && !h.gruid) out.push({ text: 'Select the G.R.N.' });
   if (!h.acccode) out.push({ text: 'Select the Job A/c.' });
-  if (!h.enttype) out.push({ text: 'Select the Entry Type.' });
+  if (meta?.ent_type_error) out.push({ text: meta.ent_type_error });
+  if (meta && meta.departments === undefined) out.push({ text: 'Department list not available — the server is running the old Outward Scan Sticker backend. Deploy GreyScanInwardController.php.' });
+  else if (!h.dptcode || h.dptcode === '0') out.push({ text: 'Select the Department.' });
   if (!h.strsr.trim()) out.push({ text: 'Enter the Store No.' });
   if (!h.billno.trim()) out.push({ text: 'Enter the bill / challan no.' });
   if (!h.inwdate) out.push({ text: 'Inward date is required.' });

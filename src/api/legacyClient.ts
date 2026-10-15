@@ -763,6 +763,10 @@ export const YarnHubAPI = {
 // Outward Scan Sticker (GreyScanInwardController) — grey store job inward by scanning the fusion sticker.
 // Every body carries { prpcode, yearno }. save = add (uid 0) or modify (uid); remove = HARD delete.
 export const GreyScanInwardAPI = {
+  properties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('properties'), body),
+  // fallback when the server has no grey_scan_inward/properties yet — the same lists every other screen uses
+  criterionProps: (prptype: string) => client.get('/get_criterion', { params: { prptype, txntype: "''", fetch: 'prp' } }),
+  years: (prpcode: string) => client.get('/getyear', { params: { prpcode } }),
   meta: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('meta'), body),
   parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('parties'), body),
   grn: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('grn'), body),

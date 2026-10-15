@@ -8,9 +8,11 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
+import WebQrCamera from './WebQrCamera';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -27,9 +29,12 @@ type Props = {
   manualPlaceholder: string;
   onClose: () => void;
   onScanned: (value: string) => void;
+  /** web build only: use the browser camera scanner (getUserMedia + QR decode) instead of expo-camera. Native is unchanged. */
+  webCamera?: boolean;
 };
 
-export default function QrScanSheet({ visible, title, subtitle, footer, manualPlaceholder, onClose, onScanned }: Props) {
+export default function QrScanSheet({ visible, title, subtitle, footer, manualPlaceholder, onClose, onScanned, webCamera }: Props) {
+  const webCam = !!webCamera && Platform.OS === 'web';
   const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
   const [camKey, setCamKey] = useState(0);
@@ -53,6 +58,7 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
   };
 
   useEffect(() => {
+    if (webCam) return; // the web camera asks the browser itself
     if (visible && permission && !permission.granted && permission.canAskAgain !== false) ensurePermission();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, permission?.granted]);
@@ -95,7 +101,9 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
         </View>
 
         <View style={st.camArea}>
-          {permission?.granted ? (
+          {webCam ? (
+            <WebQrCamera key={camKey} active={visible} onScanned={(v) => { if (lock.current) return; lock.current = true; onScanned(v); }} />
+          ) : permission?.granted ? (
             <CameraView
               key={camKey}
               style={{ flex: 1 }}
@@ -114,7 +122,7 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
               </TouchableOpacity>
             </View>
           )}
-          {permission?.granted ? (
+          {!webCam && permission?.granted ? (
             <View pointerEvents="none" style={st.overlay}>
               <View style={st.box}>
                 <View style={[st.corner, st.tl]} />

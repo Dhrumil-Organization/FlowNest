@@ -488,13 +488,13 @@ registerPermissionArea({
         },
         // Owner Dashboard — one-page owner summary (sales · collection · outstanding · sales orders · profit ·
         // alerts · production · deployment · executive table) via GET /api/getOwnerSummaryDashboard
-        {
-          key: 'owner_dashboard',
-          name: 'Owner Dashboard',
-          type: 'screen',
-          displayOrder: 156,
-          actions: [{ key: 'view', name: 'View' }],
-        },
+        // {
+        //   key: 'owner_dashboard',
+        //   name: 'Owner Dashboard',
+        //   type: 'screen',
+        //   displayOrder: 156,
+        //   actions: [{ key: 'view', name: 'View' }],
+        // },
         {
           key: 'weft_carton_issue_new',
           name: 'Weft Carton Issue',
@@ -1624,24 +1624,24 @@ registerUiNodes([
     order: 155,
   },
   // Owner Dashboard (Date · Month · Executive filters -> KPI cards, profit, alerts, production, deployment, executives)
-  {
-    id: 'nav.owner_dashboard',
-    kind: 'navigation',
-    title: 'Owner Dashboard',
-    permission: 'production.owner_dashboard',
-    action: 'view',
-    route: 'owner-dashboard',
-    icon: 'dashboard',
-    order: 156,
-  },
-  {
-    id: 'screen.owner_dashboard',
-    kind: 'screen',
-    title: 'Owner Dashboard',
-    permission: 'production.owner_dashboard',
-    action: 'view',
-    order: 156,
-  },
+  // {
+  //   id: 'nav.owner_dashboard',
+  //   kind: 'navigation',
+  //   title: 'Owner Dashboard',
+  //   permission: 'production.owner_dashboard',
+  //   action: 'view',
+  //   route: 'owner-dashboard',
+  //   icon: 'dashboard',
+  //   order: 156,
+  // },
+  // {
+  //   id: 'screen.owner_dashboard',
+  //   kind: 'screen',
+  //   title: 'Owner Dashboard',
+  //   permission: 'production.owner_dashboard',
+  //   action: 'view',
+  //   order: 156,
+  // },
   {
     id: 'nav.weft_carton_issue_new',
     kind: 'navigation',

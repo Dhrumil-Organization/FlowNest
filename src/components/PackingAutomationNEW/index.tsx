@@ -22,20 +22,21 @@ import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 import { confirmAsync } from '../ProductionOrderNEW/ui';
-import type { Api, Ctx } from './api';
+import type { Api, Ctx, Printer, Row } from './api';
+import { apiErrorText, fetchPrinters } from './api';
 import DetailsStep from './DetailsStep';
 import DoneStep from './DoneStep';
 import PrintStep from './PrintStep';
 import RouteStep, { FacilitySheet } from './RouteStep';
 import { Btn, Notice, ProgressSteps, SelectionsCard } from './ui';
 import type { Errors, Step } from './usePackingForm';
-import { usePackingForm, validate } from './usePackingForm';
+import { isSameRoute, routeRowView, usePackingForm, validate } from './usePackingForm';
 
 export const PA_RESOURCE = 'production.packing_automation';
 const CTX_KEY = 'packing_auto_ctx_v1';
 const PRINTER_KEY = (prpcode: string) => `packing_auto_printer_v1_${prpcode}`;
 
-type Props = { token: string; API: string; username?: string; userId?: string };
+type Props = { token: string; API: string; username?: string; userId?: string; isvis?: string };
 
 const STEP_FIELDS: Record<1 | 2 | 3, (keyof Errors)[]> = {
   1: ['facility', 'route'],
@@ -45,7 +46,7 @@ const STEP_FIELDS: Record<1 | 2 | 3, (keyof Errors)[]> = {
 const onlyStep = (e: Errors, s: 1 | 2 | 3): Errors =>
   Object.fromEntries(Object.entries(e).filter(([k]) => STEP_FIELDS[s].includes(k as keyof Errors))) as Errors;
 
-export default function PackingAutomationNEW({ token, API, username, userId }: Props) {
+export default function PackingAutomationNEW({ token, API, username, userId, isvis }: Props) {
   const biz = useBusinessContext();
   const { canDo } = usePermission();
   const { width } = useWindowDimensions();
@@ -60,8 +61,14 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
   const [tried, setTried] = useState<Record<number, boolean>>({});
   const [reprinting, setReprinting] = useState(false);
 
-  const { f, busy, problem, lastPrint, actions } = usePackingForm(api, ctx, String(userId || username || ''));
+  const uid = String(userId || username || '');
+  const { f, routes, linked, busy, problem, lastPrint, actions } = usePackingForm(api, ctx, uid);
   const canPrint = canDo(PA_RESOURCE, 'add');
+
+  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [printersBusy, setPrintersBusy] = useState(false);
+  const [printersError, setPrintersError] = useState('');
+  const [printerLocked, setPrinterLocked] = useState(false);
 
   // Last facility chosen on this screen wins over the login default for the same property.
   useEffect(() => {
@@ -79,11 +86,33 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
     });
   }, [biz.prpCode]);
 
+  /**
+   * Printers — same rules as the web PrinterSelect:
+   *  • Rayons (prptype 'R') normal users (isvis ≠ '-999') with a printer named
+   *    MTX_BAR_<userid> are locked to it.
+   *  • Everyone else may choose; the last printer used on this device for this
+   *    facility is pre-selected when it is still in the list.
+   */
+  const loadPrinters = async () => {
+    setPrintersBusy(true); setPrintersError('');
+    try {
+      const list = await fetchPrinters(api);
+      setPrinters(list);
+      const own = list.find((p) => p.name === `MTX_BAR_${userId || ''}`);
+      const lock = biz.prpGroup === 'R' && String(isvis ?? '') !== '-999' && !!own && !!userId;
+      setPrinterLocked(lock);
+      if (lock && own) { actions.set('printer', own.name); return; }
+      const saved = ctx.prpcode ? await AsyncStorage.getItem(PRINTER_KEY(ctx.prpcode)) : null;
+      const keep = [f.printer, saved].find((n) => n && list.some((p) => p.name === n));
+      actions.set('printer', keep || '');
+    } catch (e) {
+      setPrintersError(apiErrorText(e, 'Printers could not be loaded.'));
+    } finally {
+      setPrintersBusy(false);
+    }
+  };
+  useEffect(() => { if (ctx.prpcode) loadPrinters(); }, [api, ctx.prpcode]); // eslint-disable-line react-hooks/exhaustive-deps
   // The printer is remembered per facility on this device.
-  useEffect(() => {
-    if (!ctx.prpcode) return;
-    AsyncStorage.getItem(PRINTER_KEY(ctx.prpcode)).then((p) => { if (p) actions.set('printer', p); });
-  }, [ctx.prpcode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (ctx.prpcode && f.printer) AsyncStorage.setItem(PRINTER_KEY(ctx.prpcode), f.printer);
   }, [ctx.prpcode, f.printer]);
@@ -109,10 +138,6 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
   const goTo = (s: Step) => setStep(s);
   const next = async (from: 1 | 2) => {
     setTried((t) => ({ ...t, [from]: true }));
-    if (from === 1 && !f.route && f.routeNo && !busy.route) {
-      if (await actions.lookupRoute()) setStep(2); // typed but not looked up yet → look up, then go on
-      return;
-    }
     if (stepOk(from)) setStep((from + 1) as Step);
   };
   const doPrint = async () => {
@@ -130,6 +155,27 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
     await actions.print();
     setReprinting(false);
   };
+  /**
+   * Pick / change the route card. Changing it after details were entered asks first,
+   * then clears party, production type, carton, weights, grade, merge, marka and cones
+   * and loads them again for the new card. Picking the same card again changes nothing.
+   */
+  const changeRoute = async (row: Row): Promise<boolean> => {
+    if (isSameRoute(f.route, row)) return true;
+    const entered = !!(f.party || f.prodtype || f.nocones || lastPrint);
+    if (f.route && entered) {
+      const no = routeRowView(row).routeNo;
+      const okGo = await confirmAsync(
+        'Change route card?',
+        `Party, production type, carton, grade, merge, shipping marka and cones will be cleared and loaded again for route card ${no}.`,
+        'Change',
+      );
+      if (!okGo) return false;
+    }
+    actions.chooseRoute(row);
+    setTried({}); // start the new card without old error messages
+    return true;
+  };
   const copies = parseInt(f.noprint, 10) || 1;
 
   /* ------------------------------ body ------------------------------ */
@@ -137,14 +183,15 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
   const form = (
     <>
       {step === 1 ? (
-        <RouteStep f={f} ctx={ctx} facility={facility} onFacility={() => setFacilityOpen(true)} busy={busy} problem={problem}
-          errors={errorsFor(1)} onRouteNo={actions.setRouteNo} onLookup={actions.lookupRoute} />
+        <RouteStep f={f} ctx={ctx} facility={facility} onFacility={() => setFacilityOpen(true)} routes={routes} busy={busy} problem={problem}
+          errors={errorsFor(1)} onChoose={changeRoute} onReload={actions.reloadRoutes} />
       ) : null}
       {step === 2 ? (
-        <DetailsStep f={f} api={api} ctx={ctx} busy={busy} problem={problem} errors={errorsFor(2)} actions={actions} />
+        <DetailsStep f={f} api={api} ctx={ctx} linked={linked} busy={busy} problem={problem} errors={errorsFor(2)} actions={actions} />
       ) : null}
       {step === 3 ? (
-        <PrintStep f={f} api={api} ctx={ctx} errors={errorsFor(3)} printError={problem.print} actions={actions} />
+        <PrintStep f={f} errors={errorsFor(3)} printError={problem.print} printers={printers} printersBusy={printersBusy}
+          printersError={printersError} printerLocked={printerLocked} onReloadPrinters={loadPrinters} actions={actions} />
       ) : null}
       {step === 4 && lastPrint ? (
         <DoneStep f={f} facility={facility} result={lastPrint} printError={problem.print} onReprint={reprint} reprinting={reprinting} />
@@ -159,7 +206,7 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
 
   let footer: React.ReactNode = null;
   if (step === 1) {
-    footer = <Btn flex label="Continue to details" icon="arrow-forward" onPress={() => next(1)} loading={busy.route} disabled={busy.defaults} />;
+    footer = <Btn flex label="Continue to details" icon="arrow-forward" onPress={() => next(1)} disabled={busy.defaults || !f.route} />;
   } else if (step === 2) {
     footer = (
       <>
@@ -183,7 +230,7 @@ export default function PackingAutomationNEW({ token, API, username, userId }: P
     );
   }
 
-  const maxW = wide && carried ? 1180 : 680;
+  const maxW = wide && carried ? 1180 : wide && step === 1 ? 860 : 680;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

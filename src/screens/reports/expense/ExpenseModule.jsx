@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   T, XC, makeXSEC, makeXU_CARDS, makeXU_METERS, xClosedRates, xCr, xCurrent, xDailySeries, xDayKwhAB, xK0, xM, xPc,
-  xR2, xR3, xR4, xSectionMTD, xUtilDaily, xUtilMeters, XUKEYS,
+  xR2, xR3, xR4, xSectionMTD, xUtilDaily, xUtilMeters, XUKEYS, xGroupHeads,
 } from './xCalc';
 import { card, DefaultTip, Grid, hbuzz, MONO, PremiumTip, Sheet, XChart, XDonut, XKPI, XSection, XSecTag, XStat } from './xUi';
 
@@ -16,13 +16,32 @@ const SHARE_TXT = 'A 1/3 : B 2/3';
 /* ------------------------------------------------------------------ */
 /*  Management summary card                                            */
 /* ------------------------------------------------------------------ */
-function XSumCard({ title, d, accent, onTrend }) {
-  const row = (l, b, c) => (
-    <View key={l} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: T.alt }}>
-      <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: c }} />
-      <Text style={{ flex: 1, fontSize: 11.5, color: T.ink }}>{l}</Text>
-      <Text style={{ fontFamily: MONO, fontSize: 11.5, color: T.ink, minWidth: 62, textAlign: 'right' }}>{b.amt === null ? '—' : xCr(b.amt)}</Text>
-      <Text style={{ fontFamily: MONO, fontSize: 10, color: T.muted, minWidth: 58, textAlign: 'right' }}>{b.perPick === null ? '—' : `${xR3(b.perPick)}/pk`}</Text>
+const pcTxt = (v) => { const x = Math.round((+v || 0) * 10000) / 100; return `${Number.isInteger(x) ? x : x.toFixed(2)}%`; };
+/** machine-group lines under a head (Electricity / Salary / Stores) — always open, like the production card */
+const groupNote = (g, head) => {
+  if (head === 'elec') return `own meters ${xCr(g.elec.own)} + ${pcTxt(g.pct)} of Section ${g.sec}'s ${g.sec === 'A' ? '1/3' : '2/3'} warping + misc ${xCr(g.elec.shared)}`;
+  return `${pcTxt(g.pct)} of Section ${g.sec} ${head === 'sal' ? 'salary' : 'stores'}`;
+};
+function XSumCard({ title, d, accent, onTrend, groups }) {
+  const sub = (head) => (groups || []).map((g) => (
+    <View key={`${head}-${g.k}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, paddingLeft: 16, borderBottomWidth: 1, borderBottomColor: T.alt }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: T.ink }} numberOfLines={1}>{g.lbl}</Text>
+        <Text style={{ fontSize: 9, color: T.muted, marginTop: 1 }} numberOfLines={2}>{groupNote(g, head)}</Text>
+      </View>
+      <Text style={{ fontFamily: MONO, fontSize: 11, fontWeight: '600', color: T.ink, minWidth: 62, textAlign: 'right' }}>{xCr(g[head].amt)}</Text>
+      <Text style={{ fontFamily: MONO, fontSize: 9.5, color: T.muted, minWidth: 58, textAlign: 'right' }}>{`${xR3(g[head].perPick)}/pk`}</Text>
+    </View>
+  ));
+  const row = (l, b, c, head) => (
+    <View key={l}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: T.alt }}>
+        <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: c }} />
+        <Text style={{ flex: 1, fontSize: 11.5, color: T.ink, fontWeight: head && groups ? '700' : '400' }}>{l}</Text>
+        <Text style={{ fontFamily: MONO, fontSize: 11.5, color: T.ink, minWidth: 62, textAlign: 'right', fontWeight: head && groups ? '700' : '400' }}>{b.amt === null ? '—' : xCr(b.amt)}</Text>
+        <Text style={{ fontFamily: MONO, fontSize: 10, color: T.muted, minWidth: 58, textAlign: 'right' }}>{b.perPick === null ? '—' : `${xR3(b.perPick)}/pk`}</Text>
+      </View>
+      {head && groups && b.amt !== null ? sub(head) : null}
     </View>
   );
   return (
@@ -38,9 +57,9 @@ function XSumCard({ title, d, accent, onTrend }) {
         </Pressable>
         <Text style={{ fontSize: 10, color: T.muted, fontFamily: MONO }}>{xM(d.prod)} · {(+d.picks || 0).toFixed(0)} pk</Text>
       </View>
-      {row('Electricity', d.elec, XC.elec)}
-      {row('Salary', d.sal, XC.sal)}
-      {row('Stores', d.store, XC.store)}
+      {row('Electricity', d.elec, XC.elec, 'elec')}
+      {row('Salary', d.sal, XC.sal, 'sal')}
+      {row('Stores', d.store, XC.store, 'store')}
       {d.maint.amt > 0 ? row('Maintenance', d.maint, XC.fixed) : null}
       {d.oth.amt > 0 ? row('Other', d.oth, XC.other) : null}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 9 }}>
@@ -574,6 +593,7 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
   const isCur = sel === exp.cur;
   const XSEC = makeXSEC(m.counts || exp.counts);
   const utilPP = useMemo(() => xUtilMeters(m), [m]);
+  const gh = useMemo(() => xGroupHeads(m), [m]);
   const utilDaily = useMemo(() => (isCur ? xUtilDaily(exp) : null), [exp, isCur]);
   const tog = (k) => { hbuzz(7); setOp((o) => ({ ...o, [k]: !o[k] })); };
   const ab = m.ab !== false;
@@ -819,9 +839,15 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
 
       {/* management summary */}
       {heading('Management summary')}
-      <XSumCard title={XSEC.A.lbl} d={m.A} accent={XSEC.A.color} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'A' }) : undefined} />
-      <XSumCard title={XSEC.B.lbl} d={m.B} accent={XSEC.B.color} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'B' }) : undefined} />
-      <XSumCard title={`Total · A + B · ${m.looms.total} machines`} d={m.T} accent={T.nav} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'T' }) : undefined} />
+      <XSumCard title={XSEC.A.lbl} d={m.A} accent={XSEC.A.color} groups={gh && gh.bySec.A} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'A' }) : undefined} />
+      <XSumCard title={XSEC.B.lbl} d={m.B} accent={XSEC.B.color} groups={gh && gh.bySec.B} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'B' }) : undefined} />
+      <XSumCard title={`Total · A + B · ${m.looms.total} machines`} d={m.T} accent={T.nav} groups={gh && gh.bySec.T} onTrend={isCur ? () => setTrend({ kind: 'sec', k: 'T' }) : undefined} />
+      {gh ? (
+        <Text style={{ fontSize: 9.5, color: T.muted, lineHeight: 13.5, marginTop: -2, marginBottom: 10, marginHorizontal: 2 }}>
+          Machine-group lines: Warping + Misc → Section A 1/3 (Waterjet 75 % · S. Rapier 230 cm 25 %) · Section B 2/3 (MW Rapier 55 % · Sudamo Rapier 45 %).
+          Salary and Stores of each section are divided with the same 75/25 and 55/45. ₹/pick on each group’s own production and PPI.
+        </Text>
+      ) : null}
       {trend ? <XTrendSheet exp={exp} kind={trend.kind === 'util' ? 'util' : 'sec'} k={trend.k} onClose={() => setTrend(null)} /> : null}
 
       {/* expense breakdown */}

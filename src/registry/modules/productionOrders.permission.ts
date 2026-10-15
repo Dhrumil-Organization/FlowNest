@@ -31,7 +31,7 @@ registerPermissionArea({
         },
         {
           key: 'sudamo_production_order',
-          name: 'Sudamo Production Order',
+          name: 'Sudamo Production Order Auth',
           type: 'screen',
           displayOrder: 50,
           actions: [{ key: 'view', name: 'View' }],
@@ -43,23 +43,6 @@ registerPermissionArea({
           displayOrder: 60,
           actions: [{ key: 'view', name: 'View' }],
         },
-<<<<<<< HEAD
-        {
-          key: 'payable',
-          name: 'Payable',
-          type: 'screen',
-          displayOrder: 70,
-          actions: [{ key: 'view', name: 'View' }],
-        },
-        {
-          key: 'receivables',
-          name: 'Receivables',
-          type: 'screen',
-          displayOrder: 70,
-          actions: [{ key: 'view', name: 'View' }],
-        },
-
-=======
         // {
         //   key: 'payable',
         //   name: 'Payable',
@@ -67,7 +50,6 @@ registerPermissionArea({
         //   displayOrder: 70,
         //   actions: [{ key: 'view', name: 'View' }],
         // },          
->>>>>>> 2f2f05e535b11bf14bd1b98fcc3d8727155a2268
       ],
     },
   ],

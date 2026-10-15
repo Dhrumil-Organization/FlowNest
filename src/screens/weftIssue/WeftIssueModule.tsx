@@ -258,6 +258,7 @@ function ListView(p: {
   const { api, prp, year } = p;
   const { wide, xwide } = useWide();
   const [rows, setRows] = useState<any[]>([]);
+  const [loadedScope, setLoadedScope] = useState('');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +268,7 @@ function ListView(p: {
   const [opening, setOpening] = useState<any>(null);
 
   const dmyToIso = (v: string) => { const d = toDate(v); return d ? isoDay(d) : ''; };
+  const browseScope = `${str(prp?.PrpCode)}|${str(year?.YearNo)}|${p.mode}`;
 
   const reqId = useRef(0);
   const load = useCallback(async (spinner = true) => {
@@ -279,23 +281,41 @@ function ListView(p: {
         prptype: p.prptype, prpcode: str(prp.PrpCode), yearno: str(year.YearNo),
         fromdate: dmyToIso(p.fromDate), todate: dmyToIso(p.toDate), ExpProdQtyType: p.mode === 'new' ? '1' : '0',
       });
-      if (id === reqId.current) setRows(list);
+      if (id === reqId.current) { setRows(list); setLoadedScope(browseScope); }
     } catch (e) {
       if (id === reqId.current) { setRows([]); setError(errOf(e, 'Unable to load weft issues')); }
     } finally {
       if (id === reqId.current) { setLoading(false); setRefreshing(false); }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, prp?.PrpCode, year?.YearNo, p.fromDate, p.toDate, p.prptype]);
+  }, [api, prp?.PrpCode, year?.YearNo, p.fromDate, p.toDate, p.prptype, p.mode]);
 
-  const key = `${str(prp?.PrpCode)}|${str(year?.YearNo)}`;
+  const key = browseScope;
   useEffect(() => { if (prp?.PrpCode && year?.YearNo) void load(); }, [key, p.dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = useMemo(() => {
+    // Never show or total a previous property/year's records while the new
+    // criteria are being selected or fetched.
+    if (loadedScope !== browseScope) return [];
     const t = q.trim().toLowerCase();
     if (!t) return rows;
     return rows.filter((r) => [r.IssNo, r.CreelId, r.Remark, r.BeamNo, r.DsnName].some((v) => str(v).toLowerCase().includes(t)));
-  }, [rows, q]);
+  }, [rows, q, loadedScope, browseScope]);
+
+  // The browse API supplies every card's CreelQty. Sum the SAME records shown in
+  // the search results, not the unfiltered rows, so search/date/property/year
+  // changes always have matching totals. Invalid or blank quantities count as 0.
+  const totalQty = useMemo(() => list.reduce((sum, row) => {
+    const qty = Number(str(row.CreelQty).trim().replace(/,/g, ''));
+    return sum + (Number.isFinite(qty) ? qty : 0);
+  }, 0), [list]);
+  const totalQtyText = useMemo(() => {
+    const [whole, fractional] = totalQty.toFixed(3).split('.');
+    const negative = whole.startsWith('-');
+    const digits = negative ? whole.slice(1) : whole;
+    const leading = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    return `${negative ? '-' : ''}${leading ? `${leading},` : ''}${digits.slice(-3)}.${fractional}`;
+  }, [totalQty]);
 
   const remove = (row: any) => {
     AppAlert.alert('Delete Weft Issue', `Are you sure you want to delete ${str(row.IssNo)} (Beam ${str(row.BeamNo)})?`, [
@@ -321,18 +341,32 @@ function ListView(p: {
   const cols = xwide ? 3 : wide ? 2 : 1;
 
   const filterCard = (
-    <Card title="Filters">
-      <SelectBox label="Property" required value={prp?.LngName} placeholder="Select Property" onPress={() => setSheet('prp')} icon="expand-more" />
-      <SelectBox label="Year" required value={year?.YearName} placeholder="Select Year" onPress={() => setSheet('year')} icon="expand-more" disabled={!prp} />
-      <View style={s.row2}>
-        <View style={s.col}><DateField label="From Date" value={p.fromDate} onChange={p.setFromDate} minToday={false} /></View>
-        <View style={s.col}><DateField label="To Date" value={p.toDate} onChange={p.setToDate} minToday={false} /></View>
-      </View>
-      <View style={s.row2}>
-        <Btn title="Clear dates" variant="secondary" small onPress={() => { p.setFromDate(''); p.setToDate(''); }} style={{ flex: 1 }} />
-        <Btn title="Apply Filters" icon="refresh" variant="accent" small onPress={() => { setFiltersOpen(false); void load(); }} loading={loading} style={{ flex: 2 }} />
-      </View>
-    </Card>
+    <View style={{ gap: 12 }}>
+      <Card title="Filters">
+        <SelectBox label="Property" required value={prp?.LngName} placeholder="Select Property" onPress={() => setSheet('prp')} icon="expand-more" />
+        <SelectBox label="Year" required value={year?.YearName} placeholder="Select Year" onPress={() => setSheet('year')} icon="expand-more" disabled={!prp} />
+        <View style={s.row2}>
+          <View style={s.col}><DateField label="From Date" value={p.fromDate} onChange={p.setFromDate} minToday={false} /></View>
+          <View style={s.col}><DateField label="To Date" value={p.toDate} onChange={p.setToDate} minToday={false} /></View>
+        </View>
+        <View style={s.row2}>
+          <Btn title="Clear dates" variant="secondary" small onPress={() => { p.setFromDate(''); p.setToDate(''); }} style={{ flex: 1 }} />
+          <Btn title="Apply Filters" icon="refresh" variant="accent" small onPress={() => { setFiltersOpen(false); void load(); }} loading={loading} style={{ flex: 2 }} />
+        </View>
+      </Card>
+      <Card title="Quantity Summary">
+        <View style={s.issueSummaryBox}>
+          <Text style={s.issueSummaryLabel}>TOTAL QTY</Text>
+          <Text style={s.issueSummaryQty} selectable>{loading ? '…' : totalQtyText}</Text>
+          <View style={s.issueSummaryDivider} />
+          <View style={s.issueSummaryRow}>
+            <Text style={s.issueSummaryCountLabel}>Matching Issues</Text>
+            <Text style={s.issueSummaryCount}>{loading ? '…' : list.length}</Text>
+          </View>
+          {!!q.trim() && <Text style={s.issueSummaryHint}>Based on your current search</Text>}
+        </View>
+      </Card>
+    </View>
   );
 
   const header = (
@@ -343,6 +377,12 @@ function ListView(p: {
         <TextInput value={q} onChangeText={setQ} placeholder="Search issue no, beam, design, remark…" placeholderTextColor={T.muted} style={s.searchInput} autoCorrect={false} />
         {!!q && <TouchableOpacity onPress={() => setQ('')} hitSlop={HIT}><Icon name="close" size={16} color={T.muted} /></TouchableOpacity>}
       </View>
+      {!wide && (
+        <View style={s.mobileQtySummary}>
+          <Text style={s.mobileQtySummaryLabel}>Total Qty: <Text style={s.mobileQtySummaryValue}>{loading ? '…' : totalQtyText}</Text></Text>
+          <Text style={s.mobileQtySummaryLabel}>Issues: <Text style={s.mobileQtySummaryValue}>{loading ? '…' : list.length}</Text></Text>
+        </View>
+      )}
       <View style={s.chipLine}>
         <Pill label={prp?.LngName || 'Select Property'} fg={T.nav} bg={T.alt} icon="business" />
         <Pill label={year?.YearName || 'Select Year'} fg={T.nav} bg={T.alt} icon="event" />
@@ -1238,6 +1278,17 @@ const s = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingHorizontal: 11 },
   searchInput: { flex: 1, fontSize: 13.5, color: T.ink, paddingVertical: 0 },
   chipLine: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  issueSummaryBox: { backgroundColor: T.sub, borderRadius: 11, padding: 14, borderWidth: 1, borderColor: T.hair },
+  issueSummaryLabel: { fontSize: 10, fontWeight: '900', color: T.muted, letterSpacing: 0.7 },
+  issueSummaryQty: { fontSize: 25, fontWeight: '900', color: T.ink, fontFamily: MONO, marginTop: 5 },
+  issueSummaryDivider: { height: 1, backgroundColor: T.border, marginVertical: 12 },
+  issueSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  issueSummaryCountLabel: { fontSize: 12.5, fontWeight: '700', color: T.muted },
+  issueSummaryCount: { fontSize: 14, fontWeight: '900', color: T.ink, fontFamily: MONO },
+  issueSummaryHint: { fontSize: 11, color: T.muted, fontWeight: '600', marginTop: 10 },
+  mobileQtySummary: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, backgroundColor: T.sub, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
+  mobileQtySummaryLabel: { fontSize: 12, fontWeight: '700', color: T.muted },
+  mobileQtySummaryValue: { fontWeight: '900', color: T.ink, fontFamily: MONO },
 
   modeIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${T.copper}1A`, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 20 },
   modeTitle: { fontSize: 16, fontWeight: '900', color: T.ink, textAlign: 'center', marginVertical: 16 },

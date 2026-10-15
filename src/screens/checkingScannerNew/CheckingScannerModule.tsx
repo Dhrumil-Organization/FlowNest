@@ -1273,16 +1273,39 @@ function ScannerList(p: {
                     <Text style={s.rowTitle} numberOfLines={1}>{str(item.DsnName) || '-'}</Text>
                     {!!item.GrdName && <Pill label={str(item.GrdName)} fg={T.green} bg={`${T.green}14`} />}
                   </View>
-                  <View style={s.metaRow}>
+                  {/* <View style={s.metaRow}>
                     <Meta k="BEAM NO" v={str(item.BeamNo)} />
                     <Meta k="TAKA" v={str(item.TakaNo)} />
                     <Meta k="METER" v={`${str(item.Qty)} m`} />
+                  </View> */}
+
+
+                  {/* Taka No - Full Width */}
+                  <View style={s.takaCard}>
+                    <Text style={s.takaLabel}>TAKA NUMBER</Text>
+                    <Text style={s.takaValue}>
+                      {str(item.TakaNo) || '-'}
+                    </Text>
                   </View>
+
+                  {/* Beam No + Meter */}
+                  <View style={s.beamMeterRow}>
+                    <View style={s.beamMeterCol}>
+                      <Meta k="BEAM NO" v={str(item.BeamNo)} />
+                    </View>
+
+                    <View style={s.beamMeterCol}>
+                      <Meta k="METER" v={`${str(item.Qty)} m`} />
+                    </View>
+                  </View>
+
+                  {/* Weight + Avg WT + Linked Order */}
                   <View style={s.metaRow}>
                     <Meta k="WEIGHT" v={str(item.Wt)} />
                     <Meta k="AVG WT" v={str(item.AvgWt)} />
                     <Meta k="LINKED ORDER" v={str(item.LinkedOrderNo)} />
                   </View>
+
                   <Text style={s.rowSub} numberOfLines={1}>Design: {str(item.OrdDsnName || item.DsnName)}</Text>
                   {last && (
                     <View style={s.lastBox}>
@@ -1437,5 +1460,45 @@ const s = StyleSheet.create({
   camFrame: { width: 240, height: 240, borderWidth: 3, borderColor: T.copper, borderRadius: 18 },
   camNo: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   camNoText: { color: '#fff', fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
+
+  takaCard: {
+    backgroundColor: `${T.blue}08`,
+    borderWidth: 1,
+    borderColor: `${T.blue}25`,
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  takaLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: T.muted,
+    letterSpacing: 0.7,
+  },
+
+  takaValue: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: T.ink,
+    marginTop: 3,
+    fontFamily: MONO,
+  },
+
+  beamMeterRow: {
+    flexDirection: 'row',
+    width: '100%',
+    alignItems: 'flex-start',
+    marginTop: 12,
+    marginBottom: 2,
+  },
+
+  beamMeterCol: {
+    width: '50%',
+    flexGrow: 0,
+    flexShrink: 0,
+    minWidth: 0,
+  },
+
 });
 

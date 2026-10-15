@@ -4,6 +4,36 @@ export const r3 = (n: any) => Math.round((Number(n) || 0) * 1000) / 1000;
 export const f2 = (n: any) => (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
 export const f3 = (n: any) => (Math.round((Number(n) || 0) * 1000) / 1000).toFixed(3);
 
+// Sum at the issue level. A browse issue contains nested groups and carton
+// lines, so adding all three totals would count the same quantity repeatedly.
+// Fall back to group/line quantities only if the parent total is absent.
+const numericQty = (value: any): number | null => {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number(typeof value === 'string' ? value.replace(/,/g, '').trim() : value);
+    return Number.isFinite(n) ? n : null;
+};
+
+export const browseIssueQtyKg = (issue: any): number => {
+    const issueQty = numericQty(issue?.TotQty);
+    if (issueQty !== null) return issueQty;
+    const groups = Array.isArray(issue?.groups) ? issue.groups : [];
+    return groups.reduce((total: number, group: any) => {
+        const groupQty = numericQty(group?.TotQty);
+        if (groupQty !== null) return total + groupQty;
+        const lines = Array.isArray(group?.lines) ? group.lines : [];
+        return total + lines.reduce((sum: number, line: any) => sum + (numericQty(line?.Qty) ?? 0), 0);
+    }, 0);
+};
+
+// Stable Indian-number grouping without relying on platform-specific Intl support.
+export const formatBrowseQty = (quantity: number): string => {
+    const [whole, decimals] = quantity.toFixed(3).split('.');
+    const negative = whole.startsWith('-');
+    const digits = negative ? whole.slice(1) : whole;
+    const leading = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    return `${negative ? '-' : ''}${leading ? `${leading},` : ''}${digits.slice(-3)}.${decimals}`;
+};
+
 const p2 = (n: number) => String(n).padStart(2, '0');
 
 /** Date -> 20260928 (what the backend stores in IssDate) */

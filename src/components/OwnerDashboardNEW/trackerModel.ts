@@ -157,6 +157,11 @@ export const STATUS_LEGEND: { status: StageStatus; label: string }[] = [
   { status: 'skip', label: 'Not needed' },
 ];
 
+/** Not started = dark grey, Not needed = periwinkle blue (dashed ring). Text colour of the matching pills below. */
+export const NOT_STARTED = '#5F6672';
+export const NOT_NEEDED = '#5B7FD6';
+export const NOT_NEEDED_TEXT = '#3A55B0';
+
 /** NEW ERP theme colours of each stage status. */
 export const statusColor = (status: StageStatus | undefined): string => {
   switch (status) {
@@ -168,6 +173,10 @@ export const statusColor = (status: StageStatus | undefined): string => {
       return T.yd;
     case 'overdue':
       return T.red;
+    case 'pending':
+      return NOT_STARTED;
+    case 'skip':
+      return NOT_NEEDED;
     default:
       return T.muted;
   }

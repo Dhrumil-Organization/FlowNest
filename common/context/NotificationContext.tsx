@@ -88,7 +88,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Credit Limit Request', 'credit-limit'],
     ['Outstanding Days Request', 'outstanding-days-request'],
     // ['Receivables', 'Receivables-Screen'],
-    ['Receivables' , 'receivables-screen'],
+    ['Receivables', 'receivables-screen'],
     ['Collection', 'Collection'],
     ['Yarn Purchase Order', 'yarn-purchase-order'],
     ['Production Order Tracking', 'production-order-tracking'],
@@ -99,7 +99,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Sales Order Tracking', 'sales-order-tracking'],
     ['Daily Payment Report', 'daily-payment-report'],
     ['Inquiry', 'Inquiry'],
-    ['Sudamo Production Order', 'sudamo-production-order'],
+    ['Sudamo Production Order Auth', 'sudamo-production-order'],
     ['New Account Request', 'new-account-request'],
     ['Yarn Stock Verification', 'yarnstockverification'],
     ['Sales Order(Inactive)', 'sales order-inactive'],
@@ -142,6 +142,7 @@ const LEGACY_NOTIFICATION_ROUTES: { name: string; route: string }[] = [
     ['Sudamo Sales Order Entry', 'sudamo-sales-order-entry'],
     ['Fabric Stock Verification', 'fabric-stock-verification'],
     ['Weft Carton Issue', 'weft-carton-issue-new'],
+    ['Taka History', 'taka-history'],
 ].map(([name, route]) => ({ name, route }));
 
 // Legacy route / Legacy Home app name (lower-case) -> New ERP route name
@@ -179,6 +180,7 @@ const NEW_ROUTE_ALIASES: Record<string, string> = {
     'quarterwisedispatch': 'quarter-summary',
     'sales-order-entry': 'orders',
     'sales order entry': 'orders',
+    'taka-history': 'taka-history',
 };
 
 const getLegacyUserMenuNames = async (): Promise<Set<string>> => {

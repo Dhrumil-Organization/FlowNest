@@ -151,7 +151,7 @@ export function NotificationProvider({
         { name: 'Sales Analysis', route: 'sales-analysis' },
         { name: 'Daily Payment Report', route: 'daily-payment-report' },
         { name: 'Inquiry', route: 'Inquiry' },
-        { name: 'Sudamo Production Order', route: 'sudamo-production-order' },
+        { name: 'Sudamo Production Order Auth', route: 'sudamo-production-order' },
         { name: 'New Account Request', route: 'new-account-request' },
         { name: 'Yarn Stock Verification', route: 'yarnstockverification' },
         { name: 'Sales Order(Inactive)', route: 'sales order-inactive' },
@@ -194,6 +194,7 @@ export function NotificationProvider({
         { name: 'Weft Issue Return', route: 'weft-issue-return' },
         { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry' },
         { name: 'Fabric Stock Verification', route: 'fabric-stock-verification' },
+        { name: 'Taka History', route: 'taka-history' },
     ];
 
     const readLegacyHomeRights = async () => {

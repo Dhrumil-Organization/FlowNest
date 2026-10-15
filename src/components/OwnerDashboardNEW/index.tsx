@@ -41,15 +41,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Btn, CONTENT_MAX, DateField, IconBtn, PickField, ProgressBar, SearchBox, Sheet } from '../erpUi';
-import { getOwnerSummaryDashboard, OwnerSummaryError } from './api';
-import { ExecutiveOrders } from './OrderTracker';
+import { Btn, CONTENT_MAX, IconBtn, PickField, ProgressBar, SearchBox, Sheet } from '../erpUi';
+import { getCriterionExecutives, getOwnerSummaryDashboard, OwnerSummaryError } from './api';
+import { PRP_CODE, stageYearNo } from './prodOrderModel';
 import {
   count,
   DASH,
   efficiencyBand,
   money,
-  monthLabel,
   mtrs,
   percent,
   rpm,
@@ -57,10 +56,16 @@ import {
   ymdLabel,
   type Num,
   type OwnerDeploymentRow,
+  type OwnerExecutiveOption,
   type OwnerExecutiveRow,
   type OwnerProductionRow,
-  type OwnerSummaryData,
+  type OwnerSummaryData
 } from './model';
+import { ExecutiveOrders } from './OrderTracker';
+import ProductionOrders from './ProductionOrders';
+import StageAssignment from './StageAssignment';
+import { FONT, loadOwnerFonts } from './fonts';
+
 
 type Props = { token: string; API: string; username?: string; prptype?: string };
 
@@ -370,25 +375,41 @@ function EffPill({ value, threshold }: { value: Num; threshold: number }) {
 /* Screen                                                              */
 /* ------------------------------------------------------------------ */
 
-export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) {
-  const { mode, setMode } = useDashboardAmountMode();
+type SalesProps = Props & {
+  executive: { code: string; name: string };
+  onPickExecutive: (opt: { code: string; name: string }) => void;
+  mode: DashboardAmountMode;
+  refreshTick: number;
+};
+
+function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExecutive, mode, refreshTick }: SalesProps) {
 
   const [date, setDate] = useState<Date>(() => new Date());
-  const [executive, setExecutive] = useState<{ code: string; name: string }>({ code: '', name: 'All' });
 
   const [data, setData] = useState<OwnerSummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<{ message: string; denied: boolean } | null>(null);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerSearch, setPickerSearch] = useState('');
   const [contentWidth, setContentWidth] = useState(0);
   // Executive Summary drill-down: tapped executive -> open sales orders -> sales order detail.
   const [drill, setDrill] = useState<{ code: string; name: string } | null>(null);
 
   const requestSeq = useRef(0);
   const isoDate = toIsoDate(date);
+
+
+  const getCurrentFinancialYearMain = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+    // Financial year starts in April
+    const financialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    const financialYearEnd = financialYearStart + 1;
+
+    return `${financialYearStart}-${financialYearEnd}`;
+  };
 
   const load = useCallback(
     async (opts: { silent?: boolean; refresh?: boolean } = {}) => {
@@ -399,7 +420,7 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
 
       try {
         const result = await getOwnerSummaryDashboard(API, token, {
-          date: isoDate,
+          yearno: getCurrentFinancialYearMain(),
           prptype: prptype || 'S',
           executive_code: executive.code,
           refresh: opts.refresh ? 1 : 0,
@@ -432,6 +453,15 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
 
   const onRefresh = useCallback(() => void load({ silent: true, refresh: true }), [load]);
 
+  // Refresh button of the shared filter
+  const lastTick = useRef(refreshTick);
+  useEffect(() => {
+    if (refreshTick !== lastTick.current) {
+      lastTick.current = refreshTick;
+      onRefresh();
+    }
+  }, [refreshTick, onRefresh]);
+
   const kpiCols = contentWidth >= 1160 ? 7 : contentWidth >= 820 ? 4 : contentWidth >= 520 ? 3 : 2;
   const twoUp = contentWidth >= 820;
   const isPhone = contentWidth > 0 && contentWidth < 560;
@@ -442,18 +472,6 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
   const production = data?.production;
   const deployment = data?.deployment;
   const threshold = production?.low_efficiency_threshold ?? alerts?.low_efficiency_threshold ?? 90;
-
-  const executiveOptions = useMemo(() => {
-    const list = [{ code: '', name: 'All' }, ...(data?.executives || [])];
-    const q = pickerSearch.trim().toLowerCase();
-    return q ? list.filter((e) => e.name.toLowerCase().includes(q)) : list;
-  }, [data?.executives, pickerSearch]);
-
-  const pickExecutive = (opt: { code: string; name: string }) => {
-    setExecutive(opt);
-    setPickerOpen(false);
-    setPickerSearch('');
-  };
 
   /* ----------------------------- columns ----------------------------- */
 
@@ -538,43 +556,6 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
         }
       >
         <View style={st.content} onLayout={(e) => setContentWidth(e.nativeEvent.layout.width)}>
-          {/* ------------------------------ filters ------------------------------ */}
-          <View style={st.filterCard}>
-            <View style={[st.filterRow, isPhone && { flexWrap: 'wrap' }]}>
-              <View style={[st.filterField, isPhone ? { flexBasis: '58%', flexGrow: 1 } : { width: 190 }]}>
-                <Text style={st.filterLabel}>Date</Text>
-                <DateField value={date} onChange={setDate} />
-              </View>
-
-              <View style={[st.filterField, isPhone ? { flexBasis: '34%', flexGrow: 1 } : { width: 120 }]}>
-                <Text style={st.filterLabel}>Month</Text>
-                <View style={st.monthPill}>
-                  <Icon name="calendar-today" size={16} color={T.copper} />
-                  <Text style={st.monthText} numberOfLines={1}>
-                    {monthLabel(date)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[st.filterField, isPhone ? { flexBasis: '100%' } : { flex: 1, minWidth: 200, maxWidth: 340 }]}>
-                <Text style={st.filterLabel}>Executive Name</Text>
-                <PickField
-                  value={executive.name}
-                  icon="person-outline"
-                  onPress={() => setPickerOpen(true)}
-                  onClear={executive.code ? () => pickExecutive({ code: '', name: 'All' }) : undefined}
-                />
-              </View>
-
-              {!isPhone ? <View style={{ flex: 1 }} /> : null}
-
-              <View style={[st.filterActions, isPhone && { flexBasis: '100%', justifyContent: 'space-between' }]}>
-                <AmountDisplayModeControl mode={mode} onChange={(m: DashboardAmountMode) => setMode(m)} compact />
-                <IconBtn icon="refresh" label="Refresh" onPress={onRefresh} loading={refreshing} tone="soft" color={T.copper} />
-              </View>
-            </View>
-          </View>
-
           {/* ------------------------------ states ------------------------------- */}
           {loading && !data ? (
             <View style={st.stateBox}>
@@ -699,9 +680,8 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
               <View style={[st.duo, !twoUp && { flexDirection: 'column' }]}>
                 <Panel
                   title="Profit Overview"
-                  meta={`Company  ·  ${data.filters.month_label}${
-                    profit?.expense_through_ymd ? `  ·  expense through ${ymdLabel(profit.expense_through_ymd)}` : ''
-                  }`}
+                  meta={`Company  ·  ${data.filters.month_label}${profit?.expense_through_ymd ? `  ·  expense through ${ymdLabel(profit.expense_through_ymd)}` : ''
+                    }`}
                   icon="insights"
                   accent={T.blue}
                   style={twoUp ? { flex: 1 } : undefined}
@@ -836,7 +816,7 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
                 accent={T.nav}
                 right={
                   executive.code ? (
-                    <Btn label="Show all" icon="close" kind="soft" compact onPress={() => pickExecutive({ code: '', name: 'All' })} />
+                    <Btn label="Show all" icon="close" kind="soft" compact onPress={() => onPickExecutive({ code: '', name: 'All' })} />
                   ) : undefined
                 }
               >
@@ -878,7 +858,194 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
         />
       ) : null}
 
-      {/* ------------------------------ executive picker ------------------------------ */}
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Module entry: Sales orders | Production orders (Production opens first) */
+/* ------------------------------------------------------------------ */
+
+type ModuleTab = 'sales' | 'production';
+// outer tabs: Order (everything that was on the dashboard before) | Setup (item x stage -> person)
+type Section = 'order' | 'setup';
+
+export default function OwnerDashboardNEW(props: Props) {
+  const { mode, setMode } = useDashboardAmountMode();
+  const [section, setSection] = useState<Section>('order'); // Order opens first
+  const [setupVisited, setSetupVisited] = useState(false); // Setup loads only once it is opened
+  const [tab, setTab] = useState<ModuleTab>('production');
+  useEffect(() => {
+    loadOwnerFonts();
+  }, []);
+  const [executive, setExecutive] = useState<{ code: string; name: string }>({ code: '', name: 'All' });
+  const [executives, setExecutives] = useState<OwnerExecutiveOption[]>([]); // from get_criterion only
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [width, setWidth] = useState(0);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const isPhone = width > 0 && width < 560;
+
+  const tabs: { key: ModuleTab; label: string }[] = [
+    { key: 'sales', label: 'Sales orders' },
+    { key: 'production', label: 'Production orders' },
+  ];
+
+  // dropdown list: get_criterion (prpcode SIP, strcode 012, txntype sales_order, fetch salesexe)
+  useEffect(() => {
+    let alive = true;
+    getCriterionExecutives(props.API, props.token, { prpcode: PRP_CODE, yearno: stageYearNo() })
+      .then((list) => {
+        if (alive) setExecutives(list);
+      })
+      .catch(() => {
+        /* keep the fallback list */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [props.API, props.token]);
+
+  const executiveOptions = useMemo(() => {
+    const list = [{ code: '', name: 'All' }, ...executives];
+    const q = pickerSearch.trim().toLowerCase();
+    return q ? list.filter((e) => e.name.toLowerCase().includes(q)) : list;
+  }, [executives, pickerSearch]);
+
+  const pickExecutive = useCallback((opt: { code: string; name: string }) => {
+    setExecutive(opt);
+    setPickerOpen(false);
+    setPickerSearch('');
+  }, []);
+
+  const openSection = (k: Section) => {
+    setSection(k);
+    if (k === 'setup') setSetupVisited(true);
+  };
+  const sectionTabs: { key: Section; label: string }[] = [
+    { key: 'order', label: 'Order' },
+    { key: 'setup', label: 'Setup' },
+  ];
+  // the Order / Setup bar is hidden only while a production order detail is open (same rule as the inner tabs)
+  const hideSectionBar = section === 'order' && tab === 'production' && detailOpen;
+
+  return (
+    <View style={st.screen}>
+      {hideSectionBar ? null : (
+        <View style={st.tabBarWrap}>
+          <View style={st.tabBarInner}>
+            <View style={[st.tabBar, st.sectionBar]}>
+              {sectionTabs.map((t) => {
+                const on = section === t.key;
+                return (
+                  <TouchableOpacity
+                    key={t.key}
+                    activeOpacity={0.8}
+                    onPress={() => openSection(t.key)}
+                    style={[st.tabBtn, on && st.tabBtnOn]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: on }}
+                  >
+                    <Text style={[st.tabText, on && st.tabTextOn]} numberOfLines={1}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Setup tab: mounted on first open, then kept (display toggled) so typed values survive tab switches */}
+      {setupVisited ? (
+        <View style={{ flex: 1, display: section === 'setup' ? 'flex' : 'none' }}>
+          <StageAssignment token={props.token} API={props.API} />
+        </View>
+      ) : null}
+
+      {/* Order tab: the original dashboard, untouched, just wrapped */}
+      <View style={{ flex: 1, display: section === 'order' ? 'flex' : 'none' }}>
+      {/* ------------- shared filter: above the tabs, applies to both ------------- */}
+      {/* filter + tabs are shown only on the main page, not while a production order detail is open */}
+      {tab === 'production' && detailOpen ? null : (
+      <View style={st.tabBarWrap}>
+        <View style={st.tabBarInner} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+          <View style={st.filterCard}>
+            <View style={[st.filterRow, isPhone && { flexWrap: 'wrap' }]}>
+              <View style={[st.filterField, isPhone ? { flexBasis: '100%' } : { flex: 1, minWidth: 260, maxWidth: 420 }]}>
+                <Text style={st.filterLabel}>Executive</Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                <PickField
+                  value={executive.name}
+                  icon="person-outline"
+                  onPress={() => setPickerOpen(true)}
+                  onClear={executive.code ? () => pickExecutive({ code: '', name: 'All' }) : undefined}
+                />
+                </View>
+              </View>
+
+              {!isPhone ? <View style={{ flex: 1 }} /> : null}
+
+              <View style={[st.filterActions, isPhone && { flexBasis: '100%', justifyContent: 'space-between' }]}>
+                <AmountDisplayModeControl mode={mode} onChange={(m: DashboardAmountMode) => setMode(m)} compact />
+                <IconBtn icon="refresh" label="Refresh" onPress={() => setRefreshTick((n) => n + 1)} tone="soft" color={T.copper} />
+              </View>
+            </View>
+          </View>
+
+          {/* tabs are hidden while a production order detail is open */}
+          {tab === 'production' && detailOpen ? null : (
+          <View style={st.tabBar}>
+            {tabs.map((t) => {
+              const on = tab === t.key;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  activeOpacity={0.8}
+                  onPress={() => setTab(t.key)}
+                  style={[st.tabBtn, on && st.tabBtnOn]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                >
+                  <Text style={[st.tabText, on && st.tabTextOn]} numberOfLines={1}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          )}
+        </View>
+      </View>
+      )}
+
+      {/* both tabs stay mounted (state is kept when switching); the hidden one just is not drawn */}
+      <View style={{ flex: 1, display: tab === 'production' ? 'flex' : 'none' }}>
+        <ProductionOrders
+          token={props.token}
+          API={props.API}
+          prptype={props.prptype || 'S'}
+          executiveCode={executive.code}
+          refreshTick={refreshTick}
+          onDetailChange={setDetailOpen}
+        />
+      </View>
+      {tab === 'sales' ? (
+      <View style={{ flex: 1 }}>
+        <SalesOrdersDashboard
+          {...props}
+          executive={executive}
+          onPickExecutive={pickExecutive}
+          mode={mode}
+          refreshTick={refreshTick}
+        />
+      </View>
+      ) : null}
+
+      </View>
+
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} eyebrow="FILTER" title="Executive Name" wideMax={460}>
         <SearchBox value={pickerSearch} onChangeText={setPickerSearch} placeholder="Search executive…" />
         <View>
@@ -913,6 +1080,25 @@ export default function OwnerDashboardNEW({ token, API, prptype = 'S' }: Props) 
 
 const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: T.bg },
+  tabBarWrap: { paddingHorizontal: 12, paddingTop: 8 },
+  tabBarInner: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', gap: 8 },
+  tabBar: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    maxWidth: 420,
+    width: '100%',
+    backgroundColor: T.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.border,
+    padding: 3,
+    gap: 3,
+  },
+  sectionBar: { maxWidth: 260 },
+  tabBtn: { flex: 1, height: 36, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  tabBtnOn: { backgroundColor: T.nav },
+  tabText: { fontFamily: FONT, fontSize: 13, fontWeight: '800', color: T.nav },
+  tabTextOn: { color: '#fff' },
   scroll: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 32 },
   content: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', gap: 12 },
 
@@ -922,14 +1108,15 @@ const st = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: T.border,
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     ...S.card,
     shadowOpacity: 0.04,
     elevation: 1,
   },
-  filterRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
-  filterField: { gap: 6 },
-  filterLabel: { fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  filterField: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterLabel: { fontFamily: FONT, fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
   monthPill: {
     height: 44,
     flexDirection: 'row',
@@ -941,8 +1128,8 @@ const st = StyleSheet.create({
     borderColor: T.border,
     backgroundColor: T.sub,
   },
-  monthText: { fontSize: 14, fontWeight: '800', color: T.nav },
-  filterActions: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 44 },
+  monthText: { fontFamily: FONT, fontSize: 14, fontWeight: '800', color: T.nav },
+  filterActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
   // states
   stateBox: {
@@ -955,14 +1142,14 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
   },
-  stateText: { marginTop: 10, fontSize: 13, fontWeight: '700', color: T.muted },
+  stateText: { marginTop: 10, fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.muted },
   errorBox: { borderColor: `${T.red}40`, backgroundColor: `${T.red}08` },
-  errorText: { marginTop: 8, fontSize: 13, fontWeight: '700', color: T.red, textAlign: 'center', maxWidth: 520 },
+  errorText: { marginTop: 8, fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.red, textAlign: 'center', maxWidth: 520 },
 
   // section heading
   sectionHead: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 4, flexWrap: 'wrap' },
-  sectionTitle: { fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' },
-  sectionMeta: { fontSize: 11.5, fontWeight: '600', color: T.muted, flexShrink: 1 },
+  sectionTitle: { fontFamily: FONT, fontSize: 12, fontWeight: '900', color: T.nav, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionMeta: { fontFamily: FONT, fontSize: 11.5, fontWeight: '600', color: T.muted, flexShrink: 1 },
 
   // tiles
   grid: { flexDirection: 'row', flexWrap: 'wrap', margin: -4 },
@@ -987,6 +1174,7 @@ const st = StyleSheet.create({
   tileHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 28 },
   tileLabel: {
     flex: 1,
+    fontFamily: FONT,
     fontSize: 10.5,
     lineHeight: 14,
     fontWeight: '800',
@@ -995,8 +1183,8 @@ const st = StyleSheet.create({
     textTransform: 'uppercase',
   },
   tileIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  tileValue: { fontSize: 20, fontWeight: '900', color: T.ink, marginTop: 6 },
-  tileSub: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 4 },
+  tileValue: { fontFamily: FONT, fontSize: 20, fontWeight: '900', color: T.ink, marginTop: 6 },
+  tileSub: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 4 },
 
   // panels
   duo: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
@@ -1020,8 +1208,8 @@ const st = StyleSheet.create({
     borderBottomColor: T.hair,
   },
   panelIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  panelTitle: { fontSize: 13, fontWeight: '900', color: T.nav, letterSpacing: 0.6, textTransform: 'uppercase' },
-  panelMeta: { fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
+  panelTitle: { fontFamily: FONT, fontSize: 13, fontWeight: '900', color: T.nav, letterSpacing: 0.6, textTransform: 'uppercase' },
+  panelMeta: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 1 },
   panelBody: { paddingHorizontal: 12, paddingVertical: 4 },
 
   statusLine: {
@@ -1033,8 +1221,8 @@ const st = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.hair,
   },
-  statusLabel: { fontSize: 13, fontWeight: '700', color: T.ink },
-  statusSub: { fontSize: 10.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+  statusLabel: { fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.ink },
+  statusSub: { fontFamily: FONT, fontSize: 10.5, fontWeight: '600', color: T.muted, marginTop: 1 },
   statusBox: {
     minWidth: 128,
     maxWidth: '52%',
@@ -1044,7 +1232,7 @@ const st = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  statusValue: { fontSize: 14.5, fontWeight: '900' },
+  statusValue: { fontFamily: FONT, fontSize: 14.5, fontWeight: '900' },
 
   note: {
     flexDirection: 'row',
@@ -1057,12 +1245,12 @@ const st = StyleSheet.create({
     backgroundColor: T.sub,
   },
   noteWarn: { backgroundColor: `${T.amber}12` },
-  noteText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '600', color: T.muted },
+  noteText: { flex: 1, fontFamily: FONT, fontSize: 11, lineHeight: 15, fontWeight: '600', color: T.muted },
 
   // table
   th: { flexDirection: 'row', minHeight: 38 },
   thCell: { justifyContent: 'center' },
-  thText: { fontSize: 11, lineHeight: 14, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  thText: { fontFamily: FONT, fontSize: 11, lineHeight: 14, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
   tr: { flexDirection: 'row', minHeight: 40, alignItems: 'stretch', borderBottomWidth: 1, borderBottomColor: T.hair },
   trAlt: { backgroundColor: T.sub },
   trSelected: { backgroundColor: `${T.copper}18` },
@@ -1070,14 +1258,14 @@ const st = StyleSheet.create({
   td: { paddingHorizontal: 10, paddingVertical: 8, justifyContent: 'center', minWidth: 0 },
   tdFirst: { paddingLeft: 14 },
   tdRight: { alignItems: 'flex-end' },
-  tdText: { fontSize: 12.5, fontWeight: '600', color: T.ink },
+  tdText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.ink },
   tdTextFirst: { fontWeight: '800', color: T.nav },
   tdTextTotal: { fontWeight: '900' },
   tableEmpty: { paddingVertical: 22, alignItems: 'center' },
-  tableEmptyText: { fontSize: 12.5, fontWeight: '600', color: T.muted, textAlign: 'center', paddingVertical: 8 },
+  tableEmptyText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.muted, textAlign: 'center', paddingVertical: 8 },
 
   effPill: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
-  effText: { fontSize: 12, fontWeight: '800' },
+  effText: { fontFamily: FONT, fontSize: 12, fontWeight: '800' },
 
   // picker
   option: {
@@ -1091,7 +1279,7 @@ const st = StyleSheet.create({
     borderBottomColor: T.hair,
   },
   optionOn: { backgroundColor: `${T.copper}12` },
-  optionText: { flex: 1, fontSize: 14, fontWeight: '700', color: T.ink },
+  optionText: { flex: 1, fontFamily: FONT, fontSize: 14, fontWeight: '700', color: T.ink },
 
-  footer: { fontSize: 10.5, lineHeight: 15, fontWeight: '600', color: T.muted, textAlign: 'center', marginTop: 2 },
+  footer: { fontFamily: FONT, fontSize: 10.5, lineHeight: 15, fontWeight: '600', color: T.muted, textAlign: 'center', marginTop: 2 },
 });

@@ -27,7 +27,7 @@ import IssueEntry, { SavedEntry } from './components/IssueEntry';
 import type { Beam } from './components/LineFields';
 import LineRow from './components/LineRow';
 import ScannerModal from './components/ScannerModal';
-import { f2, parseCartonQr, r3, toDmy, toYmd, typeOf, ymdShow } from './helpers';
+import { browseIssueQtyKg, f2, formatBrowseQty, parseCartonQr, r3, toDmy, toYmd, typeOf, ymdShow } from './helpers';
 import { C, s } from './styles';
 import type { Carton } from './types';
 
@@ -148,6 +148,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
     const [tab, setTab] = useState<'issue' | 'beams'>('beams');
     const [listW, setListW] = useState(0);
     const [propPick, setPropPick] = useState(false);
+    const [yearPick, setYearPick] = useState(false);
     const { width: screenWidth } = useWindowDimensions();
     const isMobile = screenWidth < 700;
     // Beams tab grid: 1 card per row on phones, 2 on tablets, 3 on laptops, 4 on wide screens
@@ -490,6 +491,14 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         );
     }, [issuesView, browseSearch]);
 
+    // Use precisely the same issues as the card list after search/filtering.
+    // TotQty already represents the issue's entire carton quantity in kg.
+    const matchingQtyKg = useMemo(() =>
+        filteredIssues.reduce((sum: number, issue: any) => sum + browseIssueQtyKg(issue), 0),
+        [filteredIssues]
+    );
+    const matchingQtyText = useMemo(() => formatBrowseQty(matchingQtyKg), [matchingQtyKg]);
+
     const renderIssueItem = useCallback(({ item }: { item: any }) => (
         <View style={[s.issCell, { maxWidth: `${100 / beamCols}%` as any }]}>
             <IssueCard iss={item} onEditLine={setEditLine} onDeleteLine={confirmDeleteLine} onDeleteIssue={confirmDeleteIssue} />
@@ -620,6 +629,22 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
         setToDate(d);
         if (d < fromDate) setFromDate(d);
     };
+    // The total belongs to the browse criteria, directly after Apply Filters
+    // on desktop. On narrow screens a compact total stays below the search.
+    const qtySummaryCard = tab === 'beams' ? (
+        <View style={s.qtySummaryCard}>
+            <Text style={s.qtySummaryHeading}>Quantity Summary</Text>
+            <Text style={s.qtySummaryLabel}>TOTAL QTY (KG)</Text>
+            <Text style={s.qtySummaryValue} selectable>{issuesLoading ? '…' : matchingQtyText}</Text>
+            <View style={s.qtySummaryDivider} />
+            <View style={s.qtySummaryCountRow}>
+                <Text style={s.qtySummaryCountLabel}>Matching Issues</Text>
+                <Text style={s.qtySummaryCount}>{issuesLoading ? '…' : filteredIssues.length}</Text>
+            </View>
+            {!!browseSearch.trim() && <Text style={s.qtySummaryHint}>Based on current search</Text>}
+        </View>
+    ) : null;
+
     // ONE common filter for both tabs: Property, Year, date range, Apply.
     const filterCard = (
         <Card title="Filter Records">
@@ -631,26 +656,12 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 onPress={() => setPropPick(true)}
             />
             <View style={{ marginBottom: 10 }}>
-                <Text style={s.filterLabel}>Year <Text style={{ color: C.bad }}>*</Text></Text>
-                {yearList.length > 0 ? (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {yearList.map((y: any, i: number) => {
-                            const on = String(y.YearNo) === String(selectedYearNo);
-                            return (
-                                <TouchableOpacity
-                                    key={`${y.YearNo}-${i}`}
-                                    onPress={() => handleYearChange(y)}
-                                    activeOpacity={0.8}
-                                    style={{ paddingHorizontal: 14, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: on ? C.primary : C.line, backgroundColor: on ? C.primary : C.surface }}
-                                >
-                                    <Text style={{ fontSize: 13, fontWeight: '800', color: on ? '#fff' : C.ink }}>{y.YearName || y.YearNo}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                ) : (
-                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: C.ink2 }}>{selectedProperty ? 'No years data available' : 'Select a property first'}</Text>
-                )}
+                <SelectBox
+                    label="Year" required icon="expand-more"
+                    value={selectedYear ? (selectedYear.YearName || String(selectedYear.YearNo)) : null}
+                    placeholder={selectedProperty ? (yearList.length ? 'Choose year...' : 'No years data available') : 'Select a property first'}
+                    onPress={() => { if (yearList.length > 0) setYearPick(true); }}
+                />
             </View>
             <Text style={[s.filterLabel, { marginTop: 4 }]}>Issue Date Range</Text>
             <DateInput label="From Date" value={fromDate} onChange={setFrom} />
@@ -663,6 +674,7 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                 <Icon name="refresh" size={18} color="#fff" />
                 <Text style={s.btnPrimaryText}>Apply Filters</Text>
             </TouchableOpacity>
+            {wide && qtySummaryCard}
         </Card>
     );
 
@@ -728,6 +740,12 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                                     </TouchableOpacity>
                                 )}
                             </View>
+                            {!wide && (
+                                <View style={s.qtySummaryMobile}>
+                                    <Text style={s.qtySummaryMobileText}>Total Qty (kg): <Text style={s.qtySummaryMobileValue}>{issuesLoading ? '…' : matchingQtyText}</Text></Text>
+                                    <Text style={s.qtySummaryMobileText}>Issues: <Text style={s.qtySummaryMobileValue}>{issuesLoading ? '…' : filteredIssues.length}</Text></Text>
+                                </View>
+                            )}
                             {(showNewDesign || browseIsNewDesign) && (
                             <View style={s.filterRow}>
                                 <TouchableOpacity
@@ -810,6 +828,20 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
                     render={(x: any) => ({ title: x.LngName || x.PrpName || x.PrpCode, sub: [x.PrpCode, x.PrpType].filter(Boolean).join(' · ') })}
                     onPick={(x: any) => { setPropPick(false); handlePropertyChange(x); }}
                     emptyText="No properties available"
+                />
+            )}
+            {yearPick && (
+                <PickerSheet<any>
+                    visible
+                    title="Select Year"
+                    placeholder="Search year…"
+                    remote={false}
+                    onClose={() => setYearPick(false)}
+                    load={async () => yearList}
+                    keyOf={(x: any, i: number) => `${x.YearNo}-${i}`}
+                    render={(x: any) => ({ title: x.YearName || String(x.YearNo), sub: x.YearNo != null ? String(x.YearNo) : '' })}
+                    onPick={(x: any) => { setYearPick(false); handleYearChange(x); }}
+                    emptyText="No years data available"
                 />
             )}
 

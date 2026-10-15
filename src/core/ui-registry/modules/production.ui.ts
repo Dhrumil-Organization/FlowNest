@@ -40,7 +40,7 @@ registerUiNodes([
   {
     id: 'nav.sudamo_production_order',
     kind: 'navigation',
-    title: 'Sudamo Production Order',
+    title: 'Sudamo Production Order Auth',
     permission: 'production.sudamo_production_order',
     action: 'view',
     route: 'sudamo-production-order',
@@ -50,7 +50,7 @@ registerUiNodes([
   {
     id: 'screen.sudamo_production_order',
     kind: 'screen',
-    title: 'Sudamo Production Order',
+    title: 'Sudamo Production Order Auth',
     permission: 'production.sudamo_production_order',
     action: 'view',
     order: 100,

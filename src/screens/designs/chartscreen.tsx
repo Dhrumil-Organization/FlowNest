@@ -1,7 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/chartscreen.tsx
 // ERP-theme version. Same API as before.
-// Web fixes: visible scrollbar + drag-to-scroll + hover/tap tooltip on points.
+// Chart is FIXED (no horizontal scroll): it always fits the card width.
+//   mobile layout (card < 600px): shorter chart, touch + slide to inspect a rate
+//   web layout    (card >= 600px): taller chart, hover / click to inspect a rate
+// Works for both Item Wise and Party Wise.
 //  1) IN-SCREEN (Yarns tab in DesignsScreen):
 //       <ChartScreen item={...} d1Item={...} token={...} onBack={() => ...} />
 //  2) ROUTE (Purchase Order screen):
@@ -24,7 +27,7 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import client from '../../../common/API/client_fix_design';
 import { T } from '../../theme';
 
@@ -92,12 +95,8 @@ const COLORS = [
     '#A17C34', '#6A6DAD', '#4E819A', '#A76080', '#818B39', '#736353',
 ];
 const colorAt = (index: number) => COLORS[index] || `hsl(${Math.round(index * 137.508) % 360}, 62%, 43%)`;
-const AXIS_W = 64;
 const PLOT_TOP = 20;
-const PLOT_BOTTOM = 216;
-const PLOT_H = 265;
-const EVENT_STEP = 48;
-const X_START = 27;
+const NARROW = 600;   // card narrower than this => "mobile" layout, otherwise "web" layout
 
 // Shape-preserving monotone cubic interpolation in SVG screen coordinates.
 // - Every original purchase stays on the curve at its exact (x, y).
@@ -186,6 +185,7 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
 
 // One transaction occupies one timeline slot, even when date/rate are identical.
 // Each supplier joins ONLY its own purchase points, with no fabricated zeros.
+// The chart is FIXED: all rates always fit the card width (no horizontal scroll).
 function TrendChart({
     data,
     title,
@@ -203,9 +203,8 @@ function TrendChart({
 }) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [cardWidth, setCardWidth] = useState(0);
-    const scrollRef = useRef<ScrollView>(null);
-    const pointPick = useRef<(index: number) => void>(() => {});
-    const dragMeta = useRef({ n: 0 });
+    const plotRef = useRef<any>(null);
+    const pickX = useRef<(x: number) => void>(() => {});
 
     const points = useMemo(() => data
         .filter(p => Number.isFinite(Number(p.value)) && parseDate(p.date || p.label) !== null)
@@ -234,22 +233,32 @@ function TrendChart({
             .map(([key, group], index) => ({ key, name: group.name, points: group.points, color: colorAt(index) }));
     }, [points, mode]);
 
-    useEffect(() => { setSelectedId(null); scrollRef.current?.scrollTo({ x: 0, animated: false }); }, [data, mode]);
+    useEffect(() => { setSelectedId(null); }, [data, mode]);
 
+    // ── layout: everything derives from the real card width, so mobile and web each get their own look ──
     const actualWidth = cardWidth > 0 ? cardWidth : Math.min(windowWidth - 24, 1120);
-    const viewport = Math.max(180, actualWidth - 28 - AXIS_W);
-    const plotWidth = Math.max(viewport, 2 * X_START + Math.max(0, points.length - 1) * EVENT_STEP);
+    const narrow = actualWidth < NARROW;
+    const axisW = narrow ? 54 : 64;
+    const plotH = narrow ? 235 : 300;
+    const plotBottom = plotH - (narrow ? 44 : 49);
+    const plotWidth = Math.max(120, actualWidth - 28 - axisW);   // 28 = card padding (14 + 14)
+    const xStart = narrow ? 16 : 22;
+    const n = points.length;
+    const step = n > 1 ? (plotWidth - 2 * xStart) / (n - 1) : 0;
+    const xOf = (i: number) => (n > 1 ? xStart + i * step : plotWidth / 2);
+    const markerR = step < 6 ? 2.2 : step < 12 ? 3 : 4;
+    const tickFont = narrow ? 10.5 : 11.5;
+
     const allValues = points.map(p => p.value);
-    const latest = points.length ? points[points.length - 1].value : 0;
-    const minRate = points.length ? Math.min(...allValues) : 0;
-    const maxRate = points.length ? Math.max(...allValues) : 0;
-    const average = points.length ? allValues.reduce((sum, value) => sum + value, 0) / points.length : 0;
+    const latest = n ? points[n - 1].value : 0;
+    const minRate = n ? Math.min(...allValues) : 0;
+    const maxRate = n ? Math.max(...allValues) : 0;
+    const average = n ? allValues.reduce((sum, value) => sum + value, 0) / n : 0;
     const spread = maxRate - minRate;
     const buffer = spread > 0 ? spread * 0.12 : Math.max(1, Math.abs(maxRate) * 0.05);
     const low = minRate - buffer;
     const high = maxRate + buffer;
-    const xOf = (i: number) => X_START + i * EVENT_STEP;
-    const yOf = (v: number) => PLOT_BOTTOM - (v - low) / (high - low) * (PLOT_BOTTOM - PLOT_TOP);
+    const yOf = (v: number) => plotBottom - (v - low) / (high - low) * (plotBottom - PLOT_TOP);
     const yTicks = Array.from({ length: 5 }, (_, i) => high - (high - low) * i / 4);
     const pointIndices = useMemo(() => {
         const lookup = new Map<string, number>();
@@ -257,53 +266,29 @@ function TrendChart({
         return lookup;
     }, [points]);
     const selected = selectedId ? (points.find(p => p.id === selectedId) || null) : null;
-    dragMeta.current = { n: points.length };
-    pointPick.current = (index: number) => {
-        if (index >= 0 && index < points.length) setSelectedId(points[index].id);
+
+    // x position inside the plot -> nearest purchase
+    pickX.current = (x: number) => {
+        if (!n) return;
+        const raw = n > 1 ? Math.round((x - xStart) / step) : 0;
+        const index = Math.min(n - 1, Math.max(0, raw));
+        setSelectedId(points[index].id);
     };
 
-    // Desktop: drag horizontally, or simply move the pointer to inspect a
-    // transaction. The fixed rate axis is separate from the scrollable plot.
+    // Web: hover anywhere on the graph shows the nearest rate (touch / click is handled by the overlay below).
     useEffect(() => {
-        if (Platform.OS !== 'web' || !points.length) return;
-        const node: any = (scrollRef.current as any)?.getScrollableNode?.();
-        if (!node?.addEventListener) return;
-        let down = false;
-        let moved = false;
-        let downX = 0;
-        let left = 0;
-        node.style.cursor = 'grab';
-        const downHandler = (e: MouseEvent) => {
-            if (e.button !== 0) return;
-            down = true; moved = false; downX = e.pageX; left = node.scrollLeft;
-            node.style.cursor = 'grabbing';
-        };
-        const moveHandler = (e: MouseEvent) => {
-            if (down) {
-                const dx = e.pageX - downX;
-                if (Math.abs(dx) > 3) moved = true;
-                if (moved) node.scrollLeft = left - dx;
-                return;
-            }
+        if (Platform.OS !== 'web' || !n) return;
+        const node: any = plotRef.current;
+        if (!node?.addEventListener || !node.getBoundingClientRect) return;
+        const move = (e: MouseEvent) => {
             const rect = node.getBoundingClientRect();
-            const x = e.clientX - rect.left + node.scrollLeft;
-            const index = Math.round((x - X_START) / EVENT_STEP);
-            if (index >= 0 && index < dragMeta.current.n) pointPick.current(index);
+            pickX.current(e.clientX - rect.left);
         };
-        const upHandler = () => { down = false; node.style.cursor = 'grab'; };
-        node.addEventListener('mousedown', downHandler);
-        node.addEventListener('mousemove', moveHandler);
-        window.addEventListener('mouseup', upHandler);
-        node.addEventListener('mouseleave', upHandler);
-        return () => {
-            node.removeEventListener('mousedown', downHandler);
-            node.removeEventListener('mousemove', moveHandler);
-            window.removeEventListener('mouseup', upHandler);
-            node.removeEventListener('mouseleave', upHandler);
-        };
-    }, [points.length, mode]);
+        node.addEventListener('mousemove', move);
+        return () => node.removeEventListener('mousemove', move);
+    }, [n, mode, plotWidth]);
 
-    if (!points.length) {
+    if (!n) {
         return (
             <View style={st.card}>
                 <EmptyState icon="show-chart" title="No purchase rates found"
@@ -312,14 +297,16 @@ function TrendChart({
         );
     }
 
-    const axisLabelsStep = points.length <= 8 ? 1 : 3;
+    // only as many date labels as fit without overlapping
+    const maxLabels = Math.max(2, Math.floor(plotWidth / (narrow ? 58 : 76)));
+    const labelStep = Math.max(1, Math.ceil(n / maxLabels));
 
     return (
         <View style={st.card} onLayout={e => setCardWidth(e.nativeEvent.layout.width)}>
             <View style={st.trendHeader}>
                 <Icon name="show-chart" size={19} color="#fff" />
                 <Text style={st.trendHeaderText}>PRICE TREND</Text>
-                <Text style={st.trendCount}>{points.length} rates</Text>
+                <Text style={st.trendCount}>{n} rates</Text>
             </View>
             {!!title && <Text style={st.chartTitle}>{title}</Text>}
             <View style={st.statRow}>
@@ -343,70 +330,73 @@ function TrendChart({
                     </>
                 ) : (
                     <Text style={st.pointHint}>
-                        {Platform.OS === 'web' ? 'Hover over the graph or click a point for its rate' : 'Tap a point to see its rate and supplier'}
+                        {Platform.OS === 'web' ? 'Hover over the graph or click a point for its rate' : 'Touch the graph and slide to see each rate'}
                     </Text>
                 )}
             </View>
 
             <View style={st.chartBody}>
-                <Svg width={AXIS_W} height={PLOT_H}>
+                {/* fixed rate axis */}
+                <Svg width={axisW} height={plotH}>
                     {yTicks.map((tick, i) => (
-                        <SvgText key={`y-${i}`} x={AXIS_W - 7} y={yOf(tick) + 4}
-                            fontSize={11.5} fill={T.muted} textAnchor="end">
+                        <SvgText key={`y-${i}`} x={axisW - 6} y={yOf(tick) + 4}
+                            fontSize={tickFont} fill={T.muted} textAnchor="end">
                             {`₹${fmtINR(tick)}`}
                         </SvgText>
                     ))}
                 </Svg>
-                <View style={st.chartPlot}>
-                    <ScrollView ref={scrollRef} horizontal nestedScrollEnabled
-                        showsHorizontalScrollIndicator={Platform.OS === 'web'}
-                        contentContainerStyle={{ minWidth: viewport }}
-                        scrollEventThrottle={16}>
-                        <Svg width={plotWidth} height={PLOT_H}>
-                            {yTicks.map((tick, i) => (
-                                <Line key={`grid-${i}`} x1={0} x2={plotWidth} y1={yOf(tick)} y2={yOf(tick)}
-                                    stroke={T.border} strokeWidth={1} strokeDasharray="4 6" />
-                            ))}
-                            {selected && pointIndices.has(selected.id) && (
-                                <Line x1={xOf(pointIndices.get(selected.id)!)} x2={xOf(pointIndices.get(selected.id)!)}
-                                    y1={PLOT_TOP} y2={PLOT_BOTTOM} stroke={T.muted}
-                                    strokeOpacity={0.45} strokeDasharray="3 5" />
-                            )}
-                            {bySupplier.map(group => {
-                                const ordered = group.points.map(p => ({ p, i: pointIndices.get(p.id) ?? -1 }))
-                                    .filter(q => q.i >= 0);
-                                // Smooth only the visual path; the markers, transaction count,
-                                // interaction targets, and prices still use the actual purchases.
-                                const d = buildSmoothPricePath(ordered.map(q => ({
-                                    x: xOf(q.i), y: yOf(q.p.value),
-                                })));
-                                return d ? <Path key={group.key} d={d} stroke={group.color} fill="none"
-                                    strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" /> : null;
-                            })}
-                            {points.map((p, i) => {
-                                const group = mode === 'item' ? bySupplier[0] : bySupplier.find(g => g.key === `${p.prpcode}:${p.parcode}`);
-                                const color = group?.color || T.copper;
-                                const isSelected = selectedId === p.id;
-                                return (
-                                    <G key={p.id}>
-                                        <Circle cx={xOf(i)} cy={yOf(p.value)} r={isSelected ? 5.7 : 4}
-                                            fill={color} stroke="#fff" strokeWidth={isSelected ? 2.2 : 1.4} />
-                                        <Circle cx={xOf(i)} cy={yOf(p.value)} r={14} fill="transparent"
-                                            onPress={() => setSelectedId(p.id)} />
-                                    </G>
-                                );
-                            })}
-                            {points.map((p, i) => {
-                                if (i % axisLabelsStep !== 0) return null;
-                                const dt = parseDate(p.date || p.label);
-                                if (!dt) return null;
-                                return <SvgText key={`x-${p.id}`} x={xOf(i)} y={PLOT_BOTTOM + 23}
-                                    textAnchor="middle" fontSize={11.5} fill={T.muted}>
-                                    {formatShort(dt)}
-                                </SvgText>;
-                            })}
-                        </Svg>
-                    </ScrollView>
+
+                {/* fixed plot: always exactly the available width, no scrolling */}
+                <View ref={plotRef} style={{ width: plotWidth, height: plotH }}>
+                    <Svg width={plotWidth} height={plotH}>
+                        {yTicks.map((tick, i) => (
+                            <Line key={`grid-${i}`} x1={0} x2={plotWidth} y1={yOf(tick)} y2={yOf(tick)}
+                                stroke={T.border} strokeWidth={1} strokeDasharray="4 6" />
+                        ))}
+                        {selected && pointIndices.has(selected.id) && (
+                            <Line x1={xOf(pointIndices.get(selected.id)!)} x2={xOf(pointIndices.get(selected.id)!)}
+                                y1={PLOT_TOP} y2={plotBottom} stroke={T.muted}
+                                strokeOpacity={0.45} strokeDasharray="3 5" />
+                        )}
+                        {bySupplier.map(group => {
+                            const ordered = group.points.map(p => ({ p, i: pointIndices.get(p.id) ?? -1 }))
+                                .filter(q => q.i >= 0);
+                            // Smooth only the visual path; the markers, transaction count,
+                            // interaction targets, and prices still use the actual purchases.
+                            const d = buildSmoothPricePath(ordered.map(q => ({
+                                x: xOf(q.i), y: yOf(q.p.value),
+                            })));
+                            return d ? <Path key={group.key} d={d} stroke={group.color} fill="none"
+                                strokeWidth={narrow ? 2.2 : 2.8} strokeLinecap="round" strokeLinejoin="round" /> : null;
+                        })}
+                        {points.map((p, i) => {
+                            const group = mode === 'item' ? bySupplier[0] : bySupplier.find(g => g.key === `${p.prpcode}:${p.parcode}`);
+                            const color = group?.color || T.copper;
+                            const isSelected = selectedId === p.id;
+                            return (
+                                <Circle key={p.id} cx={xOf(i)} cy={yOf(p.value)}
+                                    r={isSelected ? markerR + 1.7 : markerR}
+                                    fill={color} stroke="#fff" strokeWidth={isSelected ? 2 : 1.2} />
+                            );
+                        })}
+                        {points.map((p, i) => {
+                            if (i % labelStep !== 0) return null;
+                            const dt = parseDate(p.date || p.label);
+                            if (!dt) return null;
+                            return <SvgText key={`x-${p.id}`} x={xOf(i)} y={plotBottom + 23}
+                                textAnchor="middle" fontSize={tickFont} fill={T.muted}>
+                                {formatShort(dt)}
+                            </SvgText>;
+                        })}
+                    </Svg>
+
+                    {/* transparent touch layer: tap / slide a finger (or click) on the graph to pick the nearest rate */}
+                    <View
+                        style={StyleSheet.absoluteFill}
+                        onStartShouldSetResponder={() => true}
+                        onResponderGrant={e => pickX.current(e.nativeEvent.locationX)}
+                        onResponderMove={e => pickX.current(e.nativeEvent.locationX)}
+                    />
                 </View>
             </View>
 
@@ -423,7 +413,7 @@ function TrendChart({
             <Text style={st.chartFooter}>
                 {isLegacy && mode === 'party'
                     ? 'Supplier comparison requires the updated purchase history API.'
-                    : `${points.length} individual purchase entries · Scroll horizontally to see all rates`}
+                    : `${n} individual purchase entries`}
             </Text>
         </View>
     );
@@ -837,7 +827,6 @@ const st = StyleSheet.create({
     trendHeaderText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1.1, flex: 1 },
     trendCount: { color: '#fff', fontSize: 11, fontWeight: '700' },
     chartBody: { flexDirection: 'row', alignItems: 'flex-start', width: '100%', minWidth: 0, marginTop: 8 },
-    chartPlot: { flex: 1, minWidth: 0, overflow: 'hidden' },
     pointReference: { fontSize: 10, color: T.muted, marginTop: 2 },
     legendRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%' },

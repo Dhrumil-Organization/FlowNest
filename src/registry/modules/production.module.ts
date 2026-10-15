@@ -68,8 +68,21 @@ registerPermissionArea({
           actions: [{ key: 'view', name: 'View' }],
         },
         {
+          // NEW: Production Order entry (SO based / Stock & sell + job work split).
+          key: 'production_order_entry',
+          name: 'Production Orders',
+          type: 'screen',
+          displayOrder: 45,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'edit', name: 'Edit' },
+            { key: 'delete', name: 'Delete' },
+          ],
+        },
+        {
           key: 'sudamo_production_order',
-          name: 'Sudamo Production Order',
+          name: 'Sudamo Production Order Auth',
           type: 'screen',
           displayOrder: 50,
           actions: [{ key: 'view', name: 'View' }],
@@ -207,6 +220,17 @@ registerPermissionArea({
           type: 'screen',
           displayOrder: 132,
           actions: [{ key: 'view', name: 'View' }],
+        },
+        {
+          // NEW: Packing Automation (route card → details → QR label print).
+          key: 'packing_automation',
+          name: 'Packing Automation',
+          type: 'screen',
+          displayOrder: 132,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Print labels' },
+          ],
         },
         {
           key: 'poy_rate_entry',
@@ -504,6 +528,13 @@ registerPermissionArea({
           displayOrder: 159,
           actions: [{ key: 'view', name: 'View' }],
         },
+         {
+          key: 'taka_history',
+          name: 'Taka History',
+          type: 'screen',
+          displayOrder: 161,
+          actions: [{ key: 'view', name: 'View' }],
+        },
         // Outward Scan Sticker — grey store job inward by scanning the fusion (checking) sticker: party ->
         // scan -> shade + qty (shortage / add to taka) -> GRYInw / D1 / D2; browse, modify, hard delete.
         // POST /api/grey_scan_inward/* (GreyScanInwardController)
@@ -557,9 +588,28 @@ registerUiNodes([
     order: 90,
   },
   {
+    // NEW: Production Order entry — route file app/new/(tabs)/production-orders.tsx
+    id: 'nav.production_order_entry',
+    kind: 'navigation',
+    title: 'Production Orders',
+    permission: 'production.production_order_entry',
+    action: 'view',
+    route: 'production-orders',
+    icon: 'precision-manufacturing',
+    order: 95,
+  },
+  {
+    id: 'screen.production_order_entry',
+    kind: 'screen',
+    title: 'Production Orders',
+    permission: 'production.production_order_entry',
+    action: 'view',
+    order: 95,
+  },
+  {
     id: 'nav.sudamo_production_order',
     kind: 'navigation',
-    title: 'Sudamo Production Order',
+    title: 'Sudamo Production Order Auth',
     permission: 'production.sudamo_production_order',
     action: 'view',
     route: 'sudamo-production-order',
@@ -569,7 +619,7 @@ registerUiNodes([
   {
     id: 'screen.sudamo_production_order',
     kind: 'screen',
-    title: 'Sudamo Production Order',
+    title: 'Sudamo Production Order Auth',
     permission: 'production.sudamo_production_order',
     action: 'view',
     order: 100,
@@ -1118,6 +1168,24 @@ registerUiNodes([
     action: 'view',
     order: 132,
   },
+  {
+    id: 'nav.packing_automation',
+    kind: 'navigation',
+    title: 'Packing Automation',
+    permission: 'production.packing_automation',
+    action: 'view',
+    route: 'packing-automation',
+    icon: 'qr-code-2',
+    order: 132,
+  },
+  {
+    id: 'screen.packing_automation',
+    kind: 'screen',
+    title: 'Packing Automation',
+    permission: 'production.packing_automation',
+    action: 'view',
+    order: 132,
+  },
   // POY Rate Entry (moved from the legacy ERP)
   {
     id: 'nav.poy_rate_entry',
@@ -1574,7 +1642,7 @@ registerUiNodes([
     action: 'view',
     order: 156,
   },
-   {
+  {
     id: 'nav.weft_carton_issue_new',
     kind: 'navigation',
     title: 'Weft Carton Issue',
@@ -1668,6 +1736,24 @@ registerUiNodes([
     permission: 'production.outward_scan_sticker',
     action: 'view',
     order: 160,
-  }
+  },
+  {
+    id: 'nav.taka_history',
+    kind: 'navigation',
+    title: 'Taka History',
+    permission: 'production.taka_history',
+    action: 'view',
+    route: 'taka-history',
+    icon: 'shopping-cart-checkout',
+    order: 161,
+  },
+  {
+    id: 'screen.taka_history',
+    kind: 'screen',
+    title: 'Taka History',
+    permission: 'production.taka_history',
+    action: 'view',
+    order: 161,
+  },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

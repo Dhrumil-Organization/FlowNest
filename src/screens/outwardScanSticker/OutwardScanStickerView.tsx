@@ -25,6 +25,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
@@ -61,6 +62,7 @@ import {
   q3,
   r3,
   ShowData,
+  StaleRow,
   totals,
   unwrap,
   validate,
@@ -84,7 +86,13 @@ export function OutwardScanStickerView() {
   const canEdit = canDo(RES, 'edit');
   const canDelete = canDo(RES, 'delete');
   const { width } = useWindowDimensions();
-  const wide = width >= 900;
+  // layout follows the space this screen really gets (side menu on web, iPad split view), not the window
+  const [cw, setCw] = useState(width);
+  const wide = cw >= 1000;        // desktop / iPad landscape: 2 taka cards per row, 4 header fields per row
+  const tablet = cw >= 600;       // iPad portrait / phone landscape: 3 header fields per row
+  const narrow = cw < 380;        // small phones
+  const grid = useMemo(() => makeGrid(cw, wide ? 4 : tablet ? 3 : 2, 26), [cw, wide, tablet]);
+  const cardW = wide ? Math.floor((Math.min(cw - 24, 1200) - 10) / 2) : undefined;
 
   const [tab, setTab] = useState<Tab>(canAdd ? 'entry' : 'browse');
   const [ctx, setCtx] = useState<{ prpcode: string; yearno: string } | null>(null);
@@ -151,19 +159,19 @@ export function OutwardScanStickerView() {
       const m: Meta = unwrap(await GreyScanInwardAPI.meta(c));
       setMeta(m);
       setHdr((h) => ({ ...h, enttype: h.enttype || (m.ent_types.length === 1 ? m.ent_types[0].code : '') }));
-      if (!shades.length) {
-        setShadesLoading(true);
-        GreyScanInwardAPI.shades({ ...c, all: 1 })
-          .then((r) => setShades((unwrap(r)?.shades || []).map((s: any) => ({ value: String(s.code), label: s.name || String(s.code), searchText: `${s.name} ${s.code}` }))))
-          .catch(() => undefined)
-          .finally(() => setShadesLoading(false));
-      }
+      // shade master of THIS property (reloaded whenever the property / year changes)
+      setShades([]);
+      setShadesLoading(true);
+      GreyScanInwardAPI.shades({ ...c, all: 1 })
+        .then((r) => setShades((unwrap(r)?.shades || []).map((s: any) => ({ value: String(s.code), label: s.name || String(s.code), searchText: `${s.name} ${s.code}` }))))
+        .catch(() => undefined)
+        .finally(() => setShadesLoading(false));
     } catch (err) {
       setMetaErr(errText(err, 'Unable to open Outward Scan Sticker.'));
     } finally {
       setLoading(false);
     }
-  }, [resolveCtx, shades.length]);
+  }, [resolveCtx]);
 
   const keyRef = useRef('');
   useFocusEffect(useCallback(() => {
@@ -176,10 +184,15 @@ export function OutwardScanStickerView() {
 
   /* draft: the unsaved new inward survives an app restart (per property / year) */
   const draftKey = ctx ? DRAFT_KEY + ctx.prpcode + '|' + ctx.yearno : '';
-  const draftLoaded = useRef(false);
+  const draftLoaded = useRef('');
   useEffect(() => {
-    if (!draftKey || draftLoaded.current) return;
-    draftLoaded.current = true;
+    if (!draftKey || draftLoaded.current === draftKey) return;
+    const first = draftLoaded.current === '';
+    draftLoaded.current = draftKey;
+    if (!first) {
+      // property / year switched: the takas on screen belong to the old one — start clean for the new one
+      setEditUid(''); setEditNo(''); setParty(''); setEntries([]); setHdr(emptyHeader()); setGrns([]);
+    }
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(draftKey);
@@ -187,8 +200,9 @@ export function OutwardScanStickerView() {
         if (d && Array.isArray(d.entries) && d.entries.length && d.party) {
           setParty(d.party);
           setHdr({ ...emptyHeader(), ...d.hdr });
-          setEntries(d.entries);
-          say('warn', `Unsaved inward restored — ${d.entries.length} taka(s).`);
+          setEntries(d.entries.map((e: Entry) => ({ ...e, stale: undefined, note: undefined })));
+          say('warn', `Unsaved inward restored — ${d.entries.length} taka(s). Checking their balances…`);
+          void recheckRef.current?.(d.party, d.entries);
         }
       } catch {
         // no draft
@@ -196,13 +210,49 @@ export function OutwardScanStickerView() {
     })();
   }, [draftKey, say]);
   useEffect(() => {
-    if (!draftKey || !draftLoaded.current || editUid) return;
+    if (!draftKey || draftLoaded.current !== draftKey || editUid) return;
     const t = setTimeout(() => {
       const v = entries.length ? JSON.stringify({ party, hdr, entries }) : '';
       (v ? AsyncStorage.setItem(draftKey, v) : AsyncStorage.removeItem(draftKey)).catch(() => undefined);
     }, 600);
     return () => clearTimeout(t);
   }, [draftKey, party, hdr, entries, editUid]);
+
+  /**
+   * Takas kept on this phone (restored draft, or a save refused because someone else received them meanwhile):
+   * take the server's current balance, mark what changed, so the user corrects the kg before saving.
+   */
+  const applyStale = useCallback((rows: StaleRow[]) => {
+    const m: Record<string, StaleRow> = {};
+    rows.forEach((x) => { m[x.key] = x; });
+    setEntries((list) => list.map((e) => {
+      const x = m[e.key];
+      if (!x) return e;
+      const by = x.inwno ? ` in inward ${x.inwno}${x.inwdate ? ' (' + dmy(x.inwdate) + ')' : ''}${x.user ? ' by ' + x.user : ''}` : '';
+      if (x.status === 'used' || (x.status === undefined && x.bal <= 0.0005)) {
+        return { ...e, bal: 0, stale: 'used', note: `Already fully received${by}. Remove this taka.` };
+      }
+      if (x.status === 'missing' || x.status === 'party') {
+        return { ...e, stale: 'used', note: x.status === 'party' ? 'This taka is no longer pending with this party. Remove it.' : 'Outward taka not found any more. Remove it.' };
+      }
+      if (x.status === 'ok') return { ...e, stale: undefined, note: undefined, bal: x.bal };
+      return { ...e, bal: x.bal, stale: 'changed', note: `Balance changed ${q3(x.seen ?? e.bal)} → ${q3(x.bal)}${by}. Check the kg.` };
+    }));
+  }, []);
+  const recheckRef = useRef<((par: string, list: Entry[]) => Promise<void>) | null>(null);
+  recheckRef.current = async (par: string, list: Entry[]) => {
+    if (!list.length) return;
+    try {
+      const d = unwrap(await GreyScanInwardAPI.recheck(body({ parcode: par, uid: editUid || 0, pieces: list.map((e) => ({ outuid: e.outuid, outsrno: e.outsrno, outsubsr: e.outsubsr, bal: e.bal })) })));
+      const rows: StaleRow[] = d?.pieces || [];
+      applyStale(rows);
+      const bad = rows.filter((x) => x.status !== 'ok').length;
+      if (bad) say('err', `${bad} taka(s) were received elsewhere after scanning — see the marked cards.`);
+      else say('ok', 'All restored takas are still pending with the same balance.');
+    } catch {
+      // offline: the save will check again on the server
+    }
+  };
 
   /* G.R.N. of the party */
   const applyGrn = useCallback((g: Grn | null) => {
@@ -320,6 +370,9 @@ export function OutwardScanStickerView() {
   const problems = useMemo(() => validate(meta, party, hdr, entries), [meta, party, hdr, entries]);
   const tot = useMemo(() => totals(entries, meta?.max_excess_factor), [entries, meta]);
   const badKeys = useMemo(() => new Set(problems.filter((p) => p.key).map((p) => p.key as string)), [problems]);
+  const hintEl = entries.length && problems.length
+    ? <Text style={[st.footHint, tablet && { flexBasis: '100%' }]} numberOfLines={2}>Next: {problems[0].text}</Text>
+    : null;
 
   const doSave = async () => {
     setShowProblems(true);
@@ -344,7 +397,7 @@ export function OutwardScanStickerView() {
   const reallySave = async () => {
     setSaving(true);
     try {
-      const res: any = await GreyScanInwardAPI.save(body(payload(editUid, party, hdr, entries)));
+      const res: any = await GreyScanInwardAPI.save(body({ ...payload(editUid, party, hdr, entries), source: Platform.OS }));
       const d = unwrap(res);
       const msg = res?.data?.message || `Inward ${d?.inwno} saved.`;
       if (draftKey) AsyncStorage.removeItem(draftKey).catch(() => undefined);
@@ -356,10 +409,22 @@ export function OutwardScanStickerView() {
       AppAlert.alert(wasEdit ? 'Modified' : 'Saved', msg);
       say('ok', msg);
       if (wasEdit) setTab('browse');
-    } catch (err) {
+    } catch (err: any) {
       const m = errText(err, 'Save failed.');
-      AppAlert.alert('Not saved', m);
-      say('err', m.split('\n')[0]);
+      const stale: StaleRow[] | undefined = err?.response?.data?.code === 'stale' ? err.response.data.stale : undefined;
+      if (stale && stale.length) {
+        // someone else received these takas after they were scanned here: update balances, mark the cards, nothing was saved
+        applyStale(stale.map((x) => ({ ...x, status: x.bal <= 0.0005 ? 'used' : 'changed' })));
+        setShowProblems(true);
+        const used = stale.filter((x) => x.bal <= 0.0005).map((x) => x.key);
+        AppAlert.alert('Not saved — takas changed', m, used.length
+          ? [{ text: 'Check myself', style: 'cancel' }, { text: `Remove ${used.length} received taka(s)`, onPress: () => setEntries((list) => list.filter((e) => !used.includes(e.key))) }]
+          : [{ text: 'OK' }]);
+        say('err', 'Not saved — ' + stale.length + ' taka(s) changed meanwhile. Marked cards show the new balance.');
+      } else {
+        AppAlert.alert('Not saved', m);
+        say('err', m.split('\n')[0]);
+      }
     } finally {
       setSaving(false);
     }
@@ -448,7 +513,8 @@ export function OutwardScanStickerView() {
   );
 
   return (
-    <View style={st.root}>
+    <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      onLayout={(ev: any) => { const w = Math.round(ev?.nativeEvent?.layout?.width || 0); if (w && Math.abs(w - cw) > 2) setCw(w); }}>
       {header}
       {flash ? (
         <View style={[st.flash, flash.kind === 'ok' ? st.flashOk : flash.kind === 'warn' ? st.flashWarn : st.flashErr]}>
@@ -464,6 +530,8 @@ export function OutwardScanStickerView() {
           body={body}
           tick={browseTick}
           wide={wide}
+          tablet={tablet}
+          cw={cw}
           canEdit={canEdit}
           canDelete={canDelete}
           editingUid={editUid}
@@ -475,7 +543,7 @@ export function OutwardScanStickerView() {
         />
       ) : (
         <>
-          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={[st.pad, { paddingBottom: 140 }]} keyboardShouldPersistTaps="handled"
+          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={[st.pad, { paddingBottom: 24 }]} keyboardShouldPersistTaps="handled"
             refreshControl={<RefreshControl refreshing={false} onRefresh={() => { void loadMeta(); void loadGrn(party, editUid); }} />}>
             <View style={st.wrap}>
               {editUid ? (
@@ -498,28 +566,47 @@ export function OutwardScanStickerView() {
                   { n: 5, t: 'Save', d: problems.length ? 'Waiting' : 'Ready', ok: false },
                 ];
                 const cur = steps.find((x) => !x.ok)?.n || 5;
+                const curStep = steps[cur - 1];
+                const helpBtn = (
+                  <TouchableOpacity style={st.helpBtn} onPress={() => setHelpOpen((v) => !v)} accessibilityLabel="How to enter">
+                    <Icon name={helpOpen ? 'close' : 'help-outline'} size={18} color={T.blue} />
+                    <Text style={st.helpBtnText}>{helpOpen ? 'Close' : tablet ? 'How to enter' : 'Help'}</Text>
+                  </TouchableOpacity>
+                );
+                if (!tablet) {
+                  // phone: one clear line — which step, what it needs — and a 5-part progress bar
+                  return (
+                    <View style={st.stepsPhone}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={st.stepPhoneT} numberOfLines={1}>{'Step ' + cur + ' of 5 · ' + curStep.t}</Text>
+                        <Text style={st.stepD} numberOfLines={1}>{curStep.d}</Text>
+                        <View style={st.progress}>
+                          {steps.map((x) => (
+                            <View key={x.n} style={[st.progSeg, x.ok && { backgroundColor: T.green }, x.n === cur && { backgroundColor: T.copper }]} />
+                          ))}
+                        </View>
+                      </View>
+                      {helpBtn}
+                    </View>
+                  );
+                }
                 return (
                   <View style={st.steps}>
                     {steps.map((x) => {
                       const on = x.n === cur;
                       return (
-                        <View key={x.n} style={[st.step, on && st.stepOn, x.ok && st.stepOk, !wide && !on && st.stepMini]}>
+                        <View key={x.n} style={[st.step, on && st.stepOn, x.ok && st.stepOk]}>
                           <View style={[st.stepDot, on && { backgroundColor: T.copper }, x.ok && { backgroundColor: T.green }]}>
                             {x.ok ? <Icon name="check" size={13} color="#fff" /> : <Text style={st.stepNum}>{x.n}</Text>}
                           </View>
-                          {wide || on ? (
-                            <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={[st.stepT, on && { color: T.copper }]} numberOfLines={1}>{x.t}</Text>
-                              <Text style={st.stepD} numberOfLines={1}>{x.d}</Text>
-                            </View>
-                          ) : null}
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={[st.stepT, on && { color: T.copper }]} numberOfLines={1}>{x.t}</Text>
+                            {wide ? <Text style={st.stepD} numberOfLines={1}>{x.d}</Text> : null}
+                          </View>
                         </View>
                       );
                     })}
-                    <TouchableOpacity style={st.helpBtn} onPress={() => setHelpOpen((v) => !v)} accessibilityLabel="How to enter">
-                      <Icon name={helpOpen ? 'close' : 'help-outline'} size={18} color={T.blue} />
-                      {wide ? <Text style={st.helpBtnText}>{helpOpen ? 'Close help' : 'How to enter'}</Text> : null}
-                    </TouchableOpacity>
+                    {helpBtn}
                   </View>
                 );
               })()}
@@ -528,26 +615,26 @@ export function OutwardScanStickerView() {
               {/* ----------------------------- header ----------------------------- */}
               <View style={st.card}>
                 <Text style={st.cardEyebrow}>JOB INWARD · GREY STORE</Text>
-                <View style={[st.grid, wide && st.gridWide]}>
+                <View style={st.grid}>
                   <SelectField label="Party (pending outward)" required value={party} options={partyOpts} onChange={(v) => chooseParty(v)}
-                    placeholder="Select party…" disabled={!!editUid} onRefresh={() => void loadMeta()} style={wide ? st.col3 : st.colFull} />
+                    placeholder="Select party…" disabled={!!editUid} onRefresh={() => void loadMeta()} style={grid.w(2, 1, 1)} />
                   <SelectField label={meta.require_grn ? 'G.R.N.' : 'G.R.N. (optional)'} required={meta.require_grn} value={hdr.gruid ? `${hdr.gruid}-${hdr.grsrno}` : ''} options={grnOpts}
                     onChange={(v) => chooseGrn(v)} loading={grnLoading} disabled={!party || (!grnLoading && !grns.length)} disabledHint={!party ? 'Select party first' : 'No pending G.R.N. — not needed'}
                     clearable={!meta.require_grn}
-                    placeholder={party && !grnLoading && !grns.length ? 'No pending G.R.N. — not needed' : 'Select G.R.N. (optional)…'} onRefresh={() => void loadGrn(party, editUid)} style={wide ? st.col3 : st.colFull} />
-                  <SelectField label="Job A/c" required value={hdr.acccode} options={accOpts} onChange={(v) => setHdr((h) => ({ ...h, acccode: v }))} style={wide ? st.col3 : st.colFull} />
-                  <SelectField label="Entry type" required value={hdr.enttype} options={entOpts} onChange={(v) => setHdr((h) => ({ ...h, enttype: v }))} style={wide ? st.col3 : st.colHalf} />
-                  <Field label="Store No" required value={hdr.strsr} onChange={(v) => setHdr((h) => ({ ...h, strsr: v.slice(0, 20) }))} placeholder="e.g. R-12" style={wide ? st.col3 : st.colHalf} />
-                  <Field label="Bill / challan no." required value={hdr.billno} onChange={(v) => setHdr((h) => ({ ...h, billno: v.slice(0, 30) }))} placeholder="Party challan" style={wide ? st.col3 : st.colHalf} />
-                  <View style={wide ? st.col3 : st.colHalf}>
+                    placeholder={party && !grnLoading && !grns.length ? 'No pending G.R.N. — not needed' : 'Select G.R.N. (optional)…'} onRefresh={() => void loadGrn(party, editUid)} style={grid.w(2, 1, 1)} />
+                  <SelectField label="Job A/c" required value={hdr.acccode} options={accOpts} onChange={(v) => setHdr((h) => ({ ...h, acccode: v }))} style={grid.w(2, 1, 1)} />
+                  <SelectField label="Entry type" required value={hdr.enttype} options={entOpts} onChange={(v) => setHdr((h) => ({ ...h, enttype: v }))} style={grid.w(1, 1, 1)} />
+                  <Field label="Store No" required value={hdr.strsr} onChange={(v) => setHdr((h) => ({ ...h, strsr: v.slice(0, 20) }))} placeholder="e.g. R-12" style={grid.w(1, 1, 1)} />
+                  <Field label="Bill / challan no." required value={hdr.billno} onChange={(v) => setHdr((h) => ({ ...h, billno: v.slice(0, 30) }))} placeholder="Party challan" style={grid.w(1, 1, 1)} />
+                  <View style={grid.w(1, 1, 1)}>
                     <Text style={st.label}>Bill date</Text>
                     <PoyDateField value={isoToDate(hdr.billdate)} onChange={(d) => setHdr((h) => ({ ...h, billdate: dateToIso(d) }))} />
                   </View>
-                  <View style={wide ? st.col3 : st.colHalf}>
+                  <View style={grid.w(1, 1, 1)}>
                     <Text style={st.label}>Inward date<Text style={{ color: T.red }}> *</Text></Text>
                     <PoyDateField value={isoToDate(hdr.inwdate)} onChange={(d) => setHdr((h) => ({ ...h, inwdate: dateToIso(d) }))} />
                   </View>
-                  <Field label="Remark" value={hdr.remark} onChange={(v) => setHdr((h) => ({ ...h, remark: v.slice(0, 100) }))} placeholder="Optional" style={wide ? st.col3 : st.colFull} />
+                  <Field label="Remark" value={hdr.remark} onChange={(v) => setHdr((h) => ({ ...h, remark: v.slice(0, 100) }))} placeholder="Optional" style={grid.w(1, 1, 4)} />
                 </View>
                 {party ? (() => {
                   const p = meta.parties.find((x) => x.code === party);
@@ -564,15 +651,15 @@ export function OutwardScanStickerView() {
               </View>
 
               {/* ----------------------------- scan bar ----------------------------- */}
-              <View style={[st.card, st.scanCard]}>
-                <TouchableOpacity style={[st.scanBtn, (!party || busy) && { opacity: 0.5 }]} disabled={!party || busy} onPress={() => setScanOpen(true)} accessibilityLabel="Scan sticker with camera">
+              <View style={[st.card, st.scanCard, !tablet && { flexDirection: 'column', alignItems: 'stretch' }]}>
+                <TouchableOpacity style={[st.scanBtn, !tablet && { minWidth: 0 }, (!party || busy) && { opacity: 0.5 }]} disabled={!party || busy} onPress={() => setScanOpen(true)} accessibilityLabel="Scan sticker with camera">
                   {busy ? <ActivityIndicator color="#fff" /> : <Icon name="qr-code-scanner" size={26} color="#fff" />}
                   <View>
                     <Text style={st.scanBtnText}>Scan sticker</Text>
                     <Text style={st.scanBtnSub}>{party ? partyName : 'Select party first'}</Text>
                   </View>
                 </TouchableOpacity>
-                <View style={st.typeWrap}>
+                <View style={[st.typeWrap, !tablet && { minWidth: 0 }]}>
                   <TextInput
                     ref={typeRef}
                     value={typed}
@@ -606,7 +693,7 @@ export function OutwardScanStickerView() {
               {!entries.length ? (
                 <View style={st.empty}>
                   <Text style={st.emptyTitle}>{party ? 'Add the takas — 3 ways' : 'Step 1 — choose the party (mill) above'}</Text>
-                  <View style={[st.ways, wide && { flexDirection: 'row' }]}>
+                  <View style={[st.ways, tablet && { flexDirection: 'row' }]}>
                     <Way icon="photo-camera" title="Camera" text="Press “Scan sticker” and point at the fusion sticker QR." onPress={party ? () => setScanOpen(true) : undefined} />
                     <Way icon="qr-code-scanner" title="Scanner gun" text="Click the “Scanner / taka no.” box once, then shoot each sticker." onPress={party ? () => typeRef.current?.focus?.() : undefined} />
                     <Way icon="keyboard" title="Manual" text="Type the taka no. + Enter, or open “Pending list” and tap a taka." onPress={party ? () => setPendingOpen(true) : undefined} />
@@ -620,13 +707,15 @@ export function OutwardScanStickerView() {
                       key={e.key}
                       e={e}
                       wide={wide}
+                      cardW={cardW}
+                      narrow={narrow}
                       maxF={meta.max_excess_factor}
                       hi={hiKey === e.key}
                       bad={showProblems && badKeys.has(e.key)}
-                      onQty={(id, v) => patchLine(e.key, id, { qty: cleanQty(v) })}
+                      onQty={(id, v) => patch(e.key, (x) => ({ ...x, ...(x.stale === 'changed' ? { stale: undefined } : {}), lines: x.lines.map((l) => (l.id === id ? { ...l, qty: cleanQty(v) } : l)) }))}
                       onShade={(id) => setShadeTarget({ key: e.key, id })}
                       onRemoveLine={(id) => patch(e.key, (x) => ({ ...x, lines: x.lines.filter((l) => l.id !== id) }))}
-                      onShortage={() => patch(e.key, (x) => ({ ...x, shortage: !x.shortage }))}
+                      onShortage={() => patch(e.key, (x) => ({ ...x, ...(x.stale === 'changed' ? { stale: undefined } : {}), shortage: !x.shortage }))}
                       onAddLine={() => addLine(e)}
                       onFill={() => fillBalance(e)}
                       onRemove={() => removeEntry(e)}
@@ -639,21 +728,20 @@ export function OutwardScanStickerView() {
 
           {/* ----------------------------- footer ----------------------------- */}
           <View style={st.footer}>
-            <View style={[st.footInner, st.wrap]}>
-              <View style={st.footStats}>
+            <View style={[st.footInner, st.wrap, !tablet && st.footCol]}>
+              <View style={[st.footStats, !tablet && { minWidth: 0, alignSelf: 'stretch' }]}>
                 <Stat label="Takas" value={String(tot.takas)} sub={tot.lines > tot.takas ? `${tot.lines} lines` : undefined} />
                 <Stat label="Received" value={q3(tot.entered)} />
                 <Stat label="Shortage" value={q3(tot.shortage)} color={tot.shortage ? T.red : undefined} />
-                {wide || tot.excess ? <Stat label="Excess" value={q3(tot.excess)} color={tot.excess ? T.blue : undefined} /> : null}
-                {wide || tot.remain ? <Stat label="Stays pending" value={q3(tot.remain)} color={tot.remain ? T.amber : undefined} /> : null}
+                {tablet || tot.excess ? <Stat label="Excess" value={q3(tot.excess)} color={tot.excess ? T.blue : undefined} /> : null}
+                {tablet || tot.remain ? <Stat label={tablet ? 'Stays pending' : 'Pending'} value={q3(tot.remain)} color={tot.remain ? T.amber : undefined} /> : null}
               </View>
-              {entries.length && problems.length ? (
-                <Text style={st.footHint} numberOfLines={1}>Next: {problems[0].text}</Text>
-              ) : null}
-              <View style={st.footBtns}>
+              {!tablet ? hintEl : null}
+              <View style={[st.footBtns, !tablet && { alignSelf: 'stretch', marginLeft: 0 }]}>
                 {entries.length && !editUid ? <Btn label="Clear" kind="ghost" compact onPress={() => AppAlert.alert('Clear all?', 'Every scanned taka will be removed.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: () => resetEntry(true) }])} /> : null}
-                <Btn label={editUid ? 'Modify' : 'Save'} icon="save" kind="copper" loading={saving} disabled={!entries.length || !(editUid ? canEdit : canAdd)} onPress={() => void doSave()} style={{ minWidth: 120 }} />
+                <Btn label={editUid ? 'Modify' : 'Save'} icon="save" kind="copper" loading={saving} disabled={!entries.length || !(editUid ? canEdit : canAdd)} onPress={() => void doSave()} style={tablet ? { minWidth: 120 } : { flex: 1 }} />
               </View>
+              {tablet ? hintEl : null}
             </View>
           </View>
         </>
@@ -704,7 +792,7 @@ export function OutwardScanStickerView() {
         addedKeys={entries.map((e) => e.key)}
         onPick={(p) => addPiece(p)}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -712,8 +800,8 @@ export function OutwardScanStickerView() {
 /*  pieces                                                                                           */
 /* ================================================================================================= */
 
-function EntryCard({ e, wide, maxF, hi, bad, onQty, onShade, onRemoveLine, onShortage, onAddLine, onFill, onRemove }: {
-  e: Entry; wide: boolean; maxF: number; hi: boolean; bad: boolean;
+function EntryCard({ e, wide, cardW, narrow, maxF, hi, bad, onQty, onShade, onRemoveLine, onShortage, onAddLine, onFill, onRemove }: {
+  e: Entry; wide: boolean; cardW?: number; narrow?: boolean; maxF: number; hi: boolean; bad: boolean;
   onQty: (id: string, v: string) => void; onShade: (id: string) => void; onRemoveLine: (id: string) => void;
   onShortage: () => void; onAddLine: () => void; onFill: () => void; onRemove: () => void;
 }) {
@@ -725,7 +813,13 @@ function EntryCard({ e, wide, maxF, hi, bad, onQty, onShade, onRemoveLine, onSho
     c.status === 'excess' ? { t: `Excess ${q3(-c.sht)} · closes`, col: T.blue, bg: '#E9EEF6' } :
     { t: `${q3(c.remain)} stays pending`, col: T.amber, bg: '#FBF3E2' };
   return (
-    <View style={[st.entry, wide && st.entryWide, hi && st.entryHi, bad && st.entryBad]}>
+    <View style={[st.entry, cardW ? { width: cardW } : null, hi && st.entryHi, (bad || e.stale === 'used') && st.entryBad, e.stale === 'changed' && st.entryChanged]}>
+      {e.note && e.stale ? (
+        <View style={[st.staleBox, e.stale === 'used' ? st.staleUsed : st.staleChanged]}>
+          <Icon name={e.stale === 'used' ? 'block' : 'sync-problem'} size={16} color={e.stale === 'used' ? T.red : T.amber} />
+          <Text style={[st.staleText, { color: e.stale === 'used' ? T.red : T.ink }]}>{e.note}</Text>
+        </View>
+      ) : null}
       <View style={st.entryHead}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={st.taka}>TAKA {e.takano}</Text>
@@ -741,7 +835,7 @@ function EntryCard({ e, wide, maxF, hi, bad, onQty, onShade, onRemoveLine, onSho
 
       {e.lines.map((l, i) => (
         <View key={l.id} style={st.line}>
-          <Text style={[st.lineTag, i > 0 && { color: T.purple }]}>{i === 0 ? 'MAIN' : `ADD ${i}`}</Text>
+          <Text style={[st.lineTag, narrow && { width: 30 }, i > 0 && { color: T.purple }]}>{i === 0 ? 'MAIN' : narrow ? `+${i}` : `ADD ${i}`}</Text>
           <TouchableOpacity style={[st.shadeBtn, !l.shdcode && { borderColor: T.amber }]} onPress={() => onShade(l.id)} accessibilityLabel="Select shade">
             <Icon name="palette" size={15} color={l.shdcode ? T.nav : T.amber} />
             <Text style={[st.shadeText, !l.shdcode && { color: T.amber }]} numberOfLines={1}>{l.shdcode ? l.shdname || l.shdcode : 'Select shade'}</Text>
@@ -752,7 +846,7 @@ function EntryCard({ e, wide, maxF, hi, bad, onQty, onShade, onRemoveLine, onSho
             placeholder={i === 0 ? q3(e.bal) : 'qty'}
             placeholderTextColor={T.muted}
             keyboardType="decimal-pad"
-            style={[st.qty, !!l.qty && { borderColor: T.nav }]}
+            style={[st.qty, narrow && st.qtyNarrow, !!l.qty && { borderColor: T.nav }]}
             selectTextOnFocus
             accessibilityLabel={`Qty ${i === 0 ? 'main' : 'add ' + i}`}
           />
@@ -842,17 +936,19 @@ function PendingSheet({ open, onClose, body, party, partyName, addedKeys, onPick
 /*  browse                                                                                           */
 /* ================================================================================================= */
 
-function BrowsePane({ meta, body, tick, wide, canEdit, canDelete, editingUid, onEdit, onDeleted }: {
-  meta: Meta; body: (x?: Record<string, any>) => any; tick: number; wide: boolean; canEdit: boolean; canDelete: boolean;
+function BrowsePane({ meta, body, tick, wide, tablet, cw, canEdit, canDelete, editingUid, onEdit, onDeleted }: {
+  meta: Meta; body: (x?: Record<string, any>) => any; tick: number; wide: boolean; tablet: boolean; cw: number; canEdit: boolean; canDelete: boolean;
   editingUid: string; onEdit: (d: ShowData) => void; onDeleted: (inwno: string) => void;
 }) {
+  const grid = makeGrid(cw, wide ? 4 : 2, 26);
+  const rowW = wide ? Math.floor((Math.min(cw - 24, 1200) - 10) / 2) : undefined;
   const today = isoToday();
   const [from, setFrom] = useState(today.slice(0, 8) + '01');
   const [to, setTo] = useState(today);
   const [party, setParty] = useState('');
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<BrowseRow[]>([]);
-  const [info, setInfo] = useState<{ total: number; page: number; pages: number } | null>(null);
+  const [info, setInfo] = useState<{ total: number; total_qty: number; total_takas: number; page: number; pages: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [open, setOpen] = useState<string>('');
@@ -869,7 +965,7 @@ function BrowsePane({ meta, body, tick, wide, canEdit, canDelete, editingUid, on
       const d = unwrap(await GreyScanInwardAPI.browse(body({ fromdate: from, todate: to, parcode: party, search: q.trim(), page })));
       if (id !== req.current) return;
       setRows((r) => (page === 1 ? d.rows : [...r, ...d.rows]));
-      setInfo({ total: d.total, page: d.page, pages: d.pages });
+      setInfo({ total: d.total, total_qty: d.total_qty ?? 0, total_takas: d.total_takas ?? 0, page: d.page, pages: d.pages });
     } catch (e) {
       if (id === req.current) setErr(errText(e, 'Unable to load inwards.'));
     } finally {
@@ -939,31 +1035,33 @@ function BrowsePane({ meta, body, tick, wide, canEdit, canDelete, editingUid, on
                 return <TouchableOpacity key={x.l} style={[st.quick, on && st.quickOn]} onPress={() => { setFrom(x.f); setTo(x.t); }}><Text style={[st.quickText, on && { color: '#fff' }]}>{x.l}</Text></TouchableOpacity>;
               })}
             </View>
-            <View style={[st.grid, wide && st.gridWide]}>
-              <View style={wide ? st.col4 : st.colHalf}><Text style={st.label}>From</Text><PoyDateField value={isoToDate(from)} onChange={(d) => setFrom(dateToIso(d))} /></View>
-              <View style={wide ? st.col4 : st.colHalf}><Text style={st.label}>To</Text><PoyDateField value={isoToDate(to)} onChange={(d) => setTo(dateToIso(d))} /></View>
-              <SelectField label="Party" value={party} options={partyOpts} onChange={(v) => setParty(v)} style={wide ? st.col4 : st.colFull} />
-              <Field label="Search" value={q} onChange={setQ} placeholder="Inward / bill / taka no." style={wide ? st.col4 : st.colFull} />
+            <View style={st.grid}>
+              <View style={grid.w(1, 1, 1)}><Text style={st.label}>From</Text><PoyDateField value={isoToDate(from)} onChange={(d) => setFrom(dateToIso(d))} /></View>
+              <View style={grid.w(1, 1, 1)}><Text style={st.label}>To</Text><PoyDateField value={isoToDate(to)} onChange={(d) => setTo(dateToIso(d))} /></View>
+              <SelectField label="Party" value={party} options={partyOpts} onChange={(v) => setParty(v)} style={grid.w(2, 2, 1)} />
+              <Field label="Search" value={q} onChange={setQ} placeholder="Inward / bill / taka no." style={grid.w(2, 2, 1)} />
             </View>
           </View>
 
+          <Text style={[st.muted, { textAlign: 'left', marginBottom: 8 }]}>Only inwards made from Outward Scan Sticker (web, mobile app, iPad) are listed here.</Text>
           {err ? <View style={st.probBox}><Text style={st.probText}>{err}</Text></View> : null}
           {info ? (
             <View style={st.infoRow}>
               <Chip icon="inventory" text={`${info.total} inwards`} />
-              <Chip icon="straighten" text={`${q3(sum.qty)} · ${sum.takas} takas${info.pages > 1 ? ' (shown)' : ''}`} />
+              <Chip icon="straighten" text={`${q3(info.total_qty || sum.qty)} · ${info.total_takas || sum.takas} takas`} />
               {sum.sht ? <Chip icon="trending-down" text={`Shortage ${q3(sum.sht)}`} color={T.red} /> : null}
             </View>
           ) : null}
 
           <View style={[st.list, wide && st.listWide]}>
             {rows.map((r) => (
-              <Pressable key={r.uid} onPress={() => void openDetail(r.uid)} style={(s: any) => [st.bRow, wide && st.entryWide, (s.hovered || s.pressed) && { backgroundColor: T.sub }, r.uid === editingUid && { borderColor: T.amber }]}>
+              <Pressable key={r.uid} onPress={() => void openDetail(r.uid)} style={(s: any) => [st.bRow, rowW ? { width: rowW } : null, (s.hovered || s.pressed) && { backgroundColor: T.sub }, r.uid === editingUid && { borderColor: T.amber }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={st.bNo}>{r.inwno}</Text>
                     <Text style={st.entryMeta}>{dmy(r.inwdate)}</Text>
                     {r.lock ? <View style={st.lockTag}><Text style={st.lockText}>{r.lock}</Text></View> : null}
+                    {r.source ? <Text style={st.srcTag}>{srcLabel(r.source)}{r.modified ? ' · edited' : ''}</Text> : null}
                   </View>
                   <Text style={st.entrySub} numberOfLines={1}>{r.parname || r.parcode}</Text>
                   <Text style={st.entryMeta} numberOfLines={1}>Bill {r.billno || '—'} · {r.shade}{r.shades > 1 ? ` +${r.shades - 1}` : ''}{r.remark ? ` · ${r.remark}` : ''}</Text>
@@ -991,8 +1089,8 @@ function BrowsePane({ meta, body, tick, wide, canEdit, canDelete, editingUid, on
         notice={detail?.lock ? <View style={st.lockBox}><Icon name="lock" size={16} color={T.amber} /><Text style={st.lockBoxText}>{detail.lock}</Text></View> : undefined}
         footer={detail ? (
           <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
-            {canDelete ? <Btn label="Delete" icon="delete-forever" kind="danger" compact loading={deleting} disabled={!!detail.lock} onPress={() => del(detail)} /> : null}
-            {canEdit ? <Btn label="Modify" icon="edit" compact disabled={!!detail.lock} onPress={() => { setOpen(''); onEdit(detail); }} /> : null}
+            {canDelete ? <Btn label="Delete" icon="delete-forever" kind="danger" compact loading={deleting} disabled={!!detail.lock} onPress={() => del(detail)} style={!tablet ? { flex: 1 } : undefined} /> : null}
+            {canEdit ? <Btn label="Modify" icon="edit" compact disabled={!!detail.lock} onPress={() => { setOpen(''); onEdit(detail); }} style={!tablet ? { flex: 1 } : undefined} /> : null}
           </View>
         ) : undefined}
       >
@@ -1015,6 +1113,7 @@ function Detail({ d }: { d: ShowData }) {
     ['Bill', `${h.billno || '—'} · ${dmy(h.billdate)}`],
     ['Department', h.dptname || h.dptcode],
     ['Total', `${h.nettaka} takas · ${q3(h.netqty)}`],
+    ['Made on', d.source ? srcLabel(d.source) + (d.updated ? ' · edited' : '') : '—'],
   ];
   if (h.remark) kv.push(['Remark', h.remark]);
   return (
@@ -1050,6 +1149,8 @@ function Detail({ d }: { d: ShowData }) {
 /*  small parts                                                                                      */
 /* ================================================================================================= */
 
+const srcLabel = (s: string) => ({ web: 'Web', android: 'Android app', ios: 'iPhone / iPad', windows: 'Windows', macos: 'Mac' } as Record<string, string>)[s] || 'App';
+
 function HelpCard() {
   const rows: [string, string, string][] = [
     ['looks-one', 'Party', 'Choose the dyeing mill. Only mills with takas still out (pending job outward) are listed, with count and kg.'],
@@ -1060,7 +1161,7 @@ function HelpCard() {
     ['trending-up', 'More kg', 'Kg above the balance (100 vs 98) is saved as excess; the taka closes.'],
     ['hourglass-empty', 'Less kg', 'Not ticked: the rest stays pending on the outward and can be received later.'],
     ['add', 'Add to taka', 'Same taka, different shade for the extra / leftover kg — its own line.'],
-    ['save', 'Save', 'Shows totals first. Browse lists every inward: open, Modify or Delete (permanent).'],
+    ['save', 'Save', 'Shows totals first. Browse lists every inward made from this screen (web, app, iPad): open, Modify or Delete (permanent).'],
   ];
   return (
     <View style={[st.card, { gap: 8 }]}>
@@ -1084,6 +1185,21 @@ function Way({ icon, title, text, onPress }: { icon: string; title: string; text
       <Text style={st.wayD}>{text}</Text>
     </TouchableOpacity>
   );
+}
+
+/** fixed-width grid: identical on web, Android, iOS (no %-flex guessing). spans = columns on phone(2) / tablet(3) / desktop(4) */
+function makeGrid(cw: number, cols: number, cardInset: number) {
+  const gap = 10;
+  const inner = Math.max(240, Math.min(cw - 24, 1200) - cardInset);
+  const colW = (inner - gap * (cols - 1)) / cols;
+  return {
+    w: (phone: number, tab: number, desk: number) => {
+      const n = Math.min(cols, cols === 2 ? phone : cols === 3 ? tab : desk);
+      const w = Math.floor(n * colW + (n - 1) * gap);
+      // overrides SelectField's own `flex: 1, minWidth: 150` — fixed width, never grows / shrinks
+      return { width: w, flexBasis: w, flexGrow: 0, flexShrink: 0, minWidth: 0, maxWidth: w };
+    },
+  };
 }
 
 function Field({ label, value, onChange, placeholder, required, style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; style?: any }) {
@@ -1145,13 +1261,13 @@ const st = StyleSheet.create({
 
   card: { backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 12, marginBottom: 10 },
   cardEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: T.copper, marginBottom: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' },
   gridWide: { gap: 12 },
   colFull: { flexBasis: '100%', flexGrow: 1, minWidth: 0 },
   colHalf: { flexBasis: '46%', flexGrow: 1, minWidth: 140 },
   col3: { flexBasis: '31%', flexGrow: 1, minWidth: 200 },
   col4: { flexBasis: '23%', flexGrow: 1, minWidth: 160 },
-  label: { fontSize: 11, fontWeight: '700', color: T.muted, marginBottom: 4 },
+  label: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.4, marginBottom: 5, textTransform: 'uppercase' },
   input: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12, fontSize: 14, color: T.ink },
   infoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: T.sub, borderWidth: 1, borderColor: T.hair, maxWidth: '100%' },
@@ -1174,6 +1290,10 @@ const st = StyleSheet.create({
   wayT: { fontSize: 14, fontWeight: '900', color: T.nav },
   wayD: { fontSize: 12, color: T.muted, lineHeight: 17 },
   steps: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  stepsPhone: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, padding: 10, borderRadius: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
+  stepPhoneT: { fontSize: 13, fontWeight: '900', color: T.copper },
+  progress: { flexDirection: 'row', gap: 4, marginTop: 6 },
+  progSeg: { flex: 1, height: 4, borderRadius: 2, backgroundColor: T.alt },
   step: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 10, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
   stepOn: { borderColor: T.copper, backgroundColor: '#FCF6F1' },
   stepMini: { flex: 0, paddingHorizontal: 6 },
@@ -1187,7 +1307,7 @@ const st = StyleSheet.create({
   helpRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
   helpT: { width: 92, fontSize: 12.5, fontWeight: '900', color: T.nav },
   helpD: { flex: 1, minWidth: 200, fontSize: 12.5, color: T.ink, lineHeight: 18 },
-  footHint: { flexBasis: '100%', fontSize: 11.5, color: T.amber, fontWeight: '700' },
+  footHint: { fontSize: 11.5, color: T.amber, fontWeight: '700' },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: T.nav, textAlign: 'center' },
 
   list: { gap: 10 },
@@ -1196,6 +1316,11 @@ const st = StyleSheet.create({
   entryWide: { flexBasis: '48%', flexGrow: 1, minWidth: 360 },
   entryHi: { borderColor: T.green, borderWidth: 2 },
   entryBad: { borderColor: T.red, borderWidth: 2 },
+  entryChanged: { borderColor: T.amber, borderWidth: 2 },
+  staleBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, padding: 8, borderRadius: 8 },
+  staleUsed: { backgroundColor: '#F8E9E6' },
+  staleChanged: { backgroundColor: '#FBF3E2' },
+  staleText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
   entryHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   taka: { fontSize: 17, fontWeight: '900', color: T.nav, fontFamily: MF },
   entrySub: { fontSize: 12.5, color: T.ink, fontWeight: '600', marginTop: 1 },
@@ -1208,6 +1333,7 @@ const st = StyleSheet.create({
   lineTag: { width: 38, fontSize: 10, fontWeight: '900', color: T.copper, letterSpacing: 0.6 },
   shadeBtn: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
   shadeText: { flex: 1, fontSize: 13, fontWeight: '700', color: T.ink },
+  qtyNarrow: { width: 92, fontSize: 15 },
   qty: { width: 110, height: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 10, fontSize: 16, fontWeight: '800', textAlign: 'right', color: T.ink, fontFamily: MF, backgroundColor: T.surface },
   fillBtn: { width: 46, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: T.sub, borderWidth: 1, borderColor: T.hair },
   fillText: { fontSize: 10.5, fontWeight: '900', color: T.nav },
@@ -1215,8 +1341,8 @@ const st = StyleSheet.create({
   entryFoot: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   check: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 34, paddingRight: 6 },
   checkText: { fontSize: 13, fontWeight: '800', color: T.ink },
-  status: { flex: 1, minWidth: 120, height: 30, borderRadius: 15, paddingHorizontal: 10, justifyContent: 'center' },
-  statusRow: { flex: 0, minWidth: 0, alignSelf: 'stretch' },
+  status: { flex: 1, minWidth: 120, minHeight: 30, borderRadius: 15, paddingHorizontal: 12, paddingVertical: 6, justifyContent: 'center' },
+  statusRow: { flex: 0, flexGrow: 0, minWidth: 0, alignSelf: 'stretch' },
   statusText: { fontSize: 12, fontWeight: '800' },
   addLine: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: '#D9C6E3', backgroundColor: '#F6F0F9' },
   addLineText: { fontSize: 12, fontWeight: '800', color: T.purple },
@@ -1227,7 +1353,8 @@ const st = StyleSheet.create({
   pBal: { fontSize: 14, fontWeight: '800', color: T.ink, fontFamily: MF },
   search: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 12, fontSize: 14, color: T.ink, backgroundColor: T.surface },
 
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, paddingHorizontal: 12, paddingVertical: 8 },
+  footer: { backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, paddingHorizontal: 12, paddingVertical: 8 },
+  footCol: { flexDirection: 'column', alignItems: 'stretch', gap: 6 },
   footInner: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
   footStats: { flex: 1, flexDirection: 'row', gap: 6, minWidth: 240 },
   footBtns: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
@@ -1245,6 +1372,7 @@ const st = StyleSheet.create({
   bQty: { fontSize: 15, fontWeight: '900', color: T.ink, fontFamily: MF },
   lockTag: { paddingHorizontal: 7, height: 18, borderRadius: 9, backgroundColor: '#FBF3E2', justifyContent: 'center' },
   lockText: { fontSize: 10, fontWeight: '800', color: T.amber },
+  srcTag: { fontSize: 10, fontWeight: '800', color: T.blue },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: '#FBF3E2' },
   lockBoxText: { flex: 1, fontSize: 12.5, color: T.ink, fontWeight: '600' },
 

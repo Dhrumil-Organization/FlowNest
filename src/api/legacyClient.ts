@@ -769,6 +769,7 @@ export const GreyScanInwardAPI = {
   shades: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('shades'), body, { timeout: 60000 }),
   scan: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('scan'), body),
   pending: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('pending'), body),
+  recheck: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('recheck'), body),
   save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('save'), body, { timeout: 120000 }),
   browse: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('browse'), body),
   show: (body: Record<string, any>) => client.post(LEGACY_ROUTES.greyScanInward('show'), body),

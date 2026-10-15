@@ -3,9 +3,13 @@
 // one line per party (purchase rate ₹/kg over time, gaps joined), each party a fixed colour,
 // touch / drag (or hover on web) shows the exact entries of that date, legend with each party's latest rate.
 // Points come from the purchase entries (FAMPur / FAMPurD1, POST /yarn_hub/item -> prices).
-// Long histories: every entry keeps a fixed width and the plot scrolls sideways (opens at the latest date),
-// the ₹ axis stays fixed on the left, a year marker shows where each year starts, "Fit" squeezes everything
-// into the card, and tapping a party in the legend shows only that party's line.
+// Two views (switch above the chart):
+//   Fit (default)  every entry of the whole history inside the card, no sideways scrolling, on a real date axis
+//                  (spacing = time between purchases), month / quarter / year ticks chosen so labels never overlap,
+//                  dot size adapts to how dense the entries are; hover / tap picks the nearest date.
+//   Scroll         every entry a fixed width, the plot scrolls sideways (opens at the latest date).
+// The ₹ axis stays fixed on the left, a marker shows where each year starts, tapping a party in the legend
+// shows only that party's line, ⤢ opens the same chart full screen.
 
 import { T } from '@/src/theme';
 import React, { useMemo, useRef, useState } from 'react';
@@ -56,6 +60,11 @@ function monotonePath(pts: { x: number; y: number }[]): string {
   return d;
 }
 
+/** straight segments — used when entries are very dense (a smooth curve would overshoot between near points) */
+function linePath(pts: { x: number; y: number }[]): string {
+  return pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join('');
+}
+
 const niceTicks = (lo: number, hi: number, count = 4) => {
   const span = hi - lo || Math.abs(hi) || 1;
   const raw = span / count;
@@ -72,7 +81,13 @@ type Geo = {
   ticks: number[]; lo: number; hi: number; ih: number; viewW: number; scrolls: boolean; cw: number; iw: number;
   gap: number; lastI: number; xLabels: Set<number>; yearStarts: number[];
   xOf: (i: number) => number; yOf: (v: number) => number;
+  /** Fit: date ticks on the time axis + year boundaries (x positions) */
+  timeTicks: { x: number; label: string }[] | null; yearLines: { x: number; label: string }[] | null;
+  dot: number; stroke: number;
 };
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dayMs = (d: string) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
 
 /**
  * Price trend. `title` + `onClose` turn it into the full-screen view (opened from the ⤢ button of the card chart).
@@ -85,7 +100,7 @@ export function YarnPriceChart({
   const [w, setW] = useState(0);
   const [active, setActive] = useState<number | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
-  const [fit, setFit] = useState(false);
+  const [fit, setFit] = useState(true); // default: the whole history inside the card
   const [full, setFull] = useState(false);
   const scrollRef = useRef<any>(null);
   const win = useWindowDimensions();
@@ -100,8 +115,8 @@ export function YarnPriceChart({
     const vals = data.flatMap((r) => shownSups.map((s) => r.vals[s.key]).filter((v) => v != null)) as number[];
     const lo0 = Math.min(...vals);
     const hi0 = Math.max(...vals);
-    const padV = (hi0 - lo0) * 0.12 || Math.max(1, hi0 * 0.05);
-    const ticks = niceTicks(lo0 - padV, hi0 + padV, isFull ? 6 : 4);
+    const padV = (hi0 - lo0) * 0.06 || Math.max(1, hi0 * 0.05);
+    const ticks = niceTicks(lo0 - padV, hi0 + padV, isFull ? 7 : 5); // tighter ₹ scale: lines use the full height
     const lo = ticks[0];
     const hi = ticks[ticks.length - 1];
     const ih = height - PAD.top - PAD.bottom;
@@ -109,17 +124,54 @@ export function YarnPriceChart({
     const scrolls = !fit && (data.length - 1) * step + PAD.left + PAD.right > viewW;
     const cw = scrolls ? (data.length - 1) * step + PAD.left + PAD.right : viewW;
     const iw = Math.max(1, cw - PAD.left - PAD.right);
-    const xOf = (i: number) => PAD.left + (i * iw) / (data.length - 1);
     const yOf = (v: number) => PAD.top + ih - ((v - lo) / (hi - lo || 1)) * ih;
-    const gap = iw / (data.length - 1);
-    const every = Math.max(1, Math.ceil(52 / Math.max(gap, 1)));
     const lastI = data.length - 1;
+    const t0 = dayMs(data[0].date);
+    const t1 = dayMs(data[lastI].date);
+    const timeAxis = fit && t1 > t0;
+    // Fit: x = real date (accurate gaps between purchases); Scroll: one fixed step per entry
+    const xs = data.map((r, i) => (timeAxis ? PAD.left + ((dayMs(r.date) - t0) / (t1 - t0)) * iw : PAD.left + (i * iw) / lastI));
+    const xOf = (i: number) => xs[i];
+    const gap = iw / lastI;
     const xLabels = new Set<number>();
-    data.forEach((_, i) => { if (i % every === 0) xLabels.add(i); });
-    xLabels.forEach((i) => { if (i !== lastI && xOf(lastI) - xOf(i) < 56) xLabels.delete(i); });
-    xLabels.add(lastI);
+    let timeTicks: Geo['timeTicks'] = null;
+    let yearLines: Geo['yearLines'] = null;
+    if (timeAxis) {
+      // month ticks: the smallest step (1, 2, 3, 6, 12, 24 months) that keeps labels ≥ 58 px apart
+      const pxPerDay = iw / ((t1 - t0) / 86400000);
+      const stepM = [1, 2, 3, 6, 12, 24].find((m) => m * 30.4 * pxPerDay >= 58) || 24;
+      const a = new Date(t0);
+      let y = a.getUTCFullYear();
+      let m = a.getUTCMonth() + 1; // first month start after the first entry
+      if (m > 11) { m = 0; y += 1; }
+      // align to the step (Jan / Apr / Jul / Oct for quarters, Jan for years)
+      if (stepM >= 12) { if (m !== 0) { m = 0; y += 1; } }
+      else while (m % stepM !== 0) { m += 1; if (m > 11) { m = 0; y += 1; } }
+      timeTicks = [];
+      for (let guard = 0; guard < 400; guard++) {
+        const t = Date.UTC(y, m, 1);
+        if (t > t1) break;
+        const x = PAD.left + ((t - t0) / (t1 - t0)) * iw;
+        timeTicks.push({ x, label: stepM >= 12 ? String(y) : MON[m] + ' ' + String(y).slice(2) });
+        m += stepM;
+        while (m > 11) { m -= 12; y += 1; }
+      }
+      yearLines = [];
+      for (let yy = new Date(t0).getUTCFullYear() + 1; Date.UTC(yy, 0, 1) <= t1; yy++) {
+        yearLines.push({ x: PAD.left + ((Date.UTC(yy, 0, 1) - t0) / (t1 - t0)) * iw, label: String(yy) });
+      }
+    } else {
+      const every = Math.max(1, Math.ceil(52 / Math.max(gap, 1)));
+      data.forEach((_, i) => { if (i % every === 0) xLabels.add(i); });
+      xLabels.forEach((i) => { if (i !== lastI && xOf(lastI) - xOf(i) < 56) xLabels.delete(i); });
+      xLabels.add(lastI);
+    }
     const yearStarts = data.map((r, i) => (i === 0 || r.date.slice(0, 4) !== data[i - 1].date.slice(0, 4) ? i : -1)).filter((i) => i >= 0);
-    return { ticks, lo, hi, ih, viewW, scrolls, cw, iw, gap, lastI, xLabels, yearStarts, xOf, yOf };
+    // dots / line weight follow the density so thousands of entries stay readable
+    const density = iw / Math.max(1, data.length);
+    const dot = density >= 10 ? 3.5 : density >= 5 ? 2.6 : density >= 2.5 ? 1.7 : 0;
+    const stroke = density >= 5 ? 2.2 : density >= 2 ? 1.7 : 1.3;
+    return { ticks, lo, hi, ih, viewW, scrolls, cw, iw, gap, lastI, xLabels, yearStarts, xOf, yOf, timeTicks, yearLines, dot, stroke };
   }, [data, shownSups, w, fit, height, step, isFull]);
 
   // static layer — grid, year markers, dates, every party line and point
@@ -131,7 +183,17 @@ export function YarnPriceChart({
         {ticks.map((v) => (
           <Line key={'t' + v} x1={0} x2={cw} y1={yOf(v)} y2={yOf(v)} stroke={T.hair} strokeWidth={1} />
         ))}
-        {yearStarts.map((i) => (
+        {geo.yearLines ? (
+          <>
+            <SvgText x={4} y={11} fontSize={9} fontFamily={MONO} fill={T.muted} fontWeight="700">{data[0].date.slice(0, 4)}</SvgText>
+            {geo.yearLines.map((yl) => (
+              <G key={'yl' + yl.label}>
+                <Line x1={yl.x} x2={yl.x} y1={4} y2={PAD.top + ih} stroke={T.border} strokeWidth={1} strokeDasharray="2 3" />
+                {yl.x < cw - 30 && <SvgText x={yl.x + 4} y={11} fontSize={9} fontFamily={MONO} fill={T.muted} fontWeight="700">{yl.label}</SvgText>}
+              </G>
+            ))}
+          </>
+        ) : yearStarts.map((i) => (
           <G key={'y' + i}>
             {i > 0 && <Line x1={xOf(i) - gap / 2} x2={xOf(i) - gap / 2} y1={4} y2={PAD.top + ih} stroke={T.border} strokeWidth={1} strokeDasharray="2 3" />}
             <SvgText x={(i > 0 ? xOf(i) - gap / 2 : 0) + 4} y={11} fontSize={9} fontFamily={MONO} fill={T.muted} fontWeight="700">
@@ -139,19 +201,27 @@ export function YarnPriceChart({
             </SvgText>
           </G>
         ))}
-        {data.map((r, i) =>
-          xLabels.has(i) ? (
-            <SvgText key={'x' + i} x={xOf(i)} y={height - 5} fontSize={9} fontFamily={MONO} fill={T.muted} textAnchor={i === 0 ? 'start' : i === lastI ? 'end' : 'middle'}>
-              {r.d}
-            </SvgText>
-          ) : null,
-        )}
+        {geo.timeTicks
+          ? geo.timeTicks.map((tk) => (
+            <G key={'tt' + tk.label + tk.x}>
+              <Line x1={tk.x} x2={tk.x} y1={PAD.top + ih} y2={PAD.top + ih + 3} stroke={T.border} strokeWidth={1} />
+              <SvgText x={tk.x} y={height - 5} fontSize={9} fontFamily={MONO} fill={T.muted}
+                textAnchor={tk.x < 24 ? 'start' : tk.x > cw - 24 ? 'end' : 'middle'}>{tk.label}</SvgText>
+            </G>
+          ))
+          : data.map((r, i) =>
+            xLabels.has(i) ? (
+              <SvgText key={'x' + i} x={xOf(i)} y={height - 5} fontSize={9} fontFamily={MONO} fill={T.muted} textAnchor={i === 0 ? 'start' : i === lastI ? 'end' : 'middle'}>
+                {r.d}
+              </SvgText>
+            ) : null,
+          )}
         {shownSups.map((s) => {
           const pts = data.map((r, i) => (r.vals[s.key] != null ? { x: xOf(i), y: yOf(r.vals[s.key]), i } : null)).filter(Boolean) as { x: number; y: number; i: number }[];
           return (
             <G key={s.key}>
-              {pts.length > 1 && <Path d={monotonePath(pts)} stroke={s.color} strokeWidth={2.2} fill="none" />}
-              {pts.map((p) => <Circle key={p.i} cx={p.x} cy={p.y} r={3.5} fill={s.color} />)}
+              {pts.length > 1 && <Path d={geo.dot ? monotonePath(pts) : linePath(pts)} stroke={s.color} strokeWidth={geo.stroke} fill="none" />}
+              {geo.dot > 0 || pts.length === 1 ? pts.map((p) => <Circle key={p.i} cx={p.x} cy={p.y} r={geo.dot || 2.5} fill={s.color} />) : null}
             </G>
           );
         })}
@@ -183,8 +253,14 @@ export function YarnPriceChart({
   const lastI = data.length - 1;
   const pick = (x: number) => {
     if (!geo) return;
-    const i = Math.round(((x - PAD.left) / geo.iw) * (data.length - 1));
-    const next = Math.max(0, Math.min(data.length - 1, i));
+    // nearest entry by position (x is a real date in Fit) — binary search, then the closer neighbour
+    let lo = 0;
+    let hi = data.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (geo.xOf(mid) < x) lo = mid + 1; else hi = mid;
+    }
+    const next = lo > 0 && Math.abs(geo.xOf(lo - 1) - x) <= Math.abs(geo.xOf(lo) - x) ? lo - 1 : lo;
     if (next !== active) setActive(next);
   };
   const domX = (e: any) => {
@@ -255,9 +331,14 @@ export function YarnPriceChart({
           {focus ? ' · ' + (sups.find((s) => s.key === focus)?.mill || '') : ''}
         </Text>
         {focus && <Text onPress={() => { setFocus(null); setActive(null); }} style={st.barBtn}>All parties</Text>}
-        <TouchableOpacity onPress={() => { setFit((f) => !f); setActive(null); }} style={[st.chip, fit && st.chipOn]}>
-          <Text style={[st.chipTxt, fit && { color: '#fff' }]}>{fit ? 'Scroll' : 'Fit'}</Text>
-        </TouchableOpacity>
+        <View style={st.seg}>
+          <TouchableOpacity onPress={() => { setFit(true); setActive(null); }} style={[st.segItem, fit && st.chipOn]} accessibilityLabel="Fit all dates">
+            <Text style={[st.chipTxt, fit && { color: '#fff' }]}>Fit all</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setFit(false); setActive(null); }} style={[st.segItem, !fit && st.chipOn]} accessibilityLabel="Scroll entry by entry">
+            <Text style={[st.chipTxt, !fit && { color: '#fff' }]}>Scroll</Text>
+          </TouchableOpacity>
+        </View>
         {isFull ? (
           <TouchableOpacity onPress={onClose} style={[st.chip, st.chipOn]}>
             <Text style={[st.chipTxt, { color: '#fff' }]}>✕ Close</Text>
@@ -298,7 +379,7 @@ export function YarnPriceChart({
             );
           })}
           <Text style={st.legNote}>
-            {points.length + ' rate' + (points.length !== 1 ? 's' : '') + (geo?.scrolls ? ' · scroll sideways for older dates' : '') + ' · tap a point for the exact entry · tap a party to show only its line'}
+            {points.length + ' rate' + (points.length !== 1 ? 's' : '') + (geo?.scrolls ? ' · scroll sideways for older dates' : fit ? ' · whole history fitted on a date scale' : '') + ' · tap the chart for the exact entry · tap a party to show only its line'}
           </Text>
         </View>
       )}
@@ -364,6 +445,8 @@ const st = StyleSheet.create({
   chip: { borderWidth: 1, borderColor: `${T.copper}55`, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   chipOn: { backgroundColor: T.copper, borderColor: T.copper },
   chipTxt: { fontSize: 9.5, fontWeight: '800', color: T.copper },
+  seg: { flexDirection: 'row', borderWidth: 1, borderColor: `${T.copper}55`, borderRadius: 6, overflow: 'hidden' },
+  segItem: { paddingHorizontal: 9, paddingVertical: 3 },
   fullPage: { flex: 1, backgroundColor: T.bg },
   fullBody: { padding: 16, paddingTop: 20, maxWidth: 1600, width: '100%', alignSelf: 'center' },
   fullTitle: { fontSize: 13, fontWeight: '800', color: T.ink, marginRight: 6, flexShrink: 1 },

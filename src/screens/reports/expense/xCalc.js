@@ -534,6 +534,101 @@ export function xClosedRates(mo) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Machine-group split inside each section (senior)                   */
+/* ------------------------------------------------------------------ */
+/**
+ * Warping + Misc electricity: first Section A 1/3 : Section B 2/3 (unchanged),
+ * then inside each section:
+ *   Section A (1/3) -> Waterjet 75 % · S. Rapier 230 cm 25 %
+ *   Section B (2/3) -> MW Rapier 55 % · Sudamo Rapier (190 cm) 45 %
+ * Section totals stay exactly as before; this only divides each section
+ * between its machine groups. Salary and Stores use the same 75/25 and 55/45.
+ */
+export const GROUP_SPLIT = {
+  A: { wjet: 0.75, sud230: 0.25 },
+  B: { mw: 0.55, sud: 0.45 },
+};
+export const GROUP_SHARE = {
+  wjet: SHARE.A * GROUP_SPLIT.A.wjet,
+  sud230: SHARE.A * GROUP_SPLIT.A.sud230,
+  mw: SHARE.B * GROUP_SPLIT.B.mw,
+  sud: SHARE.B * GROUP_SPLIT.B.sud,
+};
+
+/**
+ * Electricity of each machine group for a month figure (ongoing month: Σ day
+ * kWh × day rate from mo.eAll; other months: kWh × month rate):
+ *   own meters (Luwa follows its looms) + its share of warping + misc.
+ * ₹/m and ₹/pick on that group's own production and PPI.
+ */
+export function xGroupElec(mo) {
+  const c = mo.counts || {};
+  const u = mo.units || {};
+  const eAll = mo.eAll || null;
+  const rate = num(mo.rate);
+  const e = (k) => (eAll ? num(eAll[k]) : num(u[k]) * rate);
+  const kw = (k) => num(u[k]);
+  const P = mo.prod || {}, K = mo.picks || {};
+  const sharedAmt = e('warping') + e('misc');
+  const sharedKwh = kw('warping') + kw('misc');
+  const defs = [
+    { k: 'wjet', lbl: 'Waterjet', sec: 'A', n: c.wj, meters: ['wjetLooms'], meterTxt: 'Waterjet looms', prod: 'wjet', pick: 'wjet', pct: GROUP_SPLIT.A.wjet },
+    { k: 'sud230', lbl: 'S. Rapier (230 cm)', sec: 'A', n: c.s230, meters: ['sud230Looms'], meterTxt: '230 cm sub-meter', prod: 'sud230', pick: 'sud230', pct: GROUP_SPLIT.A.sud230 },
+    { k: 'mw', lbl: 'MW Rapier', sec: 'B', n: c.mw, meters: ['mwLooms', 'mwLuwa'], meterTxt: 'MW looms + MW Luwa', prod: 'mwRapier', pick: 'mw', pct: GROUP_SPLIT.B.mw },
+    { k: 'sud', lbl: 'Sudamo Rapier (190 cm)', sec: 'B', n: c.s190, meters: ['sudLooms', 'sudLuwa'], meterTxt: '190 cm looms + S. Rapier Luwa', prod: 'sudRapier', pick: 'sud', pct: GROUP_SPLIT.B.sud },
+  ];
+  const rows = defs.map((g) => {
+    const own = g.meters.reduce((a, k) => a + e(k), 0);
+    const ownKwh = g.meters.reduce((a, k) => a + kw(k), 0);
+    const share = GROUP_SHARE[g.k];
+    const shared = sharedAmt * share;
+    const amt = own + shared;
+    const prod = num(P[g.prod]);
+    const ppi = num(K[g.pick]);
+    return {
+      ...g, own, ownKwh, share, shared, sharedKwh: sharedKwh * share, amt,
+      prod, ppi, perM: prod > 0 ? amt / prod : 0, perPick: prod > 0 && ppi > 0 ? amt / prod / ppi : 0,
+    };
+  });
+  const sec = (s) => {
+    const rs = rows.filter((r) => r.sec === s);
+    const amt = rs.reduce((a, r) => a + r.amt, 0);
+    const prod = rs.reduce((a, r) => a + r.prod, 0);
+    const pm = rs.reduce((a, r) => a + r.prod * r.ppi, 0);
+    return { amt, prod, ppi: prod > 0 ? pm / prod : 0, perM: prod > 0 ? amt / prod : 0, perPick: pm > 0 ? amt / pm : 0, shared: rs.reduce((a, r) => a + r.shared, 0) };
+  };
+  const total = rows.reduce((a, r) => a + r.amt, 0);
+  return { rows, A: sec('A'), B: sec('B'), sharedAmt, sharedKwh, total };
+}
+
+/**
+ * Management summary breakdown — Electricity, Salary, Stores of each
+ * machine group:
+ *   Electricity = own meters + share of warping + misc (xGroupElec)
+ *   Salary      = section salary × group % (A 75/25 · B 55/45)
+ *   Stores      = section stores × group % (A 75/25 · B 55/45)
+ * ₹/pick on the group's own production and PPI. Null for months without
+ * Section A/B figures.
+ */
+export function xGroupHeads(mo) {
+  if (!mo || mo.ab === false) return null;
+  const el = xGroupElec(mo);
+  const sal = mo.salary || {}, st = mo.stores || {};
+  const pp = (a, p, k) => (p > 0 && k > 0 ? a / p / k : 0);
+  const rows = el.rows.map((g) => {
+    const secSal = num(sal[g.sec]), secSt = num(st[g.sec]);
+    const salAmt = secSal * g.pct, stAmt = secSt * g.pct;
+    return {
+      k: g.k, lbl: g.lbl, sec: g.sec, pct: g.pct, prod: g.prod, ppi: g.ppi,
+      elec: { amt: g.amt, perPick: pp(g.amt, g.prod, g.ppi), own: g.own, shared: g.shared, share: g.share },
+      sal: { amt: salAmt, perPick: pp(salAmt, g.prod, g.ppi) },
+      store: { amt: stAmt, perPick: pp(stAmt, g.prod, g.ppi) },
+    };
+  });
+  return { rows, bySec: { A: rows.filter((r) => r.sec === 'A'), B: rows.filter((r) => r.sec === 'B'), T: rows } };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Day labels for the input modules                                   */
 /* ------------------------------------------------------------------ */
 export function nextYmd(rows, exp) {

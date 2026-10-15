@@ -473,26 +473,28 @@
 // });
 
 // FILE: src/screens/dyeing/MillHubTab.tsx
-// Dyeing → Mill Hub (READ-ONLY — never a data-entry screen) — the ERP
-// Designing "Mill Hub" as is:
+// Dyeing → Mill Hub (READ-ONLY — never a data-entry screen), built from the
+// real job-work entries: job OUTWARD (GRYOut / GRYOutD1 / GRYOutD2) and job
+// INWARD (GRYInw / GRYInwD1 / GRYInwD2).
 //
-//   [from] → [to]  [7d] [Month] [90d]
-//   01 Sep → 28 Sep   12 outward · 9 inward · 2 re-dye   +N outside range — show all   ⓘ How to read this
-//   (guide)   [All mills] [Shree Rang Dyeing] [Akash Process]
+//   [from] → [to]  [7d] [Month] [90d] [FY]
+//   01 Sep → 28 Sep   14 lots · 6 challans · 9 complete · 3 partial · 2 pending   ⓘ How to read this
+//   PARTY [All Parties ⌄]     [All] [Complete] [Partial] [Pending]
 //   DESIGN            OUT     IN   PEND  SHORT    %    IN ₹
-//   Rib Stop 145 ›   ...      (↻ re-dye x m out · y m back)
+//   Rib Stop 145 ›   ...
 //   GRAND TOTAL
-//   tap a design -> challan-wise page (state badge CLOSED / PARTIAL / PENDING,
-//   EARLIER OUTWARD / RE-DYE tags, colour D F L·lot ✂ info line, TOTAL)
+//   tap a design -> challan / lot-wise page (status badge COMPLETE / PARTIAL / PENDING,
+//                   shade · chart · lot · party · takas received)
+//   tap a lot    -> lot detail: challan header, inward entries, taka-wise OUT vs IN
 //
-// Source: POST /dyeing/mill_hub (full status history of every shade touched)
-// turned into outward trips + receipts by dyeingReports.buildTrips; the ERP
-// rules are in buildMillHub / buildChallanRows.
+// Source: POST /dyeing/mill_hub_report and /dyeing/mill_hub_lot
+// (DyeingMillHubController). Rules in millHubModel.ts — shortage only when
+// every taka of the lot has come back.
 
 import { useBusinessContext } from '@/src/core/business';
 import { T } from '@/src/theme';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -504,28 +506,47 @@ import {
   View,
 } from 'react-native';
 import { fmt, MONO } from './DailyUpdateTab';
-import { DyeingService, unwrapBody } from './dyeingApi';
+import { DyeingService } from './dyeingApi';
 import { DyeingDateField } from './DyeingDateField';
-import { addDaysISO, DyeEventRow, todayISO, toEventRow } from './dyeingModel';
-import { buildChallanRows, buildMillHub, buildTrips, ChallanRow, MillAgg, MillTrip } from './dyeingReports';
+import { addDaysISO, todayISO } from './dyeingModel';
+import {
+  buildDesignRows,
+  failMessage,
+  filterLots,
+  HubAgg,
+  HubLot,
+  HubLotDetail,
+  lotsOfDesign,
+  LotStatus,
+  normalizeLotDetail,
+  normalizeLots,
+  partiesOf,
+  statusCounts,
+  StatusFilter,
+} from './millHubModel';
 
 const money = (v: number) => {
   v = +v || 0;
   return v >= 1e5 ? `₹${(v / 1e5).toFixed(2)}L` : v >= 1e3 ? `₹${(v / 1e3).toFixed(1)}K` : `₹${Math.round(v).toLocaleString('en-IN')}`;
 };
+const m1 = (v: number) => (Math.round((v || 0) * 10) / 10).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fmtD = (iso: string) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return iso ? `${iso.slice(8, 10)} ${months[Number(iso.slice(5, 7)) - 1]}` : '—';
 };
+const fmtDY = (iso: string) => (iso ? `${fmtD(iso)} ${iso.slice(2, 4)}` : '—');
 /** Indian financial year start (1 Apr) of a date. */
 const fyStart = (iso: string) => {
   const y = Number(iso.slice(0, 4));
   const m = Number(iso.slice(5, 7));
   return `${m >= 4 ? y : y - 1}-04-01`;
 };
+const plural = (k: number, w: string) => `${k} ${w}${k !== 1 ? 's' : ''}`;
 
 const W = { out: 52, in: 52, pend: 48, short: 46, pct: 36, amt: 58 };
+const WT = { out: 60, in: 60, diff: 54 }; // taka table
 const AMBER = '#C98A1A';
+const STATUS_COLOR: Record<LotStatus, string> = { COMPLETE: '#2A6044', PARTIAL: AMBER, PENDING: '#5A6B7A' };
 
 export function MillHubTab() {
   const { prpGroup, yearNo, isReady } = useBusinessContext();
@@ -535,105 +556,73 @@ export function MillHubTab() {
   const wide = width >= 700;
   const narrow = width < 420;
 
-  const [loadFrom, setLoadFrom] = useState(() => {
-    const f = fyStart(today);
-    const d90 = addDaysISO(today, -90);
-    return f < d90 ? f : d90;
-  });
-  const [events, setEvents] = useState<DyeEventRow[]>([]);
+  const [from, setFrom] = useState(monthStart);
+  const [to, setTo] = useState(today);
+  const [lots, setLots] = useState<HubLot[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [from, setFrom] = useState<string | null>(null); // null until data decides the default (ERP rule)
-  const [to, setTo] = useState(today);
   const [help, setHelp] = useState(false);
-  const [mill, setMill] = useState('ALL');
   const [party, setParty] = useState('ALL');
   const [partyOpen, setPartyOpen] = useState(false);
+  const [status, setStatus] = useState<StatusFilter>('COMPLETE');
   const [dsel, setDsel] = useState<string | null>(null);
+  const [lsel, setLsel] = useState<HubLot | null>(null);
+  const reqId = useRef(0);
 
-  const load = useCallback(async (windowFrom: string) => {
+  const load = useCallback(async (f: string, t: string) => {
     if (!isReady) { setLoading(false); return; }
+    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
-      const body = { prptype: prpGroup, yearno: yearNo, fromdate: windowFrom, todate: todayISO() };
+      const body = { prptype: prpGroup, yearno: yearNo, fromdate: f, todate: t };
       console.log('[Dyeing/MillHub] request ->', body);
-      const response: any = await DyeingService.millHub(body);
-      const inner = unwrapBody(response);
-      const rows = (Array.isArray(inner?.Events) ? inner.Events : []).map(toEventRow).filter(Boolean) as DyeEventRow[];
-      setEvents(rows);
-      setLoadFrom(windowFrom);
+      const response: any = await DyeingService.millHubReport(body);
+      if (id !== reqId.current) return;
+      const fail = failMessage(response);
+      if (fail) throw new Error(fail);
+      setLots(normalizeLots(response));
+      setLoaded(true);
     } catch (err: any) {
-      setEvents([]);
+      if (id !== reqId.current) return;
+      setLots([]);
       setError(err?.response?.data?.message || err?.message || 'Unable to load mill hub.');
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [isReady, prpGroup, yearNo]);
 
-  const loadFromRef = useRef(loadFrom);
-  loadFromRef.current = loadFrom;
-  useFocusEffect(useCallback(() => { void load(loadFromRef.current); }, [load]));
-
-  const trips = useMemo(() => buildTrips(events), [events]);
-
-  // Party list comes from the complete loaded history.  Keep it unique,
-  // ignore blank PartyName values, and keep ALL as the default option.
-  const partyOptions = useMemo(() => {
-    const names = new Set<string>();
-    trips.forEach((t) => {
-      const name = String(t.party || '').trim();
-      if (name) names.add(name);
-    });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [trips]);
-
-  // Apply party filtering before building the Mill Hub so every total,
-  // design row, mill filter and challan drill-down uses the same selection.
-  const partyTrips = useMemo(
-    () => party === 'ALL' ? trips : trips.filter((t) => String(t.party || '').trim() === party),
-    [trips, party],
-  );
-
-  const allDates = useMemo(
-    () => partyTrips.flatMap((t) => [t.date, ...t.ins.map((i) => i.date)]).filter(Boolean).sort(),
-    [partyTrips],
-  );
-  const earliest = allDates[0] || monthStart;
-  const latest = allDates[allDates.length - 1] || today;
-
-  // ERP default: this month if it has activity, else last 90 days, else everything
-  const effFrom = useMemo(() => {
-    if (from) return from;
-    const d90 = addDaysISO(today, -90);
-    if (allDates.some((d) => d >= monthStart)) return monthStart;
-    if (allDates.some((d) => d >= d90)) return d90;
-    return earliest;
-  }, [from, allDates, monthStart, today, earliest]);
+  const rangeRef = useRef({ from, to });
+  rangeRef.current = { from, to };
+  useFocusEffect(useCallback(() => { void load(rangeRef.current.from, rangeRef.current.to); }, [load]));
 
   const setRange = (f: string, t: string) => {
-    const nf = f > t ? t : f;
+    const nt = t > today ? today : t;
+    const nf = f > nt ? nt : f;
     setFrom(nf);
-    setTo(t);
-    if (nf < loadFrom) void load(nf); // widen the loaded window
-  };
-  const showAll = () => {
-    const f = fyStart(today) < earliest ? fyStart(today) : earliest;
-    setMill('ALL');
-    setRange(f, today >= latest ? today : latest);
+    setTo(nt);
+    setDsel(null);
+    setLsel(null);
+    void load(nf, nt);
   };
 
-  const hub = useMemo(() => buildMillHub(partyTrips, effFrom, to, mill), [partyTrips, effFrom, to, mill]);
-  const inRange = (d: string) => d >= effFrom && d <= to;
-  const outside = hub.moves - partyTrips.filter((t) => inRange(t.date)).length - partyTrips.reduce((s, t) => s + t.ins.filter((i) => inRange(i.date)).length, 0);
+  const partyOptions = useMemo(() => partiesOf(lots), [lots]);
+  const partyLots = useMemo(() => filterLots(lots, party, 'ALL'), [lots, party]);
+  const counts = useMemo(() => statusCounts(partyLots), [partyLots]);
+  const shown = useMemo(() => filterLots(lots, party, status), [lots, party, status]);
+  const hub = useMemo(() => buildDesignRows(shown), [shown]);
+  const challans = useMemo(() => new Set(shown.map((l) => l.outUId)).size, [shown]);
+
+  const tableMin = narrow ? 420 : undefined;
 
   const Rng = (
     <View style={st.rng}>
-      <DyeingDateField value={effFrom} onChange={(v) => setRange(v, to)} compact />
+      <DyeingDateField value={from} onChange={(v) => setRange(v, to)} compact />
       <Text style={st.arrowTxt}>→</Text>
-      <DyeingDateField value={to} onChange={(v) => setRange(effFrom, v)} compact />
-      {([['7d', addDaysISO(today, -7)], ['Month', monthStart], ['90d', addDaysISO(today, -90)]] as const).map(([l, f]) => {
-        const on = effFrom === f && to === today;
+      <DyeingDateField value={to} onChange={(v) => setRange(from, v)} compact />
+      {([['7d', addDaysISO(today, -7)], ['Month', monthStart], ['90d', addDaysISO(today, -90)], ['FY', fyStart(today)]] as const).map(([l, f]) => {
+        const on = from === f && to === today;
         return (
           <TouchableOpacity key={l} onPress={() => setRange(f, today)} style={[st.preset, on && st.presetOn]}>
             <Text style={[st.presetText, on && { color: '#fff' }]}>{l}</Text>
@@ -643,57 +632,51 @@ export function MillHubTab() {
     </View>
   );
 
-  const MillChips = hub.mills.length > 1 ? (
-    <View style={st.chips}>
-      {[['ALL', 'All mills'], ...hub.mills.map((m) => [m, m])].map(([k, l]) => {
-        const on = mill === k;
-        return (
-          <TouchableOpacity key={k} onPress={() => setMill(k)} style={[st.chip, on && st.chipOn]}>
-            <Text style={[st.chipText, on && { color: T.copper }]}>{l}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  ) : null;
-
-  const tableMin = narrow ? 420 : undefined;
-
-  if (loading && !events.length) {
+  if (loading && !loaded) {
     return <View style={st.loading}><ActivityIndicator color={T.copper} /></View>;
   }
 
-  /* ------------------------------ challan-wise ----------------------------- */
+  /* ------------------------------ lot detail ------------------------------ */
+  if (lsel) {
+    return (
+      <LotDetailPage
+        key={lsel.key}
+        lot={lsel}
+        prptype={prpGroup}
+        yearno={yearNo}
+        onBack={() => setLsel(null)}
+        wide={wide}
+        narrow={narrow}
+      />
+    );
+  }
+
+  /* ------------------------------ lot-wise -------------------------------- */
   if (dsel) {
-    const { rows, CT } = buildChallanRows(partyTrips, dsel, effFrom, to, mill);
+    const rows = lotsOfDesign(shown, dsel);
+    const CT = buildDesignRows(rows).G;
     return (
       <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
         <View style={st.drillHead}>
           <TouchableOpacity onPress={() => setDsel(null)} hitSlop={HIT}><Text style={st.back}>‹ Designs</Text></TouchableOpacity>
           <Text style={st.drillTitle}>{dsel}</Text>
-          <Text style={st.drillSub}>challan-wise · {mill === 'ALL' ? 'all mills' : mill}</Text>
+          <Text style={st.drillSub}>
+            challan / lot-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}
+          </Text>
         </View>
         {Rng}
         <HScroll on={!!tableMin}>
           <View style={[st.card, { paddingVertical: 4, minWidth: tableMin, flex: 1 }]}>
             <HeadRow first="CHALLAN · DATE" />
-            {rows.length === 0 && <Text style={st.emptyRow}>No challans in this range.</Text>}
-            {rows.map((r) => <ChallanLine key={r.t.id} r={r} />)}
-            <View style={[st.row, st.totalRow]}>
-              <Text style={[st.first, { fontWeight: '800', color: T.ink }]}>TOTAL</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.out }]}>{fmt(CT.outM)}</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.in }]}>{fmt(CT.inM)}</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.pend, color: CT.pend > 0 ? AMBER : T.ink }]}>{fmt(CT.pend)}</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.short, color: CT.short > 0 ? T.red : T.ink }]}>{fmt(CT.short)}</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.pct }]}>{CT.lOut > 0 ? ((CT.short / CT.lOut) * 100).toFixed(1) : '—'}</Text>
-              <Text style={[st.num, st.mono, st.bold, { width: W.amt }]}>{money(CT.inAmt)}</Text>
-            </View>
+            {rows.length === 0 && <Text style={st.emptyRow}>No outward lots in this range.</Text>}
+            {rows.map((l) => <LotLine key={l.key} l={l} onPress={() => setLsel(l)} />)}
+            {rows.length > 0 && <DesignLine r={{ ...CT, design: `TOTAL · ${plural(rows.length, 'lot')}` }} total />}
           </View>
         </HScroll>
         <Text style={st.footer}>
-          Rows are challans outwarded in the range plus earlier challans that received inward in the range (tagged EARLIER
-          OUTWARD — their outward is not counted here). IN and IN ₹ are the period’s receipts on that challan. PEND is what a
-          period outward still has at the mill. SHORT is the shortfall on the lots settled by the period’s receipts — a
-          challan can show both pending and shortage at once.
+          One row per outward lot (job outward item line). OUT = metres sent, IN = metres received back so far, PEND = metres of
+          takas not yet received. SHORT and % are worked out only when every taka of the lot has come back (COMPLETE).
+          Tap a lot for its challan details, inward entries and taka-wise out vs in.
         </Text>
       </ScrollView>
     );
@@ -704,18 +687,15 @@ export function MillHubTab() {
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
       {Rng}
       <View style={st.sumRow}>
-        <Text style={st.sumRange}>{fmtD(effFrom)} → {fmtD(to)}</Text>
+        <Text style={st.sumRange}>{fmtD(from)} → {fmtD(to)}</Text>
         <Text style={st.sumText}>
-          {hub.outCount} outward · {hub.inCount} inward{hub.reCount > 0 ? ` · ${hub.reCount} re-dye` : ''}
+          {plural(shown.length, 'lot')} · {plural(challans, 'challan')} · {counts.COMPLETE} complete · {counts.PARTIAL} partial · {counts.PENDING} pending
         </Text>
-        {outside > 0 && (
-          <Text onPress={showAll} style={st.link}>+{outside} outside range — show all</Text>
-        )}
         <Text onPress={() => setHelp((h) => !h)} style={[st.link, { marginLeft: 'auto' }]}>ⓘ {help ? 'Hide guide' : 'How to read this'}</Text>
       </View>
       {loading && <ActivityIndicator color={T.copper} size="small" />}
       {!!error && (
-        <TouchableOpacity onPress={() => load(loadFrom)} style={st.errorBox}>
+        <TouchableOpacity onPress={() => load(from, to)} style={st.errorBox}>
           <Text style={st.errorText}>{error} — tap to retry</Text>
         </TouchableOpacity>
       )}
@@ -724,70 +704,63 @@ export function MillHubTab() {
         <View style={[st.card, st.helpCard]}>
           <Text style={st.helpH}>What Mill Hub shows</Text>
           <Text style={st.helpP}>
-            Everything sent to outside mills (dye houses / finishers) and everything received back, for the selected dates —
-            built automatically from the status history saved in <Text style={st.bold}>Priority</Text> (Sent for job, Job
-            inward, Lorry Cut) and the outward challans with their lot nos. Nothing is typed here.
+            Every job outward lot sent to an outside mill in the selected dates (by outward challan date), and everything received
+            back against it so far through job inward — taken straight from the outward and inward entries. Nothing is typed here.
           </Text>
           <Text style={st.helpH}>Reading a row</Text>
           <Text style={st.helpP}>
-            <Text style={st.bold}>OUT</Text> — metres outwarded in the range. <Text style={st.bold}>IN</Text> — metres received
-            in the range, whenever they were sent (an earlier outward’s return still counts here). These two are independent.{' '}
-            <Text style={st.bold}>PEND</Text> — of the period’s outwards, what the mill still holds (outward minus what receipts
-            have settled). <Text style={st.bold}>SHORT</Text> — on each receipt, the sent-lot it settles minus what came back;
-            summed for receipts in the period. Pending material never counts, and pending never blocks shortage on lots
-            already returned — a design can show both. <Text style={st.bold}>%</Text> — shortage as a share of the metres
-            settled in the period. <Text style={st.bold}>IN ₹</Text> — job-work value of the period’s receipts (inward rate,
-            else the challan’s rate). <Text style={st.bold}>↻ re-dye</Text> — material sent back after a lorry cut: shown
-            under the design and in the grand total as a separate figure, never added to Outward or Inward (it is the same
-            material going round again); it still counts as pending while at the mill, and any loss on it still counts as
-            shortage.
+            <Text style={st.bold}>OUT</Text> — metres sent on the outward takas. <Text style={st.bold}>IN</Text> — metres received
+            back on the inward takas linked to them (whatever the inward date). <Text style={st.bold}>PEND</Text> — metres of outward
+            takas that have not come back yet. <Text style={st.bold}>SHORT</Text> — OUT minus IN, counted only for a lot whose every
+            taka has come back (COMPLETE); a PARTIAL or PENDING lot never shows shortage. <Text style={st.bold}>%</Text> — shortage as
+            a share of the outward metres of the completed lots. <Text style={st.bold}>IN ₹</Text> — job amount of the inward entries.
           </Text>
           <Text style={st.helpH}>Drill down</Text>
           <Text style={st.helpP}>
-            Tap any design → its challan-wise page (which challans, when, how much back, which are short). The{' '}
-            <Text style={st.bold}>GRAND TOTAL</Text> row is the whole mill activity for the range. Use the mill chips to look
-            at one mill; change the dates or use the presets to move the window.
+            Tap a design → its outward lots (challan no., date, shade, chart no., party, takas received). Tap a lot → the challan
+            details, its inward entries and the taka-wise list of what was sent and what came back. Use the party box and the
+            status chips to narrow the view; change the dates or use the presets to move the window.
           </Text>
         </View>
       )}
 
-      <PartySelector
-        value={party}
-        options={partyOptions}
-        open={partyOpen}
-        onOpen={() => setPartyOpen(true)}
-        onClose={() => setPartyOpen(false)}
-        onChange={(value) => {
-          setParty(value);
-          setPartyOpen(false);
-          setMill('ALL');
-        }}
-      />
-
-      {MillChips}
+      <View style={st.filterRow}>
+        <PartySelector
+          value={party}
+          options={partyOptions}
+          open={partyOpen}
+          onOpen={() => setPartyOpen(true)}
+          onClose={() => setPartyOpen(false)}
+          onChange={(value) => {
+            setParty(value);
+            setPartyOpen(false);
+          }}
+        />
+        <View style={st.chips}>
+          {([['ALL', `All ${partyLots.length}`], ['COMPLETE', `Complete ${counts.COMPLETE}`], ['PARTIAL', `Partial ${counts.PARTIAL}`], ['PENDING', `Pending ${counts.PENDING}`]] as [StatusFilter, string][]).map(([k, l]) => {
+            const on = status === k;
+            return (
+              <TouchableOpacity key={k} onPress={() => setStatus(k)} style={[st.chip, on && st.chipOn]}>
+                <Text style={[st.chipText, on && { color: T.copper }]}>{l}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
       <HScroll on={!!tableMin}>
         <View style={[st.card, { paddingVertical: 4, minWidth: tableMin, flex: 1 }]}>
           <HeadRow first="DESIGN" />
-          {hub.rows.length === 0 && (
+          {hub.rows.length === 0 && !loading && !error && (
             <View style={st.emptyBox}>
-              {trips.length === 0 ? (
-                <Text style={st.emptyText}>
-                  No mill movements recorded yet. This dashboard fills itself from the Priority status sheet — mark a
-                  shade <Text style={st.bold}>Sent for job</Text> (and later <Text style={st.bold}>Job inward</Text>) and it
-                  appears here.
-                </Text>
-              ) : (
-                <>
-                  <Text style={st.emptyText}>
-                    No mill activity between <Text style={st.bold}>{fmtD(effFrom)}</Text> and <Text style={st.bold}>{fmtD(to)}</Text>
-                    {mill !== 'ALL' ? ` for ${mill}` : ''}. {hub.moves} movements are recorded between{' '}
-                    <Text style={st.bold}>{fmtD(earliest)}</Text> and <Text style={st.bold}>{fmtD(latest)}</Text>.
-                  </Text>
-                  <TouchableOpacity onPress={showAll} style={st.showAllBtn}>
-                    <Text style={st.showAllText}>Show all recorded activity</Text>
-                  </TouchableOpacity>
-                </>
+              <Text style={st.emptyText}>
+                No job outward between <Text style={st.bold}>{fmtD(from)}</Text> and <Text style={st.bold}>{fmtD(to)}</Text>
+                {party !== 'ALL' ? ` for ${party}` : ''}{status !== 'ALL' ? ` (${status.toLowerCase()})` : ''}.
+              </Text>
+              {from !== fyStart(today) && (
+                <TouchableOpacity onPress={() => setRange(fyStart(today), today)} style={st.showAllBtn}>
+                  <Text style={st.showAllText}>Show this financial year</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -797,11 +770,169 @@ export function MillHubTab() {
       </HScroll>
 
       <Text style={st.footer}>
-        Metres = each outward lot's LOT QTY (one challan row per lot, with its own mill); a shade with no lot qty
-        yet uses its order qty (≈ on the challan page). Outward and inward are counted independently by their own dates, over the full history. Pending = period outwards
-        not yet settled by receipts. Shortage = sent-lot minus received on the period’s receipts — never pending material,
-        and never blocked by it. Re-dye trips (after lorry cuts) are shown separately and never inflate Outward or Inward.
-        Tap a design for the challan-wise breakdown.
+        Built from job outward and job inward. Lots are picked by outward challan date; inward is counted whenever it came.
+        Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
+        Tap a design for the lot-wise breakdown.
+      </Text>
+    </ScrollView>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  lot detail (3rd level, on click of a lot)                                  */
+/* -------------------------------------------------------------------------- */
+
+function LotDetailPage({
+  lot, prptype, yearno, onBack, wide, narrow,
+}: {
+  lot: HubLot;
+  prptype: string;
+  yearno: string | number;
+  onBack: () => void;
+  wide: boolean;
+  narrow: boolean;
+}) {
+  const [detail, setDetail] = useState<HubLotDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [onlyPending, setOnlyPending] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response: any = await DyeingService.millHubLot({ prptype, yearno, outuid: lot.outUId, outsrno: lot.outSrNo }, lot);
+      const fail = failMessage(response);
+      if (fail) throw new Error(fail);
+      setDetail(normalizeLotDetail(response));
+    } catch (err: any) {
+      setDetail(null);
+      setError(err?.response?.data?.message || err?.message || 'Unable to load lot detail.');
+    } finally {
+      setLoading(false);
+    }
+  }, [prptype, yearno, lot]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const takas = (detail?.takas || []).filter((t) => !onlyPending || !t.received);
+  const facts: [string, string][] = [
+    ['Outward no.', lot.outNo || '—'],
+    ['Outward date', fmtDY(lot.outDate)],
+    ['Party (mill)', lot.party],
+    ['Job', lot.jobName || '—'],
+    ['Chart no.', lot.chartNo || '—'],
+    ['Lot no.', lot.lotNo || '—'],
+    ['Design', lot.design],
+    ['Shade', lot.shade || '—'],
+    ['Item', lot.item || '—'],
+    ['Customer', lot.customer || '—'],
+    ['Takas back', `${lot.recvTakas} of ${lot.outTakas}`],
+    ['Last inward', fmtDY(lot.lastInw)],
+  ];
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
+      <View style={st.drillHead}>
+        <TouchableOpacity onPress={onBack} hitSlop={HIT}><Text style={st.back}>‹ {lot.design}</Text></TouchableOpacity>
+      </View>
+      <View style={st.titleRow}>
+        <Text style={st.lotTitle}>{lot.outNo} · {lot.shade || lot.design}</Text>
+        <Text style={[st.stateBadge, { backgroundColor: STATUS_COLOR[lot.status] }]}>{lot.status}</Text>
+      </View>
+
+      <View style={st.stats}>
+        <Stat label="Outward" value={`${m1(lot.outM)} m`} />
+        <Stat label="Inward" value={`${m1(lot.inM)} m`} />
+        <Stat label="Pending" value={`${m1(lot.pend)} m`} color={lot.pend > 0 ? AMBER : undefined} />
+        <Stat
+          label={lot.short === null ? 'Shortage (on completion)' : 'Shortage'}
+          value={lot.short === null ? '—' : `${m1(lot.short)} m · ${(lot.pct || 0).toFixed(1)}%`}
+          color={lot.short !== null && (lot.pct || 0) > 5 ? T.red : undefined}
+        />
+      </View>
+
+      <View style={[st.card, st.factsCard]}>
+        {facts.map(([k, v]) => (
+          <View key={k} style={[st.fact, wide && { width: '25%' }]}>
+            <Text style={st.factK}>{k}</Text>
+            <Text style={st.factV} numberOfLines={2}>{v}</Text>
+          </View>
+        ))}
+      </View>
+
+      {loading && <ActivityIndicator color={T.copper} size="small" />}
+      {!!error && (
+        <TouchableOpacity onPress={load} style={st.errorBox}>
+          <Text style={st.errorText}>{error} — tap to retry</Text>
+        </TouchableOpacity>
+      )}
+
+      {!!detail && (
+        <>
+          <Text style={st.section}>INWARD ENTRIES</Text>
+          <View style={[st.card, { paddingVertical: 4 }]}>
+            {detail.inwards.length === 0 && <Text style={st.emptyRow}>Nothing received against this lot yet.</Text>}
+            {detail.inwards.map((i, k) => (
+              <View key={`${i.inwNo}-${k}`} style={[st.row, st.line]}>
+                <View style={st.first}>
+                  <Text style={[st.mono, st.cChallan]}><Text style={st.bold}>{i.inwNo}</Text> <Text style={{ color: T.muted }}>{fmtDY(i.inwDate)}</Text></Text>
+                  <Text style={st.infoText}>
+                    {[i.chalNo ? `challan ${i.chalNo}` : '', i.lotNo ? `lot ${i.lotNo}` : '', plural(i.takas, 'taka'), i.jobRate ? `rate ₹${i.jobRate}` : ''].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                <Text style={[st.num, st.mono, { width: 70 }]}>{m1(i.inM)} m</Text>
+                <Text style={[st.num, st.mono, { width: 64 }]}>{money(i.jobAmt)}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={st.sectionRow}>
+            <Text style={st.section}>TAKA-WISE · {detail.takas.filter((t) => t.received).length} of {detail.takas.length} back</Text>
+            {detail.takas.some((t) => !t.received) && (
+              <TouchableOpacity onPress={() => setOnlyPending((p) => !p)} style={[st.chip, onlyPending && st.chipOn]}>
+                <Text style={[st.chipText, onlyPending && { color: T.copper }]}>Not received only</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <HScroll on={narrow}>
+            <View style={[st.card, { paddingVertical: 4, minWidth: narrow ? 380 : undefined, flex: 1 }]}>
+              <View style={[st.row, { paddingVertical: 8 }]}>
+                <Text style={[st.first, st.head]}>TAKA · INWARD</Text>
+                <Text style={[st.num, st.head, { width: WT.out }]}>OUT</Text>
+                <Text style={[st.num, st.head, { width: WT.in }]}>IN</Text>
+                <Text style={[st.num, st.head, { width: WT.diff }]}>DIFF</Text>
+              </View>
+              {takas.length === 0 && <Text style={st.emptyRow}>No taka detail on this outward lot.</Text>}
+              {takas.map((t, k) => (
+                <View key={`${t.takaNo}-${k}`} style={[st.row, st.line, !t.received && { backgroundColor: '#FBF6EC' }]}>
+                  <View style={st.first}>
+                    <Text style={[st.mono, st.cChallan, st.bold]}>{t.takaNo || '—'}</Text>
+                    <Text style={st.infoText} numberOfLines={1}>
+                      {t.received ? [t.inwNo, t.inwDate.split(', ').map(fmtDY).join(', ')].filter(Boolean).join(' · ') : 'not received yet'}
+                    </Text>
+                  </View>
+                  <Text style={[st.num, st.mono, { width: WT.out }]}>{m1(t.outM)}</Text>
+                  <Text style={[st.num, st.mono, { width: WT.in, color: t.received ? T.ink : T.muted }]}>{t.received ? m1(t.inM) : '—'}</Text>
+                  <Text style={[st.num, st.mono, { width: WT.diff, color: (t.diff || 0) > 0 ? T.red : T.ink, fontWeight: (t.diff || 0) > 0 ? '800' : '400' }]}>
+                    {t.diff === null ? '—' : m1(t.diff)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </HScroll>
+
+          {detail.unmatched.length > 0 && (
+            <Text style={[st.footer, { color: T.red }]}>
+              {plural(detail.unmatched.length, 'inward taka')} linked to this lot could not be matched to an outward taka
+              ({detail.unmatched.map((u) => `${u.takaNo || '—'} ${m1(u.inM)} m`).join(', ')}) — counted in IN, not in the taka list.
+            </Text>
+          )}
+        </>
+      )}
+
+      <Text style={st.footer}>
+        DIFF = outward minus inward metres of the taka. Shortage of the lot is shown only when every taka has come back.
       </Text>
     </ScrollView>
   );
@@ -818,6 +949,15 @@ function HScroll({ on, children }: { on: boolean; children: React.ReactNode }) {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
       {children}
     </ScrollView>
+  );
+}
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={st.stat}>
+      <Text style={[st.statValue, st.mono, !!color && { color }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={st.statLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -891,7 +1031,7 @@ function PartySelector({
                 );
               })}
               {options.length === 0 && (
-                <Text style={st.partyEmpty}>No PartyName found in the loaded data.</Text>
+                <Text style={st.partyEmpty}>No party found in the loaded outwards.</Text>
               )}
             </ScrollView>
           </TouchableOpacity>
@@ -915,19 +1055,14 @@ function HeadRow({ first }: { first: string }) {
   );
 }
 
-function DesignLine({ r, onPress, total }: { r: MillAgg; onPress?: () => void; total?: boolean }) {
-  const hasRe = r.redye > 0 || r.redyeBack > 0;
+function DesignLine({ r, onPress, total }: { r: HubAgg; onPress?: () => void; total?: boolean }) {
   const Body = (
     <View style={[st.row, st.line, total && st.totalRow]}>
       <View style={st.first}>
         <Text style={[st.designName, total && { fontWeight: '800' }]} numberOfLines={2}>
           {r.design}{!total && <Text style={{ color: T.copper }}> ›</Text>}
         </Text>
-        {hasRe && (
-          <Text style={[st.reLine, st.mono]}>
-            ↻ re-dye {fmt(r.redye)} m out · {fmt(r.redyeBack)} m back{total ? ' — not in totals' : ''}
-          </Text>
-        )}
+        {!total && <Text style={st.designMeta}>{plural(r.lots, 'lot')}</Text>}
       </View>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.out }]}>{fmt(r.outM)}</Text>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.in }]}>{fmt(r.inM)}</Text>
@@ -947,52 +1082,41 @@ function DesignLine({ r, onPress, total }: { r: MillAgg; onPress?: () => void; t
   return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{Body}</TouchableOpacity>;
 }
 
-const stateColor = (r: ChallanRow) =>
-  r.closed ? (r.shAll > 0 ? T.red : '#2A6044') : r.t.ins.length ? (r.shAll > 0 ? '#B5651D' : AMBER) : '#5A6B7A';
-
-const infoOf = (t: MillTrip) =>
-  `${t.colour}${t.dyed ? ' D' : ''}${t.finished ? 'F' : ''}${t.lotNo ? ` L·${t.lotNo}` : ''}${t.cuts ? ` ✂${t.cuts}` : ''}`;
-
-function ChallanLine({ r }: { r: ChallanRow }) {
-  const { t } = r;
+function LotLine({ l, onPress }: { l: HubLot; onPress: () => void }) {
+  const info = [
+    l.shade,
+    l.chartNo ? `chart ${l.chartNo}` : '',
+    l.lotNo ? `lot ${l.lotNo}` : '',
+    l.party,
+    `${l.recvTakas}/${l.outTakas} takas back`,
+    l.lastInw ? `last inward ${fmtD(l.lastInw)}` : '',
+  ].filter(Boolean).join(' · ');
   return (
-    <View style={[st.cRow, r.pct !== null && r.pct > 5 && { backgroundColor: '#FCEDEA' }]}>
-      <View style={st.row}>
-        <View style={st.first}>
-          <Text style={[st.mono, st.cChallan]} numberOfLines={2}>
-            <Text style={st.bold}>{t.challan}</Text> <Text style={{ color: T.muted }}>{fmtD(t.date)}</Text>
-          </Text>
-          <View style={st.tags}>
-            {t.reprocess && <Text style={[st.tag, { color: '#B5651D', backgroundColor: '#FBF1DC' }]}>RE-DYE</Text>}
-            {!r.outIn && <Text style={[st.tag, { color: '#1C567A', backgroundColor: '#E3EEF5' }]}>EARLIER OUTWARD</Text>}
-            {t.implied && <Text style={[st.tag, { color: T.muted, backgroundColor: T.alt }]}>NO SENT ENTRY</Text>}
+    <TouchableOpacity onPress={onPress} activeOpacity={0.6}>
+      <View style={[st.cRow, l.pct !== null && l.pct > 5 && { backgroundColor: '#FCEDEA' }]}>
+        <View style={st.row}>
+          <View style={st.first}>
+            <Text style={[st.mono, st.cChallan]} numberOfLines={2}>
+              <Text style={[st.bold, { color: T.copper }]}>{l.outNo} ›</Text> <Text style={{ color: T.muted }}>{fmtD(l.outDate)}</Text>
+            </Text>
           </View>
+          <Text style={[st.num, st.mono, { width: W.out }]}>{fmt(l.outM)}</Text>
+          <Text style={[st.num, st.mono, { width: W.in }]}>{l.inM > 0 ? fmt(l.inM) : '—'}</Text>
+          <Text style={[st.num, st.mono, { width: W.pend, color: l.pend > 0 ? AMBER : T.muted }]}>{l.pend > 0 ? fmt(l.pend) : '—'}</Text>
+          <Text style={[st.num, st.mono, { width: W.short, color: (l.short || 0) > 0 ? T.red : T.ink, fontWeight: (l.short || 0) > 0 ? '800' : '400' }]}>
+            {l.short !== null ? fmt(l.short) : '—'}
+          </Text>
+          <Text style={[st.num, st.mono, { width: W.pct, color: l.pct !== null && l.pct > 5 ? T.red : T.ink }]}>
+            {l.pct !== null ? l.pct.toFixed(1) : '—'}
+          </Text>
+          <Text style={[st.num, st.mono, { width: W.amt }]}>{l.inAmt > 0 ? money(l.inAmt) : '—'}</Text>
         </View>
-        <Text style={[st.num, st.mono, { width: W.out, color: r.outIn ? T.ink : T.muted }]}>{r.outIn ? fmt(t.metres) : '—'}</Text>
-        <Text style={[st.num, st.mono, { width: W.in }]}>{r.inM > 0 ? fmt(r.inM) : '—'}</Text>
-        <Text style={[st.num, st.mono, { width: W.pend, color: (r.pend || 0) > 0 ? AMBER : T.muted }]}>
-          {r.pend !== null && r.pend > 0 ? fmt(r.pend) : '—'}
-        </Text>
-        <Text style={[st.num, st.mono, { width: W.short, color: (r.sh || 0) > 0 ? T.red : T.ink, fontWeight: (r.sh || 0) > 0 ? '800' : '400' }]}>
-          {r.sh !== null ? fmt(r.sh) : '—'}
-        </Text>
-        <Text style={[st.num, st.mono, { width: W.pct, color: r.pct !== null && r.pct > 5 ? T.red : T.ink }]}>
-          {r.pct !== null ? r.pct.toFixed(1) : '—'}
-        </Text>
-        <Text style={[st.num, st.mono, { width: W.amt }]}>{r.inAmt > 0 ? money(r.inAmt) : '—'}</Text>
+        <View style={st.infoRow}>
+          <Text style={[st.stateBadge, { backgroundColor: STATUS_COLOR[l.status] }]}>{l.status}</Text>
+          <Text style={st.infoText}>{info}</Text>
+        </View>
       </View>
-      <View style={st.infoRow}>
-        <Text style={[st.stateBadge, { backgroundColor: stateColor(r) }]}>{r.state}</Text>
-        <Text style={st.infoMain}>{infoOf(t)}</Text>
-        <Text style={st.infoText}>
-          {t.mill}{t.chartNo ? ` · chart ${t.chartNo}` : ''}{t.party ? ` · ${t.party}` : ''} · outwarded {t.estimate ? '≈ ' : ''}{fmt(t.metres)} m{t.estimate ? ' (order qty — lot qty not entered)' : ''} ·
-          settled {fmt(r.settled)} m, received {fmt(r.received)} m
-          {t.ins.length ? ` (${t.ins.map((i) => fmtD(i.date)).join(', ')})` : ''}
-          {r.shAll > 0 ? ` · shortage so far ${fmt(r.shAll)} m` : ''}
-          {!r.closed && r.rem > 0 ? ` · ${fmt(r.rem)} m still at mill` : ''}
-        </Text>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -1024,6 +1148,7 @@ const st = StyleSheet.create({
   helpH: { fontSize: 11, fontWeight: '800', color: T.ink, marginTop: 4, marginBottom: 3 },
   helpP: { fontSize: 11, lineHeight: 17, color: T.ink },
 
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   partyWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   partyLabel: { fontSize: 9.5, fontWeight: '900', color: T.muted, letterSpacing: 0.5 },
   partySelect: {
@@ -1098,7 +1223,7 @@ const st = StyleSheet.create({
   first: { flex: 1, minWidth: 0 },
   num: { textAlign: 'right', fontSize: 11, color: T.ink },
   designName: { fontSize: 11.5, fontWeight: '700', color: T.ink },
-  reLine: { fontSize: 9, fontWeight: '700', color: '#B5651D', marginTop: 1 },
+  designMeta: { fontSize: 9, color: T.muted, marginTop: 1 },
 
   emptyBox: { paddingHorizontal: 14, paddingVertical: 16, alignItems: 'center' },
   emptyText: { fontSize: 12, lineHeight: 19, color: T.muted, textAlign: 'center' },
@@ -1113,12 +1238,22 @@ const st = StyleSheet.create({
 
   cRow: { borderTopWidth: 1, borderTopColor: T.alt, paddingVertical: 9 },
   cChallan: { fontSize: 11, color: T.ink },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
-  tag: { fontSize: 8, fontWeight: '900', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   infoRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4, paddingHorizontal: 12 },
   stateBadge: { fontSize: 8, fontWeight: '900', color: '#fff', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
-  infoMain: { fontSize: 9.5, color: '#4b535b', fontWeight: '700' },
   infoText: { fontSize: 9.5, color: T.muted, flexShrink: 1 },
+
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  lotTitle: { fontSize: 17, fontWeight: '800', color: T.ink },
+  stats: { flexDirection: 'row', gap: 8 },
+  stat: { flex: 1, minWidth: 0, backgroundColor: T.sub, borderRadius: 9, paddingVertical: 8, paddingHorizontal: 6, alignItems: 'center' },
+  statValue: { fontSize: 13, fontWeight: '800', color: T.ink },
+  statLabel: { fontSize: 7.5, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2, textAlign: 'center' },
+  factsCard: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingVertical: 10, rowGap: 8 },
+  fact: { width: '50%', paddingRight: 8 },
+  factK: { fontSize: 8, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  factV: { fontSize: 11, color: T.ink, marginTop: 1, fontWeight: '600' },
+  section: { fontSize: 9, fontWeight: '900', color: T.copper, letterSpacing: 0.5 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
 
   footer: { fontSize: 9.5, color: T.muted, lineHeight: 14 },
 });

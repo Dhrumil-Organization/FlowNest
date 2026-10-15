@@ -47,6 +47,27 @@ export const s = StyleSheet.create({
     headerTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
     filterLabel: { fontSize: 11, color: C.ink, marginBottom: 4, fontWeight: '800' },
 
+    /* Search-aware quantity summary for the weft carton issue browse. */
+    qtySummaryCard: {
+        marginTop: 16, paddingTop: 14, borderTopWidth: 1,
+        borderTopColor: C.line, width: '100%',
+    },
+    qtySummaryHeading: { fontSize: 13, fontWeight: '900', color: C.ink, marginBottom: 13 },
+    qtySummaryLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5, color: C.ink2 },
+    qtySummaryValue: { fontSize: 26, fontWeight: '900', color: C.primary, marginTop: 4, fontFamily: MONO },
+    qtySummaryDivider: { height: 1, backgroundColor: C.line, marginVertical: 12 },
+    qtySummaryCountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    qtySummaryCountLabel: { fontSize: 12, fontWeight: '700', color: C.ink2 },
+    qtySummaryCount: { fontSize: 16, fontWeight: '900', color: C.ink },
+    qtySummaryHint: { fontSize: 11, color: C.ink2, marginTop: 8 },
+    qtySummaryMobile: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 8, paddingTop: 10, marginTop: 10,
+        borderTopWidth: 1, borderTopColor: C.line,
+    },
+    qtySummaryMobileText: { fontSize: 12, color: C.ink2, fontWeight: '700' },
+    qtySummaryMobileValue: { fontSize: 13.5, fontWeight: '900', color: C.primary },
+
     /* ---------- Property / Year criteria bar (both tabs) ----------
        On mobile it spans the full screen width (matching the body's mobile padding). On a
        wide/desktop viewport it sits inside the same 1100px content column as the page body,

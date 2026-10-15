@@ -210,8 +210,33 @@ export function entriesFromShow(d: ShowData): Entry[] {
 
 export function unwrap(response: any): any {
   const body = response && typeof response === 'object' && 'data' in response && 'status' in response && 'headers' in response ? response.data : response;
+  // an HTML page / text instead of JSON (wrong route, old server, proxy page) must never reach the screen as data
+  if (typeof body === 'string') {
+    const t = body.trim();
+    throw new Error(t.startsWith('<') ? 'The server sent a web page instead of data — the Outward Scan Sticker backend is not deployed on this server (or the route cache is old).' : 'The server sent an unexpected answer: ' + t.slice(0, 120));
+  }
   if (body && typeof body === 'object' && body.success === false) throw new Error(body.message || 'Request failed.');
   return body && typeof body === 'object' && 'data' in body ? body.data : body;
+}
+
+const arr = <T,>(v: any): T[] => (Array.isArray(v) ? v : []);
+
+/** meta with every list present (an old / different server must not crash the screen) */
+export function normalizeMeta(m: any): Meta {
+  if (!m || typeof m !== 'object' || !m.prpcode) throw new Error('The server sent an unexpected answer for this property (no grey store data). Deploy the latest GreyScanInwardController.php and retry.');
+  return {
+    ...m,
+    parties: arr<Party>(m.parties),
+    ent_types: arr(m.ent_types),
+    job_accounts: arr(m.job_accounts),
+    ...(m.departments === undefined ? {} : { departments: arr(m.departments) }),
+  } as Meta;
+}
+
+/** show data with pieces / lines always arrays */
+export function normalizeShow(d: any): ShowData {
+  if (!d || typeof d !== 'object' || !d.header) throw new Error('The server sent an unexpected answer for this inward.');
+  return { ...d, pieces: arr<any>(d.pieces).map((p) => ({ ...p, lines: arr(p.lines) })) } as ShowData;
 }
 
 export const errText = (err: any, fallback: string) =>

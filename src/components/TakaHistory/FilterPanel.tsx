@@ -1,22 +1,28 @@
 // FILE: src/components/TakaHistory/FilterPanel.tsx
 // Filters as a slide-in panel (right drawer on web / tablet, full screen on phone) - same idea as the
 // Daily Collection Report "Filters" panel, so the user never has to go "back" to change a filter.
-// Property (one or many) · As on date · Fresh data   (no year filter - a blank year is sent)   (Store is fixed to TAKA_STR_CODE, see model.ts).
+// Property (one or many) · Date (As on date | Sales between From - To) · Fresh data   (no year filter - a blank year is sent)   (Store is fixed to TAKA_STR_CODE, see model.ts).
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import type { useTakaCriteria } from './criteria';
-import { todayText } from './model';
+import { todayText, type DateMode } from './model';
 import SelectField from './SelectField';
 
 type Props = {
   c: ReturnType<typeof useTakaCriteria>;
   prpCode: string;
+  dateMode: DateMode;
   asOn: string;
+  fromDate: string;
+  toDate: string;
   refresh: boolean;
   onPrp: (v: string) => void;
+  onDateMode: (v: DateMode) => void;
   onAsOn: (v: string) => void;
+  onFromDate: (v: string) => void;
+  onToDate: (v: string) => void;
   onRefresh: (v: boolean) => void;
   loading: boolean;
   error: string;
@@ -26,7 +32,7 @@ type Props = {
 
 const PANEL_W = 440;
 
-export default function FilterPanel({ c, prpCode, asOn, refresh, onPrp, onAsOn, onRefresh, loading, error, onLoad, onClose }: Props) {
+export default function FilterPanel({ c, prpCode, dateMode, asOn, fromDate, toDate, refresh, onPrp, onDateMode, onAsOn, onFromDate, onToDate, onRefresh, loading, error, onLoad, onClose }: Props) {
   const { width } = useWindowDimensions();
   const wide = width >= 700;
   const anim = useRef(new Animated.Value(0)).current;
@@ -86,22 +92,48 @@ export default function FilterPanel({ c, prpCode, asOn, refresh, onPrp, onAsOn, 
             />
             */}
 
-            <View style={st.field}>
-              <Text style={st.label}>As on date</Text>
-              <View style={st.row}>
-                <TextInput
-                  style={[st.input, { flex: 1, minWidth: 0 }]}
-                  value={asOn}
-                  onChangeText={onAsOn}
-                  placeholder="dd/mm/yyyy"
-                  placeholderTextColor={T.muted}
-                  keyboardType="numbers-and-punctuation"
-                />
-                <TouchableOpacity style={st.smallBtn} onPress={() => onAsOn(todayText())} accessibilityRole="button">
-                  <Text style={st.smallBtnText}>Today</Text>
-                </TouchableOpacity>
+            <View style={[st.field, { flexBasis: '100%' }]}>
+              <Text style={st.label}>Date</Text>
+              <View style={st.segment}>
+                {([
+                  { key: 'A', label: 'As on date' },
+                  { key: 'S', label: 'Sales between' },
+                ] as { key: DateMode; label: string }[]).map((m) => {
+                  const on = dateMode === m.key;
+                  return (
+                    <TouchableOpacity
+                      key={m.key}
+                      activeOpacity={0.8}
+                      onPress={() => onDateMode(m.key)}
+                      style={[st.segBtn, on && st.segBtnOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[st.segText, on && st.segTextOn]}>{m.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
+
+            {dateMode === 'A' ? (
+              <View style={[st.field, { flexBasis: '100%' }]}>
+                <DateInput value={asOn} onChange={onAsOn} />
+                <Text style={st.hint}>Every taka with its history up to this date</Text>
+              </View>
+            ) : (
+              <>
+                <View style={[st.field, { flexBasis: '100%' }]}>
+                  <Text style={st.label}>From</Text>
+                  <DateInput value={fromDate} onChange={onFromDate} />
+                </View>
+                <View style={[st.field, { flexBasis: '100%' }]}>
+                  <Text style={st.label}>To</Text>
+                  <DateInput value={toDate} onChange={onToDate} />
+                  <Text style={st.hint}>Only takas sold between these dates, with their history up to the To date</Text>
+                </View>
+              </>
+            )}
           </View>
 
           <View style={[st.row, st.switchRow]}>
@@ -148,6 +180,24 @@ export default function FilterPanel({ c, prpCode, asOn, refresh, onPrp, onAsOn, 
   );
 }
 
+function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <View style={st.row}>
+      <TextInput
+        style={[st.input, { flex: 1, minWidth: 0 }]}
+        value={value}
+        onChangeText={onChange}
+        placeholder="dd/mm/yyyy"
+        placeholderTextColor={T.muted}
+        keyboardType="numbers-and-punctuation"
+      />
+      <TouchableOpacity style={st.smallBtn} onPress={() => onChange(todayText())} accessibilityRole="button">
+        <Text style={st.smallBtnText}>Today</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 50, elevation: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,27,45,0.45)' },
@@ -165,6 +215,11 @@ const st = StyleSheet.create({
   hint: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 4 },
   input: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12, fontSize: 15, fontWeight: '700', color: T.ink },
   row: { flexDirection: 'row', alignItems: 'center' },
+  segment: { flexDirection: 'row', borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, overflow: 'hidden' },
+  segBtn: { flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' },
+  segBtnOn: { backgroundColor: T.nav },
+  segText: { fontSize: 13.5, fontWeight: '700', color: T.nav },
+  segTextOn: { color: '#fff', fontWeight: '800' },
   smallBtn: { marginLeft: 8, height: 44, paddingHorizontal: 14, borderRadius: 10, backgroundColor: T.alt, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
   smallBtnText: { color: T.copper, fontWeight: '800', fontSize: 13 },
   switchRow: { padding: 12, gap: 10, backgroundColor: T.sub, borderRadius: 10, borderWidth: 1, borderColor: T.border },

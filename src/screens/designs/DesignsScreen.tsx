@@ -1302,42 +1302,53 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
     const [search, setSearch] = useState('');
     const [categories, setCategories] = useState<GetItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [categoryError, setCategoryError] = useState('');
 
-    const loadCategories = useCallback(async (q = '') => {
+    const loadCategories = useCallback(async () => {
         if (!visible) return;
-
         setLoading(true);
+        setCategoryError('');
 
         try {
-            const res = await ItemAPI.getItem({
-                yearno: yearno,
-                prpcode: prpcode,
-                strcode: strcode,
-                txntype: 'design_master',
-                isall: 1,
-                billdate: '',
-                itmcode: '',
-                ttype: [8, 3, 30, 2, 34, 83, 42],
-                fetch: '',
+            // The existing /designs route also serves the read-only,
+            // server-controlled category list when category_options=1.
+            // No new routes or hard-coded ERP store/property/year.
+            const apiResponse = await client.get('/designs', {
+                params: { category_options: 1, yearno, prpcode, strcode },
             });
+            const root: any = apiResponse?.data?.response ?? apiResponse?.data;
+            if (root?.success === false) {
+                throw new Error(root?.message || 'ERP category lookup failed');
+            }
 
-            console.log("ITEM RESPONSE =>", res.data);
-
-            const list = res.data.response?.data || [];
-            setCategories(list);
+            if (root?.meta?.filter_enabled === false) {
+                // Rollback switch (0): EXACT original category API behaviour.
+                const legacy = await ItemAPI.getItem({
+                    yearno, prpcode, strcode,
+                    txntype: 'design_master', isall: 1,
+                    billdate: '', itmcode: '',
+                    ttype: [8, 3, 30, 2, 34, 83, 42], fetch: '',
+                });
+                setCategories(legacy?.data?.response?.data || []);
+            } else if (root?.meta?.filter_enabled === true && Array.isArray(root?.data)) {
+                setCategories(root.data as GetItem[]);
+            } else {
+                throw new Error('Unexpected Design Category API response');
+            }
         } catch (e: any) {
+            // Do NOT silently revert to the unfiltered master if the dynamic
+            // ERP validation request fails while the feature is enabled.
             setCategories([]);
+            setCategoryError('Unable to load Design Categories. Please retry.');
+            console.warn('Design Category API error', e?.message || e);
         } finally {
             setLoading(false);
         }
-
-    }, [visible]);
+    }, [visible, prpcode, strcode, yearno]);
 
     useEffect(() => {
-        if (!visible) return;
-
-        loadCategories();
-    }, [visible]);
+        if (visible) loadCategories();
+    }, [visible, loadCategories]);
 
     const closePicker = () => {
         onClose();
@@ -1441,7 +1452,7 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                                             textAlign: "center",
                                         }}
                                     >
-                                        No Category Found
+                                        {categoryError || 'No Category Found'}
                                     </Text>
                                 ) : null
                             }
@@ -2761,7 +2772,12 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         </View>
 
                         <TouchableOpacity
-                            onPress={() => set('category', '')}
+                            onPress={() => setForm((previous: any) => ({
+                                ...previous,
+                                category: '',
+                                erp_itm_code: undefined,
+                                erp_str_code: undefined,
+                            }))}
                             style={{ paddingLeft: 8 }}
                         >
                             <Text style={{ color: T.pd, fontSize: 18 }}>✕</Text>
@@ -2927,7 +2943,32 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             <CategoryPickerModal
                 visible={categoryPickerVisible}
                 onSelect={(item) => {
-                    set('category', item.ItmName);
+                    // Display ERP category name but persist its real item/store
+                    // identity for unambiguous DAPDesign synchronization.
+                    // Legacy fallback may not supply StrCode; in that case do
+                    // not invent a fabric store or force an item mapping.
+                    setForm((previous: any) => {
+                        const sameCategory = String(previous.category || '')
+                            .trim().toUpperCase() === String(item.ItmName || '')
+                            .trim().toUpperCase();
+                        const wasExplicitlySelected =
+                            !!previous.erp_itm_code || !!previous.erp_str_code;
+                        // Re-selecting the unchanged category while editing
+                        // must not reclassify an existing DAPDesign record.
+                        if (sameCategory && !wasExplicitlySelected) {
+                            return { ...previous, category: item.ItmName };
+                        }
+                        return {
+                            ...previous,
+                            category: item.ItmName,
+                            erp_itm_code: (item as any).StrCode != null
+                                ? String(item.ItmCode)
+                                : undefined,
+                            erp_str_code: (item as any).StrCode != null
+                                ? String((item as any).StrCode)
+                                : undefined,
+                        };
+                    });
                 }}
                 onClose={() => setCategoryPickerVisible(false)}
             />

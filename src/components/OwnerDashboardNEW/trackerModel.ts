@@ -192,8 +192,9 @@ export const ymd = (value: number | null | undefined, withYear = true): string =
   return withYear ? `${s.slice(6, 8)} ${month} ${s.slice(2, 4)}` : `${s.slice(6, 8)} ${month}`;
 };
 
+// qty is never rounded: shown exactly as the API sends it (up to 6 decimals)
 export const qty = (value: number | null | undefined): string =>
-  typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—';
+  typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-IN', { maximumFractionDigits: 6 }) : '—';
 
 export const pct = (value: number | null | undefined): string =>
   typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '—';

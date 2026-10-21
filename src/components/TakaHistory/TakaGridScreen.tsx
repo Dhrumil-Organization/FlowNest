@@ -132,7 +132,8 @@ export default function TakaGridScreen({ token, API, create }: Props) {
     if (!run) return;
     setExporting(true);
     try {
-      const day = (run.as_on_date || '').split('/').reverse().join('');
+      const dmy = (t?: string | null) => (t || '').split('/').reverse().join('');
+      const day = run.from_date || run.to_date ? `Sold_${dmy(run.from_date)}_${dmy(run.to_date)}` : dmy(run.as_on_date);
       await downloadGridExcel(
         API,
         token,

@@ -20,7 +20,7 @@
 //     party's credit days, can be changed, and Due Date = SO date (today when new) + Due Days;
 //     picking a Due Date by hand sets Due Days to match. Due Days must be a whole number >= 0.
 //   - Sales Executive can be changed on the order (GET /api/get_criterion fetch:'salesexe').
-//   - Sales Party card after the main party (party list reused); blank = same as the party.
+//   - Sales Party card after the main party (party list reused); optional, blank when not picked.
 //   - Qty / Pcs / Rate have a pencil on every row (like the Item pencil) — the value is
 //     changed in place, Amount is recalculated, nothing else on the row changes.
 //   - Every row shows its available stock (POST /api/get_so_current_stock, one request per
@@ -50,6 +50,7 @@ import {
   dueDateFor,
   dueDaysFor,
   effectiveSalesParty,
+  filterAddresses,
   filterOrderRows,
   lineAmount,
   makeRowKey,
@@ -144,6 +145,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const [addressListVisible, setAddressListVisible] = useState(false);
   const [addressList, setAddressList] = useState<Row[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
+  const [addressSearch, setAddressSearch] = useState('');
   const [actionRow, setActionRow] = useState<Row | null>(null);
 
   const [executives, setExecutives] = useState<Row[]>([]);
@@ -437,8 +439,8 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       title: 'Select Sales Party',
       crumb: 'Sales party',
       onPick: (party: Row) => {
-        // a sales party equal to the main party is stored as "same as party"
-        setSalesParty(String(party?.ParCode) === String(currentParty?.ParCode) ? null : salesPartyFromPick(party));
+        // stored as picked, even when it is the same as the main party
+        setSalesParty(salesPartyFromPick(party));
         setDirty(true);
       },
     });
@@ -610,6 +612,8 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const badge = authorised ? 'VIEW' : initialMode;
   const daysEditable = !isViewMode || screenMode === 'ADD';
   const shownSalesParty = effectiveSalesParty(salesParty, currentParty);
+  const partyPlace = placeLine(currentParty?.City, currentParty?.State, currentParty?.Cnty, currentParty?.Zip);
+  const shownAddresses = filterAddresses(addressList, addressSearch);
   const salesPlace = placeLine(shownSalesParty?.City, shownSalesParty?.State, shownSalesParty?.Cnty, shownSalesParty?.Zip);
   const stockRow = stockRowKey ? rows.find((r) => makeRowKey(r) === stockRowKey) : null;
   const stockInfo = stockRowKey ? stock[stockRowKey] : undefined;
@@ -772,6 +776,12 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               <Text style={st.partySub} numberOfLines={3}>
                 {currentParty?.ParCode || '-'} | {currentParty?.Address || '-'}
               </Text>
+              {partyPlace ? (
+                <View style={st.placeRow}>
+                  <Icon name="location-on" size={14} color={T.muted} />
+                  <Text style={st.placeText} numberOfLines={2}>{partyPlace}</Text>
+                </View>
+              ) : null}
               <TouchableOpacity
                 style={[st.exePick, isViewMode && st.exePickOff]}
                 onPress={openExecutivePicker}
@@ -825,11 +835,14 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         <Card style={st.partyCard}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={st.eyebrow}>Sales Party</Text>
-            <Text style={st.salesName} numberOfLines={2}>{shownSalesParty?.ParName || '-'}</Text>
-            <Text style={st.partySub} numberOfLines={1}>
-              {shownSalesParty?.ParCode || '-'}
-              {!salesParty?.ParCode ? '  ·  Same as party' : ''}
-            </Text>
+            {shownSalesParty ? (
+              <>
+                <Text style={st.salesName} numberOfLines={2}>{shownSalesParty.ParName || '-'}</Text>
+                <Text style={st.partySub} numberOfLines={1}>{shownSalesParty.ParCode || '-'}</Text>
+              </>
+            ) : (
+              <Text style={st.partySub} numberOfLines={1}>Not selected</Text>
+            )}
             {shownSalesParty?.Address ? (
               <Text style={st.partySub} numberOfLines={3}>{shownSalesParty.Address}</Text>
             ) : null}
@@ -845,7 +858,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               {salesParty?.ParCode ? (
                 <IconBtn
                   icon="close"
-                  label="Use main party as sales party"
+                  label="Clear sales party"
                   color={T.muted}
                   tone="soft"
                   onPress={() => {
@@ -991,12 +1004,25 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
           <InfoRow icon="handshake" label="Broker" value={String(currentParty?.BAccName || '-')} />
           <InfoRow icon="calendar-today" label="Due Days" value={dueDays || '-'} />
           <InfoRow icon="event" label="Due Date" value={dueDate || '-'} />
+          {/* Billing address (party master) — read-only, same layout as the delivery address */}
+          <View style={st.addrRow}>
+            <Icon name="receipt-long" size={18} color={T.copper} />
+            <Text style={st.addrLabel}>Billing Address</Text>
+            <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
+              <Text style={st.addrValue} numberOfLines={10}>{currentParty?.Address || '-'}</Text>
+            </View>
+          </View>
+          <InfoRow icon="location-city" label="Billing City" value={String(currentParty?.City || '-')} />
+          <InfoRow icon="map" label="Billing State" value={String(currentParty?.State || '-')} />
+          <InfoRow icon="public" label="Billing Country" value={String(currentParty?.Cnty || '-')} />
+          <InfoRow icon="markunread-mailbox" label="Billing Zip" value={cleanZip(currentParty?.Zip) || '-'} />
           <TouchableOpacity
             style={st.addrRow}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Change delivery address"
             onPress={() => {
+              setAddressSearch('');
               setAddressListVisible(true);
               loadDeliveryAddress();
             }}
@@ -1017,14 +1043,22 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
 
       {/* Select address */}
       <Sheet open={addressListVisible} onClose={() => setAddressListVisible(false)} title="Select Delivery Address" wideMax={520}>
+        <SearchInput
+          value={addressSearch}
+          onChangeText={setAddressSearch}
+          placeholder="Search address, city, state or zip"
+          onRefresh={loadDeliveryAddress}
+          loading={addressLoading}
+          style={st.addrSearch}
+        />
         {addressLoading ? (
           <View style={st.addrState}>
             <ActivityIndicator size="large" color={T.copper} />
             <Text style={st.addrStateText}>Loading Address...</Text>
           </View>
-        ) : addressList && addressList.length > 0 ? (
+        ) : shownAddresses.length > 0 ? (
           <View>
-            {addressList.map((item, index) => (
+            {shownAddresses.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={st.addrItem}
@@ -1043,7 +1077,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
           </View>
         ) : (
           <View style={st.addrState}>
-            <Text style={st.addrStateText}>No Address Found</Text>
+            <Text style={st.addrStateText}>{addressList.length > 0 ? 'No matching address' : 'No Address Found'}</Text>
           </View>
         )}
       </Sheet>
@@ -1277,6 +1311,7 @@ const st = StyleSheet.create({
   addrLabel: { width: 136, fontSize: 12.5, fontWeight: '700', color: T.muted },
   addrValue: { textAlign: 'right', fontSize: 13.5, fontWeight: '800', color: T.ink },
   addrHint: { fontSize: 12, fontWeight: '800', color: T.copper, marginTop: 4 },
+  addrSearch: { marginBottom: 6 },
   addrState: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center', gap: 12 },
   addrStateText: { fontSize: 14, fontWeight: '600', color: T.muted },
   addrItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: T.hair },

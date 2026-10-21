@@ -51,14 +51,18 @@
 //     a new order sends the Due Days.
 //   - Sales Executive can be changed on the order (saved as SExe).
 //   - Sales Party card after the main party. Saved in main[SALES_PARTY_KEYS] (model.ts) —
-//     CONFIRM those column names with the backend. Not picked = same as the main party.
+//     CONFIRM those column names with the backend. Optional: not picked = saved blank
+//     (no longer defaults to the main party).
 //   - Qty / Pcs / Rate pencils on every row (changed in place, Amount recalculated).
 //   - Available stock shown on every row (tap for the merchant-wise breakdown).
 //   - Search box over the order rows.
 //   - Billing vs delivery address kept apart (model.ts): the Party card shows the billing
-//     address (party master); the details sheet shows Delivery Address / City / State /
+//     address = party master BAddress (Address only if the API sends no BAddress); a new
+//     order's delivery address starts as the master Address. The details sheet shows Delivery Address / City / State /
 //     Country / Zip. A saved order's billing address is filled from /api/accountbasic.
-//   - Sales Party card shows its billing address with City, State, Country - Zip.
+//   - Party and Sales Party cards show the billing address with City, State, Country - Zip;
+//     the details sheet lists Billing Address / City / State / Country / Zip above the
+//     Delivery rows. "Select Delivery Address" has a search box (filters the loaded list).
 //
 // Deliberate differences from legacy
 //   - No own header / StatusBar / SafeArea: the global AppHeader is used; every step

@@ -508,7 +508,7 @@ const st = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.hair,
   },
-  infoLabel: { width: 118, fontSize: 12.5, fontWeight: '700', color: T.muted },
+  infoLabel: { width: 136, fontSize: 12.5, fontWeight: '700', color: T.muted },
   infoValue: { flex: 1, minWidth: 0, textAlign: 'right', fontSize: 13.5, fontWeight: '800', color: T.ink },
 
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },

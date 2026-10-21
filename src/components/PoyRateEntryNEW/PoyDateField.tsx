@@ -29,7 +29,13 @@ export function PoyDateField({ value, onChange, disabled }: Props) {
           'aria-label': 'Applicable from date',
           onChange: (e: any) => {
             const v = e?.target?.value;
-            if (v) onChange(fromISO(String(v)));
+            if (!v) return;
+            const picked = fromISO(String(v));
+            // legacy maximumDate={new Date()}: a typed future date is ignored (the `max` attr alone does not block typing)
+            const endOfToday = new Date();
+            endOfToday.setHours(23, 59, 59, 999);
+            if (picked.getTime() > endOfToday.getTime()) return;
+            onChange(picked);
           },
           style: {
             border: 'none', outline: 'none', background: 'transparent', color: T.ink,

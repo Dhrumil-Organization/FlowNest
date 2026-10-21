@@ -9,6 +9,7 @@ import {
 import { firstValue, Row, rowKey, todayDMY } from './format';
 import { authorizationReason, computePlan, sourcingFromRows, validatePlan } from './plan';
 import { buildEngine, computeBreakup, Engine, matchesSnap, Rates } from './costEngine';
+import { confirmAsync, notifyAsync } from './ui';
 
 const mergeParties = (existing: Row[], rows: Row[]): Row[] => {
   const map: Record<string, Row> = {};
@@ -230,8 +231,11 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     setStockType(v); setSelectedGroupKey(''); setSelectedOrders([]); setGroups([]); setSelectedGroupSnapshot(null);
     setStockMeters('0'); setStockMetersTouched(false); resetSourcing(); setGroupQuery({ search: '', page: 1 });
   };
-  const chooseGroup = (g: Row) => {
+  const chooseGroup = async (g: Row) => {
     if (readOnly) return;
+    // web chooseGroup: confirm before replacing the design group of a saved order
+    if (isEdit && selectedGroupKey && selectedGroupKey !== g.key &&
+      !(await confirmAsync('Change the Design group?', 'Existing selected Sales Orders will be replaced.', 'Change'))) return;
     if (selectedGroupKey !== g.key) clearCosting();
     setSelectedGroupSnapshot(g); setSelectedGroupKey(g.key); setReviewStep(false);
     setStockMeters('0'); setStockMetersTouched(false); setPoOwnerCode(''); resetSourcing();
@@ -242,6 +246,11 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
   const toggleOrder = (order: Row) => {
     if (readOnly) return;
     const key = rowKey(order);
+    // web toggleOrder: the last selected Sales Order of the group cannot be unticked
+    if (selectedOrders.length === 1 && selectedOrders.some(r => rowKey(r) === key)) {
+      notifyAsync('Production Order', 'At least one Sales Order must remain selected in the group.');
+      return;
+    }
     setSelectedOrders(cur => {
       if (cur.some(r => rowKey(r) === key)) {
         return cur.filter(r => rowKey(r) !== key);
@@ -370,7 +379,7 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     sourceMode, selfFabricType, stockType, selectedOrders, selectedGroup, selfDesign, baseQtyInput,
     selfGreigeQtyInput, shrinkage, stockMeters, stockMetersTouched, legacyCostingData, legacyCostChoice,
     newCostChoice, costingResult: effectiveCostingResult, resolvedCostingMeta, costingLoading: costingLoading || engineLoading, costingError, main,
-    jobList, purchaseList, inhouseQtyInput, inhouseTouched, readOnly, lock, selfFinishedCost, selfGreigeCost, ownerLoading, poOwnerCode, isAdd, voucher
+    jobList, purchaseList, inhouseQtyInput, inhouseTouched, readOnly, lock, selfFinishedCost, selfGreigeCost, ownerLoading, poOwnerCode, isAdd, voucher, greigeRate
   };
   const plan = useMemo(() => computePlan(state), Object.values(state)); // eslint-disable-line react-hooks/exhaustive-deps
   const saveReason = validatePlan(state, plan);

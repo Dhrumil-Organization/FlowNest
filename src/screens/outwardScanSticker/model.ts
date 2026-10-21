@@ -1,7 +1,7 @@
 // FILE: src/screens/outwardScanSticker/model.ts
 // Outward Scan Sticker — types, the per-taka quantity rules and the save payload.
 // The rules are the SAME as GreyScanInwardController (backend) so what the screen shows is what gets saved:
-//   entered = Σ lines (main line + "add to taka" lines, each with its own shade)
+//   entered = Σ lines (main line + "TP taka" lines, each with its own shade)
 //   shortage ticked  OR  entered ≥ balance  ->  shortage = balance − entered (negative = excess), taka closes
 //   entered < balance, not ticked            ->  balance − entered stays pending on the job outward
 

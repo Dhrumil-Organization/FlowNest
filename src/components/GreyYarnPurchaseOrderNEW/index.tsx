@@ -319,7 +319,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // AppAlert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -410,7 +410,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // AppAlert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -505,7 +505,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // AppAlert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -536,7 +536,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 prptype: userPtype,
                 yearno: yno,
                 // strcode: FormState.values.StrCode || '',
-                atype: 'H',
+                atype: 'A',
                 //strtype: 'Y'
                 strtype: 'G'
             };
@@ -554,7 +554,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // AppAlert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -606,7 +606,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // AppAlert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);

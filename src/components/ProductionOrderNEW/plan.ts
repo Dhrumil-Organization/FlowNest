@@ -173,9 +173,11 @@ export function computePlan(st: Row): Row {
 
 export function validatePlan(st: Row, p: Row): string {
   const { readOnly, lock, sourceMode, selectedOrders, stockType, selfDesign, selfFinishedCost, selfGreigeCost,
-    ownerLoading, poOwnerCode, costingLoading, shrinkage, isAdd, voucher } = st;
+    ownerLoading, poOwnerCode, costingLoading, shrinkage, isAdd, voucher, greigeRate } = st;
   if (readOnly) return (lock && lock.reason) || 'This record is view-only.';
   if (sourceMode === 'sales' && selectedOrders.length === 0) return stockType === 'P' ? 'Select a Design and at least one Job Order.' : 'Select a Design and at least one Sales Order.';
+  // web saveReason: a picked Stock & Sell design must carry an item code
+  if (sourceMode === 'self' && selfDesign.dsncode && !selfDesign.itmcode) return 'The selected design must provide an item code.';
   if (sourceMode === 'self' && p.baseQty <= 0) return p.fabricType === 'Finish' ? 'Enter Finished qty.' : 'Enter Greige qty.';
   if (sourceMode === 'self' && !selfDesign.dsncode && p.fabricType === 'Finish' && Number(selfFinishedCost || 0) <= 0) return 'Enter Finished costing.';
   if (sourceMode === 'self' && !selfDesign.dsncode && p.fabricType === 'Greige' && Number(selfGreigeCost || 0) <= 0) return 'Enter Greige costing.';
@@ -189,6 +191,8 @@ export function validatePlan(st: Row, p: Row): string {
   if (costingLoading) return 'Selected costing is still loading.';
   if (p.finishRequirement && !p.recipeValid && (Number(shrinkage) < 0 || Number(shrinkage) > 100)) return 'Shrinkage must be between 0 and 100 percent.';
   if (p.finishRequirement && p.recipeAvailable && !p.recipeValid) return 'Design Recipe Finish Shrink must be between 0 and less than 100 percent.';
+  // web saveReason: greige rate (loaded from the saved order) may not be negative
+  if (Number(greigeRate || 0) < 0) return 'Greige Rate cannot be negative.';
   if (p.jobErrors.length) return p.jobErrors[0];
   if (p.millQty < 0) return 'Job Work + Purchase quantity cannot exceed Total Production quantity.';
   if (isAdd && !voucher.vouno) return 'Voucher number is still being prepared.';

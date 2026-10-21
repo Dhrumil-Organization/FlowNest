@@ -698,17 +698,29 @@ const ChequeForm: React.FC<Props> = ({
         </Text>
     );
 
-    const webDate = (value: string, onPick: (v: string) => void, ariaLabel: string, max?: string) => (
+    const webDate = (value: string, onPick: (v: string) => void, ariaLabel: string, max?: string, min?: string) => (
         <View style={styles.dateBox}>
             <Icon name="event" size={17} color={T.copper} />
             {React.createElement('input', {
                 type: 'date',
                 value,
                 ...(max ? { max } : {}),
+                ...(min ? { min } : {}),
                 'aria-label': ariaLabel,
                 onChange: (e: any) => {
                     const v = e.target.value; // "YYYY-MM-DD"
-                    if (v) onPick(v);
+                    if (v) {
+                        // Same rule as the native picker (maximumDate / minimumDate): typed dates outside the range are rejected
+                        if (max && v > max) {
+                            AppAlert.alert('Validation', 'Only today or past dates are allowed.');
+                            return;
+                        }
+                        if (min && v < min) {
+                            AppAlert.alert('Validation', 'Please select a valid date.');
+                            return;
+                        }
+                        onPick(v);
+                    }
                 },
                 style: {
                     flex: 1,

@@ -3,7 +3,7 @@
 //
 //   New inward   party (pending job outward) -> G.R.N. / Job A/c / Department / Store No (Entry Type fixed GST) / bill -> scan stickers
 //                (camera, hardware scanner or typed taka no., or pick from the pending list) -> per taka: shade + qty,
-//                shortage tick (auto shortage), "Add to taka" lines with their own shade -> Save
+//                shortage tick (auto shortage), "TP taka" lines with their own shade -> Save
 //   Browse       every grey job inward of the period -> view, modify, HARD delete
 //
 // Backend: GreyScanInwardController (POST /api/grey_scan_inward/*) — writes GRYInw / GRYInwD1 / GRYInwD2, the job
@@ -1032,7 +1032,7 @@ function EntryCard({ e, wide, cardW, narrow, maxF, hi, bad, onQty, onShade, onRe
         {wide ? <View style={[st.status, { backgroundColor: status.bg }]}><Text style={[st.statusText, { color: status.col }]} numberOfLines={1}>{status.t}</Text></View> : <View style={{ flex: 1 }} />}
         <TouchableOpacity style={st.addLine} onPress={onAddLine} disabled={e.lines.length >= 10}>
           <Icon name="add" size={16} color={T.purple} />
-          <Text style={st.addLineText}>Add to taka</Text>
+          <Text style={st.addLineText}>TP taka</Text>
         </TouchableOpacity>
       </View>
       {!wide ? <View style={[st.status, st.statusRow, { backgroundColor: status.bg }]}><Text style={[st.statusText, { color: status.col }]} numberOfLines={1}>{status.t}</Text></View> : null}
@@ -1327,7 +1327,7 @@ function HelpCard() {
     ['check-box', 'Shortage ✓', 'Tick when the mill will not send more: balance − kg is booked as shortage and the taka closes.'],
     ['trending-up', 'More kg', 'Kg above the balance (100 vs 98) is saved as excess; the taka closes.'],
     ['hourglass-empty', 'Less kg', 'Not ticked: the rest stays pending on the outward and can be received later.'],
-    ['add', 'Add to taka', 'Same taka, different shade for the extra / leftover kg — its own line.'],
+    ['add', 'TP taka', 'Same taka, different shade for the extra / leftover kg — its own line.'],
     ['save', 'Save', 'Shows totals first. Browse lists every inward made from this screen (web, app, iPad): open, Modify or Delete (permanent).'],
   ];
   return (

@@ -63,6 +63,7 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
   const [poOwners, setPoOwners] = useState<Row[]>([]);
   const [poOwnerCode, setPoOwnerCode] = useState('');
   const [ownerLoading, setOwnerLoading] = useState(false);
+  const [savedOwner, setSavedOwner] = useState<{ code: string; name: string }>({ code: '', name: '' });
   const [stockMeters, setStockMeters] = useState('0');
   const [stockMetersTouched, setStockMetersTouched] = useState(false);
   const [voucherLoading, setVoucherLoading] = useState(false);
@@ -105,6 +106,15 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     const codes = [...new Set(selectedOrders.map((r: Row) => String(firstValue(r.sexecode, r.SExe, r.sexe, '') || '').trim()).filter(Boolean))];
     if (codes.length === 1 && String(poOwnerCode || '') !== codes[0]) setPoOwnerCode(codes[0]);
   }, [sourceMode, selectedOrders]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Edit / view: if the saved order only carries the owner's NAME, pick the
+  // matching owner from the list once it has loaded.
+  useEffect(() => {
+    if (isAdd || poOwnerCode || savedOwner.code || !savedOwner.name || poOwners.length === 0) return;
+    const want = savedOwner.name.toUpperCase();
+    const hit = poOwners.find((o: Row) => String(o.parname || '').trim().toUpperCase() === want);
+    if (hit) setPoOwnerCode(String(hit.parcode));
+  }, [isAdd, poOwnerCode, savedOwner, poOwners]);
 
   // ---------- record ----------
   const loadRecord = useCallback(async () => {
@@ -152,7 +162,18 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       const sourcing = sourcingFromRows(data.d12 || [], data.d13 || []);
       setJobList(sourcing.jobList); setPurchaseList(sourcing.purchaseList);
       setVoucher({ vouno: m.vouno || '', suffix: m.suffix || '', month: m.month || '' });
-      setPoOwnerCode(String(firstValue(meta.po_owner_code, meta.group_exec, m.sexe, '') || ''));
+      // Saved PO owner. Stock & sell orders have no SO lines, so the owner must
+      // come from the header / web meta — check every key the server may use.
+      const snap = data.commercial_snapshot || meta.commercial_snapshot || {};
+      const rawOwnerCode = String(firstValue(
+        meta.po_owner_code, data.po_owner_code, m.po_owner_code, snap.po_owner_code,
+        m.sexe, m.SExe, m.sexecode, m.SExeCode, meta.group_exec, orders[0] && orders[0].sexecode, ''
+      ) || '').trim();
+      const ownerCode = rawOwnerCode === '0' ? '' : rawOwnerCode;
+      const ownerName = String(firstValue(meta.po_owner_name, data.po_owner_name, m.sexename, m.SExeName, orders[0] && orders[0].sexename, '') || '').trim();
+      setSavedOwner({ code: ownerCode, name: ownerName });
+      setPoOwnerCode(ownerCode);
+      if (ownerCode) setPoOwners(cur => mergeParties(cur, [{ parcode: ownerCode, parname: ownerName || ownerCode }]));
       if (routeMode === 'add') {
         setVoucherLoading(true);
         try { setVoucher(await prepareVoucher(api, ctx, m, store, todayDMY())); }

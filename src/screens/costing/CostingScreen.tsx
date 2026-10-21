@@ -208,6 +208,8 @@ function CostSheetPreviewModal({
     result,
     onSave,
     saving,
+    readOnly = false,
+    savedDate,
 }: {
     visible: boolean;
     onClose: () => void;
@@ -215,11 +217,13 @@ function CostSheetPreviewModal({
     result: ComputeResult | null;
     onSave: () => void;
     saving: boolean;
+    readOnly?: boolean;
+    savedDate?: string | null;
 }) {
     if (!design || !result) return null;
 
     const today = new Date();
-    const dateLabel = today.toLocaleDateString('en-GB').replace(/\//g, '/');
+    const dateLabel = savedDate ? new Date(savedDate).toLocaleDateString('en-GB') : today.toLocaleDateString('en-GB');
     const gsm = Math.round((result.snap_greige_glm / (result.greige_width || 1)) * 100);
     const shareText = [
         'ESTIMATED FABRIC COST',
@@ -270,7 +274,7 @@ function CostSheetPreviewModal({
             <View style={pm.overlay}>
                 <View style={pm.sheet}>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-                        <Text style={pm.title}>ESTIMATED FABRIC COST</Text>
+                        <Text style={pm.title}>{readOnly ? 'SAVED FABRIC COST · READ ONLY' : 'ESTIMATED FABRIC COST'}</Text>
                         <View style={pm.metaRow}>
                             <Text style={pm.meta}>Design: <Text style={pm.bold}>{design.code}</Text></Text>
                             <Text style={pm.meta}>Type: <Text style={pm.bold}>{design.type === 'PD' ? 'Piece-dyed' : 'Yarn-dyed'}</Text></Text>
@@ -323,9 +327,11 @@ function CostSheetPreviewModal({
                     <View style={pm.actions}>
                         <TouchableOpacity style={pm.closeBtn} onPress={onClose}><Text style={pm.closeTxt}>Close</Text></TouchableOpacity>
                         <TouchableOpacity style={pm.shareBtn} onPress={doShare}><Text style={pm.actionTxt}>WhatsApp</Text></TouchableOpacity>
-                        <TouchableOpacity style={[pm.saveBtn, saving && { opacity: 0.55 }]} onPress={onSave} disabled={saving}>
-                            <Text style={pm.actionTxt}>{saving ? 'Saving…' : 'Save costing'}</Text>
-                        </TouchableOpacity>
+                        {!readOnly && (
+                            <TouchableOpacity style={[pm.saveBtn, saving && { opacity: 0.55 }]} onPress={onSave} disabled={saving}>
+                                <Text style={pm.actionTxt}>{saving ? 'Saving…' : 'Save costing'}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
             </View>
@@ -409,6 +415,8 @@ function CostingTab({
     const [computing, setComputing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [savedPreview, setSavedPreview] = useState<{ id: string; createdAt: string | null; result: ComputeResult } | null>(null);
+    const [savedPreviewLoading, setSavedPreviewLoading] = useState(false);
     const [reopening, setReopening] = useState(false);
     const [reopenedInfo, setReopenedInfo] = useState<ReopenedCostingInfo | null>(null);
     const [prefilledInfo, setPrefilledInfo] = useState<ReopenedCostingInfo | null>(null);
@@ -459,6 +467,7 @@ function CostingTab({
         setParams({ ...DEFAULT_P });
         setAdjust(designAdjustments(full));
         setResult(null);
+        setSavedPreview(null);
         setPrefilledInfo(null);
         setReopenedInfo(null);
     };
@@ -778,6 +787,60 @@ function CostingTab({
         };
     }, [reopenRequest?.requestKey, reopenRequest?.costingId]);
 
+    // A saved revision is immutable. Never re-compute its cost from today's yarn
+    // masters when reviewing a Production Order's selected costing.
+    const openSavedRevision = async (revisionId: string) => {
+        if (!design || !revisionId || savedPreviewLoading) return;
+        setSavedPreviewLoading(true);
+        try {
+            const response: any = await CostingAPI.get(revisionId);
+            const saved = response?.data?.data;
+            if (!saved || String(saved.id) !== revisionId || String(saved.md_id) !== String(design.id)) {
+                throw new Error('The saved revision does not belong to the selected design.');
+            }
+            const snap = saved.snap;
+            if (!snap || !Number.isFinite(Number(snap.final_cost))) {
+                throw new Error('The saved revision has no valid costing snapshot.');
+            }
+            const lines = saved.yarn_lines;
+            if (!Array.isArray(lines) || !lines.length) {
+                throw new Error('The saved revision has no yarn consumption lines.');
+            }
+            const allYarns: any[] = [
+                ...(design.warp_yarns || []), ...(design.weft_yarns || []),
+                ...(design.selvedge_yarns || []),
+            ];
+            const rows = lines.map((line: any) => {
+                const yarn = allYarns.find((y: any) => String(y.mi_id) === String(line.mi_id)
+                    && String(y.blend_ratio ?? '') === String(line.blend_ratio ?? ''));
+                return {
+                    ...line,
+                    name: line.name || yarn?.yarn?.name || yarn?.name || yarn?.yarn_name || String(line.mi_id),
+                    cnt: yarn?.cnt ?? yarn?.count ?? yarn?.yarn?.count ?? 0,
+                    sys: yarn?.sys ?? yarn?.count_type ?? '',
+                    epi: yarn?.epi ?? (line.basis_name === 'EPI' ? line.basis_value : 0),
+                    ppi: yarn?.ppi ?? (line.basis_name === 'PPI' ? line.basis_value : 0),
+                };
+            });
+            const resultFromSnapshot: ComputeResult = {
+                ...Object.fromEntries(Object.entries(snap).map(([key, value]) => [`snap_${key}`, value])),
+                warp_rows: rows.filter((line: any) => line.yarn_type === 'warp'),
+                weft_rows: rows.filter((line: any) => line.yarn_type === 'weft'),
+                selvedge_rows: rows.filter((line: any) => line.yarn_type === 'selvedge'),
+                greige_width: Number(saved.inputs?.greige_width || 0),
+                shrink_impact: Number(snap.shrink_impact || 0),
+                dye_proc_amount: Number(snap.dye_proc_amount || 0),
+                fin_brok_amt: Number(snap.fin_brok_amt || 0),
+                cut_pack: Number(snap.cut_pack || 0),
+            } as unknown as ComputeResult;
+            setSavedPreview({ id: revisionId, createdAt: saved.created_at || null, result: resultFromSnapshot });
+        } catch (error: any) {
+            AppAlert.alert('Saved costing unavailable', error?.response?.data?.message || error?.message || 'Unable to load the saved costing.');
+        } finally {
+            setSavedPreviewLoading(false);
+        }
+    };
+
     // live compute
     const compute = useCallback(async () => {
         if (!mdId || !design) return;
@@ -905,6 +968,12 @@ function CostingTab({
                 </View>
             ) : null}
 
+            {design && reopenedInfo && (
+                <TouchableOpacity onPress={() => void openSavedRevision(reopenedInfo.id)} disabled={savedPreviewLoading} style={c.freshLink}>
+                    <Text style={c.freshLinkText}>{savedPreviewLoading ? 'Loading saved revision…' : 'View original saved costing (unchanged)'}</Text>
+                </TouchableOpacity>
+            )}
+
             {/* Design selector */}
             <View style={c.section}>
                 <DesignPicker value={mdId} selectedDesign={design} disabled={designLoading} onSelect={handleSelectDesign} />
@@ -917,6 +986,9 @@ function CostingTab({
                         {prefilledInfo.createdAt ? `${historyDateTimeLabel(prefilledInfo.createdAt)} · ` : ''}
                         Conversion, finishing and costing adjustments carry the latest saved costing. Yarn prices are refreshed from the current masters. Change what you need and Save to create a new version.
                     </Text>
+                    <TouchableOpacity onPress={() => void openSavedRevision(prefilledInfo.id)} disabled={savedPreviewLoading} style={c.freshLink}>
+                        <Text style={c.freshLinkText}>{savedPreviewLoading ? 'Loading saved revision…' : 'View original saved costing (unchanged)'}</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={startFreshFromMasters} activeOpacity={0.75} style={c.freshLink}>
                         <Text style={c.freshLinkText}>↻ Start fresh from masters</Text>
                     </TouchableOpacity>
@@ -1237,6 +1309,16 @@ function CostingTab({
                     )}
                 </>
             )}
+            <CostSheetPreviewModal
+                visible={!!savedPreview}
+                onClose={() => setSavedPreview(null)}
+                design={design}
+                result={savedPreview?.result || null}
+                onSave={() => {}}
+                saving={false}
+                readOnly
+                savedDate={savedPreview?.createdAt || null}
+            />
         </ScrollView>
     );
 }

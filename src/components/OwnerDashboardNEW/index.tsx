@@ -25,7 +25,6 @@
 // No own header / SafeAreaView (global AppHeader). AsyncStorage: none (amount mode uses the shared
 // dashboard preference through useDashboardAmountMode).
 import {
-  AmountDisplayModeControl,
   useDashboardAmountMode,
   type DashboardAmountMode,
 } from '@/src/components/dashboard/AmountDisplayModeControl';
@@ -39,11 +38,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Btn, CONTENT_MAX, IconBtn, PickField, ProgressBar, SearchBox, Sheet } from '../erpUi';
+import BeamPlan from './BeamPlan';
 import { getCriterionExecutives, getOwnerSummaryDashboard, OwnerSummaryError } from './api';
-import { PRP_CODE, stageYearNo } from './prodOrderModel';
+import { FONT, loadOwnerFonts } from './fonts';
 import {
   count,
   DASH,
@@ -61,10 +62,11 @@ import {
   type OwnerProductionRow,
   type OwnerSummaryData
 } from './model';
+import DelaysByPerson from './DelaysByPerson';
 import { ExecutiveOrders } from './OrderTracker';
+import { PRP_CODE, stageYearNo } from './prodOrderModel';
 import ProductionOrders from './ProductionOrders';
 import StageAssignment from './StageAssignment';
-import { FONT, loadOwnerFonts } from './fonts';
 
 
 type Props = { token: string; API: string; username?: string; prptype?: string };
@@ -380,9 +382,10 @@ type SalesProps = Props & {
   onPickExecutive: (opt: { code: string; name: string }) => void;
   mode: DashboardAmountMode;
   refreshTick: number;
+  onBusyChange?: (busy: boolean) => void;
 };
 
-function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExecutive, mode, refreshTick }: SalesProps) {
+function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExecutive, mode, refreshTick, onBusyChange }: SalesProps) {
 
   const [date, setDate] = useState<Date>(() => new Date());
 
@@ -452,6 +455,11 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
   }, [data]);
 
   const onRefresh = useCallback(() => void load({ silent: true, refresh: true }), [load]);
+
+  // tell the shared Refresh button while this screen is re-fetching
+  useEffect(() => {
+    onBusyChange?.(refreshing);
+  }, [refreshing, onBusyChange]);
 
   // Refresh button of the shared filter
   const lastTick = useRef(refreshTick);
@@ -868,12 +876,20 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
 
 type ModuleTab = 'sales' | 'production';
 // outer tabs: Order (everything that was on the dashboard before) | Setup (item x stage -> person)
-type Section = 'order' | 'setup';
+type Section = 'order' |'delaysbyperson' |'beamplan' | 'setup';
 
 export default function OwnerDashboardNEW(props: Props) {
-  const { mode, setMode } = useDashboardAmountMode();
+  const { mode } = useDashboardAmountMode(); // Compact / Actual switch removed from the UI; saved preference is still honoured
   const [section, setSection] = useState<Section>('order'); // Order opens first
   const [setupVisited, setSetupVisited] = useState(false); // Setup loads only once it is opened
+  const [delaysVisited, setDelaysVisited] = useState(false); // Delays by person loads only once it is opened
+  const [delaysTick, setDelaysTick] = useState(0);
+  const [beamVisited, setBeamVisited] = useState(false); // Beam plan loads only once it is opened
+  const [beamTick, setBeamTick] = useState(0);
+  const { width: winW } = useWindowDimensions();
+  const [barW, setBarW] = useState(0);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false); // phone only: Order / Delays / Beam / Setup picker sheet
+  const phoneBar = (barW || winW) < 680; // phone: 4 equal tabs (icon upar, poora naam neeche)
   const [tab, setTab] = useState<ModuleTab>('production');
   useEffect(() => {
     loadOwnerFonts();
@@ -893,19 +909,41 @@ export default function OwnerDashboardNEW(props: Props) {
   ];
 
   // dropdown list: get_criterion (prpcode SIP, strcode 012, txntype sales_order, fetch salesexe)
-  useEffect(() => {
-    let alive = true;
+  // runs on mount AND on every Refresh click, exactly like the other load-time APIs
+  const [execBusy, setExecBusy] = useState(false);
+  const [prodBusy, setProdBusy] = useState(false);
+  const [salesBusy, setSalesBusy] = useState(false);
+  const execSeq = useRef(0);
+  const loadExecutives = useCallback(() => {
+    const id = ++execSeq.current;
+    setExecBusy(true);
     getCriterionExecutives(props.API, props.token, { prpcode: PRP_CODE, yearno: stageYearNo() })
       .then((list) => {
-        if (alive) setExecutives(list);
+        if (id === execSeq.current) {
+          const seen = new Set<string>();
+          setExecutives(list.filter((e) => (seen.has(e.code) ? false : (seen.add(e.code), true))));
+        }
       })
       .catch(() => {
         /* keep the fallback list */
+      })
+      .finally(() => {
+        if (id === execSeq.current) setExecBusy(false);
       });
-    return () => {
-      alive = false;
-    };
   }, [props.API, props.token]);
+  useEffect(() => {
+    loadExecutives();
+    return () => {
+      execSeq.current++;
+    };
+  }, [loadExecutives]);
+
+  // one Refresh = every API the screen calls on load (executives + production orders + sales dashboard)
+  const onRefreshAll = useCallback(() => {
+    loadExecutives();
+    setRefreshTick((n) => n + 1);
+  }, [loadExecutives]);
+  const refreshBusy = execBusy || prodBusy || salesBusy;
 
   const executiveOptions = useMemo(() => {
     const list = [{ code: '', name: 'All' }, ...executives];
@@ -919,12 +957,31 @@ export default function OwnerDashboardNEW(props: Props) {
     setPickerSearch('');
   }, []);
 
+  // every time the person switches between Order and Setup, that screen calls its APIs again
+  const [setupTick, setSetupTick] = useState(0);
   const openSection = (k: Section) => {
     setSection(k);
-    if (k === 'setup') setSetupVisited(true);
+    if (k === 'setup') {
+      setSetupVisited(true);
+      setSetupTick((n) => n + 1);
+    } else if (k === 'delaysbyperson') {
+      // every time this tab is opened it calls getdelaysbyperson again (so a person saved in Setup shows up at once)
+      setDelaysVisited(true);
+      setDelaysTick((n) => n + 1);
+    } else if (k === 'order') {
+      setTab('production'); // Order always opens on its default tab (Production orders) and loads that tab's APIs
+      onRefreshAll();
+    } else if (k === 'beamplan') {
+      // every time this tab is opened it calls getbeamplan again
+      setBeamVisited(true);
+      setBeamTick((n) => n + 1);
+    }
   };
+  const sectionIcon: Record<Section, string> = { order: 'dashboard', delaysbyperson: 'groups', beamplan: 'view-week', setup: 'tune' };
   const sectionTabs: { key: Section; label: string }[] = [
     { key: 'order', label: 'Order' },
+    { key: 'delaysbyperson', label: 'Delays By Person' },
+    { key: 'beamplan', label: 'Beam Plan' },
     { key: 'setup', label: 'Setup' },
   ];
   // the Order / Setup bar is hidden only while a production order detail is open (same rule as the inner tabs)
@@ -934,26 +991,44 @@ export default function OwnerDashboardNEW(props: Props) {
     <View style={st.screen}>
       {hideSectionBar ? null : (
         <View style={st.tabBarWrap}>
-          <View style={st.tabBarInner}>
-            <View style={[st.tabBar, st.sectionBar]}>
-              {sectionTabs.map((t) => {
-                const on = section === t.key;
-                return (
-                  <TouchableOpacity
-                    key={t.key}
-                    activeOpacity={0.8}
-                    onPress={() => openSection(t.key)}
-                    style={[st.tabBtn, on && st.tabBtnOn]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[st.tabText, on && st.tabTextOn]} numberOfLines={1}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View style={st.tabBarInner} onLayout={(e) => setBarW(e.nativeEvent.layout.width)}>
+            {phoneBar ? (
+              // MOBILE: 4 tabs ki jagah ek button - selected section ka naam dikhta hai, click karne par bottom sheet khulti hai
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setSectionPickerOpen(true)}
+                style={st.sectionMenuBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Select section"
+              >
+                <Icon name={sectionIcon[section] as any} size={18} color="#fff" />
+                <Text style={st.sectionMenuText} numberOfLines={1}>
+                  {sectionTabs.find((t) => t.key === section)?.label || ''}
+                </Text>
+                <Icon name="menu" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <View style={[st.tabBar, st.sectionBar, phoneBar && st.sectionBarPhone]}>
+                {sectionTabs.map((t) => {
+                  const on = section === t.key;
+                  return (
+                    <TouchableOpacity
+                      key={t.key}
+                      activeOpacity={0.8}
+                      onPress={() => openSection(t.key)}
+                      style={[st.tabBtn, st.sectionBtn, phoneBar && st.sectionBtnPhone, on && st.tabBtnOn]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Icon name={sectionIcon[t.key] as any} size={phoneBar ? 18 : 15} color={on ? '#fff' : T.muted} />
+                      <Text style={[st.tabText, phoneBar && st.tabTextPhone, on && st.tabTextOn]} numberOfLines={phoneBar ? 2 : undefined}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -961,7 +1036,21 @@ export default function OwnerDashboardNEW(props: Props) {
       {/* Setup tab: mounted on first open, then kept (display toggled) so typed values survive tab switches */}
       {setupVisited ? (
         <View style={{ flex: 1, display: section === 'setup' ? 'flex' : 'none' }}>
-          <StageAssignment token={props.token} API={props.API} />
+          <StageAssignment token={props.token} API={props.API} refreshTick={setupTick} />
+        </View>
+      ) : null}
+
+      {/* Delays by person tab: mounted on first open, then kept; reloads on every open (delaysTick) */}
+      {delaysVisited ? (
+        <View style={{ flex: 1, display: section === 'delaysbyperson' ? 'flex' : 'none' }}>
+          <DelaysByPerson token={props.token} API={props.API} refreshTick={delaysTick} />
+        </View>
+      ) : null}
+
+      {/* Beam plan tab: mounted on first open, then kept; reloads on every open (beamTick) */}
+      {beamVisited ? (
+        <View style={{ flex: 1, display: section === 'beamplan' ? 'flex' : 'none' }}>
+          <BeamPlan token={props.token} API={props.API} refreshTick={beamTick} />
         </View>
       ) : null}
 
@@ -973,25 +1062,32 @@ export default function OwnerDashboardNEW(props: Props) {
       <View style={st.tabBarWrap}>
         <View style={st.tabBarInner} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
           <View style={st.filterCard}>
-            <View style={[st.filterRow, isPhone && { flexWrap: 'wrap' }]}>
-              <View style={[st.filterField, isPhone ? { flexBasis: '100%' } : { flex: 1, minWidth: 260, maxWidth: 420 }]}>
-                <Text style={st.filterLabel}>Executive</Text>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                <PickField
-                  value={executive.name}
-                  icon="person-outline"
-                  onPress={() => setPickerOpen(true)}
-                  onClear={executive.code ? () => pickExecutive({ code: '', name: 'All' }) : undefined}
-                />
+            <View style={[st.filterRow, isPhone && { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+              {isPhone ? (
+                <View style={st.filterHeadPhone}>
+                  <Text style={st.filterLabel}>Executive</Text>
+                  <IconBtn icon="refresh" label="Refresh" onPress={onRefreshAll} loading={refreshBusy} tone="soft" color={T.copper} />
+                </View>
+              ) : null}
+
+              <View style={isPhone ? { width: '100%' } : { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, maxWidth: 480 }}>
+                {!isPhone ? <Text style={st.filterLabel}>Executive</Text> : null}
+                <View style={isPhone ? { width: '100%' } : { flex: 1, minWidth: 0 }}>
+                  <PickField
+                    value={executive.name}
+                    icon="person-outline"
+                    onPress={() => setPickerOpen(true)}
+                    onClear={executive.code ? () => pickExecutive({ code: '', name: 'All' }) : undefined}
+                  />
                 </View>
               </View>
 
-              {!isPhone ? <View style={{ flex: 1 }} /> : null}
-
-              <View style={[st.filterActions, isPhone && { flexBasis: '100%', justifyContent: 'space-between' }]}>
-                <AmountDisplayModeControl mode={mode} onChange={(m: DashboardAmountMode) => setMode(m)} compact />
-                <IconBtn icon="refresh" label="Refresh" onPress={() => setRefreshTick((n) => n + 1)} tone="soft" color={T.copper} />
-              </View>
+              {!isPhone ? (
+                <>
+                  <View style={{ flex: 1 }} />
+                  <IconBtn icon="refresh" label="Refresh" onPress={onRefreshAll} loading={refreshBusy} tone="soft" color={T.copper} />
+                </>
+              ) : null}
             </View>
           </View>
 
@@ -1029,6 +1125,7 @@ export default function OwnerDashboardNEW(props: Props) {
           prptype={props.prptype || 'S'}
           executiveCode={executive.code}
           refreshTick={refreshTick}
+          onBusyChange={setProdBusy}
           onDetailChange={setDetailOpen}
         />
       </View>
@@ -1040,11 +1137,39 @@ export default function OwnerDashboardNEW(props: Props) {
           onPickExecutive={pickExecutive}
           mode={mode}
           refreshTick={refreshTick}
+          onBusyChange={setSalesBusy}
         />
       </View>
       ) : null}
 
       </View>
+
+      {/* MOBILE section picker: selected section highlighted + tick */}
+      <Sheet open={phoneBar && sectionPickerOpen} onClose={() => setSectionPickerOpen(false)} eyebrow="OWNER DASHBOARD" title="Select section" wideMax={460}>
+        <View>
+          {sectionTabs.map((t) => {
+            const on = section === t.key;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[st.option, on && st.optionOn]}
+                onPress={() => {
+                  setSectionPickerOpen(false);
+                  openSection(t.key);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+              >
+                <Icon name={sectionIcon[t.key] as any} size={18} color={on ? T.copper : T.muted} />
+                <Text style={[st.optionText, on && { color: T.nav, fontWeight: '900' }]} numberOfLines={1}>
+                  {t.label}
+                </Text>
+                {on ? <Icon name="check" size={18} color={T.copper} /> : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Sheet>
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} eyebrow="FILTER" title="Executive Name" wideMax={460}>
         <SearchBox value={pickerSearch} onChangeText={setPickerSearch} placeholder="Search executive…" />
@@ -1085,20 +1210,31 @@ const st = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     alignSelf: 'flex-start',
-    maxWidth: 420,
+    maxWidth: 400,
     width: '100%',
     backgroundColor: T.surface,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: T.border,
-    padding: 3,
-    gap: 3,
+    padding: 4,
+    gap: 4,
+    ...S.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
   },
-  sectionBar: { maxWidth: 260 },
-  tabBtn: { flex: 1, height: 36, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  tabBtnOn: { backgroundColor: T.nav },
-  tabText: { fontFamily: FONT, fontSize: 13, fontWeight: '800', color: T.nav },
+  sectionBar: { width: '100%', maxWidth: 720, alignSelf: 'flex-start' }, // web: 4 barabar tabs, har ek ~180px - poora naam aata hai
+  sectionBarPhone: { width: '100%', maxWidth: '100%', alignSelf: 'stretch' },
+  sectionMenuBtn: { width: '100%', height: 44, borderRadius: 12, backgroundColor: T.nav, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, ...S.card },
+  sectionMenuText: { flex: 1, fontFamily: FONT, fontSize: 14, fontWeight: '800', color: '#fff' },
+  sectionBtn: { flex: 1, minWidth: 0 },
+  sectionBtnPhone: { flex: 1, flexShrink: 1, minWidth: 0, height: 54, paddingHorizontal: 2, gap: 2, flexDirection: 'column' },
+  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  placeholderText: { fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.muted },
+  tabBtn: { flex: 1, height: 36, paddingHorizontal: 14, borderRadius: 9, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  tabBtnOn: { backgroundColor: T.nav, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  tabText: { fontFamily: FONT, fontSize: 13, fontWeight: '800', color: T.muted },
   tabTextOn: { color: '#fff' },
+  tabTextPhone: { fontSize: 11, lineHeight: 13, textAlign: 'center' },
   scroll: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 32 },
   content: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', gap: 12 },
 
@@ -1108,12 +1244,13 @@ const st = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: T.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     ...S.card,
     shadowOpacity: 0.04,
     elevation: 1,
   },
+  filterHeadPhone: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   filterField: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterLabel: { fontFamily: FONT, fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },

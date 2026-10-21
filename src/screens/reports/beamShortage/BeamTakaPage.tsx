@@ -1,3 +1,5 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../../production/ConversionTypography';
+ensureConversionWebFonts();
 // FILE: src/screens/reports/beamShortage/BeamTakaPage.tsx
 // Reports → Beam Shortage → (design › beam | beam › design) → TAKA-WISE CHECKING
 //
@@ -24,7 +26,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   useWindowDimensions,

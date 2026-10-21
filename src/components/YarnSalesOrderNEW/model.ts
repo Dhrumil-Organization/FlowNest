@@ -116,6 +116,19 @@ export const dueDateFor = (dueDay: any, soDate: any): string | null => {
   return dmy(baseDate);
 };
 
+/**
+ * Due Date picked by hand -> Due Days (whole days from the SO date, or today for a
+ * new order). Returns null when the picked date is before that base date.
+ */
+export const dueDaysFor = (picked: Date, soDate: any): number | null => {
+  let base = parseDmy(soDate);
+  if (!base || isNaN(base.getTime())) base = new Date();
+  const a = Date.UTC(base.getFullYear(), base.getMonth(), base.getDate());
+  const b = Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate());
+  const days = Math.round((b - a) / 86400000);
+  return days < 0 ? null : days;
+};
+
 /* ------------------------------------------------------------------ */
 /* Browse list                                                         */
 /* ------------------------------------------------------------------ */
@@ -213,6 +226,34 @@ export const partyFromMain = (main: Row): Row => ({
   DState: main.State || main.DState || '',
   DCnty: main.Cnty || main.DCnty || '',
   DZip: main.Zip || main.DZip || '',
+});
+
+/**
+ * Sales Party (second party, shown after the main party).
+ * >>> CONFIRM WITH BACKEND: the column names in `main` that hold it. <<<
+ * Change them here only — load and save both read these two keys.
+ */
+export const SALES_PARTY_KEYS = { code: 'SalesParCode', name: 'SalesParName' } as const;
+
+/** Sales Party saved on an order (null when the order has none). */
+export const salesPartyFromMain = (main: Row): Row | null => {
+  const code = main?.[SALES_PARTY_KEYS.code];
+  if (code === undefined || code === null || String(code).trim() === '') return null;
+  return { ParCode: String(code), ParName: main?.[SALES_PARTY_KEYS.name] || '' };
+};
+
+/** Picked Sales Party, or the main party when none was picked (a temp party '-1' is never sent). */
+export const effectiveSalesParty = (salesParty: Row | null, party: Row | null): Row | null => {
+  if (salesParty?.ParCode) return salesParty;
+  if (party?.ParCode && String(party.ParCode) !== '-1') return { ParCode: party.ParCode, ParName: party.ParName || '' };
+  return null;
+};
+
+/** Sales executive picked on the order -> fields stored on the party object (SExe is what is saved). */
+export const applyExecutive = (party: Row | null, exe: Row): Row => ({
+  ...(party || {}),
+  SExe: exe?.Code ?? '',
+  SExeName: exe?.SalesExecutive || '',
 });
 
 /** Legacy "Select Address" tap: fields copied from a /api/getaddress row. */
@@ -555,6 +596,35 @@ export const updateRowDetails = (
   return { rows, lastRow };
 };
 
+/**
+ * Pencil on Qty / Pcs / Rate of a summary row: only that value changes, Amount is
+ * recalculated (Qty x Rate, 2 decimals) — every other field of the row is kept.
+ */
+export const updateRowValue = (rows: Row[], lineId: any, field: 'Qty' | 'Pcs' | 'Rate', value: string): Row[] =>
+  rows.map((row) => {
+    if (String(row.LineId) !== String(lineId)) return row;
+    const next: Row = { ...row, [field]: num(value) };
+    next.Amount = num(lineAmount(next.Qty, next.Rate));
+    return next;
+  });
+
+/** Search box on the order rows: item / grade / shade code or name, remark. */
+export const filterOrderRows = (rows: Row[], search: string): Row[] => {
+  const s = toText(search).toLowerCase();
+  if (!s) return rows;
+  return rows.filter((row) =>
+    [row.ItmCode, row.ItmName, row.GrdCode, row.GrdName, row.ShdCode, row.ShdName, row.Denier, row.Remark]
+      .map(toText)
+      .join('\n')
+      .toLowerCase()
+      .includes(s),
+  );
+};
+
+/** A row whose stock can be asked for (a not-yet-created item '-1' has none). */
+export const canAskStock = (row: Row) =>
+  !!row?.ItmCode && !!row?.GrdCode && !!row?.ShdCode && String(row.ItmCode) !== '-1';
+
 /** Legacy get_so_current_stock body parts (d1 = rows being entered, selectedd1 = rows already on the order). */
 export const buildStockLines = (
   selectedItem: Row | null,
@@ -626,11 +696,16 @@ export const computeAmounts = (totals: Totals, discount: any, tax: any) => {
   return { discountAmt, taxPercent, taxableAmount, taxAmt, grandTotal };
 };
 
-/** Legacy validateBeforeSave(). Returns [title, message] or null when the order can be saved. */
-export const validateOrder = (party: Row | null, ddays: any, rows: Row[]): [string, string] | null => {
+/**
+ * Legacy validateBeforeSave(), with Due Days in place of Delivery Days.
+ * Due Days must be a whole number >= 0 (0 = due on the SO date is allowed).
+ * Returns [title, message] or null when the order can be saved.
+ */
+export const validateOrder = (party: Row | null, dueDays: any, rows: Row[]): [string, string] | null => {
   if (!party?.ParCode) return ['Required', 'Please select party.'];
-  // eslint-disable-next-line eqeqeq
-  if (!ddays || ddays == '0') return ['Required', 'Delivery Days cannot be blank.'];
+  const dd = toText(dueDays);
+  if (dd === '') return ['Required', 'Due Days cannot be blank.'];
+  if (!/^\d+$/.test(dd)) return ['Invalid Due Days', 'Enter Due Days as a whole number.'];
   if (rows.length === 0) return ['Required', 'Please add at least one item.'];
   for (const row of rows) {
     if (!row.ItmCode || !row.GrdCode || !row.ShdCode) return ['Invalid Row', 'Item/design/shade missing.'];
@@ -649,8 +724,11 @@ export type SaveInput = {
   discount: any;
   tax: any;
   remark: string;
-  ddays: any;
+  /** Due Days entered on the order (replaces the old Delivery Days input). */
+  dueDays: any;
   dueDate: string;
+  /** Sales Party picked after the main party (null = same as the main party). */
+  salesParty: Row | null;
   /** mobappshow `main` of a saved order (null for a new order). */
   rawMain: Row | null;
   rawTax: Row[];
@@ -660,7 +738,9 @@ export type SaveInput = {
 
 /** Legacy buildMainPayload() — same keys, same value sources, same fallbacks. */
 export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row[] } => {
-  const { mode, uid, ctx, party: currentParty, remark, ddays } = input;
+  const { mode, uid, ctx, party: currentParty, remark, dueDays } = input;
+  const dueDayText = toText(dueDays);
+  const salesParty = effectiveSalesParty(input.salesParty, currentParty);
   const totals = computeTotals(input.rows);
   const { discountAmt, taxAmt, grandTotal } = computeAmounts(totals, input.discount, input.tax);
 
@@ -704,8 +784,11 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
 
     BAccCode: currentParty?.BAccCode || base?.BAccCode || '',
     BAccName: currentParty?.BAccName || base?.BAccName || '',
-    DueDay: currentParty?.DueDay || base?.DueDay || '',
+    DueDay: dueDayText !== '' ? dueDayText : base?.DueDay || '',
     DueDate: input.dueDate || base.DueDate || '',
+
+    [SALES_PARTY_KEYS.code]: salesParty?.ParCode || base[SALES_PARTY_KEYS.code] || '',
+    [SALES_PARTY_KEYS.name]: salesParty?.ParName || base[SALES_PARTY_KEYS.name] || '',
 
     GrsAmt: fmt(totals.totalAmount),
     DisAmt: fmt(discountAmt),
@@ -721,7 +804,9 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     D1NetAmt: fmt(totals.totalAmount) || '.00',
 
     Remark: remark || '',
-    DDays: ddays || '',
+    // Delivery Days is no longer entered. A saved order keeps its own value; a new
+    // order sends the Due Days so the column is not left blank.
+    DDays: base.DDays || dueDayText || '',
 
     DAdd: currentParty?.Address || base.DAdd || '',
     DCity: currentParty?.City || base.DCity || '',
@@ -872,6 +957,7 @@ export const parseOrderResponse = (resData: any) => {
     discount: String(num(main.DisAmt || main.TDisAmt || main.NDisAmt || 0)),
     tax: String(num(main.TaxPercent || main.TaxPer || 0)),
     party: partyFromMain(main),
+    salesParty: salesPartyFromMain(main),
   };
 };
 

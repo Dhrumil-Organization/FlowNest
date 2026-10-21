@@ -1,8 +1,9 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../ConversionTypography';
+ensureConversionWebFonts();
 import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
-    Text,
     TouchableOpacity,
     Modal,
     StyleSheet,

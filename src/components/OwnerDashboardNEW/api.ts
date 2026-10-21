@@ -363,11 +363,18 @@ export async function getItemStageAssignments(
 export async function saveItemStageAssignments(
   API: string, token: string,
   body: { prpcode: string; yearno: string; items: { ItemCode: string; ItemName: string; assignments: { StageId: string; StageName: string; PersonName: string | null }[] }[] },
-) {
+): Promise<{ inserted: number; updated: number; deactivated: number; message: string }> {
   try {
     const r = await axios.post(`${API}/api/saveItemStageAssignments`, body, { headers: authHdr(token) });
     if (!r.data || r.data.success === false) throw new OwnerSummaryError(r.data?.message || 'Save failed.');
-    return r.data;
+    // { success, response: { response: { inserted, updated, deactivated }, message }, message }
+    const c = r.data.response?.response ?? r.data.response ?? {};
+    return {
+      inserted: Number(c.inserted) || 0,
+      updated: Number(c.updated) || 0,
+      deactivated: Number(c.deactivated) || 0,
+      message: String(r.data.response?.message || r.data.message || ''),
+    };
   } catch (err: any) {
     if (err instanceof OwnerSummaryError) throw err;
     throw apiErr(err, 'save assignments');
@@ -377,11 +384,12 @@ export async function saveItemStageAssignments(
 //   POST {API}/api/deleteItemStageAssignments   (soft delete: IsActive = 0)
 export async function deleteItemStageAssignments(
   API: string, token: string, body: { prpcode: string; yearno: string; itemcode: string; stageid?: string; stagename?: string },
-) {
+): Promise<{ deactivated: number; message: string }> {
   try {
     const r = await axios.post(`${API}/api/deleteItemStageAssignments`, body, { headers: authHdr(token) });
     if (!r.data || r.data.success === false) throw new OwnerSummaryError(r.data?.message || 'Delete failed.');
-    return r.data;
+    // { success, response: { deactivated }, message }
+    return { deactivated: Number(r.data.response?.deactivated) || 0, message: String(r.data.message || '') };
   } catch (err: any) {
     if (err instanceof OwnerSummaryError) throw err;
     throw apiErr(err, 'delete assignments');
@@ -400,5 +408,127 @@ export async function bulkSaveItemStageAssignments(
   } catch (err: any) {
     if (err instanceof OwnerSummaryError) throw err;
     throw apiErr(err, 'apply to all items');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Delays by person tab                                                */
+/* ------------------------------------------------------------------ */
+//   GET {API}/api/getdelaysbyperson?prpcode=SIP&yearno=27
+//   backend : ProductionDelaysByPersonController@getDelaysByPerson  (SP_ProductionOrderTrackingDashboard @Mode = 'PERSON')
+//   -> { success, response: { summary: PersonSummaryApiRow[], data: PersonDetailApiRow[] } }
+export type PersonSummaryApiRow = {
+  Person: string;
+  Stages: string | null; // 'Warping,Loom Start,...'
+  PendingLate: number | string;
+  FinishedLate: number | string;
+  FinishedOnTime: number | string;
+  TotalDaysLost: number | string;
+};
+export type PersonDetailApiRow = {
+  Person: string;
+  StageNo: number | string;
+  StageName: string;
+  TrackId: string | number;
+  ProductionOrderNo: string;
+  ProdItmCode?: string | null;
+  ProdDsnCode?: string | null;
+  DesignName?: string | null;
+  SExe?: string | null;
+  ProductionQty?: number | string | null;
+  PlanDate?: string | null; // 'YYYY-MM-DD'
+  Status: 'Overdue' | 'Done - Late' | 'On Time' | string;
+  LateDays: number | string;
+  OverdueDays: number | string;
+  DaysLost: number | string;
+};
+
+export async function getDelaysByPerson(
+  API: string,
+  token: string,
+  p: { prpcode: string; yearno: string },
+): Promise<{ summary: PersonSummaryApiRow[]; data: PersonDetailApiRow[] }> {
+  try {
+    const r = await axios.get(`${API}/api/getdelaysbyperson`, { params: { prpcode: p.prpcode, yearno: p.yearno }, headers: authHdr(token) });
+    const b = r.data;
+    const pl = b?.response ?? b;
+    if (!b || b.success === false || !Array.isArray(pl?.summary) || !Array.isArray(pl?.data)) {
+      throw new OwnerSummaryError(b?.message || 'Unable to load delays by person.');
+    }
+    return { summary: pl.summary, data: pl.data };
+  } catch (err: any) {
+    if (err instanceof OwnerSummaryError) throw err;
+    const status: number | undefined = err?.response?.status;
+    const e = new OwnerSummaryError(
+      status === 404 && !err?.response?.data?.message
+        ? 'Delays by person API is not available on this server yet (route getdelaysbyperson).'
+        : err?.response?.data?.message || err?.message || 'Unable to load delays by person.',
+    );
+    e.status = status;
+    throw e;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Beam plan tab                                                       */
+/* ------------------------------------------------------------------ */
+//   GET {API}/api/getbeamplan?prpcode=SIP&yearno=27&mode=BEAM|PRODORDER
+//   backend : BeamPlanController@getBeamPlan  (SP dbo.SP_BeamPlanDashboard @Mode)
+//   -> { success, response: { mode, summary: BeamPlanSummaryApi, data: BeamPlanApiRow[] } }
+//   PlannedFor / MadeFor = 'label|qty|flag, label|qty|flag'  (flag 1 = made more than planned)
+export type BeamPlanMode = 'BEAM' | 'PRODORDER';
+export type BeamPlanSummaryApi = {
+  TotalPlannedMtr: number | string;
+  TotalMadeMtr: number | string;
+  TotalAsPlannedMtr: number | string;
+  TotalUnplannedMtr: number | string;
+  TotalNotMadeMtr: number | string;
+  TotalAsPlannedPercent: number | string;
+  TotalUnplannedPercent: number | string;
+};
+export type BeamPlanApiRow = {
+  // BEAM mode
+  BeamUId?: number | string;
+  BeamNo?: string | null;
+  MachineName?: string | null;
+  BeamWarpLen?: number | string | null;
+  // PRODORDER mode
+  DsnCode?: string | null;
+  // both
+  PlannedFor?: string | null;
+  MadeFor?: string | null;
+  PlannedQty: number | string;
+  MadeQty: number | string;
+  AsPlannedQty: number | string;
+  UnplannedQty: number | string;
+  NotMadeQty: number | string;
+  UnplannedPercent: number | string;
+  AsPlannedPercent: number | string;
+  HasUnplannedFlag: number | string;
+};
+
+export async function getBeamPlan(
+  API: string,
+  token: string,
+  p: { prpcode: string; yearno: string; mode: BeamPlanMode },
+): Promise<{ summary: BeamPlanSummaryApi; data: BeamPlanApiRow[] }> {
+  try {
+    const r = await axios.get(`${API}/api/getbeamplan`, { params: { prpcode: p.prpcode, yearno: p.yearno, mode: p.mode }, headers: authHdr(token) });
+    const b = r.data;
+    const pl = b?.response ?? b;
+    if (!b || b.success === false || !pl?.summary || !Array.isArray(pl?.data)) {
+      throw new OwnerSummaryError(b?.message || 'Unable to load beam plan.');
+    }
+    return { summary: pl.summary, data: pl.data };
+  } catch (err: any) {
+    if (err instanceof OwnerSummaryError) throw err;
+    const status: number | undefined = err?.response?.status;
+    const e = new OwnerSummaryError(
+      status === 404 && !err?.response?.data?.message
+        ? 'Beam plan API is not available on this server yet (route getbeamplan).'
+        : err?.response?.data?.message || err?.message || 'Unable to load beam plan.',
+    );
+    e.status = status;
+    throw e;
   }
 }

@@ -60,15 +60,8 @@ const toYmd = (v:number) => {
   const s=String(v||''); return /^\d{8}$/.test(s) ? `${s.slice(6)}-${s.slice(4,6)}-${s.slice(0,4)}` : '—';
 };
 
-function DetailText({children, color=MUT}:{children:React.ReactNode; color?:string}) {
-  return <Text style={{fontSize:10, color, lineHeight:15}}>{children}</Text>;
-}
-
-/** Hover on web, tap/long-press on touch. Positioned above content via row zIndex. */
+/** Beam row opens Grey Checking details; no hover or long-press tooltip. */
 function BeamRow({item, compact, onOpen}:{item:BeamStatusRow;compact:boolean;onOpen:()=>void}) {
-  const [hover,setHover] = useState(false);
-  const [pinned,setPinned] = useState(false);
-  const active=hover || pinned;
   const color=COLOR[item.status] || COLOR.UNVERIFIED;
   const required=Number(item.required_rolls);
   const haveRequired=!!item.required_rolls_verified && Number.isInteger(required) && required>0;
@@ -85,14 +78,10 @@ function BeamRow({item, compact, onOpen}:{item:BeamStatusRow;compact:boolean;onO
   const fill=ratio!==null?ratio:metrePct;
   const rowLabel=haveRequired?`${fmt(checked)}/${fmt(required)}`:fmt(checked);
   const subtitle=`warp ${fmt(item.warp_metres,1)} m${item.designated_roll != null ? ` · last-piece sticker #${item.designated_roll}${item.designated_entered?' entered':''}` : ''}`;
-  const warnings=Array.isArray(item.warnings)?item.warnings:[];
-  const stopToggle=(e:any)=>{e?.stopPropagation?.();setPinned(v=>!v);};
   return <Pressable onPress={onOpen} accessibilityRole="button"
     accessibilityLabel={`Open ${item.beam_no} checking details`}
-    onLongPress={()=>setPinned(v=>!v)}
     style={{paddingVertical:compact?9:8,paddingHorizontal:compact?9:12,
-      borderBottomWidth:1,borderBottomColor:'#EFEAE5',backgroundColor:active?'#FCFAFD':'#FFF',
-      zIndex:active?40:0,overflow:'visible'}}>
+      borderBottomWidth:1,borderBottomColor:'#EFEAE5',backgroundColor:'#FFF',overflow:'visible'}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:compact?5:9}}>
       <View style={{flex:1,minWidth:0}}>
         <View style={{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:5,minWidth:0}}>
@@ -104,32 +93,17 @@ function BeamRow({item, compact, onOpen}:{item:BeamStatusRow;compact:boolean;onO
           <View style={{paddingVertical:1,paddingHorizontal:6,borderRadius:6,borderWidth:1,borderColor:'#D8C8E4',backgroundColor:'#F7F0FB'}}>
             <Text style={{fontSize:9,fontWeight:'700',color:'#664183'}}>{item.machine_label||item.machine_code||'—'} · {item.shed_label||'—'}</Text>
           </View>
-          <Pressable onPress={stopToggle} onHoverIn={()=>setHover(true)} onHoverOut={()=>setHover(false)}
-            accessibilityRole="button" accessibilityLabel={`${LABEL[item.status]} details`}
-            style={{backgroundColor:color,borderRadius:5,paddingHorizontal:6,paddingVertical:2}}>
+          <View style={{backgroundColor:color,borderRadius:5,paddingHorizontal:6,paddingVertical:2}}>
             <Text style={{fontSize:8.5,fontWeight:'800',color:'#FFF'}}>{LABEL[item.status].toUpperCase()}</Text>
-          </Pressable>
+          </View>
         </View>
-        <Pressable onPress={stopToggle} onHoverIn={()=>setHover(true)} onHoverOut={()=>setHover(false)}
-          accessibilityRole="button"
+        <View
           accessibilityLabel={haveRequired?`${checked} of ${required} required Taka checked`: `${checked} checked Taka; required Taka unknown. Bar shows ${fmt(metrePct,1)} percent warp-metre coverage`}
           style={{marginTop:5,marginBottom:3,justifyContent:'center',height:7,backgroundColor:TRACK,borderRadius:4,overflow:'hidden'}}>
           {fill!==null && fill>0 &&
             <View style={{width:`${fill}%`,height:7,backgroundColor:color,borderRadius:4}}/>}
-        </Pressable>
+        </View>
         <Text numberOfLines={1} style={{fontSize:9.5,color:MUT}}>{subtitle}</Text>
-        {active && <View style={{position:'absolute',left:compact?0:10,top:compact?59:42,
-          width:compact?'100%':'84%',maxWidth:420,backgroundColor:'#FFF',borderRadius:9,
-          borderWidth:1,borderColor:'#DED6DE',padding:11,zIndex:80,elevation:14,
-          shadowColor:'#000',shadowOpacity:.15,shadowRadius:10,shadowOffset:{width:0,height:4},gap:4}}>
-          <Text style={{fontSize:12,fontWeight:'800',color:INK}}>{item.beam_no} · {LABEL[item.status]}</Text>
-          <DetailText color={INK}>{fmt(checked)} checked Taka · {fmt(item.checked_metres,2)} m checked</DetailText>
-          <DetailText color={INK}>{haveRequired?`${fmt(checked)} of ${fmt(required)} required Taka · ${fmt(pending)} pending · ${fmt(ratio,1)}% checked`:'Required Taka has not been established in the production ERP. Progress bar shows warp-metre coverage only.'}</DetailText>
-          <DetailText>Warp {fmt(item.warp_metres,2)} m · {fmt(item.checked_metres,2)} m checked · {fmt(metrePct,1)}% metre coverage · balance {fmt(item.beam_balance_metres,2)} m (not outstanding Taka)</DetailText>
-          {!!item.last_piece_seen && <DetailText>Last Taka recorded; this does not independently confirm checking completion.</DetailText>}
-          {warnings.slice(0,5).map((w,i)=><DetailText key={i} color="#916F32">{w}</DetailText>)}
-          <DetailText>Click the beam row to open Grey Checking records.</DetailText>
-        </View>}
       </View>
       {compact ?
         <View style={{width:78,alignItems:'flex-end',gap:2}}>

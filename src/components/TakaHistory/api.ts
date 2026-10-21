@@ -1,7 +1,7 @@
 // FILE: src/components/TakaHistory/api.ts
 // Every HTTP call of the NEW ERP Taka History module (4 calls, same endpoints as before).
 //
-//   POST {API}/api/taka-history/runs                          body { prp_codes, str_codes, as_on_date, refresh }
+//   POST {API}/api/taka-history/runs                          body { prp_codes, str_codes, date_mode, as_on_date | from_date + to_date, yearno, refresh }
 //   GET  {API}/api/taka-history/runs/{run}/totals             ?search&prp&only_in_stock
 //   GET  {API}/api/taka-history/runs/{run}/takas              ?search&prp&only_in_stock&sort&page&per_page
 //   GET  {API}/api/taka-history/runs/{run}/takas/{takaKey}    one taka + all its steps
@@ -10,7 +10,7 @@
 // Host = `API` prop and Bearer = `token` prop, both injected by ErpSessionGate
 // (sudamo_knits -> apig, rayons -> apiy). No config file, no API key in the app.
 import axios from 'axios';
-import type { TakaDetailData, TakaFilters, TakaRun, TakasPage, TakaTotals } from './model';
+import type { DateMode, TakaDetailData, TakaFilters, TakaRun, TakasPage, TakaTotals } from './model';
 
 export class TakaHistoryError extends Error {
   status?: number;
@@ -58,11 +58,23 @@ async function request<T>(
   }
 }
 
+/** date_mode 'A' sends as_on_date; date_mode 'S' (Sales between) sends from_date + to_date (all yyyy-mm-dd). */
+export type TakaRunCreate = {
+  prp_codes: string;
+  str_codes: string;
+  date_mode: DateMode;
+  as_on_date?: string;
+  from_date?: string;
+  to_date?: string;
+  yearno: string;
+  refresh: boolean;
+};
+
 /** Builds (or re-uses) the snapshot. A fresh build can take 30-60 seconds on the server. */
 export const createTakaRun = (
   API: string,
   token: string,
-  body: { prp_codes: string; str_codes: string; as_on_date: string; yearno: string, refresh: boolean },
+  body: TakaRunCreate,
 ) => request<TakaRun>(API, token, '/runs', { method: 'POST', body, timeoutMs: 330000 });
 
 export const getTakaTotals = (API: string, token: string, runId: number, filters: TakaFilters) =>

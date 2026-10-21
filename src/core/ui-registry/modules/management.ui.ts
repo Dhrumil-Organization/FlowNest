@@ -48,6 +48,7 @@ registerUiNodes([
     title: 'Costing / Production Cost',
     permission: 'dashboard.costing_summary',
     action: 'view',
+    metadata: { ownerCard: true },
     order: 30,
   },
 
@@ -60,6 +61,7 @@ registerUiNodes([
     action: 'view',
     order: 100,
     metadata: {
+      ownerCard: true,
       anyPermissions: [
         'dashboard.sales_detail',
         'dashboard.production_detail',

@@ -301,7 +301,7 @@ export default function PoyRateEntryNEW({ token, API }: Props) {
             placeholderTextColor={T.muted}
             keyboardType="decimal-pad"
             style={s.amountInput}
-            onSubmitEditing={onSavePress}
+            onSubmitEditing={() => { if (!loading) onSavePress(); }} // legacy: Save disabled while loading/saving
             accessibilityLabel="Rate"
           />
         ) : (

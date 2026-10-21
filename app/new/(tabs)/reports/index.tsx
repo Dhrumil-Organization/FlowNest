@@ -26,7 +26,8 @@ export default function ReportsHome() {
   const { canAccess } = usePermission();
 
   const cards = [
-    { key: 'management.reports.real_costing', title: 'Real Costing Chain', sub: 'Assumed vs actual by design and beam', route: 'RealCosting' },
+    // Registered resource path 'reports.real_costing' (dashboard.permission.ts) — assignable per role / user.
+    { key: 'reports.real_costing', title: 'Real Costing Chain', sub: 'Assumed vs actual by design and beam', route: 'RealCosting' },
     { key: 'management.reports.expense', title: 'Expense & Production', sub: 'Electricity, salary, stores and cost per pick', route: 'Expense' },
     // Registered resource path is 'reports.beam_shortage' (see dashboard.permission.ts) — assignable per role / user.
     { key: 'reports.beam_shortage', title: 'Beam Shortage', sub: 'Completed beams: warped vs produced, design-wise with beam detail', route: 'BeamShortage' },

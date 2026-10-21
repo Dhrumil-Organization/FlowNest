@@ -1,20 +1,18 @@
 // FILE: src/screens/yarnRates/YarnRatesView.tsx
 // Yarn Rates — the ERP Designing artifact's "Yarn Rates" master (YarnRatesMaster) on live ERP data.
 //
-//   Add rate     yarn (main yarns of the yarn master) · supplier (Dyeing → shade party list) · date · ₹ per kg · remark
-//                picking a yarn pre-fills its current rate; warns when a later-dated entry already exists
-//                (the current rate is the latest-dated entry, so an older date will not replace it)
+//   Add rate     yarn (main yarns of the group) · supplier (Dyeing shade party list + yarn suppliers of the group) ·
+//                date · ₹ per kg · remark. Picking a yarn pre-fills its current rate; warns when a later-dated entry
+//                already exists (the current rate is the latest-dated entry, so an older date will not replace it)
 //   List         search + All / With rate / No rate; "Latest rate by yarn" then "No rate yet"
-//                each yarn: current ₹/kg, supplier · date · suppliers · entries, ▲ / ▼ % vs that supplier's previous
-//                quote; no rate yet -> last purchase rate
-//   Yarn (tap)   price trend (one line per supplier, purchases optional), every entry newest first:
-//                rate entries (edit / delete by rights) and purchases (FAMPur) with "Use as rate"
+//                each yarn: current ₹/kg, supplier · date · suppliers · entries, ▲ / ▼ % vs that supplier's previous quote
+//   Yarn (tap)   price trend (one line per supplier) and every rate entry newest first (edit / delete by rights)
 //
+// EVERYTHING comes from the new table TMSMASTER.dbo.FAMIYarnRate — no purchase / old data on this screen.
 // Rights (production.yarn_rates): view · add · edit · delete.
-// Data: POST /api/yarn_rates/properties | list | item | parties | save | delete (YarnRateController).
-// Property + Year: picked in this screen's combo (login's properties of the header group, default = header's).
-// Everything is property-wise: yarns, suppliers, purchases and rates of that property only. Rates shown up to the
-// end of the selected FY; add / modify / delete only for dates inside it (backend checks the same).
+// Data: POST /api/yarn_rates/list | item | parties | save | delete (YarnRateController) with { prptype, yearno } of
+// the login (header) — PROPERTY GROUP wise, no property code anywhere. Rates up to the FY end; add / modify / delete
+// only for dates inside the login year (backend checks the same).
 
 import AppAlert from '@/common/utils/appAlert';
 import { YarnRateAPI } from '@/src/api/legacyClient';
@@ -56,10 +54,7 @@ import {
   normalizeItem,
   normalizeList,
   normalizeParties,
-  normalizeProps,
   Party,
-  PropOpt,
-  purchaseUsed,
   RateRow,
   rupee,
   searchText,
@@ -74,14 +69,13 @@ const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM M
 type Chip = 'all' | 'with' | 'none';
 type Tab = 'rates' | 'entries';
 type Period = 'month' | '3m' | 'fy' | 'all';
-type Form = { itm: string; par: string; date: string; rate: string; remark: string; edit: RateRow | null; source: 'rates' | 'purchase'; srcref: string };
+type Form = { itm: string; par: string; date: string; rate: string; remark: string; edit: RateRow | null };
 /** default rate date: today when it is inside the selected FY, else the FY's last day */
 const defDate = (fy?: Fy | null) => (!fy || inFy(isoToday(), fy) ? isoToday() : fy.to);
-const emptyForm = (fy?: Fy | null): Form => ({ itm: '', par: '', date: defDate(fy), rate: '', remark: '', edit: null, source: 'rates', srcref: '' });
-type Sel = { prpcode: string; yearno: string };
+const emptyForm = (fy?: Fy | null): Form => ({ itm: '', par: '', date: defDate(fy), rate: '', remark: '', edit: null });
 
 export function YarnRatesView() {
-  const { prpGroup, prpCode, yearNo } = useBusinessContext();
+  const { prpGroup, yearNo } = useBusinessContext();
   const { canDo } = usePermission();
   const canAdd = canDo(RES, 'add');
   const canEdit = canDo(RES, 'edit');
@@ -106,43 +100,18 @@ export function YarnRatesView() {
   const [open, setOpen] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, ItemData>>({});
   const [detailErr, setDetailErr] = useState<Record<string, string>>({});
-  const [withBuys, setWithBuys] = useState(false);
   const [form, setForm] = useState<Form>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const scrollRef = useRef<any>(null);
   const req = useRef(0);
 
-  /* ---------------- Property / Year combo (login's properties of the header group) ---------------- */
-  const [props, setProps] = useState<PropOpt[] | null>(null);
-  const [propsErr, setPropsErr] = useState('');
-  const [sel, setSel] = useState<Sel | null>(null);
-  const loadProps = useCallback(async () => {
-    if (!prpGroup) return;
-    setPropsErr('');
-    setProps(null);
-    try {
-      const list = normalizeProps(unwrap(await YarnRateAPI.properties({ prptype: prpGroup })));
-      setProps(list);
-      setSel((cur) => {
-        const keep = cur && list.find((p) => p.code === cur.prpcode)?.years.some((y) => y.yearno === cur.yearno);
-        if (keep) return cur;
-        const hdr = String(prpCode || '').toUpperCase();
-        const p = list.find((x) => x.code === hdr) || list[0];
-        if (!p) return null;
-        const y = p.years.find((x) => x.yearno === String(parseInt(String(yearNo), 10) || '')) || p.years[0];
-        return { prpcode: p.code, yearno: y.yearno };
-      });
-    } catch (e) {
-      setProps([]);
-      setPropsErr(errText(e, 'Property list not available.'));
-    }
-  }, [prpGroup, prpCode, yearNo]);
-  useEffect(() => { void loadProps(); }, [loadProps]);
-
-  const ctx = useMemo(() => ({ prptype: prpGroup, prpcode: sel?.prpcode || '', yearno: sel?.yearno || '' }), [prpGroup, sel]);
-  const ready = !!(prpGroup && sel?.prpcode && sel?.yearno);
-  const fy: Fy | null = data && data.prpcode === sel?.prpcode && data.fy.yearno === sel?.yearno ? data.fy : null;
+  // group, login property and year: all from the header (login)
+  const yearno = String(parseInt(String(yearNo), 10) || '');
+  // group + year of the login (header) — no property code
+  const ctx = useMemo(() => ({ prptype: prpGroup, yearno }), [prpGroup, yearno]);
+  const ready = !!(prpGroup && yearno);
+  const fy: Fy | null = data && data.fy.yearno === yearno ? data.fy : null;
 
   const say = useCallback((kind: 'ok' | 'err', text: string) => setFlash({ kind, text }), []);
 
@@ -192,7 +161,7 @@ export function YarnRatesView() {
 
   useFocusEffect(
     useCallback(() => {
-      // property / year changed (or screen opened): never show the old property's lists
+      // year changed (or screen opened): never show the old year's lists
       setData(null);
       setParties([]);
       setDetails({});
@@ -211,24 +180,8 @@ export function YarnRatesView() {
     if (fy) setForm((f) => (f.edit || inFy(f.date, fy) ? f : { ...f, date: defDate(fy) }));
   }, [fy]);
 
-  const changeSel = (next: Sel) => {
-    if (!sel || (next.prpcode === sel.prpcode && next.yearno === sel.yearno)) return;
-    if (form.edit) {
-      say('err', 'Save or cancel the edit first, then change the property / year.');
-      return;
-    }
-    if (form.itm || form.par || form.rate || form.remark) {
-      AppAlert.alert('Change property / year?', 'The rate you are entering is cleared — yarns and suppliers are of the selected property.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Change', onPress: () => setSel(next) },
-      ]);
-      return;
-    }
-    setSel(next);
-  };
-
-  /** modify / delete only on this property's entries dated inside the selected FY */
-  const changeable = (r: RateRow) => !!data && r.prpcode === data.prpcode && inFy(r.date, fy);
+  /** modify / delete only on entries dated inside the login year */
+  const changeable = (r: RateRow) => !!data && inFy(r.date, fy);
 
   /** rates of one yarn changed (save / delete): refresh the list rows and the open detail from the answer */
   const applyItem = (d: ItemData) => {
@@ -237,7 +190,7 @@ export function YarnRatesView() {
   };
 
   /* ------------------------------ rows ------------------------------ */
-  const rows: YarnRow[] = useMemo(() => (data ? yarnRows(data.items, data.rates, data.buys) : []), [data]);
+  const rows: YarnRow[] = useMemo(() => (data ? yarnRows(data.items, data.rates) : []), [data]);
   const shown = useMemo(
     () => rows.filter((y) => matches(searchText(y), q) && (chip === 'all' || (chip === 'with' ? !!y.lf : !y.lf))),
     [rows, q, chip],
@@ -250,7 +203,7 @@ export function YarnRatesView() {
     [rows],
   );
   const partyOpts: Opt[] = useMemo(() => {
-    const list = parties.map((p) => ({ value: p.code, label: p.name, searchText: `${p.name} ${p.short} ${p.code}` }));
+    const list = parties.map((p) => ({ value: p.code, label: p.name, searchText: `${p.name} ${p.short} ${p.code} ${p.src.join(' ')}` }));
     if (form.par && !list.some((o) => o.value === form.par)) list.unshift({ value: form.par, label: form.edit?.party || form.par, searchText: form.par });
     return list;
   }, [parties, form.par, form.edit]);
@@ -286,16 +239,15 @@ export function YarnRatesView() {
     setSaving(true);
     const body: Record<string, any> = {
       ...ctx, itmcode: form.itm, parcode: form.par, date: form.date, rate: form.rate, remark: form.remark.trim(), replace,
-      source: form.source, srcref: form.srcref,
     };
-    if (form.edit) body.orig = { itmcode: form.edit.itmcode, parcode: form.edit.parcode, date: form.edit.date, prpcode: form.edit.prpcode };
+    if (form.edit) body.orig = { itmcode: form.edit.itmcode, parcode: form.edit.parcode, date: form.edit.date };
     try {
       const res: any = await YarnRateAPI.save(body);
       const raw = unwrap(res);
       const d = normalizeItem(raw);
       applyItem(d);
       // modify moved the rate to another yarn: refresh the old yarn's book too
-      if (raw?.moved_from?.itmcode) applyItem(normalizeItem({ itmcode: raw.moved_from.itmcode, rates: raw.moved_from.rates, purchases: details[raw.moved_from.itmcode]?.purchases || [] }));
+      if (raw?.moved_from?.itmcode) applyItem(normalizeItem({ itmcode: raw.moved_from.itmcode, rates: raw.moved_from.rates }));
       const party = partyOpts.find((o) => o.value === form.par)?.label || form.par;
       say('ok', `${res?.data?.message || 'Saved.'} ${selYarn?.name || form.itm} · ${rupee(rateNum)}/kg · ${party} · ${dateFull(form.date)}`);
       setOpen(form.itm);
@@ -317,31 +269,19 @@ export function YarnRatesView() {
 
   const startEdit = (r: RateRow) => {
     if (!changeable(r)) {
-      say('err', `This entry is dated ${dateFull(r.date)} — select ${r.prpcode} and its year to modify it.`);
+      say('err', `This entry is dated ${dateFull(r.date)} — select its year to modify it.`);
       return;
     }
     setTab('rates');
-    setForm({ itm: r.itmcode, par: r.parcode, date: r.date, rate: String(r.rate), remark: r.remark, edit: r, source: (r.source === 'purchase' ? 'purchase' : 'rates'), srcref: r.srcref });
+    setForm({ itm: r.itmcode, par: r.parcode, date: r.date, rate: String(r.rate), remark: r.remark, edit: r });
     setFlash(null);
-    scrollRef.current?.scrollTo?.({ y: 0, animated: true });
-  };
-
-  const useBuy = (y: YarnRow, p: { date: string; parcode: string; rate: number; inwno: string; party: string }) => {
-    if (!canAdd) return;
-    const known = parties.some((x) => x.code === p.parcode);
-    const inside = inFy(p.date, fy);
-    setForm({ itm: y.itmcode, par: known ? p.parcode : '', date: inside ? p.date : defDate(fy), rate: String(p.rate), remark: `Purchase ${p.inwno}`, edit: null, source: 'purchase', srcref: p.inwno });
-    say(known && inside ? 'ok' : 'err', !known
-      ? `${p.party} is not in the Dyeing party list of ${data?.prpcode || ''} — pick the supplier, then press Add rate.`
-      : inside ? `Purchase ${p.inwno} copied into Add rate — check and press Add rate.`
-        : `Purchase ${p.inwno} is dated ${dateFull(p.date)}, outside ${fy?.name || 'the selected year'} — the date was set to ${dateFull(defDate(fy))}; change it if needed.`);
     scrollRef.current?.scrollTo?.({ y: 0, animated: true });
   };
 
   const del = (r: RateRow) => {
     if (!canDelete) return;
     if (!changeable(r)) {
-      say('err', `This entry is dated ${dateFull(r.date)} — select ${r.prpcode} and its year to delete it.`);
+      say('err', `This entry is dated ${dateFull(r.date)} — select its year to delete it.`);
       return;
     }
     const yn = rows.find((y) => y.itmcode === r.itmcode)?.name || r.itmcode;
@@ -350,7 +290,7 @@ export function YarnRatesView() {
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           try {
-            const res: any = await YarnRateAPI.remove({ ...ctx, itmcode: r.itmcode, parcode: r.parcode, date: r.date, rateprp: r.prpcode });
+            const res: any = await YarnRateAPI.remove({ ...ctx, itmcode: r.itmcode, parcode: r.parcode, date: r.date });
             applyItem(normalizeItem(unwrap(res)));
             if (form.edit && form.edit.parcode === r.parcode && form.edit.date === r.date && form.edit.itmcode === r.itmcode) setForm(emptyForm(fy));
             say('ok', `Rate deleted permanently — ${yn} · ${r.party} · ${rupee(r.rate)} · ${dateFull(r.date)}`);
@@ -369,44 +309,8 @@ export function YarnRatesView() {
   };
 
   /* ------------------------------ render ------------------------------ */
-  if (!prpGroup) {
-    return <View style={st.center}><Text style={st.muted}>Select the property group in the header first.</Text></View>;
-  }
-
-  const curProp = (props || []).find((p) => p.code === sel?.prpcode);
-  const propOpts: Opt[] = (props || []).map((p) => ({ value: p.code, label: `${p.code} — ${p.name}`, searchText: `${p.code} ${p.name} ${p.short}` }));
-  const yearOpts: Opt[] = (curProp?.years || []).map((y) => ({ value: y.yearno, label: y.name }));
-  const ctxBar = (
-    <View style={[st.card, st.ctxBar]}>
-      <SelectField
-        label="Property" required value={sel?.prpcode || ''} options={propOpts} loading={props === null}
-        disabled={!!form.edit || (props !== null && !propOpts.length)} disabledHint={form.edit ? 'Finish the edit first' : propsErr || 'No property assigned'}
-        onChange={(v) => { const p = (props || []).find((x) => x.code === v); if (p) changeSel({ prpcode: p.code, yearno: p.years.find((y) => y.yearno === sel?.yearno)?.yearno || p.years[0].yearno }); }}
-        style={{ flexGrow: 2, flexShrink: 1, flexBasis: 220, minWidth: 0 }}
-      />
-      <SelectField
-        label="Year" required value={sel?.yearno || ''} options={yearOpts} loading={props === null}
-        disabled={!!form.edit || !yearOpts.length} disabledHint={form.edit ? 'Finish the edit first' : 'Select the property'}
-        onChange={(v) => sel && changeSel({ prpcode: sel.prpcode, yearno: v })}
-        style={{ flexGrow: 1, flexShrink: 1, flexBasis: 130, minWidth: 0 }}
-      />
-    </View>
-  );
-
   if (!ready) {
-    return (
-      <View style={{ flex: 1, backgroundColor: T.bg }}>
-        <View style={[st.pad, st.wrap]}>
-          {ctxBar}
-          {props === null ? <ActivityIndicator color={T.copper} style={{ marginVertical: 30 }} /> : (
-            <View style={[st.card, { padding: 14, gap: 8 }]}>
-              <Text style={{ color: propsErr ? T.red : C.mut, fontWeight: '700' }}>{propsErr || 'No property / year of this group is assigned to your login.'}</Text>
-              <Btn label="Retry" icon="refresh" kind="ghost" compact onPress={() => void loadProps()} />
-            </View>
-          )}
-        </View>
-      </View>
-    );
+    return <View style={st.center}><Text style={st.muted}>Select the group and year in the header first.</Text></View>;
   }
 
   const addCard = (canAdd || form.edit) ? (
@@ -417,7 +321,7 @@ export function YarnRatesView() {
       </View>
       {form.edit ? (
         <Text style={st.note}>
-          Editing {form.edit.party} · {rupee(form.edit.rate)} · {dateFull(form.edit.date)} · {form.edit.prpcode}
+          Editing {form.edit.party} · {rupee(form.edit.rate)} · {dateFull(form.edit.date)}
         </Text>
       ) : null}
       <View style={{ gap: 10 }}>
@@ -426,7 +330,7 @@ export function YarnRatesView() {
           <SelectField
             label="Supplier" required value={form.par} options={partyOpts} onChange={(v) => setForm((f) => ({ ...f, par: v }))}
             placeholder={partyErr ? 'Supplier list not available' : 'Select supplier…'} loading={partyLoading} onRefresh={() => void loadParties()}
-            disabled={!partyLoading && !partyOpts.length} disabledHint={partyErr || 'No party in the Dyeing party list'} style={st.half}
+            disabled={!partyLoading && !partyOpts.length} disabledHint={partyErr || 'No supplier found'} style={st.half}
           />
           <View style={st.half}>
             <Text style={st.label}>DATE<Text style={{ color: T.red }}> *</Text></Text>
@@ -456,7 +360,6 @@ export function YarnRatesView() {
             so a rate dated {dateFull(form.date)} will not replace it — change the date if this is the newer price.
           </Text>
         ) : null}
-        {form.source === 'purchase' && form.srcref ? <Text style={st.note}>From purchase {form.srcref}.</Text> : null}
         <Btn
           label={form.edit ? 'Save change' : 'Add rate'} icon={form.edit ? 'save' : 'add'} kind="primary" loading={saving}
           disabled={!formOk || !(form.edit ? canEdit : canAdd)} onPress={() => void doSave()}
@@ -470,7 +373,7 @@ export function YarnRatesView() {
     const on = open === y.itmcode;
     const sub = y.lf
       ? `${y.lf.party} · ${dateFull(y.lf.date)}${y.nSup > 1 ? ` · ${y.nSup} suppliers` : ''} · ${y.rates.length} entr${y.rates.length !== 1 ? 'ies' : 'y'}`
-      : y.buy ? `no rate entered · last purchase ${rupee(y.buy.rate)} · ${y.buy.party}` : 'no rate entered';
+      : 'no rate entered';
     return (
       <View key={y.itmcode} style={[st.card, st.yRow]}>
         <Pressable onPress={() => toggle(y)} style={(s: any) => [st.yHead, (s.hovered || s.pressed) && { opacity: 0.85 }]} accessibilityLabel={`Yarn ${y.name}`}>
@@ -502,76 +405,55 @@ export function YarnRatesView() {
       );
     }
     const lf = latestOf(d.rates);
-    const entries: ({ kind: 'rate'; r: RateRow; k: string } | { kind: 'buy'; p: ItemData['purchases'][number]; k: string })[] = [
-      ...d.rates.map((r) => ({ kind: 'rate' as const, r, k: r.date + '|1|' + (r.ts || '') })),
-      ...d.purchases.map((p) => ({ kind: 'buy' as const, p, k: p.date + '|0|' + p.inwno })),
-    ].sort((a, b) => b.k.localeCompare(a.k));
-    const pts = chartPoints(d.rates, d.purchases, withBuys);
+    const entries = d.rates.slice().sort((a, b) => (b.date + '|' + (b.ts || '')).localeCompare(a.date + '|' + (a.ts || '')));
+    const pts = chartPoints(d.rates);
     return (
       <View style={st.detail}>
         <Text style={st.note}>
           Rate history by supplier · current rate:{' '}
           {lf ? <Text style={{ color: T.copper, fontWeight: '800', fontFamily: MF }}>{rupee(lf.rate)} · {lf.party} · {dateFull(lf.date)}{lf.ts ? ', ' + timeOf(lf.ts) : ''}</Text> : 'none yet'}
         </Text>
-        <View style={st.chipRow}>
-          <Text onPress={() => setWithBuys(false)} style={[st.chip, !withBuys && st.chipOn]}>Rates</Text>
-          <Text onPress={() => setWithBuys(true)} style={[st.chip, withBuys && st.chipOn]}>Rates + purchases ({d.purchases.length})</Text>
-        </View>
         {pts.length >= 2 ? (
           <YarnPriceChart points={pts} height={200} />
         ) : (
           <Text style={st.note}>{pts.length ? 'One entry so far — the trend appears from the second entry.' : 'No rates entered yet.'}</Text>
         )}
         <Text style={st.head}>ENTRIES · {entries.length}</Text>
-        {entries.map((x) => {
-          const isRate = x.kind === 'rate';
-          const date = isRate ? x.r.date : x.p.date;
-          const time = isRate && x.r.ts ? timeOf(x.r.ts) : '';
-          const party = isRate ? x.r.party : x.p.party;
-          const by = isRate
-            ? [x.r.user ? 'by ' + x.r.user : '', x.r.uuser ? 'edited by ' + x.r.uuser : '', x.r.source === 'purchase' && x.r.srcref ? 'from purchase ' + x.r.srcref : '',
-              x.r.remark].filter(Boolean).join(' · ')
-            : ['purchase ' + x.p.inwno, x.p.qty ? x.p.qty.toLocaleString('en-IN') + ' kg' : ''].filter(Boolean).join(' · ');
-          const badge = (
-            <Text style={[st.badge, isRate ? { backgroundColor: T.copper + '1E', color: T.copper } : { backgroundColor: T.nav + '14', color: T.nav }]}>
-              {isRate ? 'RATE' : 'PURCHASE'}
-            </Text>
+        {entries.map((r) => {
+          const time = r.ts ? timeOf(r.ts) : '';
+          const by = [r.user ? 'by ' + r.user : '', r.uuser ? 'edited by ' + r.uuser : '', r.remark].filter(Boolean).join(' · ');
+          const acts = !changeable(r) ? ((canEdit || canDelete) ? <Text style={st.eBy}>other FY</Text> : null) : (
+            <>
+              {canEdit ? <Text onPress={() => startEdit(r)} style={st.act} accessibilityLabel="Edit rate">Edit</Text> : null}
+              {canDelete ? <Text onPress={() => del(r)} style={[st.act, { color: T.red }]} accessibilityLabel="Delete rate">Delete</Text> : null}
+            </>
           );
-          const acts = isRate ? (
-            !changeable(x.r) ? ((canEdit || canDelete) ? <Text style={st.eBy}>other FY</Text> : null) : (
-              <>
-                {canEdit ? <Text onPress={() => startEdit(x.r)} style={st.act} accessibilityLabel="Edit rate">Edit</Text> : null}
-                {canDelete ? <Text onPress={() => del(x.r)} style={[st.act, { color: T.red }]} accessibilityLabel="Delete rate">Delete</Text> : null}
-              </>
-            )
-          ) : canAdd && !form.edit && !purchaseUsed(x.p, d.rates) ? (
-            <Text onPress={() => useBuy(y, x.p)} style={st.act} accessibilityLabel="Use as rate">Use as rate</Text>
-          ) : null;
-          const dateEl = <Text style={st.eDate}>{dateFull(date)}{time ? <Text style={st.eTime}> {time}</Text> : null}</Text>;
+          const dateEl = <Text style={st.eDate}>{dateFull(r.date)}{time ? <Text style={st.eTime}> {time}</Text> : null}</Text>;
           const who = (
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={st.eParty} numberOfLines={narrow ? 2 : 1}>{party}</Text>
+              <Text style={st.eParty} numberOfLines={narrow ? 2 : 1}>{r.party}</Text>
               {by ? <Text style={st.eBy} numberOfLines={narrow ? 2 : 1}>{by}</Text> : null}
             </View>
           );
-          const rateEl = <Text style={st.eRate}>{rupee(isRate ? x.r.rate : x.p.rate)}</Text>;
+          const rateEl = <Text style={st.eRate}>{rupee(r.rate)}</Text>;
+          const k = r.itmcode + '|' + r.parcode + '|' + r.date;
           return narrow ? (
-            <View key={x.kind + x.k + party + (isRate ? x.r.prpcode : '')} style={[st.entry, { flexDirection: 'column', alignItems: 'stretch', gap: 4 }]}>
-              <View style={st.eLine}>{dateEl}{badge}<View style={{ flex: 1 }} />{rateEl}</View>
+            <View key={k} style={[st.entry, { flexDirection: 'column', alignItems: 'stretch', gap: 4 }]}>
+              <View style={st.eLine}>{dateEl}<View style={{ flex: 1 }} />{rateEl}</View>
               <View style={st.eLine}>{who}{acts}</View>
             </View>
           ) : (
-            <View key={x.kind + x.k + party + (isRate ? x.r.prpcode : '')} style={st.entry}>
-              {dateEl}{who}{badge}{rateEl}{acts}
+            <View key={k} style={st.entry}>
+              {dateEl}{who}{rateEl}{acts}
             </View>
           );
         })}
-        {!entries.length ? <Text style={st.note}>Nothing yet for this yarn.</Text> : null}
+        {!entries.length ? <Text style={st.note}>No rates entered yet for this yarn.</Text> : null}
       </View>
     );
   };
 
-  /* ------- All entries (register): every rate of the property up to the FY end, newest first — Modify / Delete ------- */
+  /* ------- All entries (register): every rate of the group up to the FY end, newest first — Modify / Delete ------- */
   const today = isoToday();
   const fromOf = (p: Period) => {
     if (p === 'month') return today.slice(0, 8) + '01';
@@ -586,7 +468,7 @@ export function YarnRatesView() {
     return (data?.rates || [])
       .filter((r) => !from || r.date >= from)
       .map((r) => ({ r, yarn: nameOf(r.itmcode) }))
-      .filter((x) => matches([x.yarn, x.r.itmcode, x.r.party, x.r.parcode, x.r.remark, x.r.user, x.r.uuser, x.r.prpcode, x.r.srcref].join(' '), eq))
+      .filter((x) => matches([x.yarn, x.r.itmcode, x.r.party, x.r.parcode, x.r.remark, x.r.user, x.r.uuser].join(' '), eq))
       .sort((a, b) => b.r.date.localeCompare(a.r.date) || (b.r.uts || b.r.ts).localeCompare(a.r.uts || a.r.ts));
   })();
   const register = (
@@ -605,7 +487,7 @@ export function YarnRatesView() {
       </View>
       <Text style={st.head}>ENTRIES · {allEntries.length}{data ? ` of ${data.rates.length}` : ''}</Text>
       {allEntries.slice(0, eMax).map(({ r, yarn }) => (
-        <View key={r.prpcode + r.itmcode + r.parcode + r.date} style={[st.card, { padding: 10, gap: 4 }]}>
+        <View key={r.itmcode + '|' + r.parcode + '|' + r.date} style={[st.card, { padding: 10, gap: 4 }]}>
           <View style={st.eLine}>
             <Text style={st.eDate}>{dateFull(r.date)}</Text>
             <View style={{ flex: 1 }} />
@@ -618,7 +500,7 @@ export function YarnRatesView() {
               <Text style={st.eBy} numberOfLines={2}>
                 {[r.user ? 'added by ' + r.user + (r.ts ? ' ' + dateFull(r.ts.slice(0, 10)) + ' ' + timeOf(r.ts) : '') : '',
                   r.uuser ? 'modified by ' + r.uuser + (r.uts ? ' ' + dateFull(r.uts.slice(0, 10)) + ' ' + timeOf(r.uts) : '') : '',
-                  r.source === 'purchase' && r.srcref ? 'from purchase ' + r.srcref : '', r.remark].filter(Boolean).join(' · ')}
+                  r.remark].filter(Boolean).join(' · ')}
               </Text>
             </View>
             {!changeable(r) ? ((canEdit || canDelete) ? <Text style={st.eBy}>other FY</Text> : null) : (
@@ -681,10 +563,9 @@ export function YarnRatesView() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void loadList(true); void loadParties(); }} />}
       >
         <View style={st.wrap}>
-          {ctxBar}
           <Text style={st.intro}>
-            Purchase price of each yarn, by supplier and date. The current rate is the <Text style={{ fontWeight: '800' }}>latest</Text> entry. Tap a yarn for its price trend.
-            {data && fy ? `  ·  ${data.prpname} (${data.prpcode}) · ${fy.name}` : ''}
+            Rate of each yarn, by supplier and date (entered here). The current rate is the <Text style={{ fontWeight: '800' }}>latest</Text> entry. Tap a yarn for its price trend.
+            {data && fy ? `  ·  ${fy.name}` : ''}
           </Text>
           {flash ? (
             <View style={[st.flash, { backgroundColor: flash.kind === 'ok' ? T.green : T.red }]}>
@@ -728,7 +609,6 @@ export function YarnRatesView() {
 
 const st = StyleSheet.create({
   pad: { padding: 12, paddingBottom: 40 },
-  ctxBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 12, alignItems: 'flex-end' },
   wrap: { width: '100%', maxWidth: 1200, alignSelf: 'center', gap: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: T.bg },
   intro: { fontSize: 12, color: C.mut, lineHeight: 18 },

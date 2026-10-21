@@ -1,6 +1,6 @@
 // FILE: src/components/TakaHistory/gridApi.ts
 // API of the wide "journey grid" (one row per taka, every step as columns) - same endpoints as the expo-grid app:
-//   POST {API}/api/taka-grid/runs                       body { prp_codes, str_codes, as_on_date, yearno, only_in_stock, max_steps, refresh }
+//   POST {API}/api/taka-grid/runs                       body { prp_codes, str_codes, date_mode, as_on_date | from_date + to_date, yearno, only_in_stock, max_steps, refresh }
 //   GET  {API}/api/taka-grid/runs/{run}/columns
 //   GET  {API}/api/taka-grid/runs/{run}/rows            ?search&sort&dir&filters(json)&page&per_page
 //   POST {API}/api/taka-grid/runs/{run}/export         body { search, sort, dir, filters, cols }   -> .xlsx (small) or streamed .csv (big)
@@ -12,8 +12,17 @@ import { Platform } from 'react-native';
 export const GRID_MAX_STEPS = 30;
 export const GRID_PAGE_SIZE = 200;
 
-export type GridCreate = { prp_codes: string; str_codes: string; as_on_date: string; yearno: string; refresh: boolean };
-export type GridRun = { run_id: number; as_on_date: string; prp_codes?: string; str_codes?: string };
+export type GridCreate = {
+  prp_codes: string;
+  str_codes: string;
+  date_mode: 'A' | 'S'; // 'A' = as on date, 'S' = sales between from_date and to_date
+  as_on_date?: string;
+  from_date?: string;
+  to_date?: string;
+  yearno: string;
+  refresh: boolean;
+};
+export type GridRun = { run_id: number; as_on_date?: string | null; from_date?: string | null; to_date?: string | null; prp_codes?: string; str_codes?: string };
 export type GridColType = 'text' | 'number' | 'date';
 export type GridColumn = { name: string; label: string; group?: string | null; type: GridColType };
 export type GridFilter = { col: string; op: string; value?: string; value2?: string };

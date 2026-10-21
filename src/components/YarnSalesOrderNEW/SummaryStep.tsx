@@ -11,10 +11,21 @@
 //   - an order with IsAuth != 0 (or opened as VIEW) is read-only: no add / edit / save / delete
 //   - the item / grade / shade pencils are also off when IsAuth = 1
 //   - "Change" party: only on a new order, or on an authorised order whose party is the temp party '-1'
-//   - Delivery Days must be filled and not 0; every row needs item, grade, shade, Qty > 0 and Rate > 0
-//   - Delivery Date = SO date (today for a new order) + Delivery Days; Due Date = SO date + party Due Days
+//   - every row needs item, grade, shade, Qty > 0 and Rate > 0
 //   - Discount / Tax are not shown; the values loaded with a saved order still go into the totals
 //   - the save payload is model.buildSavePayload() (same keys and value sources as legacy)
+//
+// Changes on top of legacy
+//   - Due Days / Due Date replace Delivery Days / Date on the form. Due Days starts from the
+//     party's credit days, can be changed, and Due Date = SO date (today when new) + Due Days;
+//     picking a Due Date by hand sets Due Days to match. Due Days must be a whole number >= 0.
+//   - Sales Executive can be changed on the order (GET /api/get_criterion fetch:'salesexe').
+//   - Sales Party card after the main party (party list reused); blank = same as the party.
+//   - Qty / Pcs / Rate have a pencil on every row (like the Item pencil) — the value is
+//     changed in place, Amount is recalculated, nothing else on the row changes.
+//   - Every row shows its available stock (POST /api/get_so_current_stock, one request per
+//     Item + Grade + Shade, 4 at a time, cached; refresh button on the rows header).
+//   - Search box on the rows (item / grade / shade code or name, remark).
 //
 // Unlike legacy the order (party, rows, days, remark, the loaded header) stays in this
 // step while the item / grade / shade steps are open on top of it — legacy re-opened a
@@ -25,16 +36,24 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { deleteOrder, errorMessage, fetchAddresses, printOrder, saveOrder, showOrder } from './api';
+import { deleteOrder, errorMessage, fetchAddresses, fetchCurrentStock, fetchExecutives, printOrder, saveOrder, showOrder } from './api';
 import {
   applyDeliveryAddress,
+  applyExecutive,
   applyWorkingRows,
   buildSavePayload,
+  buildStockLines,
+  canAskStock,
   computeTotals,
-  deliveryDateFor,
   dmy,
   dueDateFor,
+  dueDaysFor,
+  effectiveSalesParty,
+  filterOrderRows,
+  lineAmount,
+  makeRowKey,
   money,
+  num,
   OrderCtx,
   OrderMode,
   parseOrderResponse,
@@ -42,11 +61,13 @@ import {
   Row,
   saveTimestamp,
   selectedItemFromRow,
+  totalStockQty,
+  updateRowValue,
   validateOrder,
   yy,
 } from './model';
 import { Nav, PickFlow } from './nav';
-import { CONTENT, Dialog, FooterBar, InfoRow, ListSkeleton, useCols } from './ui';
+import { CONTENT, Dialog, FooterBar, InfoRow, ListSkeleton, PickerSheet, SearchInput, useCols } from './ui';
 
 export type SummaryParams = {
   ctx: OrderCtx;
@@ -58,6 +79,17 @@ export type SummaryParams = {
 };
 
 type Props = { token: string; API: string; nav: Nav; params: SummaryParams };
+
+/** Available stock of one Item + Grade + Shade (keyed by model.makeRowKey). */
+type StockInfo = { loading: boolean; failed?: boolean; qty: number; rows: Row[] };
+
+type QuickField = 'Qty' | 'Pcs' | 'Rate';
+const QUICK_LABEL: Record<QuickField, string> = { Qty: 'Qty', Pcs: 'Pcs', Rate: 'Rate' };
+
+const STOCK_WORKERS = 4;
+
+/** Due Days as shown in the input ('' when the party has none). */
+const dueDayText = (v: any) => (v === null || v === undefined ? '' : String(v));
 
 const parseDmyDate = (text: string): Date => {
   const parts = String(text || '').split('-');
@@ -83,9 +115,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [discount, setDiscount] = useState('0');
   const [tax, setTax] = useState('0');
-  const [ddays, setDdays] = useState<any>('0');
-  const [ddate, setDdate] = useState('');
+  const [dueDays, setDueDays] = useState<string>(dueDayText(params.party?.DueDay));
   const [dueDate, setDueDate] = useState('');
+  const [salesParty, setSalesParty] = useState<Row | null>(null);
   const [remark, setRemark] = useState('');
   const [soDate, setSoDate] = useState('');
   const [soNo, setSoNo] = useState('');
@@ -109,6 +141,17 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const [addressList, setAddressList] = useState<Row[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const [actionRow, setActionRow] = useState<Row | null>(null);
+
+  const [executives, setExecutives] = useState<Row[]>([]);
+  const [exeLoading, setExeLoading] = useState(false);
+  const [exePickerVisible, setExePickerVisible] = useState(false);
+
+  const [rowSearch, setRowSearch] = useState('');
+  const [quickEdit, setQuickEdit] = useState<{ row: Row; field: QuickField; value: string } | null>(null);
+
+  const [stock, setStock] = useState<Record<string, StockInfo>>({});
+  const [stockRowKey, setStockRowKey] = useState<string | null>(null);
+  const [stockTick, setStockTick] = useState(0);
 
   const aliveRef = useRef(true);
   useEffect(() => {
@@ -144,13 +187,14 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       setRows(order.rows);
 
       setDiscount(order.discount);
-      setDdays(main.DDays);
+      setDueDays(dueDayText(main.DueDay));
       setTax(order.tax);
       setRemark(main.Remark || '');
       setSoDate(main.SODate || '');
       setSoNo(main.SONo || '');
       setDueDate(main.DueDate || '');
       setCurrentParty(order.party);
+      setSalesParty(order.salesParty);
       setDirty(false);
     } catch (error: any) {
       console.log('[YarnSalesOrderNEW] load order error', error?.response?.data || error?.message);
@@ -167,22 +211,95 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
 
   /* ---------------- dates that follow the header ---------------- */
 
-  // Delivery Date = SO date (today when new) + Delivery Days
+  // Due Date = SO date (today when new) + Due Days
   useEffect(() => {
-    const next = deliveryDateFor(ddays, soDate);
-    if (next !== null) setDdate((cur) => (cur === next ? cur : next));
-  }, [ddays, soDate]);
-
-  // Due Date = SO date (today when new) + party Due Days
-  const partyDueDay = currentParty?.DueDay;
-  useEffect(() => {
-    const next = dueDateFor(partyDueDay, soDate);
+    const next = dueDateFor(dueDays, soDate);
     if (next !== null) setDueDate((cur) => (cur === next ? cur : next));
-  }, [partyDueDay, soDate]);
+  }, [dueDays, soDate]);
+
+  /** Due Date picked by hand -> Due Days follows it. */
+  const pickDueDate = (d: Date) => {
+    const days = dueDaysFor(d, soDate);
+    if (days === null) {
+      AppAlert.alert('Invalid Due Date', 'Due Date cannot be before the SO date.');
+      return;
+    }
+    setDueDays(String(days));
+    setDueDate(dmy(d));
+    setDirty(true);
+  };
 
   /* ---------------- totals ---------------- */
 
   const totals = useMemo(() => computeTotals(rows), [rows]);
+
+  const shownRows = useMemo(() => filterOrderRows(rows, rowSearch), [rows, rowSearch]);
+
+  /* ---------------- stock of every row ---------------- */
+
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  /** Bumped by "refresh stock" so answers of an older round are dropped. */
+  const stockGen = useRef(0);
+  const stockAsked = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!token || loadingOrder) return;
+    const pending = Array.from(new Set(rows.filter(canAskStock).map(makeRowKey))).filter(
+      (k) => !stockAsked.current.has(k),
+    );
+    if (pending.length === 0) return;
+    pending.forEach((k) => stockAsked.current.add(k));
+    setStock((prev) => {
+      const next = { ...prev };
+      pending.forEach((k) => {
+        next[k] = { loading: true, qty: prev[k]?.qty || 0, rows: prev[k]?.rows || [] };
+      });
+      return next;
+    });
+
+    const gen = stockGen.current;
+    let at = 0;
+    const worker = async () => {
+      while (at < pending.length) {
+        const key = pending[at++];
+        const all = rowsRef.current;
+        const row = all.find((r) => makeRowKey(r) === key);
+        if (!row) {
+          if (gen === stockGen.current) setStock((prev) => ({ ...prev, [key]: { loading: false, qty: 0, rows: [] } }));
+          continue;
+        }
+        let info: StockInfo;
+        try {
+          // same body as the details screen when it edits this row
+          const { d1, selectedd1 } = buildStockLines(
+            { ItmCode: row.ItmCode },
+            { GrdCode: row.GrdCode },
+            [{ ShdCode: row.ShdCode }],
+            all,
+            row,
+          );
+          const stockRows = await fetchCurrentStock(API, token, ctx, d1, selectedd1);
+          info = { loading: false, qty: totalStockQty(stockRows), rows: stockRows };
+        } catch (error: any) {
+          console.log('[YarnSalesOrderNEW] row stock error', error?.response?.data || error?.message);
+          info = { loading: false, failed: true, qty: 0, rows: [] };
+        }
+        if (!aliveRef.current || gen !== stockGen.current) return;
+        setStock((prev) => ({ ...prev, [key]: info }));
+      }
+    };
+    for (let i = 0; i < Math.min(STOCK_WORKERS, pending.length); i++) worker();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, token, API, loadingOrder, stockTick]);
+
+  const refreshStock = () => {
+    stockGen.current += 1;
+    stockAsked.current = new Set();
+    setStock({});
+    // the effect above runs again on the new (empty) cache
+    setStockTick((t) => t + 1);
+  };
 
   /* ---------------- leaving with unsaved changes ---------------- */
 
@@ -279,9 +396,56 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       purpose: 'replace',
       onPick: (party: Row) => {
         setCurrentParty(party);
+        // a new party brings its own credit days
+        setDueDays(dueDayText(party?.DueDay));
         setDirty(true);
       },
     });
+
+  const pickSalesParty = () =>
+    nav.push('party', {
+      ctx,
+      purpose: 'replace',
+      title: 'Select Sales Party',
+      crumb: 'Sales party',
+      onPick: (party: Row) => {
+        // a sales party equal to the main party is stored as "same as party"
+        setSalesParty(String(party?.ParCode) === String(currentParty?.ParCode) ? null : { ParCode: party.ParCode, ParName: party.ParName || '' });
+        setDirty(true);
+      },
+    });
+
+  const openExecutivePicker = async () => {
+    setExePickerVisible(true);
+    if (executives.length > 0) return;
+    try {
+      setExeLoading(true);
+      const data = await fetchExecutives(API, token, ctx);
+      if (aliveRef.current) setExecutives(data);
+    } catch (error: any) {
+      console.log('[YarnSalesOrderNEW] executive list error', error?.response?.data || error?.message);
+      if (aliveRef.current) AppAlert.alert('Error', errorMessage(error, 'Unable to load sales executives'));
+    } finally {
+      if (aliveRef.current) setExeLoading(false);
+    }
+  };
+
+  /* ---------------- Qty / Pcs / Rate pencils ---------------- */
+
+  const openQuickEdit = (row: Row, field: QuickField) => setQuickEdit({ row, field, value: String(row[field] ?? '') });
+
+  const saveQuickEdit = () => {
+    if (!quickEdit) return;
+    const { row, field, value } = quickEdit;
+    const text = String(value || '').trim();
+    if (field === 'Pcs' ? text !== '' && (isNaN(Number(text)) || num(text) < 0) : num(text) <= 0) {
+      AppAlert.alert('Required', field === 'Pcs' ? 'Enter valid pcs' : `Enter valid ${field.toLowerCase()}`);
+      return;
+    }
+    setRows((prev) => updateRowValue(prev, row.LineId, field, text || '0'));
+    setDirty(true);
+    setQuickEdit(null);
+  };
 
   const loadDeliveryAddress = async () => {
     try {
@@ -299,7 +463,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   /* ---------------- save / delete / print ---------------- */
 
   const handleSave = async () => {
-    const invalid = validateOrder(currentParty, ddays, rows);
+    const invalid = validateOrder(currentParty, dueDays, rows);
     if (invalid) {
       AppAlert.alert(invalid[0], invalid[1]);
       return;
@@ -315,8 +479,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         discount,
         tax,
         remark,
-        ddays,
+        dueDays,
         dueDate,
+        salesParty,
         rawMain,
         rawTax,
         rawExp,
@@ -416,6 +581,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         : 'New Sales Order';
   const badge = authorised ? 'VIEW' : initialMode;
   const daysEditable = !isViewMode || screenMode === 'ADD';
+  const shownSalesParty = effectiveSalesParty(salesParty, currentParty);
+  const stockRow = stockRowKey ? rows.find((r) => makeRowKey(r) === stockRowKey) : null;
+  const stockInfo = stockRowKey ? stock[stockRowKey] : undefined;
 
   if (loadingOrder) {
     return (
@@ -442,12 +610,54 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
     );
   }
 
+  const renderStock = (item: Row) => {
+    if (!canAskStock(item)) return <Text style={st.meta}>Stock : -</Text>;
+    const info = stock[makeRowKey(item)];
+    const enough = !!info && !info.loading && !info.failed && info.qty >= num(item.Qty);
+    const color = !info || info.loading ? T.muted : info.failed ? T.red : info.qty <= 0 ? T.red : enough ? T.green : T.amber;
+    return (
+      <TouchableOpacity
+        style={[st.stockChip, { borderColor: `${color}55`, backgroundColor: `${color}12` }]}
+        onPress={() => setStockRowKey(makeRowKey(item))}
+        disabled={!info || info.loading}
+        accessibilityRole="button"
+        accessibilityLabel="Stock details"
+      >
+        <Icon name="inventory" size={14} color={color} />
+        <Text style={[st.stockChipLabel, { color }]}>Stock</Text>
+        {!info || info.loading ? (
+          <ActivityIndicator size="small" color={T.copper} />
+        ) : (
+          <Text style={[st.stockChipValue, { color }]}>{info.failed ? 'Not loaded' : info.qty.toFixed(3)}</Text>
+        )}
+        {info && !info.loading && !info.failed ? <Icon name="info-outline" size={14} color={color} /> : null}
+      </TouchableOpacity>
+    );
+  };
+
+  const editCell = (item: Row, field: QuickField, shown: string, extra?: any) => (
+    <TouchableOpacity
+      style={[st.cellBox, extra]}
+      onPress={() => openQuickEdit(item, field)}
+      disabled={pencilsOff}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Change ${QUICK_LABEL[field]}`}
+    >
+      <View style={st.cellHead}>
+        <Text style={st.cellLabel}>{QUICK_LABEL[field]}</Text>
+        {!pencilsOff ? <Icon name="edit" size={12} color={T.copper} /> : null}
+      </View>
+      <Text style={[st.cellValue, !pencilsOff && st.cellEditable]} numberOfLines={1}>{shown}</Text>
+    </TouchableOpacity>
+  );
+
   const renderRow = (item: Row, index: number) => (
     <View key={`${item.LineId}_${index}`} style={[st.rowCell, cols > 1 && { width: `${100 / Math.min(cols, 2)}%` as any }]}>
       <View style={st.rowCard}>
         <View style={st.rowTop}>
           <View style={st.rowNo}>
-            <Text style={st.rowNoText}>{index + 1}</Text>
+            <Text style={st.rowNoText}>{item.SrNo || index + 1}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
             <View style={st.line}>
@@ -471,7 +681,10 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               </View>
               <IconBtn icon="edit" label="Change shade" color={T.copper} tone="soft" disabled={pencilsOff} onPress={() => handleEditShade(item)} />
             </View>
-            <Text style={st.meta} numberOfLines={1}>Denier : {item.Denier || item.denier || '-'}</Text>
+            <View style={st.metaRow}>
+              <Text style={st.meta} numberOfLines={1}>Denier : {item.Denier || item.denier || '-'}</Text>
+              {renderStock(item)}
+            </View>
             {item.Remark ? <Text style={st.meta} numberOfLines={3}>Remark : {item.Remark}</Text> : null}
           </View>
           <TouchableOpacity
@@ -480,24 +693,15 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
             disabled={isViewMode}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityRole="button"
-            accessibilityLabel={`Row ${index + 1} actions`}
+            accessibilityLabel={`Row ${item.SrNo || index + 1} actions`}
           >
             <Icon name="more-vert" size={22} color={T.nav} />
           </TouchableOpacity>
         </View>
         <View style={st.rowBottom}>
-          <View style={st.cellBox}>
-            <Text style={st.cellLabel}>Qty</Text>
-            <Text style={st.cellValue} numberOfLines={1}>{item.Qty}</Text>
-          </View>
-          <View style={st.cellBox}>
-            <Text style={st.cellLabel}>Pcs</Text>
-            <Text style={st.cellValue} numberOfLines={1}>{item.Pcs}</Text>
-          </View>
-          <View style={st.cellBox}>
-            <Text style={st.cellLabel}>Rate</Text>
-            <Text style={st.cellValue} numberOfLines={1}>₹ {money(item.Rate)}</Text>
-          </View>
+          {editCell(item, 'Qty', String(item.Qty))}
+          {editCell(item, 'Pcs', String(item.Pcs))}
+          {editCell(item, 'Rate', `₹ ${money(item.Rate)}`)}
           <View style={[st.cellBox, { flex: 1.3, alignItems: 'flex-end' }]}>
             <Text style={st.cellLabel}>Amount</Text>
             <Text style={[st.cellValue, { color: T.green }]} numberOfLines={1}>₹ {money(item.Amount)}</Text>
@@ -538,42 +742,83 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               <Text style={st.partySub} numberOfLines={3}>
                 {currentParty?.ParCode || '-'} | {currentParty?.Address || '-'}
               </Text>
-              <View style={st.exeRow}>
-                <Icon name="person-outline" size={14} color={T.muted} />
-                <Text style={st.partySub} numberOfLines={1}>{currentParty?.SExeName || '-'}</Text>
-              </View>
+              <TouchableOpacity
+                style={[st.exePick, isViewMode && st.exePickOff]}
+                onPress={openExecutivePicker}
+                disabled={isViewMode}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Change sales executive"
+              >
+                <Icon name="person-outline" size={15} color={isViewMode ? T.muted : T.copper} />
+                <View style={{ flexShrink: 1, minWidth: 0 }}>
+                  <Text style={st.exeLabel}>Sales Executive</Text>
+                  <Text style={st.exeValue} numberOfLines={1}>{currentParty?.SExeName || 'Select'}</Text>
+                </View>
+                {!isViewMode ? <Icon name="edit" size={14} color={T.copper} /> : null}
+              </TouchableOpacity>
             </View>
             {canChangeParty ? <Btn label="Change" kind="soft" compact onPress={changeParty} /> : null}
           </Card>
 
-          {/* Delivery */}
+          {/* Due days / date */}
           <Card style={[{ gap: 12 }, !isPhone && { flex: 1 }]}>
             <Field
-              label="Delivery Days"
+              label="Due Days"
               required
-              value={ddays === null || ddays === undefined ? '' : String(ddays)}
+              value={dueDays}
               onChangeText={(t: string) => {
-                setDdays(t);
+                setDueDays(t.replace(/[^0-9]/g, ''));
                 setDirty(true);
               }}
-              keyboardType="numeric"
+              keyboardType="number-pad"
               editable={daysEditable}
               selectTextOnFocus
-              accessibilityLabel="Delivery days"
+              placeholder="Credit days"
+              accessibilityLabel="Due days"
             />
             <View style={{ gap: 6 }}>
-              <Text style={st.label}>Delivery Date</Text>
+              <Text style={st.label}>Due Date</Text>
               {isViewMode ? (
                 <View style={st.readBox}>
                   <Icon name="event" size={17} color={T.muted} />
-                  <Text style={st.readText}>{ddate || '-'}</Text>
+                  <Text style={st.readText}>{dueDate || '-'}</Text>
                 </View>
               ) : (
-                <DateField value={parseDmyDate(ddate)} onChange={(d) => setDdate(dmy(d))} />
+                <DateField value={parseDmyDate(dueDate)} onChange={pickDueDate} />
               )}
             </View>
           </Card>
         </View>
+
+        {/* Sales party (after the main party) */}
+        <Card style={st.partyCard}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.eyebrow}>Sales Party</Text>
+            <Text style={st.salesName} numberOfLines={2}>{shownSalesParty?.ParName || '-'}</Text>
+            <Text style={st.partySub} numberOfLines={1}>
+              {shownSalesParty?.ParCode || '-'}
+              {!salesParty?.ParCode ? '  ·  Same as party' : ''}
+            </Text>
+          </View>
+          {!isViewMode ? (
+            <View style={st.salesBtns}>
+              {salesParty?.ParCode ? (
+                <IconBtn
+                  icon="close"
+                  label="Use main party as sales party"
+                  color={T.muted}
+                  tone="soft"
+                  onPress={() => {
+                    setSalesParty(null);
+                    setDirty(true);
+                  }}
+                />
+              ) : null}
+              <Btn label={salesParty?.ParCode ? 'Change' : 'Select'} kind="soft" compact onPress={pickSalesParty} />
+            </View>
+          ) : null}
+        </Card>
 
         <KpiGrid isPhone={isPhone}>
           <Kpi label="Rows" value={String(totals.itemCount)} icon="format-list-numbered" />
@@ -584,8 +829,24 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
 
         <SectionHead
           title="Items / Grade / Shade rows"
-          meta={rows.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}` : undefined}
+          meta={
+            rows.length
+              ? rowSearch
+                ? `${shownRows.length} of ${rows.length} rows`
+                : `${rows.length} row${rows.length === 1 ? '' : 's'}`
+              : undefined
+          }
         />
+
+        {rows.length > 0 ? (
+          <SearchInput
+            value={rowSearch}
+            onChangeText={setRowSearch}
+            placeholder="Search item, grade or shade in this order"
+            onRefresh={refreshStock}
+            loading={Object.values(stock).some((x) => x.loading)}
+          />
+        ) : null}
 
         {rows.length === 0 ? (
           <Card>
@@ -595,8 +856,12 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               text={isViewMode ? 'This sales order has no rows.' : 'Tap Add Item to start creating the sales order.'}
             />
           </Card>
+        ) : shownRows.length === 0 ? (
+          <Card>
+            <EmptyState icon="search-off" title="No matching row" text="Try another item, grade or shade." />
+          </Card>
         ) : (
-          <View style={st.rowGrid}>{rows.map(renderRow)}</View>
+          <View style={st.rowGrid}>{shownRows.map(renderRow)}</View>
         )}
 
         <Card style={{ gap: 12 }}>
@@ -683,8 +948,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       <Sheet open={detailVisible} onClose={() => setDetailVisible(false)} title="Sales Order Details" wideMax={520}>
         <View>
           <InfoRow icon="person" label="Sales Executive" value={String(currentParty?.SExeName || '-')} />
+          <InfoRow icon="storefront" label="Sales Party" value={String(shownSalesParty?.ParName || '-')} />
           <InfoRow icon="handshake" label="Broker" value={String(currentParty?.BAccName || '-')} />
-          <InfoRow icon="calendar-today" label="Due Days" value={String(currentParty?.DueDay || '-')} />
+          <InfoRow icon="calendar-today" label="Due Days" value={dueDays || '-'} />
           <InfoRow icon="event" label="Due Date" value={dueDate || '-'} />
           <TouchableOpacity
             style={st.addrRow}
@@ -743,6 +1009,98 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         )}
       </Sheet>
 
+      {/* Sales executive */}
+      <PickerSheet
+        open={exePickerVisible}
+        title={exeLoading ? 'Loading sales executives…' : 'Select Sales Executive'}
+        searchPlaceholder="Search sales executive..."
+        rows={executives}
+        keyOf={(e) => String(e.Code)}
+        labelOf={(e) => `${e.SalesExecutive || '-'}${e.Code !== undefined ? `  (${e.Code})` : ''}`}
+        searchOf={(e) => `${e.SalesExecutive || ''} ${e.Code ?? ''}`}
+        selectedKey={currentParty?.SExe !== undefined && currentParty?.SExe !== null ? String(currentParty.SExe) : ''}
+        onPick={(e) => {
+          setCurrentParty((prev) => applyExecutive(prev, e));
+          setDirty(true);
+          setExePickerVisible(false);
+        }}
+        onClose={() => setExePickerVisible(false)}
+      />
+
+      {/* Qty / Pcs / Rate pencil */}
+      <Sheet
+        open={!!quickEdit}
+        onClose={() => setQuickEdit(null)}
+        eyebrow={quickEdit ? `ROW ${quickEdit.row.SrNo || ''}` : ''}
+        title={quickEdit ? `Change ${QUICK_LABEL[quickEdit.field]}` : ''}
+        wideMax={420}
+      >
+        {quickEdit ? (
+          <View style={{ gap: 14 }}>
+            <Text style={st.quickSub} numberOfLines={2}>
+              {quickEdit.row.ItmName} · {quickEdit.row.GrdName || quickEdit.row.GrdCode} · {quickEdit.row.ShdName || quickEdit.row.ShdCode}
+            </Text>
+            <Field
+              label={QUICK_LABEL[quickEdit.field]}
+              required={quickEdit.field !== 'Pcs'}
+              value={quickEdit.value}
+              onChangeText={(t: string) => setQuickEdit((q) => (q ? { ...q, value: t } : q))}
+              keyboardType="numeric"
+              autoFocus
+              selectTextOnFocus
+            />
+            {quickEdit.field !== 'Pcs' ? (
+              <View style={st.quickAmt}>
+                <Text style={st.cellLabel}>New Amount</Text>
+                <Text style={st.quickAmtValue}>
+                  ₹{' '}
+                  {money(
+                    lineAmount(
+                      quickEdit.field === 'Qty' ? quickEdit.value : quickEdit.row.Qty,
+                      quickEdit.field === 'Rate' ? quickEdit.value : quickEdit.row.Rate,
+                    ),
+                  )}
+                </Text>
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Btn label="Cancel" kind="ghost" onPress={() => setQuickEdit(null)} style={{ flex: 1 }} />
+              <Btn label="Update" icon="check" onPress={saveQuickEdit} style={{ flex: 1.4 }} />
+            </View>
+          </View>
+        ) : null}
+      </Sheet>
+
+      {/* Stock of one row */}
+      <Sheet
+        open={!!stockRowKey}
+        onClose={() => setStockRowKey(null)}
+        eyebrow="STOCK DETAILS"
+        title={stockRow ? `${stockRow.ItmName || ''} - ${stockRow.ShdName || ''}` : 'Stock Details'}
+        wideMax={520}
+      >
+        {!stockInfo || stockInfo.rows.length === 0 ? (
+          <Text style={st.stockEmpty}>No stock found</Text>
+        ) : (
+          <View style={{ gap: 10 }}>
+            <View style={st.grossRow}>
+              <Text style={st.grossLabel}>Total available</Text>
+              <Text style={st.grossValue}>{stockInfo.qty.toFixed(3)}</Text>
+            </View>
+            {stockInfo.rows.map((s2, i) => (
+              <View key={i} style={st.stockCard}>
+                <View style={st.grossRow}>
+                  <Text style={st.stockMer} numberOfLines={1}>{s2?.MerCode}</Text>
+                  <Text style={st.stockQty}>{Number(s2?.StkQty || 0).toFixed(3)}</Text>
+                </View>
+                <Text style={st.stockName}>{s2?.MerName}</Text>
+                <Text style={st.meta}>Carton : {s2?.TotCarton}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </Sheet>
+
       <Dialog
         open={deleteModalVisible}
         icon="delete-outline"
@@ -776,7 +1134,25 @@ const st = StyleSheet.create({
   eyebrow: { fontSize: 10.5, fontWeight: '800', color: T.copper, letterSpacing: 0.8, textTransform: 'uppercase' },
   partyName: { fontSize: 16, fontWeight: '900', color: T.nav, marginTop: 3 },
   partySub: { flexShrink: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '600', color: T.muted, marginTop: 3 },
-  exeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  exePick: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${T.copper}40`,
+    backgroundColor: `${T.copper}0D`,
+    maxWidth: '100%',
+  },
+  exePickOff: { borderColor: T.border, backgroundColor: T.alt },
+  exeLabel: { fontSize: 9.5, fontWeight: '800', color: T.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  exeValue: { fontSize: 13, fontWeight: '800', color: T.nav },
+  salesName: { fontSize: 14.5, fontWeight: '900', color: T.nav, marginTop: 3 },
+  salesBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
   readBox: {
     height: 44,
@@ -802,6 +1178,18 @@ const st = StyleSheet.create({
   itemName: { fontSize: 14.5, fontWeight: '900', color: T.ink, marginTop: 1 },
   lineValue: { fontSize: 13.5, fontWeight: '700', color: T.nav, marginTop: 1 },
   meta: { fontSize: 12.5, fontWeight: '600', color: T.muted },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  stockChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  stockChipLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
+  stockChipValue: { fontSize: 12.5, fontWeight: '900' },
   menuBtn: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: T.alt },
   rowBottom: {
     flexDirection: 'row',
@@ -815,6 +1203,18 @@ const st = StyleSheet.create({
   cellBox: { flex: 1, minWidth: 0 },
   cellLabel: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
   cellValue: { fontSize: 13.5, fontWeight: '800', color: T.ink, marginTop: 2 },
+  cellHead: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cellEditable: { color: T.nav },
+
+  quickSub: { fontSize: 13, fontWeight: '700', color: T.muted },
+  quickAmt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: T.sub },
+  quickAmtValue: { fontSize: 16, fontWeight: '900', color: T.green },
+
+  stockEmpty: { textAlign: 'center', color: T.muted, fontWeight: '700', paddingVertical: 28 },
+  stockCard: { borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 12, backgroundColor: T.sub },
+  stockMer: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '900', color: T.nav },
+  stockQty: { fontSize: 15, fontWeight: '900', color: T.green },
+  stockName: { fontSize: 13, fontWeight: '700', color: T.ink, marginTop: 4 },
 
   grossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   grossLabel: { fontSize: 13.5, fontWeight: '800', color: T.nav },

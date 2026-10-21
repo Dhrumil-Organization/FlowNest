@@ -4,6 +4,7 @@
 //   GET /api/get_criterion fetch:'salesexe' -> executive names for parties without SExeName
 // purpose 'new'     : the picked party starts a new order (opens the order summary)
 // purpose 'replace' : the picked party goes back to the open order (rows are kept)
+//                     — also used for the order's Sales Party (title 'Select Sales Party')
 import { AppAlert } from '@/common/utils/appAlert';
 import { Avatar, EmptyState, PanelHeader } from '@/src/components/erpUi';
 import { T } from '@/src/theme';
@@ -20,12 +21,15 @@ export type PartyParams = {
   purpose: 'new' | 'replace';
   /** purpose 'replace': receives the picked party. */
   onPick?: (party: Row) => void;
+  /** Header title / breadcrumb (default 'Select Party' / 'Change party'). */
+  title?: string;
+  crumb?: string;
 };
 
 type Props = { token: string; API: string; nav: Nav; params: PartyParams };
 
 export default function PartyStep({ token, API, nav, params }: Props) {
-  const { ctx, purpose, onPick } = params;
+  const { ctx, purpose, onPick, title, crumb } = params;
   const { cols } = useCols();
   const [search, setSearch] = useState('');
   const [parties, setParties] = useState<Row[]>([]);
@@ -115,8 +119,8 @@ export default function PartyStep({ token, API, nav, params }: Props) {
     <View style={st.root}>
       <PanelHeader
         onBack={nav.back}
-        crumbs={['Yarn Sales Order', purpose === 'replace' ? 'Change party' : 'New order']}
-        title="Select Party"
+        crumbs={['Yarn Sales Order', crumb || (purpose === 'replace' ? 'Change party' : 'New order')]}
+        title={title || 'Select Party'}
         subtitle={loading ? undefined : `${filteredParties.length} of ${parties.length} parties`}
       />
       <View style={[CONTENT, st.searchWrap]}>

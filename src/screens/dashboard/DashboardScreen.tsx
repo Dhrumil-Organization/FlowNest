@@ -1,28 +1,28 @@
-import AppAlert from '@/common/utils/appAlert';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
+import AppAlert from '@/common/utils/appAlert';
 import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
-import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
 import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
+import { columnsForWidth, DASH_GAP, DashboardGrid, DashboardInsetContext, DashCols, Slot } from '@/src/components/dashboard/DashboardGrid';
+import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
 import ExpenseDashboardCard from '@/src/components/dashboard/ExpenseDashboardCard';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { usePermission } from '@/src/core/permissions';
 import { RegistryLayoutItem, RegistryRenderer } from '@/src/core/ui-registry';
-import { columnsForWidth, DashboardGrid, DashboardInsetContext, DashCols, DASH_GAP, Slot } from '@/src/components/dashboard/DashboardGrid';
+import { getUiNodes } from '@/src/core/ui-registry/uiRegistry';
 import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 // FIX: the header is now rendered once, in app/new/(tabs)/_layout.tsx —
 // this screen no longer renders its own AppHeader (that was the second
@@ -163,27 +163,28 @@ function renderDashboardLayout(items: RegistryLayoutItem[], columns: DashCols) {
 
 export function DashboardScreen(token: any, getUserPrptype: any) {
   const router = useRouter();
-  const { canAccess, isSuperAdmin } = usePermission();
+  const { canAccess } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
   const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
   const sessionUser = useAppSessionStore((state) => state.user);
   const logout = useAppSessionStore((state) => state.logout);
 
   const context = appSession?.business_context;
-  const isDirector = Number(
-    sessionUser?.is_director ??
-    rawLoginResponse?.is_director ??
-    rawLoginResponse?.user?.is_director ??
-    0,
-  ) === 1;
-  const hasOwnerAuthority = isDirector || isSuperAdmin;
-
-  const [view, setView] = useState<DashboardView>(hasOwnerAuthority ? 'owner' : 'my');
+  // Card-driven Owner access: derived from the registered dashboard cards.
+  // New Owner cards participate by registering ownerCard: true and their
+  // individual permission (or anyPermissions for a composite card).
+  const ownerCardPermissions = getUiNodes('dashboard-card', 'screen.dashboard')
+    .filter(node => node.metadata?.ownerCard === true)
+    .flatMap(node => {
+      const any = node.metadata?.anyPermissions;
+      return Array.isArray(any) && any.length ? any as string[] : [node.permission];
+    });
+  const hasOwnerCardPermission = ownerCardPermissions.some(permission => canAccess(permission));
+  const [view, setView] = useState<DashboardView>(hasOwnerCardPermission ? 'owner' : 'my');
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
   const [cards, setCards] = useState<DashboardCard[]>([]);
   const [periodLabel, setPeriodLabel] = useState('Monthly Target');
   const [scopeMessage, setScopeMessage] = useState('');
-  const [ownerAllowedFromApi, setOwnerAllowedFromApi] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -204,7 +205,32 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
   const monthno = now.getMonth() + 1;
-  const ownerAllowed = ownerAllowedFromApi ?? hasOwnerAuthority;
+  // Backend scope flags cannot override explicit per-card grants.
+  const ownerAllowed = hasOwnerCardPermission;
+
+  // My View is the ONLY view that depends on the Sales Executive mapping.
+  // When the session does not carry the field at all, keep My View available
+  // (unknown ≠ unmapped); when it is present but blank/0, My View is off.
+  const rawSaleExec = sessionUser?.saleexeid ?? rawLoginResponse?.user?.saleexeid;
+  const saleExecKnown = rawSaleExec !== undefined;
+  const saleExecCode = String(rawSaleExec ?? '').trim();
+  const myViewAllowed = !saleExecKnown || (saleExecCode !== '' && saleExecCode !== '0');
+
+  // Permissions arrive asynchronously after login, so the initial useState
+  // value can be computed before they exist. Until the user picks a view
+  // themselves, follow the permissions: Owner whenever any Owner card is
+  // granted, otherwise My View.
+  const userPickedViewRef = useRef(false);
+  const pickView = useCallback((next: DashboardView) => {
+    userPickedViewRef.current = true;
+    setView(next);
+  }, []);
+
+  useEffect(() => {
+    if (userPickedViewRef.current) return;
+    if (ownerAllowed && view !== 'owner') setView('owner');
+    else if (!ownerAllowed && view !== 'my') setView('my');
+  }, [ownerAllowed, view]);
 
   // useEffect(() => {
   //   // if (!token) return
@@ -303,9 +329,6 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
       setCards(payload.cards || []);
       setPeriodLabel(payload.period?.label || payload.period?.month_name || 'Monthly Target');
       setScopeMessage(payload.scope?.message || payload.message || '');
-      if (payload.scope?.owner_view_allowed !== undefined) {
-        setOwnerAllowedFromApi(Boolean(payload.scope.owner_view_allowed));
-      }
     } catch (e: any) {
       setError(e?.message || 'Unable to load dashboard.');
     } finally {
@@ -353,14 +376,15 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         <View style={styles.segment}>
           <TouchableOpacity
             disabled={!ownerAllowed}
-            onPress={() => ownerAllowed && setView('owner')}
+            onPress={() => ownerAllowed && pickView('owner')}
             style={[styles.segmentButton, view === 'owner' && styles.segmentActive, !ownerAllowed && styles.segmentDisabled]}
           >
             <Text style={[styles.segmentText, view === 'owner' && styles.segmentTextActive]}>Owner</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => setView('my')}
-            style={[styles.segmentButton, view === 'my' && styles.segmentActive]}
+            disabled={!myViewAllowed}
+            onPress={() => myViewAllowed && pickView('my')}
+            style={[styles.segmentButton, view === 'my' && styles.segmentActive, !myViewAllowed && styles.segmentDisabled]}
           >
             <Text style={[styles.segmentText, view === 'my' && styles.segmentTextActive]}>My View</Text>
           </TouchableOpacity>

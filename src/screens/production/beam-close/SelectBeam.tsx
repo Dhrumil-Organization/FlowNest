@@ -1,8 +1,10 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../ConversionTypography';
+ensureConversionWebFonts();
 import AppAlert from '@/common/utils/appAlert';
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { API } from "@/src/api/client";
 
 const SelectBeam = ({ visible, onClose, FormState, token, txntype, setFormState }) => {

@@ -1,3 +1,5 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../production/ConversionTypography';
+ensureConversionWebFonts();
 // FILE: src/screens/reports/BeamShortageScreen.tsx
 // Reports → Beam Shortage (READ-ONLY) — the ERP Designing "Beam Shortage"
 // report as is:
@@ -45,7 +47,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   useWindowDimensions,

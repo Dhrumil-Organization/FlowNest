@@ -53,6 +53,33 @@ export default function PackingAutomationNEW({ token, API, username, userId, isv
   const wide = width >= 900;
   const api = useMemo<Api>(() => ({ API, token }), [API, token]);
 
+  // Who is logged in. The screen props can arrive empty (seen on the web build),
+  // so fall back to the login data the app keeps on the device.
+  const [me, setMe] = useState<{ id: string; isvis: string; ready: boolean }>({ id: '', isvis: '', ready: false });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const parse = (raw: string | null) => { try { return raw ? JSON.parse(raw) : null; } catch { return null; } };
+      const [uidRaw, userRaw, loginRaw, visRaw] = await Promise.all([
+        AsyncStorage.getItem('user_id'),
+        AsyncStorage.getItem('mobile_user'),
+        AsyncStorage.getItem('mobile_raw_login_response'),
+        AsyncStorage.getItem('isvis'),
+      ]);
+      const mu = parse(userRaw) || {};
+      const lu = parse(loginRaw)?.user || {};
+      const first = (...v: any[]) => {
+        const hit = v.find((x) => x !== undefined && x !== null && String(x).trim() !== '');
+        return hit === undefined ? '' : String(hit).trim();
+      };
+      const id = first(userId, mu.id, lu.id, parse(uidRaw) ?? uidRaw);
+      const vis = first(isvis, mu.isvis, mu.IsVis, lu.isvis, lu.IsVis, visRaw);
+      if (alive) setMe({ id, isvis: vis, ready: true });
+    })();
+    return () => { alive = false; };
+  }, [userId, isvis]);
+
+
   const [ctx, setCtx] = useState<Ctx>({ prpcode: biz.prpCode || '', yearno: biz.yearNo || '', strcode: '' });
   const [facility, setFacility] = useState('');
   const [ready, setReady] = useState(false);
@@ -61,7 +88,7 @@ export default function PackingAutomationNEW({ token, API, username, userId, isv
   const [tried, setTried] = useState<Record<number, boolean>>({});
   const [reprinting, setReprinting] = useState(false);
 
-  const uid = String(userId || username || '');
+  const uid = String(me.id || userId || username || ''); // user id on the label
   const { f, routes, linked, busy, problem, lastPrint, actions } = usePackingForm(api, ctx, uid);
   const canPrint = canDo(PA_RESOURCE, 'add');
 
@@ -87,31 +114,62 @@ export default function PackingAutomationNEW({ token, API, username, userId, isv
   }, [biz.prpCode]);
 
   /**
-   * Printers — same rules as the web PrinterSelect:
-   *  • Rayons (prptype 'R') normal users (isvis ≠ '-999') with a printer named
-   *    MTX_BAR_<userid> are locked to it.
-   *  • Everyone else may choose; the last printer used on this device for this
-   *    facility is pre-selected when it is still in the list.
+   * Printers — same rule as the Web ERP:
+   *  • Super admin (isvis = '-999') sees ALL printers and may choose; the last
+   *    printer used on this device for this facility is pre-selected.
+   *  • Every other user sees ONLY their own printer(s): name ending in
+   *    _<userId> (e.g. user 256 → MTX_BAR_256). One printer → selected and
+   *    locked. No own printer → nothing to choose, printing is blocked, so a
+   *    label can never go to someone else's printer by accident.
    */
+  const isSuperAdmin = me.isvis === '-999';
   const loadPrinters = async () => {
+    if (!me.ready) return;
     setPrintersBusy(true); setPrintersError('');
     try {
       const list = await fetchPrinters(api);
-      setPrinters(list);
-      const own = list.find((p) => p.name === `MTX_BAR_${userId || ''}`);
-      const lock = biz.prpGroup === 'R' && String(isvis ?? '') !== '-999' && !!own && !!userId;
-      setPrinterLocked(lock);
-      if (lock && own) { actions.set('printer', own.name); return; }
+
+      if (isSuperAdmin) {
+        setPrinters(list);
+        setPrinterLocked(false);
+        const saved = ctx.prpcode ? await AsyncStorage.getItem(PRINTER_KEY(ctx.prpcode)) : null;
+        const keep = [f.printer, saved].find((n) => n && list.some((p) => p.name === n));
+        actions.set('printer', keep || '');
+        return;
+      }
+
+      const uidKey = me.id;
+      const suffix = `_${uidKey}`.toUpperCase();
+      const own = uidKey ? list.filter((p) => p.name.trim().toUpperCase().endsWith(suffix)) : [];
+      setPrinters(own);
+
+      if (own.length === 0) {
+        setPrinterLocked(true);
+        actions.set('printer', '');
+        setPrintersError(uidKey
+          ? `No printer is assigned to your login. Ask the admin to set up a printer named …_${uidKey}.`
+          : 'Your user id is not known, so no printer can be assigned. Please log in again.');
+        return;
+      }
+
+      if (own.length === 1) {
+        setPrinterLocked(true);
+        actions.set('printer', own[0].name);
+        return;
+      }
+
+      // Several printers of this user (e.g. MTX_BAR_256 and MTX_A4_256): choose among them only.
+      setPrinterLocked(false);
       const saved = ctx.prpcode ? await AsyncStorage.getItem(PRINTER_KEY(ctx.prpcode)) : null;
-      const keep = [f.printer, saved].find((n) => n && list.some((p) => p.name === n));
-      actions.set('printer', keep || '');
+      const keep = [f.printer, saved].find((n) => n && own.some((p) => p.name === n));
+      actions.set('printer', keep || own[0].name);
     } catch (e) {
       setPrintersError(apiErrorText(e, 'Printers could not be loaded.'));
     } finally {
       setPrintersBusy(false);
     }
   };
-  useEffect(() => { if (ctx.prpcode) loadPrinters(); }, [api, ctx.prpcode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ctx.prpcode && me.ready) loadPrinters(); }, [api, ctx.prpcode, me.ready, me.id, me.isvis]); // eslint-disable-line react-hooks/exhaustive-deps
   // The printer is remembered per facility on this device.
   useEffect(() => {
     if (ctx.prpcode && f.printer) AsyncStorage.setItem(PRINTER_KEY(ctx.prpcode), f.printer);

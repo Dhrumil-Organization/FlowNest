@@ -5,9 +5,9 @@
 //  • The shine moves LEFT → RIGHT across each block (soft-edged band, no gradient library needed).
 //  • Colours come only from the light tokens T (the global dark theme converts them).
 //  • Layouts follow the same breakpoints as the real screen: phone (1 col) / tablet (2) / desktop (3).
-import { T } from '@/src/theme';
 import React, { useEffect, useState } from 'react';
 import { Animated, DimensionValue, Easing, LayoutChangeEvent, Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { T } from '../../../src/theme';
 import { Breakpoint, CONTENT_MAX } from './model';
 import { Cell, u } from './ui';
 

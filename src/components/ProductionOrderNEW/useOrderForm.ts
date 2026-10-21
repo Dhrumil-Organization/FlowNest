@@ -3,12 +3,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // All state of the Production Order entry (add / edit / view). Port of
 // SudamoProductionOrderDetailNew.js (web) + the job-work split.
 import {
-  Api, apiErrorText as errorMessage, Ctx, fetchCostingDetail, fetchCostings, fetchDesignDetail, fetchGroups, fetchLegacyCosting, fetchParties,
+  Api,
+  Ctx,
+  apiErrorText as errorMessage,
+  fetchCostingDetail, fetchCostings, fetchDesignDetail, fetchGroups, fetchLegacyCosting, fetchParties,
   mapLegacyCosting, prepareVoucher, saveOrder, showOrder
 } from './api';
+import { buildEngine, computeBreakup, Engine, matchesSnap, Rates, ratesEdited, savedBreakup } from './costEngine';
 import { firstValue, Row, rowKey, todayDMY } from './format';
 import { authorizationReason, computePlan, sourcingFromRows, validatePlan } from './plan';
-import { buildEngine, computeBreakup, Engine, matchesSnap, Rates } from './costEngine';
+
+// import { buildEngine, computeBreakup, Engine, matchesSnap, Rates } from './costEngine';
 import { confirmAsync, notifyAsync } from './ui';
 
 const mergeParties = (existing: Row[], rows: Row[]): Row[] => {
@@ -335,7 +340,7 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
         if (cancelled) return;
         const e = buildEngine(detail, design);
         if (!e.yarns.length) { setEngineNote('This costing sheet has no yarn lines — showing its saved totals.'); return; }
-        if (!matchesSnap(e)) setEngineNote('Recalculated totals differ slightly from the saved sheet; the recalculated figures are used.');
+        if (!matchesSnap(e)) setEngineNote('Saved costing revision is displayed unchanged. Editing a rate will calculate a new estimate.');
         setEngine(e); setRates(e.initial);
       } catch (err) {
         if (!cancelled) setEngineNote(errorMessage(err, 'Costing detail could not be loaded — showing saved totals.'));
@@ -343,8 +348,8 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     })();
     return () => { cancelled = true; };
   }, [engineCostingId, engineMdId, resolvedCostingMeta.design_costing_source]); // eslint-disable-line react-hooks/exhaustive-deps
-  const breakup = useMemo(() => (engine && rates ? computeBreakup(engine, rates) : null), [engine, rates]);
-  // Edited rates drive the commercial preview exactly like the artifact.
+  const breakup = useMemo(() => (engine && rates ? (ratesEdited(engine, rates) ? computeBreakup(engine, rates) : savedBreakup(engine)) : null), [engine, rates]);
+  // The saved revision is authoritative; only actual rate edits recalculate.
   const effectiveCostingResult = breakup ? {
     ...(costingResult || {}),
     snap_greige_price: breakup.greigePrice,

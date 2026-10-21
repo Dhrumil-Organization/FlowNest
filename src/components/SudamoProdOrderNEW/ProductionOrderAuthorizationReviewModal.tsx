@@ -69,7 +69,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [detail, setDetail] = useState<any | null>(null);
-    const [yarnState, setYarnState] = useState<{ key: string; loading: boolean; lines: any[]; error: string }>({ key: '', loading: false, lines: [], error: '' });
+    const [yarnState, setYarnState] = useState<{ key: string; loading: boolean; lines: any[]; error: string; savedSnap?: any }>({ key: '', loading: false, lines: [], error: '' });
 
     useEffect(() => {
         setExpandedLegacyCosting(false);
@@ -262,6 +262,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                 };
                 let lines: any[] = [];
                 let warning = '';
+                let savedSnap: any = undefined;
                 if (model.costingSource === 'NEW') {
                     const id = String(model.costingItem.design_costing_id).trim();
                     const mdId = String(model.costingItem.md_id).trim();
@@ -279,6 +280,10 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                     }
                     if (!Array.isArray(saved.yarn_lines) || saved.yarn_lines.length === 0) {
                         throw new Error('The linked costing has no saved yarn consumption rows.');
+                    }
+                    savedSnap = saved.snap;
+                    if (!savedSnap || typeof savedSnap !== 'object' || !Number.isFinite(Number(savedSnap.final_cost))) {
+                        throw new Error('The linked saved costing has no valid frozen cost breakdown.');
                     }
                     const design = designResult.status === 'fulfilled' && designResult.value?.data?.success
                         ? designResult.value.data.data : null;
@@ -306,7 +311,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                         warning = 'Legacy consumption could not be verified for one or more yarns. Check the saved weight, cost divisor, yarn rate and cost.';
                     }
                 }
-                if (active) setYarnState({ key, loading: false, lines, error: warning });
+                if (active) setYarnState({ key, loading: false, lines, error: warning, savedSnap });
             } catch (error: any) {
                 if (active && !axios.isCancel(error)) setYarnState({ key, loading: false, lines: [], error: error?.response?.data?.message || error?.message || 'Saved yarn consumption could not be loaded.' });
             }
@@ -314,6 +319,11 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
         void loadYarns();
         return () => { active = false; cancellation.cancel('Production Order review changed.'); };
     }, [visible, loading, detail, yarnReferenceKey, token]);
+
+    const verifiedSavedSnap = model.costingSource === 'NEW' && yarnState.key === yarnReferenceKey && !yarnState.loading
+        ? yarnState.savedSnap : undefined;
+    const savedCostMismatch = verifiedSavedSnap && model.snapshot && model.isFinish
+        && Math.abs(toNumber(model.derived.finished_cost) - toNumber(verifiedSavedSnap.final_cost)) > 0.011;
 
     const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
         <View style={[styles.row, strong && styles.strongRow]}>
@@ -470,20 +480,47 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
 
                                     <View style={styles.section}>
                                         <Text style={styles.sectionTitle}>COSTING BREAKUP · SAVED SNAPSHOT</Text>
-                                        <Row label="Yarn cost" value={`${money(model.derived.yarn_cost)}/m`} />
-                                        <Row label="Weaving cost" value={`${money(model.derived.weaving_cost)}/m`} />
-                                        <Row label="Total greige cost" value={`${money(model.derived.greige_cost)}/m`} strong />
-                                        {model.isFinish && (
+                                        {model.costingSource === 'NEW' ? (
+                                            verifiedSavedSnap ? (
+                                                <>
+                                                    <Row label="Total yarn cost" value={`${money(verifiedSavedSnap.rm)}/m`} />
+                                                    <Row label="Weaving cost" value={`${money(verifiedSavedSnap.weaving_cost)}/m`} />
+                                                    <Row label="Greige mfg cost" value={`${money(verifiedSavedSnap.greige_mfg)}/m`} />
+                                                    <Row label="Greige brokerage" value={`${money(verifiedSavedSnap.greige_brok_amt)}/m`} />
+                                                    <Row label="Greige price" value={`${money(verifiedSavedSnap.greige_price)}/m`} strong />
+                                                    {model.isFinish && (
+                                                        <>
+                                                            <Row label="Shrinkage impact" value={`${money(verifiedSavedSnap.shrink_impact)}/m`} />
+                                                            <Row label="Dyeing / processing" value={`${money(verifiedSavedSnap.dye_proc_amount)}/m`} />
+                                                            <Row label="Finished brokerage" value={`${money(verifiedSavedSnap.fin_brok_amt)}/m`} />
+                                                            <Row label="Cutting / packing" value={`${money(verifiedSavedSnap.cut_pack)}/m`} />
+                                                            <Row label="Finished price" value={`${money(verifiedSavedSnap.final_cost)}/m`} strong />
+                                                        </>
+                                                    )}
+                                                    {savedCostMismatch && (
+                                                        <Text style={styles.costingMissingText}>
+                                                            Saved design costing and the Production Order authorization snapshot differ. Verify the PO costing snapshot before approval.
+                                                        </Text>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <Text style={styles.costingMissingText}>
+                                                    {yarnState.key === yarnReferenceKey && yarnState.error
+                                                        ? yarnState.error : 'Loading the linked saved costing breakdown…'}
+                                                </Text>
+                                            )
+                                        ) : (
                                             <>
-                                                <Row label="Shrinkage gross-up" value={`${money(model.derived.shrink_impact)}/m`} />
-                                                <Row label="Processing / finishing" value={`${money(model.derived.processing_cost)}/m`} />
-                                                {toNumber(model.derived.finished_brokerage_amt) > 0 && (
-                                                    <Row label="Finished brokerage" value={`${money(model.derived.finished_brokerage_amt)}/m`} />
+                                                <Row label="Yarn cost" value={`${money(model.derived.yarn_cost)}/m`} />
+                                                <Row label="Weaving cost" value={`${money(model.derived.weaving_cost)}/m`} />
+                                                <Row label="Total greige cost" value={`${money(model.derived.greige_cost)}/m`} strong />
+                                                {model.isFinish && (
+                                                    <>
+                                                        <Row label="Shrinkage gross-up" value={`${money(model.derived.shrink_impact)}/m`} />
+                                                        <Row label="Processing / finishing" value={`${money(model.derived.processing_cost)}/m`} />
+                                                        <Row label="Total finished cost" value={`${money(model.derived.finished_cost)}/m`} strong />
+                                                    </>
                                                 )}
-                                                {toNumber(model.derived.cut_pack_cost) > 0 && (
-                                                    <Row label="Cut & pack" value={`${money(model.derived.cut_pack_cost)}/m`} />
-                                                )}
-                                                <Row label="Total finished cost" value={`${money(model.derived.finished_cost)}/m`} strong />
                                             </>
                                         )}
                                     </View>

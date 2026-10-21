@@ -11,16 +11,16 @@
 //   POST /api/authpacking        { prptype, prpcode, yearno, strcode, uid, srno, isauth:1|2,
 //                                   txntype:'mob_packing_auth', remark }                   — approve (1) / reject (2)
 // AsyncStorage keys read: user_prptype (every call), yno (store list).
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { TruncText } from '@/src/components/ui/TruncText';
-import { AppAlert } from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -28,11 +28,13 @@ import {
   TextInput,
   TouchableOpacity,
   useWindowDimensions,
-  View,
+  View
 } from 'react-native';
 import { Btn, Opt, Segment, SelectField, Sheet } from '../StockVerificationNEW/ui';
 import {
-  buildYearOptions, Ctx, fetchBrowse, fetchPackData, fetchStores, fmt3, matchesSearch, postAuth, Row,
+  buildYearOptions, Ctx, fetchBrowse, fetchPackData, fetchStores, fmt3,
+  getApiMessage, isApiError,
+  matchesSearch, postAuth, Row,
   statusOf, storeNameOf, strCodeOf, Tab,
 } from './api';
 
@@ -70,9 +72,12 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
   const [infoLoading, setInfoLoading] = useState<Record<string, boolean>>({});
   const [showInfo, setShowInfo] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<{ uid: string; act: 1 | 2 } | null>(null);
+  const [apiNotice, setApiNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const initialLoaded = useRef(false);
   const reqSeq = useRef(0);
+  // Blocks double-tap on Approve/Reject (state `busy` updates async, a ref does not).
+  const submitting = useRef(false);
 
   const strcode = strCodeOf(selectedStore, formStrCode);
   const ctx: Ctx = { API, token, selectedYear, strcode, tab };
@@ -98,18 +103,41 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
   useEffect(() => { loadStores(); }, [loadStores]);
 
   /* ------------------------------ list ----------------------------------- */
-  const fetchList = async () => {
+  const fetchList = async (options?: { suppressErrors?: boolean }) => {
     if (!selectedStore) return;
     const seq = ++reqSeq.current;
     setLoading(true);
     try {
-      const { rows: data, apiError } = await fetchBrowse(ctx);
+      const { rows: data, apiError, apiMessage } = await fetchBrowse(ctx);
+
       if (seq !== reqSeq.current) return;
+
+      if (apiError) {
+        setRows([]);
+        // Background refresh after Approve/Reject passes suppressErrors:true
+        // so it can never replace the success popup.
+        if (!options?.suppressErrors) {
+          setApiNotice({
+            type: 'error',
+            message: apiMessage || 'Unable to load packing records.',
+          });
+        }
+        return;
+      }
+
       setRows(data);
-      if (apiError) AppAlert.alert('Warning', 'Please Try Again !!!');
-    } catch (e) {
+
+    } catch (e: any) {
       console.log(e);
-      if (seq === reqSeq.current) setRows([]);
+      if (seq === reqSeq.current) {
+        setRows([]);
+        if (!options?.suppressErrors) {
+          setApiNotice({
+            type: 'error',
+            message: getApiMessage(e?.response?.data) || e?.message || 'Unable to load packing records.',
+          });
+        }
+      }
     } finally {
       if (seq === reqSeq.current) setLoading(false);
     }
@@ -140,42 +168,102 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
   };
 
   /* --------------------------- packing info ------------------------------ */
-  const toggleInfo = async (item: Row) => {
-    const uid = item.uid;
-    if (showInfo[uid]) {
-      setShowInfo((p) => ({ ...p, [uid]: false }));
+  // const toggleInfo = async (item: Row) => {
+  //   const uid = item.uid;
+  //   if (showInfo[uid]) {
+  //     setShowInfo((p) => ({ ...p, [uid]: false }));
+  //     return;
+  //   }
+  //   if (!selectedStore) return;
+  //   try {
+  //     setInfoLoading((p) => ({ ...p, [uid]: true }));
+  //     const { rows: data, apiError } = await fetchPackData(ctx, item);
+  //     setDetails((p) => ({ ...p, [uid]: data }));
+  //     setShowInfo((p) => ({ ...p, [uid]: !p[uid] }));
+  //     if (apiError) AppAlert.alert('Warning', 'Please Try Again !!!');
+  //   } catch (e) {
+  //     console.log(e);
+  //     setRows([]); // legacy quirk: a failed info call clears the list
+  //   } finally {
+  //     setInfoLoading((p) => ({ ...p, [uid]: false }));
+  //   }
+  // };
+
+  const toggleInfo = async (item: Row, cardKey: string) => {
+    if (showInfo[cardKey]) {
+      setShowInfo(prev => ({ ...prev, [cardKey]: false }));
       return;
     }
+
     if (!selectedStore) return;
+
     try {
-      setInfoLoading((p) => ({ ...p, [uid]: true }));
-      const { rows: data, apiError } = await fetchPackData(ctx, item);
-      setDetails((p) => ({ ...p, [uid]: data }));
-      setShowInfo((p) => ({ ...p, [uid]: !p[uid] }));
-      if (apiError) AppAlert.alert('Warning', 'Please Try Again !!!');
-    } catch (e) {
+      setInfoLoading(prev => ({ ...prev, [cardKey]: true }));
+      const { rows: data, apiError, apiMessage } = await fetchPackData(ctx, item);
+
+      if (apiError) {
+        setApiNotice({
+          type: 'error',
+          message: apiMessage || 'Unable to load packing details.',
+        });
+        return;
+      }
+
+      setDetails(prev => ({ ...prev, [cardKey]: data }));
+      setShowInfo(prev => ({ ...prev, [cardKey]: true }));
+    } catch (e: any) {
       console.log(e);
-      setRows([]); // legacy quirk: a failed info call clears the list
+      setApiNotice({
+        type: 'error',
+        message: getApiMessage(e?.response?.data) || e?.message || 'Unable to load packing details.',
+      });
     } finally {
-      setInfoLoading((p) => ({ ...p, [uid]: false }));
+      setInfoLoading(prev => ({ ...prev, [cardKey]: false }));
     }
   };
 
   /* ------------------------- approve / reject ----------------------------- */
   const doAuth = async (item: Row, isauth: 1 | 2) => {
+    // Keep the mandatory remark validation visible to the user.
+    const remark = String(remarks[item?.uid] ?? '').trim();
+    if (!remark) {
+      setApiNotice({
+        type: 'error',
+        message: `Voucher No. ${String(item?.vouno ?? '').trim() || '-'}: Please enter Remark before ${isauth === 1 ? 'approving' : 'rejecting'} this packing request.`,
+      });
+      return;
+    }
+
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy({ uid: String(item?.uid ?? ''), act: isauth });
+
     try {
-      const response = await postAuth(ctx, item, isauth, remarks[item?.uid] || '');
-      if (response?.data?.response?.error == true) {
-        AppAlert.alert('Error', 'Please Try Again');
-      } else if (response?.data?.success == true) {
-        AppAlert.alert('Success', String(response?.data?.response?.message ?? ''));
-        fetchList();
+      const response = await postAuth(ctx, item, isauth, remark);
+      const payload = response?.data;
+      console.log('[PackingGradeAuthNEW] authpacking response ->', response?.status, JSON.stringify(payload));
+
+      // Do not show API success/error messages on screen.
+      // Only the local mandatory-remark validation above should show a popup.
+      if (isApiError(payload)) {
+        console.log('[PackingGradeAuthNEW] authpacking API reported an error:', getApiMessage(payload) || payload);
       }
     } catch (error: any) {
-      console.log('PACKING AUTH ERROR:', error?.response?.data || error?.message);
-      AppAlert.alert('Error', error?.response?.data?.message || error?.message || 'Failed.');
+      // Keep API/HTTP errors out of the UI; log for debugging only.
+      console.log(
+        '[PackingGradeAuthNEW] authpacking request failed:',
+        error?.response?.status,
+        JSON.stringify(error?.response?.data),
+        error?.message,
+      );
     } finally {
+      // Refresh silently regardless of API success/error, without showing another popup.
+      try {
+        await fetchList({ suppressErrors: true });
+      } catch (refreshError) {
+        console.log('[PackingGradeAuthNEW] silent refresh failed:', refreshError);
+      }
+      submitting.current = false;
       setBusy(null);
     }
   };
@@ -290,27 +378,100 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
         refreshControl={<RefreshControl refreshing={pulling} onRefresh={onPull} colors={[T.copper]} tintColor={T.copper} />}
-        renderItem={({ item }: { item: Row }) => (
-          <View style={{ flex: 1 / cols, marginBottom: 10 }}>
-            <PackCard
-              item={item}
-              tab={tab}
-              open={!!showInfo[item.uid]}
-              infoBusy={!!infoLoading[item.uid]}
-              entries={details[item.uid] || []}
-              remark={remarks[item?.uid] || ''}
-              onRemark={(text) => setRemarks((p) => ({ ...p, [item?.uid]: text }))}
-              onInfo={() => toggleInfo(item)}
-              onApprove={() => doAuth(item, 1)}
-              onReject={() => doAuth(item, 2)}
-              busyAct={busy && busy.uid === String(item?.uid ?? '') ? busy.act : null}
-              locked={busy !== null}
-            />
-          </View>
-        )}
+        // renderItem={({ item }: { item: Row }) => (
+        //   <View style={{ flex: 1 / cols, marginBottom: 10 }}>
+        //     <PackCard
+        //       item={item}
+        //       tab={tab}
+        //       open={!!showInfo[item.uid]}
+        //       infoBusy={!!infoLoading[item.uid]}
+        //       entries={details[item.uid] || []}
+        //       remark={remarks[item?.uid] || ''}
+        //       onRemark={(text) => setRemarks((p) => ({ ...p, [item?.uid]: text }))}
+        //       onInfo={() => toggleInfo(item)}
+        //       onApprove={() => doAuth(item, 1)}
+        //       onReject={() => doAuth(item, 2)}
+        //       busyAct={busy && busy.uid === String(item?.uid ?? '') ? busy.act : null}
+        //       locked={busy !== null}
+        //     />
+        //   </View>
+        // )}
+
+        renderItem={({ item, index }: { item: Row; index: number }) => {
+          const cardKey = `${String(item.uid ?? '')}_${index}`;
+
+          return (
+            <View style={{ flex: 1 / cols, marginBottom: 10 }}>
+              <PackCard
+                item={item}
+                tab={tab}
+                open={!!showInfo[cardKey]}
+                infoBusy={!!infoLoading[cardKey]}
+                entries={details[cardKey] || []}
+                remark={remarks[item?.uid] || ''}
+                onRemark={text =>
+                  setRemarks(prev => ({
+                    ...prev,
+                    [item?.uid]: text,
+                  }))
+                }
+                onInfo={() => toggleInfo(item, cardKey)}
+                onApprove={() => doAuth(item, 1)}
+                onReject={() => doAuth(item, 2)}
+                busyAct={
+                  busy && busy.uid === String(item?.uid ?? '')
+                    ? busy.act
+                    : null
+                }
+                locked={busy !== null}
+              />
+            </View>
+          );
+        }}
       />
 
-      <Sheet
+      <Modal
+        visible={!!apiNotice}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setApiNotice(null)}
+        statusBarTranslucent
+      >
+        <View style={s.messageOverlay}>
+          <View style={[s.messageCard, { width: width >= 768 ? 440 : '92%' }]}>
+            <View
+              style={[
+                s.messageIcon,
+                { backgroundColor: apiNotice?.type === 'success' ? '#DCFCE7' : '#FEE2E2' },
+              ]}
+            >
+              <Icon
+                name={apiNotice?.type === 'success' ? 'check-circle' : 'error-outline'}
+                size={30}
+                color={apiNotice?.type === 'success' ? '#15803D' : '#DC2626'}
+              />
+            </View>
+            <Text style={s.messageTitle}>
+              {apiNotice?.type === 'success' ? 'Success' : ''}
+              {apiNotice?.type === 'error' ? 'Error' : ''}
+            </Text>
+            <Text style={s.messageText}>{apiNotice?.message}</Text>
+            <TouchableOpacity
+              style={[
+                s.messageButton,
+                { backgroundColor: apiNotice?.type === 'success' ? '#15803D' : '#DC2626' },
+              ]}
+              onPress={() => setApiNotice(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close message"
+            >
+              <Text style={s.messageButtonText}>OK, Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* <Sheet
         open={filterOpen}
         onClose={() => setFilterOpen(false)}
         eyebrow="CRITERIA"
@@ -349,7 +510,63 @@ export default function PackingGradeAuthNEW({ token, API }: Props) {
           }}
           style={{ flex: 0 }}
         />
+      </Sheet> */}
+
+      <Sheet
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        eyebrow="CRITERIA"
+        title="Filters"
+        wideMax={520}
+        footer={
+          <Btn
+            label="Load Data"
+            icon="refresh"
+            kind="copper"
+            style={{ flex: 1 }}
+            onPress={() => {
+              fetchList();
+              setFilterOpen(false);
+            }}
+          />
+        }
+      >
+        <View style={{ width: '100%' }}>
+          {/* Select Year */}
+          <View style={{ width: '100%', marginBottom: 20 }}>
+            <SelectField
+              label="Select Year"
+              value={selectedYear}
+              options={yearOpts}
+              placeholder="Select Year"
+              onChange={(v) => setSelectedYear(v)}
+              style={{ width: '100%' }}
+            />
+          </View>
+
+          {/* Select Store */}
+          <View style={{ width: '100%', marginBottom: 8 }}>
+            <SelectField
+              label="Select Store"
+              value={storeIdx === '-1' ? '' : storeIdx}
+              options={storeOpts}
+              placeholder="Select Store"
+              loading={storesLoading}
+              onRefresh={loadStores}
+              onChange={(v) => {
+                const item = stores[Number(v)];
+
+                if (!item) return;
+
+                setSelectedStore(item);
+                setFormStrCode(item.StrCode || item.strcode || '');
+              }}
+              style={{ width: '100%' }}
+            />
+          </View>
+        </View>
       </Sheet>
+
     </View>
   );
 }
@@ -552,4 +769,63 @@ const s = StyleSheet.create({
   reject: { borderWidth: 1, borderColor: T.red, backgroundColor: T.surface },
   approve: { backgroundColor: T.green },
   actText: { fontSize: 13.5, fontWeight: '800' },
+
+  messageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(8, 15, 30, 0.62)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  messageCard: {
+    maxWidth: 440,
+    backgroundColor: T.surface,
+    borderRadius: 22,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: T.border,
+    elevation: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  messageIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  messageTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: T.ink,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  messageText: {
+    width: '100%',
+    fontSize: 15,
+    lineHeight: 23,
+    color: T.ink,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  messageButton: {
+    width: '100%',
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  messageButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
 });

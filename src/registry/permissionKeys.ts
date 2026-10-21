@@ -13,6 +13,7 @@ export const PermissionKeys = {
     conversionReport: 'reports.production_report.conversion',
     dailyProductionReport: 'reports.production_report.daily_production',
     beamStatusReport: 'reports.production_report.beam_status',
+    realCostingReport: 'reports.real_costing',
   },
   design: {
     designs: 'designs',

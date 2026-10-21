@@ -619,13 +619,17 @@ const WeftCartonIssueScreen = ({ token, prpCode, yearNo, stkType, expProdQtyType
 
     /* Filter card — same design as Beam Gaiting (Card + Btn, sidebar on wide / toggled on small) */
     const { wide } = useWide();
+    // legacy filter pickers had maximumDate={new Date()} — a future date cannot be chosen
+    const notFuture = (d: Date) => { const t = new Date(); t.setHours(0, 0, 0, 0); return d > t ? t : d; };
     const setFrom = (iso: string) => {
-        const d = new Date(iso); d.setHours(0, 0, 0, 0);
+        const x = new Date(iso); x.setHours(0, 0, 0, 0);
+        const d = notFuture(x);
         setFromDate(d);
         if (d > toDate) setToDate(d);
     };
     const setTo = (iso: string) => {
-        const d = new Date(iso); d.setHours(0, 0, 0, 0);
+        const x = new Date(iso); x.setHours(0, 0, 0, 0);
+        const d = notFuture(x);
         setToDate(d);
         if (d < fromDate) setFromDate(d);
     };

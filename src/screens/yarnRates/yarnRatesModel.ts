@@ -2,7 +2,9 @@
 // Yarn Rates — types and the rules of the ERP Designing "Yarn Rates" master (YarnRatesMaster):
 //   current rate of a yarn  = its latest-dated entry (same date: the one entered last)
 //   ▲ / ▼ %                 = that entry vs the SAME supplier's previous quote
-//   chart                   = one line per supplier (rate book), purchases optional as their own lines
+//   chart                   = one line per supplier (rate book)
+// Data ONLY from the new table TMSMASTER.dbo.FAMIYarnRate (no purchase / old data). Group (prptype) + login year;
+// no property code anywhere.
 // Backend: YarnRateController (POST /api/yarn_rates/list | item | parties | save | delete).
 
 import type { PricePoint } from '../yarnHub/yarnHubModel';
@@ -11,15 +13,13 @@ export type RateItem = {
   itmcode: string; name: string; category: string; catsub: string; fibres: string[]; nsubs: number; subs: string[];
 };
 export type RateRow = {
-  prpcode: string; itmcode: string; parcode: string; party: string; date: string; rate: number; remark: string;
-  source: 'rates' | 'purchase' | string; srcref: string; ts: string; uts: string; user: string; uuser: string;
+  itmcode: string; parcode: string; party: string; date: string; rate: number; remark: string;
+  ts: string; uts: string; user: string; uuser: string;
 };
-export type Buy = { rate: number; party: string; date: string };
-export type Party = { code: string; name: string; short: string };
+export type Party = { code: string; name: string; short: string; src: string[] }; // src: dyeing | purchase
 export type Fy = { yearno: string; name: string; from: string; to: string };
-export type PropOpt = { code: string; name: string; short: string; years: Fy[] };
-export type ListData = { prpcode: string; prpname: string; prpcodes: string[]; fy: Fy; items: RateItem[]; rates: RateRow[]; buys: Record<string, Buy> };
-export type ItemData = { itmcode: string; rates: RateRow[]; purchases: PricePoint[] };
+export type ListData = { prptype: string; fy: Fy; items: RateItem[]; rates: RateRow[] };
+export type ItemData = { itmcode: string; rates: RateRow[] };
 
 export const MAX_RATE = 100000;
 
@@ -47,28 +47,21 @@ export const errText = (err: any, fallback: string) =>
 const arr = (v: any): any[] => (Array.isArray(v) ? v : []);
 
 export const normRate = (r: any): RateRow => ({
-  prpcode: s(r.prpcode), itmcode: s(r.itmcode), parcode: s(r.parcode), party: s(r.party) || s(r.parcode), date: s(r.date),
-  rate: n(r.rate), remark: s(r.remark), source: s(r.source) || 'rates', srcref: s(r.srcref), ts: s(r.ts), uts: s(r.uts), user: s(r.user), uuser: s(r.uuser),
+  itmcode: s(r.itmcode), parcode: s(r.parcode), party: s(r.party) || s(r.parcode), date: s(r.date),
+  rate: n(r.rate), remark: s(r.remark), ts: s(r.ts), uts: s(r.uts), user: s(r.user), uuser: s(r.uuser),
 });
 
 export function normalizeList(raw: any): ListData {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.items)) throw new Error('The server sent an unexpected answer for the yarn list.');
-  const buys: Record<string, Buy> = {};
-  Object.entries(raw.buys && typeof raw.buys === 'object' ? raw.buys : {}).forEach(([k, b]: [string, any]) => {
-    if (b && n(b.rate) > 0) buys[s(k)] = { rate: n(b.rate), party: s(b.party), date: s(b.date) };
-  });
   const fy = raw.fy && typeof raw.fy === 'object' ? raw.fy : {};
   return {
-    prpcode: s(raw.prpcode),
-    prpname: s(raw.prpname) || s(raw.prpcode),
-    prpcodes: arr(raw.prpcodes).map(s),
+    prptype: s(raw.prptype),
     fy: { yearno: s(fy.yearno), name: s(fy.name) || 'FY ' + s(fy.yearno), from: s(fy.from), to: s(fy.to) },
     items: arr(raw.items).map((it) => ({
       itmcode: s(it.itmcode), name: s(it.name) || s(it.itmcode), category: s(it.category), catsub: s(it.catsub),
       fibres: arr(it.fibres).map(s).filter(Boolean), nsubs: n(it.nsubs), subs: arr(it.subs).map(s),
     })).filter((it) => it.itmcode),
     rates: arr(raw.rates).map(normRate).filter((r) => r.itmcode && r.rate > 0),
-    buys,
   };
 }
 
@@ -77,14 +70,11 @@ export function normalizeItem(raw: any): ItemData {
   return {
     itmcode: s(raw.itmcode),
     rates: arr(raw.rates).map(normRate).filter((r) => r.rate > 0),
-    purchases: arr(raw.purchases).map((p) => ({
-      date: s(p.date), inwno: s(p.inwno), party: s(p.party) || s(p.parcode), parcode: s(p.parcode), itmcode: s(p.itmcode), qty: n(p.qty), rate: n(p.rate),
-    })).filter((p) => p.date && p.rate > 0),
   };
 }
 
 export const normalizeParties = (raw: any): Party[] =>
-  arr(raw?.parties).map((p) => ({ code: s(p.code), name: s(p.name), short: s(p.short) })).filter((p) => p.code && p.name);
+  arr(raw?.parties).map((p) => ({ code: s(p.code), name: s(p.name), short: s(p.short), src: arr(p.src).map(s) })).filter((p) => p.code && p.name);
 
 /* ------------------------------ rate rules ------------------------------ */
 
@@ -109,10 +99,10 @@ export function prevOf(rates: RateRow[], lf: RateRow | null): RateRow | null {
 }
 
 export type YarnRow = RateItem & {
-  rates: RateRow[]; lf: RateRow | null; pv: RateRow | null; nSup: number; delta: number | null; buy: Buy | null;
+  rates: RateRow[]; lf: RateRow | null; pv: RateRow | null; nSup: number; delta: number | null;
 };
 
-export function yarnRows(items: RateItem[], rates: RateRow[], buys: Record<string, Buy>): YarnRow[] {
+export function yarnRows(items: RateItem[], rates: RateRow[]): YarnRow[] {
   const by: Record<string, RateRow[]> = {};
   rates.forEach((r) => (by[r.itmcode] = by[r.itmcode] || []).push(r));
   return items
@@ -124,26 +114,18 @@ export function yarnRows(items: RateItem[], rates: RateRow[], buys: Record<strin
         ...it, rates: rs, lf, pv,
         nSup: new Set(rs.map((r) => r.parcode)).size,
         delta: lf && pv && pv.rate > 0 ? ((lf.rate - pv.rate) / pv.rate) * 100 : null,
-        buy: buys[it.itmcode] || null,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** chart points: rate book (one line per supplier) + purchases as their own "· purchase" lines when asked */
-export function chartPoints(rates: RateRow[], purchases: PricePoint[], withBuys: boolean): PricePoint[] {
+/** chart points: the rate book, one line per supplier (the Yarn Hub chart's point shape) */
+export function chartPoints(rates: RateRow[]): PricePoint[] {
   const pts: (PricePoint & { k: string })[] = rates.map((r) => ({
-    date: r.date, inwno: 'rate', party: r.party, parcode: r.parcode, itmcode: r.itmcode, qty: 0, rate: r.rate, k: r.date + '|0|' + (r.ts || ''),
+    date: r.date, inwno: 'rate', party: r.party, parcode: r.parcode, itmcode: r.itmcode, qty: 0, rate: r.rate, k: r.date + '|' + (r.ts || ''),
   }));
-  if (withBuys) {
-    purchases.forEach((p) => pts.push({ ...p, party: p.party + ' · purchase', k: p.date + '|1|' + p.inwno }));
-  }
   return pts.sort((a, b) => a.k.localeCompare(b.k)).map(({ k, ...p }) => p);
 }
-
-/** a purchase already taken into the rate book (same supplier, date and rate) */
-export const purchaseUsed = (p: PricePoint, rates: RateRow[]) =>
-  rates.some((r) => r.date === p.date && Math.abs(r.rate - p.rate) < 0.005 && (r.parcode === p.parcode || (r.source === 'purchase' && r.srcref === p.inwno)));
 
 /* ------------------------------ formatting ------------------------------ */
 
@@ -185,17 +167,6 @@ export const matches = (hay: string, q: string) => {
 
 export const searchText = (y: YarnRow) =>
   [y.itmcode, y.name, y.catsub, y.category, ...y.subs, y.lf ? y.lf.party : '', ...y.rates.map((r) => r.party)].join(' ');
-
-/** Property / Year combo list (POST /yarn_rates/properties): login's properties of the group, each with its years */
-export function normalizeProps(raw: any): PropOpt[] {
-  return arr(raw?.properties)
-    .map((p: any) => ({
-      code: s(p.code).toUpperCase(), name: s(p.name) || s(p.code), short: s(p.short),
-      years: arr(p.years).map((y: any) => ({ yearno: s(y.yearno), name: s(y.name) || 'FY ' + s(y.yearno), from: s(y.from), to: s(y.to) }))
-        .filter((y: Fy) => y.yearno && /^\d{4}-\d{2}-\d{2}$/.test(y.from) && /^\d{4}-\d{2}-\d{2}$/.test(y.to)),
-    }))
-    .filter((p: PropOpt) => p.code && p.years.length);
-}
 
 /** true when an ISO date lies inside the FY */
 export const inFy = (iso: string, fy: Fy | null | undefined) => !!fy && !!iso && iso >= fy.from && iso <= fy.to;

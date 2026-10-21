@@ -402,6 +402,7 @@ export const LEGACY_ROUTES = {
   beamShortageTakas: '/reports/beam_shortage/takas',
   yarnHubSummary: '/yarn_hub/summary',
   yarnHubItem: '/yarn_hub/item',
+  yarnRates: (action: string) => `/yarn_rates/${action}`,
   greyScanInward: (action: string) => `/grey_scan_inward/${action}`,
 } as const;
 
@@ -758,6 +759,21 @@ export const YarnHubAPI = {
   // stock SP + every yarn of the year: allow longer than the 30 s default
   summary: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubSummary, body, { timeout: 180000 }),
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubItem, body, { timeout: 120000 }),
+};
+
+// Yarn Rates (YarnRateController) — rate book per main yarn (TMSMASTER.dbo.FAMIYarnRate).
+// Every body carries { prptype, prpcode, yearno }.
+//   list    -> main yarns, every rate of the group, last purchase per yarn
+//   item    { itmcode }                      -> that yarn's rates + purchase rates (FAMPur, this + last year)
+//   parties                                  -> suppliers (Dyeing → shade party list, FAMAcc MHead 18 / SHead 117)
+//   save    { itmcode, parcode, date, rate, remark, replace, source, srcref, orig? } -> 409 code 'exists' = ask to replace
+//   remove  { itmcode, parcode, date, rateprp }
+export const YarnRateAPI = {
+  list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('list'), body, { timeout: 120000 }),
+  item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('item'), body, { timeout: 120000 }),
+  parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('parties'), body),
+  save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('save'), body, { timeout: 60000 }),
+  remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('delete'), body, { timeout: 60000 }),
 };
 
 // Outward Scan Sticker (GreyScanInwardController) — grey store job inward by scanning the fusion sticker.

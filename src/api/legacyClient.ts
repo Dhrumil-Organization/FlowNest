@@ -769,6 +769,7 @@ export const YarnHubAPI = {
 //   save    { itmcode, parcode, date, rate, remark, replace, source, srcref, orig? } -> 409 code 'exists' = ask to replace
 //   remove  { itmcode, parcode, date, rateprp }
 export const YarnRateAPI = {
+  properties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('properties'), body),
   list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('list'), body, { timeout: 120000 }),
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('item'), body, { timeout: 120000 }),
   parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('parties'), body),

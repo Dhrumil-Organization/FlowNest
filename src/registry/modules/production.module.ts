@@ -542,7 +542,7 @@ registerPermissionArea({
             { key: 'delete', name: 'Delete', dangerous: true },
           ],
         },
-         {
+        {
           key: 'taka_history',
           name: 'Taka History',
           type: 'screen',
@@ -563,7 +563,19 @@ registerPermissionArea({
             { key: 'edit', name: 'Modify' },
             { key: 'delete', name: 'Delete', dangerous: true },
           ],
-        }
+        },
+        {
+          key: 'storeitemmaster',
+          name: 'Store Item Master',
+          type: 'screen',
+          displayOrder: 163,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'edit', name: 'Modify' },
+            { key: 'delete', name: 'Delete', dangerous: true },
+          ],
+        },
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -1787,6 +1799,24 @@ registerUiNodes([
     permission: 'production.taka_history',
     action: 'view',
     order: 161,
+  },
+  {
+    id: 'nav.storeitemmaster',
+    kind: 'navigation',
+    title: 'Store Item Master',
+    permission: 'production.storeitemmaster',
+    action: 'view',
+    route: 'StoreItemMasterNew',
+    icon: 'store',
+    order: 163,
+  },
+  {
+    id: 'screen.storeitemmaster',
+    kind: 'screen',
+    title: 'Store Item Master',
+    permission: 'production.storeitemmaster',
+    action: 'view',
+    order: 163,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

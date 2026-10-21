@@ -5,6 +5,7 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { fetchYears } from '../StockVerificationNEW/verificationApi';
 import { Api, apiErrorText, browseOrders, Ctx, deleteOrder, fetchGroups } from './api';
 import DateField from './DateField';
 import { financialYearStartISO, fmt, num, Row, todayISO } from './format';
@@ -60,6 +61,30 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [api, ctx, authOnly, from, to]);
 
+  // Year master of the property — for the web browse "Load" financial-year check.
+  const [years, setYears] = useState<Row[]>([]);
+  useEffect(() => {
+    let alive = true;
+    if (!ctx.prpcode) { setYears([]); return undefined; }
+    fetchYears(api, ctx.prpcode).then((r) => { if (alive) setYears(r || []); }).catch(() => { if (alive) setYears([]); });
+    return () => { alive = false; };
+  }, [api, ctx.prpcode]);
+
+  /** web handleSubmit → validateFinancialYear: the To date must fall in the selected financial year. */
+  const loadChecked = () => {
+    const m = /^(\d{4})-(\d{2})/.exec(String(to || ''));
+    const selectedYear = years.find((y) => String(y.YearNo ?? y.yearno ?? '') === String(ctx.yearno || ''));
+    if (m && selectedYear) {
+      const yy = Number(m[1]); const mm = Number(m[2]);
+      const fy = mm <= 3 ? `${yy - 1}-${yy}` : `${yy}-${yy + 1}`;
+      if (String(selectedYear.YearName ?? selectedYear.yearname ?? '').trim().slice(0, 4) !== fy.slice(0, 4)) {
+        notifyAsync('Error', `Invalid financial year selected. Expected: ${fy}`);
+        return;
+      }
+    }
+    load();
+  };
+
   // Unplanned SO metres (pending, from groups) vs planned PO metres (from the list) per design.
   // Search by design or production order no.
   const q = query.trim().toLowerCase();
@@ -97,6 +122,12 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
   const coverageVisible = showAllCoverage || q ? coverageShown : coverageShown.slice(0, COVERAGE_LIMIT);
 
   const remove = async (r: Row) => {
+    // web browse Delete: any authorisation status other than 0 (or a closed order) blocks the delete
+    const authVal = String(r.isauth ?? '').trim();
+    if ((authVal !== '' && Number(authVal) !== 0) || (Number(r.mainstatusvalidate) === 1 && r.status === 'C')) {
+      notifyAsync('Not deleted', `Order No ${r.vouno} has already been authorised.`);
+      return;
+    }
     if (!(await confirmAsync('Delete order?', `Are you sure you want to delete ${r.vouno}?`, 'Delete', true))) return;
     setBusy(true);
     try {
@@ -123,7 +154,7 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <CheckBox checked={authOnly} onPress={() => setAuthOnly((v) => !v)} />
               <Text style={{ fontSize: 12, fontWeight: '700', color: T.ink, marginRight: 6 }}>Authorised</Text>
-              <SmallBtn label="Load" onPress={load} />
+              <SmallBtn label="Load" onPress={loadChecked} />
             </View>
           </View>
         </Card>

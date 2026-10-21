@@ -403,6 +403,7 @@ export const LEGACY_ROUTES = {
   yarnHubSummary: '/yarn_hub/summary',
   yarnHubItem: '/yarn_hub/item',
   yarnRates: (action: string) => `/yarn_rates/${action}`,
+  realCostChain: (action: string) => `/real_cost_chain/${action}`,
   greyScanInward: (action: string) => `/grey_scan_inward/${action}`,
 } as const;
 
@@ -761,15 +762,20 @@ export const YarnHubAPI = {
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubItem, body, { timeout: 120000 }),
 };
 
+// Real Cost Chain (RealCostChainController) — Reports → Real Costing Chain: actual vs assumed cost per metre.
+// body { prptype, prpcode, yearno, month? 'YYYY-MM' } — group / property / year of the login.
+export const RealCostChainAPI = {
+  report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.realCostChain('report'), body, { timeout: 600000 }),
+};
+
 // Yarn Rates (YarnRateController) — rate book per main yarn (TMSMASTER.dbo.FAMIYarnRate).
-// Every body carries { prptype, prpcode, yearno }.
-//   list    -> main yarns, every rate of the group, last purchase per yarn
-//   item    { itmcode }                      -> that yarn's rates + purchase rates (FAMPur, this + last year)
-//   parties                                  -> suppliers (Dyeing → shade party list, FAMAcc MHead 18 / SHead 117)
-//   save    { itmcode, parcode, date, rate, remark, replace, source, srcref, orig? } -> 409 code 'exists' = ask to replace
-//   remove  { itmcode, parcode, date, rateprp }
+// Every body carries { prptype, yearno } of the login — property GROUP wise, no prpcode. New table data only.
+//   list    -> main yarns of the group + every rate of the group's book
+//   item    { itmcode }                      -> that yarn's rates
+//   parties                                  -> supplier master: Dyeing party list (FAMAcc MHead 18 / SHead 117) + yarn suppliers of the group
+//   save    { itmcode, parcode, date, rate, remark, replace, orig? { itmcode, parcode, date } } -> 409 code 'exists' = ask to replace
+//   remove  { itmcode, parcode, date }      (hard delete)
 export const YarnRateAPI = {
-  properties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('properties'), body),
   list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('list'), body, { timeout: 120000 }),
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('item'), body, { timeout: 120000 }),
   parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('parties'), body),

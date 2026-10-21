@@ -47,6 +47,8 @@ registerPermissionArea({
             { key: 'beam_shortage', name: 'Beam Shortage', type: 'tab', displayOrder: 40, actions: [] },
           ],
         },
+        // Reports → Real Costing Chain (RealCostChainController): assumed vs actual cost per metre, design → beam
+        { key: 'real_costing', name: 'Real Costing Chain', type: 'report', displayOrder: 45, actions: [] },
       ],
     },
   ],

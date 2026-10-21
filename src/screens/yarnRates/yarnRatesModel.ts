@@ -16,7 +16,9 @@ export type RateRow = {
 };
 export type Buy = { rate: number; party: string; date: string };
 export type Party = { code: string; name: string; short: string };
-export type ListData = { prpcode: string; prpcodes: string[]; items: RateItem[]; rates: RateRow[]; buys: Record<string, Buy> };
+export type Fy = { yearno: string; name: string; from: string; to: string };
+export type PropOpt = { code: string; name: string; short: string; years: Fy[] };
+export type ListData = { prpcode: string; prpname: string; prpcodes: string[]; fy: Fy; items: RateItem[]; rates: RateRow[]; buys: Record<string, Buy> };
 export type ItemData = { itmcode: string; rates: RateRow[]; purchases: PricePoint[] };
 
 export const MAX_RATE = 100000;
@@ -55,9 +57,12 @@ export function normalizeList(raw: any): ListData {
   Object.entries(raw.buys && typeof raw.buys === 'object' ? raw.buys : {}).forEach(([k, b]: [string, any]) => {
     if (b && n(b.rate) > 0) buys[s(k)] = { rate: n(b.rate), party: s(b.party), date: s(b.date) };
   });
+  const fy = raw.fy && typeof raw.fy === 'object' ? raw.fy : {};
   return {
     prpcode: s(raw.prpcode),
+    prpname: s(raw.prpname) || s(raw.prpcode),
     prpcodes: arr(raw.prpcodes).map(s),
+    fy: { yearno: s(fy.yearno), name: s(fy.name) || 'FY ' + s(fy.yearno), from: s(fy.from), to: s(fy.to) },
     items: arr(raw.items).map((it) => ({
       itmcode: s(it.itmcode), name: s(it.name) || s(it.itmcode), category: s(it.category), catsub: s(it.catsub),
       fibres: arr(it.fibres).map(s).filter(Boolean), nsubs: n(it.nsubs), subs: arr(it.subs).map(s),
@@ -180,3 +185,17 @@ export const matches = (hay: string, q: string) => {
 
 export const searchText = (y: YarnRow) =>
   [y.itmcode, y.name, y.catsub, y.category, ...y.subs, y.lf ? y.lf.party : '', ...y.rates.map((r) => r.party)].join(' ');
+
+/** Property / Year combo list (POST /yarn_rates/properties): login's properties of the group, each with its years */
+export function normalizeProps(raw: any): PropOpt[] {
+  return arr(raw?.properties)
+    .map((p: any) => ({
+      code: s(p.code).toUpperCase(), name: s(p.name) || s(p.code), short: s(p.short),
+      years: arr(p.years).map((y: any) => ({ yearno: s(y.yearno), name: s(y.name) || 'FY ' + s(y.yearno), from: s(y.from), to: s(y.to) }))
+        .filter((y: Fy) => y.yearno && /^\d{4}-\d{2}-\d{2}$/.test(y.from) && /^\d{4}-\d{2}-\d{2}$/.test(y.to)),
+    }))
+    .filter((p: PropOpt) => p.code && p.years.length);
+}
+
+/** true when an ISO date lies inside the FY */
+export const inFy = (iso: string, fy: Fy | null | undefined) => !!fy && !!iso && iso >= fy.from && iso <= fy.to;

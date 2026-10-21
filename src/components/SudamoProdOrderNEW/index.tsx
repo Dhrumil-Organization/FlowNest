@@ -23,6 +23,15 @@ import HeaderBar from '../../components/HeaderNew';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 import ProductionCostingPreviewModal from './ProductionCostingPreviewModal';
 import ProductionOrderAuthorizationReviewModal from './ProductionOrderAuthorizationReviewModal';
+import ProductionOrderEditModal from './ProductionOrderEditModal';
+import {
+    canChangePO,
+    deleteProductionOrder,
+    isAuthorisedPO,
+    matchesPOSearch,
+    PO_SEARCH_FIELDS,
+    POSearchField
+} from './productionOrderActions';
 
 interface CardData {
     [key: string]: string;
@@ -150,6 +159,12 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     const [showCostingPreview, setShowCostingPreview] = useState(false);
     const [showAuthorizationReview, setShowAuthorizationReview] = useState(false);
     const [authorizationReviewItem, setAuthorizationReviewItem] = useState<any | null>(null);
+    // Modify / Delete / Search
+    const [searchFieldSPO, setSearchFieldSPO] = useState<POSearchField>('all');
+    const [editItemSPO, setEditItemSPO] = useState<any | null>(null);
+    const [deleteItemSPO, setDeleteItemSPO] = useState<any | null>(null);
+    const [deletingSPO, setDeletingSPO] = useState(false);
+    const [deleteErrorSPO, setDeleteErrorSPO] = useState('');
     // const [historyDataSPO, setHistoryDataSPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingSPO] = useState(false);
 
@@ -592,32 +607,131 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     //     return () => cancelToken?.cancel();
     // }, []);
 
-    const filteredDataSPO = useMemo(() => {
-        if (!searchQuerySPO) return data;
-        return data.filter((item) =>
-            filterKeySPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchQuerySPO.toLowerCase()))
-                : String(item[filterKeySPO]).toLowerCase().includes(searchQuerySPO.toLowerCase())
-        );
-    }, [data, searchQuerySPO, filterKeySPO]);
+    // Search by All / Design / Production order (see productionOrderActions.ts)
+    const filteredDataSPO = useMemo(
+        () => data.filter((item) => matchesPOSearch(item, searchQuerySPO, searchFieldSPO)),
+        [data, searchQuerySPO, searchFieldSPO]
+    );
 
-    const filteredhistoryDataSPO = useMemo(() => {
-        if (!searchhistoryQuerySPO) return allhistoryDataSPO;
-        return allhistoryDataSPO.filter((item) =>
-            filterKeySPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchhistoryQuerySPO.toLowerCase()))
-                : String(item[filterKeySPO]).toLowerCase().includes(searchhistoryQuerySPO.toLowerCase())
-        );
-    }, [allhistoryDataSPO, searchhistoryQuerySPO, filterKeySPO]);
+    const filteredhistoryDataSPO = useMemo(
+        () => allhistoryDataSPO.filter((item) => matchesPOSearch(item, searchhistoryQuerySPO, searchFieldSPO)),
+        [allhistoryDataSPO, searchhistoryQuerySPO, searchFieldSPO]
+    );
 
-    const filteredverifyDataSPO = useMemo(() => {
-        if (!searchverifyQuerySPO) return allverifyDataSPO;
-        return allverifyDataSPO.filter((item) =>
-            filterKeySPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchverifyQuerySPO.toLowerCase()))
-                : String(item[filterKeySPO]).toLowerCase().includes(searchverifyQuerySPO.toLowerCase())
+    const filteredverifyDataSPO = useMemo(
+        () => allverifyDataSPO.filter((item) => matchesPOSearch(item, searchverifyQuerySPO, searchFieldSPO)),
+        [allverifyDataSPO, searchverifyQuerySPO, searchFieldSPO]
+    );
+
+    const activeSearchQuery =
+        activeTab1SPO === 'history' ? searchhistoryQuerySPO : activeTab1SPO === 'verify' ? searchverifyQuerySPO : searchQuerySPO;
+    const setActiveSearchQuery = (value: string) => {
+        if (activeTab1SPO === 'history') setSearchhistoryQuerySPO(value);
+        else if (activeTab1SPO === 'verify') setSearchverifyQuerySPO(value);
+        else setSearchQuerySPO(value);
+    };
+    const activeResultCount =
+        activeTab1SPO === 'history' ? filteredhistoryDataSPO.length : activeTab1SPO === 'verify' ? filteredverifyDataSPO.length : filteredDataSPO.length;
+    const activeTotalCount =
+        activeTab1SPO === 'history' ? allhistoryDataSPO.length : activeTab1SPO === 'verify' ? allverifyDataSPO.length : data.length;
+
+    // ---- Modify / Delete (blocked once authorised) ---------------------------
+    const replaceEverywhere = (updated: any) => {
+        const swap = (list: any[]) => list.map((row) => (row.uid === updated.uid ? { ...row, ...updated } : row));
+        setData((prev) => swap(prev));
+        setAllHistoryDataSPO((prev) => swap(prev));
+        setAllVerifyDataSPO((prev) => swap(prev));
+        // Drop stale inline edits so the card shows the saved values.
+        setEditableValuesSPO((prev) => {
+            const next = { ...prev };
+            delete next[updated.uid];
+            return next;
+        });
+    };
+
+    const removeEverywhere = (uid: string) => {
+        setData((prev) => prev.filter((row) => row.uid !== uid));
+        setAllHistoryDataSPO((prev) => prev.filter((row) => row.uid !== uid));
+        setAllVerifyDataSPO((prev) => prev.filter((row) => row.uid !== uid));
+    };
+
+    const openModify = (item: any) => {
+        if (!isConnected) return;
+        if (!canChangePO(item)) {
+            AppAlert.alert('Locked', 'This Production Order is already authorised and can no longer be modified.');
+            return;
+        }
+        setEditItemSPO(item);
+    };
+
+    const openDelete = (item: any) => {
+        if (!isConnected) return;
+        if (!canChangePO(item)) {
+            AppAlert.alert('Locked', 'This Production Order is already authorised and can no longer be deleted.');
+            return;
+        }
+        setDeleteErrorSPO('');
+        setDeleteItemSPO(item);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteItemSPO) return;
+        setDeletingSPO(true);
+        setDeleteErrorSPO('');
+        try {
+            const res = await deleteProductionOrder(deleteItemSPO, token);
+            removeEverywhere(deleteItemSPO.uid);
+            setDeleteItemSPO(null);
+            AppAlert.alert('Deleted', res?.message || `Production Order ${deleteItemSPO.vouno} deleted.`);
+        } catch (e: any) {
+            setDeleteErrorSPO(e?.response?.data?.message || e?.message || 'Production Order could not be deleted.');
+        } finally {
+            setDeletingSPO(false);
+        }
+    };
+
+    const renderManageActions = (item: any) => {
+        if (isAuthorisedPO(item)) {
+            return (
+                <View style={{
+                    marginTop: 9, minHeight: 36, borderRadius: 9, backgroundColor: '#F3F4F6',
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}>
+                    <Icon name="lock" size={16} color="#6B7280" />
+                    <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '700' }}>Authorised · modify & delete locked</Text>
+                </View>
+            );
+        }
+        const disabled = !isConnected || !canChangePO(item);
+        return (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
+                <TouchableOpacity
+                    onPress={() => openModify(item)}
+                    disabled={disabled}
+                    style={{
+                        flex: 1, minHeight: 40, borderRadius: 9, borderWidth: 1,
+                        borderColor: disabled ? '#D1D5DB' : '#C9732E', backgroundColor: '#FFFFFF',
+                        alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6
+                    }}
+                >
+                    <Icon name="edit" size={18} color={disabled ? '#9CA3AF' : '#C9732E'} />
+                    <Text style={{ color: disabled ? '#9CA3AF' : '#A85A1F', fontSize: 12.5, fontWeight: '800' }}>Modify</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => openDelete(item)}
+                    disabled={disabled}
+                    style={{
+                        flex: 1, minHeight: 40, borderRadius: 9, borderWidth: 1,
+                        borderColor: disabled ? '#D1D5DB' : '#F0B7B7', backgroundColor: '#FFFFFF',
+                        alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6
+                    }}
+                >
+                    <Icon name="delete-outline" size={18} color={disabled ? '#9CA3AF' : '#E53935'} />
+                    <Text style={{ color: disabled ? '#9CA3AF' : '#C62828', fontSize: 12.5, fontWeight: '800' }}>Delete</Text>
+                </TouchableOpacity>
+            </View>
         );
-    }, [allverifyDataSPO, searchverifyQuerySPO, filterKeySPO]);
+    };
 
 
     const formatToIndianCurrency = (value: string | number) => {
@@ -1097,6 +1211,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                                 <Text style={{ color: disabled ? '#9CA3AF' : '#C62828', fontSize: 12.5, fontWeight: '800' }}>Reject</Text>
                             </TouchableOpacity>
                         </View>
+                        {renderManageActions(item)}
                     </View>
                 </View>
             </View>
@@ -1317,6 +1432,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         </View>
                     )}
 
+                    {renderManageActions(item)}
 
                     <View style={crlimtreq_styles.cardActions}>
                         {/* <TouchableOpacity
@@ -1604,6 +1720,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         </View>
                     )}
 
+                    {renderManageActions(item)}
                 </View>
                 <View style={crlimtreq_styles.cardActions}>
                     <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
@@ -1667,6 +1784,54 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             <View style={[crlimtreq_styles.container, { flex: 1, backgroundColor: '#F5F5F5', marginBottom: -50 }]}>
                 {isLoadingSPO && <FullScreenLoader message={'Loading...'} />}
                 <TabBar activeTabSPO={activeTab1SPO} setActiveTabSPO={setActiveTab1SPO} />
+
+                {/* Search: by design / production order */}
+                <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4, gap: 8 }}>
+                    <View style={{
+                        flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+                        borderWidth: 1, borderColor: '#D9DEE5', borderRadius: 10, paddingHorizontal: 10, minHeight: 42
+                    }}>
+                        <Icon name="search" size={20} color="#6B7280" />
+                        <RNTextInput
+                            value={activeSearchQuery}
+                            onChangeText={setActiveSearchQuery}
+                            placeholder={PO_SEARCH_FIELDS.find((f) => f.key === searchFieldSPO)?.placeholder}
+                            placeholderTextColor="#9CA3AF"
+                            autoCorrect={false}
+                            autoCapitalize="none"
+                            style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 8, fontSize: 14, color: '#111827' }}
+                        />
+                        {!!activeSearchQuery && (
+                            <TouchableOpacity onPress={() => setActiveSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Icon name="close" size={18} color="#6B7280" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                        <Text style={{ fontSize: 11.5, color: '#6B7280', fontWeight: '700', marginRight: 2 }}>Search in:</Text>
+                        {PO_SEARCH_FIELDS.map((f) => {
+                            const active = searchFieldSPO === f.key;
+                            return (
+                                <TouchableOpacity
+                                    key={f.key}
+                                    onPress={() => setSearchFieldSPO(f.key)}
+                                    style={{
+                                        paddingHorizontal: 11, paddingVertical: 5, borderRadius: 14, borderWidth: 1,
+                                        borderColor: active ? '#17324A' : '#D1D5DB',
+                                        backgroundColor: active ? '#17324A' : '#FFFFFF'
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#FFFFFF' : '#374151' }}>{f.label}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                        {!!activeSearchQuery.trim() && (
+                            <Text style={{ fontSize: 11.5, color: '#6B7280', marginLeft: 'auto' }}>
+                                {activeResultCount} of {activeTotalCount}
+                            </Text>
+                        )}
+                    </View>
+                </View>
                 {/* <TouchableOpacity
                     style={crlimtreq_styles.closeButton}
                     onPress={() => navigation.goBack()}
@@ -1933,6 +2098,59 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     openProductionCosting(costingItem);
                 }}
             />
+
+            <ProductionOrderEditModal
+                visible={!!editItemSPO}
+                item={editItemSPO}
+                token={token}
+                onClose={() => setEditItemSPO(null)}
+                onSaved={(updated) => {
+                    replaceEverywhere(updated);
+                    setEditItemSPO(null);
+                    AppAlert.alert('Updated', `Production Order ${updated.vouno} updated.`);
+                }}
+            />
+
+            <Modal
+                visible={!!deleteItemSPO}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !deletingSPO && setDeleteItemSPO(null)}
+            >
+                <View style={crlimtreq_styles.overlayContainer}>
+                    <View style={[crlimtreq_styles.overlay, { maxWidth: 420, width: '90%' }]}>
+                        <Icon name="delete-forever" size={34} color="#E53935" style={{ alignSelf: 'center' }} />
+                        <Text style={crlimtreq_styles.overlayTitle}>Delete production order?</Text>
+                        <Text style={crlimtreq_styles.overlayPartyName}>
+                            Voucher No.: {deleteItemSPO?.vouno}
+                            {deleteItemSPO?.dsnname ? `  ·  Design: ${deleteItemSPO.dsnname}` : ''}
+                        </Text>
+                        <Text style={{ fontSize: 12.5, color: '#6B7280', textAlign: 'center', marginTop: 6 }}>
+                            This cannot be undone.
+                        </Text>
+                        {!!deleteErrorSPO && (
+                            <Text style={{ fontSize: 12.5, color: '#B42318', textAlign: 'center', marginTop: 8 }}>{deleteErrorSPO}</Text>
+                        )}
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                            <TouchableOpacity
+                                onPress={() => setDeleteItemSPO(null)}
+                                disabled={deletingSPO}
+                                style={{ flex: 1, minHeight: 40, borderRadius: 9, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <Text style={{ fontWeight: '800', color: '#374151' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={confirmDelete}
+                                disabled={deletingSPO}
+                                style={{ flex: 1, minHeight: 40, borderRadius: 9, backgroundColor: '#E53935', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: deletingSPO ? 0.7 : 1 }}
+                            >
+                                {deletingSPO && <ActivityIndicator size="small" color="#FFFFFF" />}
+                                <Text style={{ fontWeight: '800', color: '#FFFFFF' }}>{deletingSPO ? 'Deleting…' : 'Delete'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             <ProductionCostingPreviewModal
                 visible={showCostingPreview}

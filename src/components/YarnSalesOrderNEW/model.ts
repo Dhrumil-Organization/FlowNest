@@ -190,43 +190,92 @@ export const filterParties = (parties: Row[], search: string): Row[] => {
   );
 };
 
+/*
+ * Party object — two separate addresses (Oct 2026):
+ *   Billing  (party master, /api/accountbasic) : Address, City, State, Cnty, Zip
+ *     -> shown on the Party and Sales Party cards; never changed by a delivery pick.
+ *   Delivery (saved as DAdd / DCity / DState / DCnty / DZip)  : DAdd, DCity, DState, DCnty, DZip
+ *     -> starts as the billing address, replaced by "Tap to change" (/api/getaddress).
+ */
+
+/** Billing address fields of a party-master row (/api/accountbasic). */
+export const billingFromMaster = (party: Row): Row => ({
+  Address: party?.Address || '',
+  City: party?.City || '',
+  State: party?.State || '',
+  Cnty: party?.Cnty || '',
+  Zip: party?.Zip || '',
+});
+
+/** Copy the billing address of a party-master row onto a party object (delivery fields untouched). */
+export const withBillingAddress = (party: Row, master: Row): Row => ({ ...party, ...billingFromMaster(master) });
+
+/** Zip as shown: blank for '', '0' and legacy rows where the City was saved as DZip. */
+export const cleanZip = (zip: any, city?: any): string => {
+  const z = String(zip ?? '').trim();
+  if (z === '' || z === '0') return '';
+  if (city && z.toLowerCase() === String(city).trim().toLowerCase()) return '';
+  return z;
+};
+
+/** "City, State, Country - Zip" (blank parts skipped). */
+export const placeLine = (city: any, state: any, cnty: any, zip: any): string => {
+  const place = [city, state, cnty].map((x) => String(x ?? '').trim()).filter(Boolean).join(', ');
+  const z = cleanZip(zip);
+  return [place, z].filter(Boolean).join(' - ');
+};
+
 /** Legacy selectParty(): the party object every later screen works with. */
 export const buildSelectedParty = (party: Row, executives: Row[]): Row => {
   const executiveData = executives.find((item) => String(item.Code) === String(party.sexe));
+  const billing = billingFromMaster(party);
   return {
     ParCode: party.acccode,
     ParName: party.accountname,
-    City: party.City || '',
-    Address: party.Address || '',
+    ...billing,
     SExe: party.sexe || '',
     SExeName: party.SExeName || executiveData?.SalesExecutive || '',
     BAccCode: party.brkAcc || '',
     BAccName: party.brkname || '',
     DueDay: party.crday || '',
-    Dcity: party.City || '',
-    DState: party.State || '',
-    DCnty: party.Cnty || '',
-    DZip: party.Zip || '',
+    // delivery address starts as the billing address
+    DAdd: billing.Address,
+    DCity: billing.City,
+    DState: billing.State,
+    DCnty: billing.Cnty,
+    DZip: billing.Zip,
   };
 };
 
-/** Legacy mobappshow -> party shown on the summary. */
-export const partyFromMain = (main: Row): Row => ({
-  ParCode: main.ParCode || '',
-  ParName: main.ParName || '',
-  SExe: main.SExe || '',
-  SExeName: main.SExeName || '',
-  City: main.city || main.DCity || main.Station || '',
-  Address: main.address || main.DAdd || '',
-  BAccCode: main.BAccCode || '',
-  BAccName: main.BAccName || '',
-  DueDay: main.DueDay || '',
-  DueDate: main.DueDate || '',
-  Dcity: main.City || main.DCity || '',
-  DState: main.State || main.DState || '',
-  DCnty: main.Cnty || main.DCnty || '',
-  DZip: main.Zip || main.DZip || '',
-});
+/**
+ * Legacy mobappshow -> party shown on the summary.
+ * Delivery fields come from the order (DAdd ...). Billing fields are taken from `main` only
+ * when the server sends them; SummaryStep then fills them from the party master.
+ */
+export const partyFromMain = (main: Row): Row => {
+  const dCity = main.DCity || main.Station || '';
+  return {
+    ParCode: main.ParCode || '',
+    ParName: main.ParName || '',
+    SExe: main.SExe || '',
+    SExeName: main.SExeName || '',
+    Address: main.address || main.Address || '',
+    City: main.city || main.City || '',
+    State: main.state || main.State || '',
+    Cnty: main.cnty || main.Cnty || '',
+    Zip: main.zip || main.Zip || '',
+    BAccCode: main.BAccCode || '',
+    BAccName: main.BAccName || '',
+    DueDay: main.DueDay || '',
+    DueDate: main.DueDate || '',
+    DAdd: main.DAdd || '',
+    DCity: dCity,
+    DState: main.DState || '',
+    DCnty: main.DCnty || '',
+    // legacy saved the City as DZip — not shown as a zip
+    DZip: cleanZip(main.DZip, dCity),
+  };
+};
 
 /**
  * Sales Party (second party, shown after the main party).
@@ -242,10 +291,21 @@ export const salesPartyFromMain = (main: Row): Row | null => {
   return { ParCode: String(code), ParName: main?.[SALES_PARTY_KEYS.name] || '' };
 };
 
+/** Sales Party picked from the party list: code, name and billing address. */
+export const salesPartyFromPick = (party: Row): Row => ({
+  ParCode: party?.ParCode,
+  ParName: party?.ParName || '',
+  Address: party?.Address || '',
+  City: party?.City || '',
+  State: party?.State || '',
+  Cnty: party?.Cnty || '',
+  Zip: party?.Zip || '',
+});
+
 /** Picked Sales Party, or the main party when none was picked (a temp party '-1' is never sent). */
 export const effectiveSalesParty = (salesParty: Row | null, party: Row | null): Row | null => {
   if (salesParty?.ParCode) return salesParty;
-  if (party?.ParCode && String(party.ParCode) !== '-1') return { ParCode: party.ParCode, ParName: party.ParName || '' };
+  if (party?.ParCode && String(party.ParCode) !== '-1') return salesPartyFromPick(party);
   return null;
 };
 
@@ -256,10 +316,10 @@ export const applyExecutive = (party: Row | null, exe: Row): Row => ({
   SExeName: exe?.SalesExecutive || '',
 });
 
-/** Legacy "Select Address" tap: fields copied from a /api/getaddress row. */
+/** Legacy "Select Address" tap: delivery fields copied from a /api/getaddress row (billing Address is kept). */
 export const applyDeliveryAddress = (party: Row | null, address: Row): Row => ({
   ...(party || {}),
-  Address: address?.DAdd || '',
+  DAdd: address?.DAdd || '',
   DCity: address?.DCity || '',
   DState: address?.DState || '',
   DCnty: address?.DCnty || '',
@@ -808,13 +868,13 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     // order sends the Due Days so the column is not left blank.
     DDays: base.DDays || dueDayText || '',
 
-    DAdd: currentParty?.Address || base.DAdd || '',
-    DCity: currentParty?.City || base.DCity || '',
-    // Legacy sends the party City as DZip (kept as-is — see index.tsx notes).
-    DZip: currentParty?.City || base.DZip || '',
-    DState: currentParty?.State || base.DState || '',
-    DCnty: currentParty?.DCnty || base.DCnty || '',
-    Station: currentParty?.City || base.Station || '',
+    // Delivery address (falls back to the billing address when none is set).
+    DAdd: currentParty?.DAdd || currentParty?.Address || base.DAdd || '',
+    DCity: currentParty?.DCity || currentParty?.City || base.DCity || '',
+    DZip: currentParty ? cleanZip(currentParty.DZip) : base.DZip || '',
+    DState: currentParty ? currentParty.DState || '' : base.DState || '',
+    DCnty: currentParty ? currentParty.DCnty || '' : base.DCnty || '',
+    Station: currentParty?.DCity || currentParty?.City || base.Station || '',
 
     Status: base.Status || 'P',
     EntType: base.EntType || '',

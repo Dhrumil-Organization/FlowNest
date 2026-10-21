@@ -6,8 +6,9 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Api, apiErrorText, browseOrders, Ctx, deleteOrder, fetchGroups } from './api';
+import DateField from './DateField';
 import { financialYearStartISO, fmt, num, Row, todayISO } from './format';
-import { Badge, Banner, BigBtn, Card, CheckBox, confirmAsync, CONTENT_W, Kicker, Loading, Muted, notifyAsync, SmallBtn, Tag, x } from './ui';
+import { Badge, Banner, BigBtn, Card, CheckBox, confirmAsync, CONTENT_W, Kicker, Loading, Muted, notifyAsync, Pill, SmallBtn, Tag, x } from './ui';
 
 const tab = { fontVariant: ['tabular-nums' as const] };
 
@@ -38,6 +39,9 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
   const [groups, setGroups] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [query, setQuery] = useState('');
+  const [searchIn, setSearchIn] = useState<'all' | 'design' | 'order'>('all');
+  const [showAllCoverage, setShowAllCoverage] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setErr('');
@@ -54,10 +58,19 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
   }, [api, ctx, from, to, authOnly]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [api, ctx, authOnly]);
+  useEffect(() => { load(); }, [api, ctx, authOnly, from, to]);
 
   // Unplanned SO metres (pending, from groups) vs planned PO metres (from the list) per design.
-  const shown = useMemo(() => (jobWorkOnly ? rows.filter((r) => num(r.jobqty) > 0) : rows), [rows, jobWorkOnly]);
+  // Search by design or production order no.
+  const q = query.trim().toLowerCase();
+  const has = (v: any) => v !== undefined && v !== null && String(v).toLowerCase().includes(q);
+  const designHit = (r: Row) => has(r.dsnname) || has(r.dsncode) || has(r.name) || has(r.orderdesign);
+  const orderHit = (r: Row) => has(r.vouno) || has(r.uid) || has(r.voudate);
+  const rowHit = (r: Row) => !q || (searchIn === 'design' ? designHit(r) : searchIn === 'order' ? orderHit(r)
+    : designHit(r) || orderHit(r) || has(r.parname) || has(r.sexename) || has(r.shdname) || has(r.itmname));
+
+  const allShown = useMemo(() => (jobWorkOnly ? rows.filter((r) => num(r.jobqty) > 0) : rows), [rows, jobWorkOnly]);
+  const shown = useMemo(() => allShown.filter(rowHit), [allShown, q, searchIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const coverage = useMemo(() => {
     if (jobWorkOnly) return [] as Row[];
@@ -75,6 +88,13 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
     });
     return Object.values(by).filter((c) => c.pending > 0 || c.planned > 0).sort((a, b) => b.pending - a.pending);
   }, [groups, rows, jobWorkOnly]);
+  // Coverage is per design: filter it only when searching by design (or all).
+  const coverageShown = useMemo(
+    () => (q && searchIn !== 'order' ? coverage.filter((c) => has(c.name) || has(c.dsncode)) : q ? [] : coverage),
+    [coverage, q, searchIn] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const COVERAGE_LIMIT = 5;
+  const coverageVisible = showAllCoverage || q ? coverageShown : coverageShown.slice(0, COVERAGE_LIMIT);
 
   const remove = async (r: Row) => {
     if (!(await confirmAsync('Delete order?', `Are you sure you want to delete ${r.vouno}?`, 'Delete', true))) return;
@@ -96,9 +116,9 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
           <View style={{ flexDirection: narrow ? 'column' : 'row', alignItems: narrow ? 'stretch' : 'center', gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: narrow ? undefined : 1 }}>
               <Icon name="date-range" size={18} color={T.muted} />
-              <TextInput value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" style={[x.input, { flex: 1, flexBasis: 0, minWidth: 0 }]} />
+              <DateField value={from} onChange={setFrom} max={to || undefined} placeholder="From date" style={{ flex: 1, flexBasis: 0, minWidth: 0 }} />
               <Muted>to</Muted>
-              <TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={[x.input, { flex: 1, flexBasis: 0, minWidth: 0 }]} />
+              <DateField value={to} onChange={setTo} min={from || undefined} placeholder="To date" style={{ flex: 1, flexBasis: 0, minWidth: 0 }} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <CheckBox checked={authOnly} onPress={() => setAuthOnly((v) => !v)} />
@@ -108,11 +128,33 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
           </View>
         </Card>
 
+        {/* Search: design / production order */}
+        <Card style={{ padding: 10, marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="search" size={18} color={T.muted} />
+            <TextInput value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false}
+              placeholder={searchIn === 'design' ? 'Search by design…' : searchIn === 'order' ? 'Search by production order no.…' : 'Search design, production order, party, executive…'}
+              placeholderTextColor={T.muted} style={[x.input, { flex: 1, minWidth: 0 }]} />
+            {query ? (
+              <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Icon name="close" size={18} color={T.muted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+            <Muted style={{ marginRight: 6 }}>Search in:</Muted>
+            {([['all', 'All'], ['design', 'Design'], ['order', 'Production order']] as const).map(([k, label]) => (
+              <Pill key={k} label={label} active={searchIn === k} onPress={() => setSearchIn(k)} />
+            ))}
+            {q ? <Muted style={{ marginLeft: 'auto' }}>{shown.length} of {allShown.length} orders</Muted> : null}
+          </View>
+        </Card>
+
         {busy && !rows.length ? <Loading label="Loading production orders…" /> : null}
         {err ? <Banner tone="err" title={err} /> : null}
 
-        {coverage.length > 0 ? <Kicker style={{ marginLeft: 2 }}>SO vs production coverage</Kicker> : null}
-        {coverage.map((c) => (
+        {coverageShown.length > 0 ? <Kicker style={{ marginLeft: 2 }}>SO vs production coverage</Kicker> : null}
+        {coverageVisible.map((c) => (
           <Card key={c.dsncode} style={{ paddingVertical: 11, paddingHorizontal: 14, marginBottom: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Tag label={String(c.name)} />
@@ -124,9 +166,16 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
             </View>
           </Card>
         ))}
+        {!q && coverageShown.length > COVERAGE_LIMIT ? (
+          <TouchableOpacity onPress={() => setShowAllCoverage((v) => !v)} style={{ alignSelf: 'center', paddingVertical: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: T.copper }}>
+              {showAllCoverage ? 'Show less' : `Show all coverage (${coverageShown.length})`}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <Kicker style={{ marginLeft: 2, marginTop: 10 }}>{jobWorkOnly ? 'Orders with job work out' : 'Production orders'}</Kicker>
-        {!busy && shown.length === 0 && !err ? <Card style={{ padding: 24 }}><Muted style={{ textAlign: 'center' }}>{jobWorkOnly ? 'No job work in this period.' : 'No production orders in this period.'}</Muted></Card> : null}
+        {!busy && shown.length === 0 && !err ? <Card style={{ padding: 24 }}><Muted style={{ textAlign: 'center' }}>{q ? 'No production orders match your search.' : jobWorkOnly ? 'No job work in this period.' : 'No production orders in this period.'}</Muted></Card> : null}
         {shown.map((r) => {
           const isLocked = locked(r);
           const jobQty = num(r.jobqty);
@@ -158,6 +207,14 @@ export default function OrdersList({ api, ctx, rights, onOpen, onNew, jobWorkOnl
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
                   {rights.edit ? <SmallBtn label="Edit" tone="copper" onPress={() => onOpen(r, 'edit')} /> : null}
                   {rights.del ? <SmallBtn label="Delete" tone="red" onPress={() => remove(r)} /> : null}
+                </View>
+              ) : null}
+              {isLocked && (rights.edit || rights.del) ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+                  <Icon name="lock" size={13} color={T.muted} />
+                  <Muted style={{ fontSize: 10 }}>
+                    {Number(r.isauth) === 1 ? 'Authorised — modify & delete locked' : 'Locked — plan / job out already created'}
+                  </Muted>
                 </View>
               ) : null}
             </Card>

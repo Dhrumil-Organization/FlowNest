@@ -26,12 +26,12 @@
 // it. Android hardware back closes one step; on the list it is left to the app.
 //
 // Legacy behaviour kept as-is (looks like a Legacy bug — decide if you want it changed)
-//   1. Save sends the party City as `DZip`, and `DState` only when the party object has
-//      `State` (a party picked from the list carries `DState`, so the saved order's own
-//      value / blank is sent). `DCity` / `Station` = party City.
-//   2. Picking a delivery address ("Tap to change") changes the Address that is saved
-//      (`DAdd`) and sends the address SrNo as `QtyKgs`; its City / State / Zip are shown
-//      but the save still sends the party City (see 1).
+//   1. (fixed Oct 2026) Save used to send the party City as `DZip` / `DCity` / `Station`.
+//      It now sends the delivery address: DAdd / DCity / DState / DCnty / DZip (and
+//      Station = delivery city), falling back to the billing address. Old orders whose
+//      DZip holds the city show a blank zip.
+//   2. Picking a delivery address ("Tap to change") sets only the delivery fields and
+//      sends the address SrNo as `QtyKgs`; the party's billing address is not changed.
 //   3. (replaced) Delivery Days / Date are no longer on the form — see "Changes" below.
 //   4. Discount and Tax % have no input; the values loaded with a saved order are still
 //      used for DisAmt / TaxAmt / NetAmt.
@@ -55,6 +55,10 @@
 //   - Qty / Pcs / Rate pencils on every row (changed in place, Amount recalculated).
 //   - Available stock shown on every row (tap for the merchant-wise breakdown).
 //   - Search box over the order rows.
+//   - Billing vs delivery address kept apart (model.ts): the Party card shows the billing
+//     address (party master); the details sheet shows Delivery Address / City / State /
+//     Country / Zip. A saved order's billing address is filled from /api/accountbasic.
+//   - Sales Party card shows its billing address with City, State, Country - Zip.
 //
 // Deliberate differences from legacy
 //   - No own header / StatusBar / SafeArea: the global AppHeader is used; every step

@@ -36,7 +36,7 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { deleteOrder, errorMessage, fetchAddresses, fetchCurrentStock, fetchExecutives, printOrder, saveOrder, showOrder } from './api';
+import { deleteOrder, errorMessage, fetchAddresses, fetchCurrentStock, fetchExecutives, fetchParties, printOrder, saveOrder, showOrder } from './api';
 import {
   applyDeliveryAddress,
   applyExecutive,
@@ -44,6 +44,7 @@ import {
   buildSavePayload,
   buildStockLines,
   canAskStock,
+  cleanZip,
   computeTotals,
   dmy,
   dueDateFor,
@@ -57,13 +58,16 @@ import {
   OrderCtx,
   OrderMode,
   parseOrderResponse,
+  placeLine,
   reSrNo,
   Row,
+  salesPartyFromPick,
   saveTimestamp,
   selectedItemFromRow,
   totalStockQty,
   updateRowValue,
   validateOrder,
+  withBillingAddress,
   yy,
 } from './model';
 import { Nav, PickFlow } from './nav';
@@ -163,6 +167,29 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
 
   /* ---------------- open a saved order ---------------- */
 
+  /**
+   * A saved order carries only the delivery address. The billing address of the party and
+   * of the Sales Party is filled from the party master (/api/accountbasic). Not a change to
+   * the order, so it does not mark it dirty; on failure the cards just show '-'.
+   */
+  const fillBillingAddresses = async (partyCode: any, salesCode: any) => {
+    try {
+      const list = await fetchParties(API, token, ctx);
+      if (!aliveRef.current) return;
+      const find = (code: any) => list.find((p) => String(p.acccode) === String(code));
+      const master = partyCode ? find(partyCode) : undefined;
+      if (master) {
+        setCurrentParty((prev) => (prev && String(prev.ParCode) === String(partyCode) ? withBillingAddress(prev, master) : prev));
+      }
+      const salesMaster = salesCode ? find(salesCode) : undefined;
+      if (salesMaster) {
+        setSalesParty((prev) => (prev && String(prev.ParCode) === String(salesCode) ? withBillingAddress(prev, salesMaster) : prev));
+      }
+    } catch (error: any) {
+      console.log('[YarnSalesOrderNEW] billing address error', error?.response?.data || error?.message);
+    }
+  };
+
   const loadOrderFromBackend = useCallback(async () => {
     try {
       setLoadingOrder(true);
@@ -196,6 +223,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       setCurrentParty(order.party);
       setSalesParty(order.salesParty);
       setDirty(false);
+      fillBillingAddresses(order.party?.ParCode, order.salesParty?.ParCode);
     } catch (error: any) {
       console.log('[YarnSalesOrderNEW] load order error', error?.response?.data || error?.message);
       if (aliveRef.current) setLoadFailed(errorMessage(error, 'Unable to load sales order'));
@@ -410,7 +438,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       crumb: 'Sales party',
       onPick: (party: Row) => {
         // a sales party equal to the main party is stored as "same as party"
-        setSalesParty(String(party?.ParCode) === String(currentParty?.ParCode) ? null : { ParCode: party.ParCode, ParName: party.ParName || '' });
+        setSalesParty(String(party?.ParCode) === String(currentParty?.ParCode) ? null : salesPartyFromPick(party));
         setDirty(true);
       },
     });
@@ -582,6 +610,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const badge = authorised ? 'VIEW' : initialMode;
   const daysEditable = !isViewMode || screenMode === 'ADD';
   const shownSalesParty = effectiveSalesParty(salesParty, currentParty);
+  const salesPlace = placeLine(shownSalesParty?.City, shownSalesParty?.State, shownSalesParty?.Cnty, shownSalesParty?.Zip);
   const stockRow = stockRowKey ? rows.find((r) => makeRowKey(r) === stockRowKey) : null;
   const stockInfo = stockRowKey ? stock[stockRowKey] : undefined;
 
@@ -739,6 +768,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={st.eyebrow}>Party</Text>
               <Text style={st.partyName} numberOfLines={2}>{currentParty?.ParName || '-'}</Text>
+              {/* billing address (party master) — a delivery address pick does not change it */}
               <Text style={st.partySub} numberOfLines={3}>
                 {currentParty?.ParCode || '-'} | {currentParty?.Address || '-'}
               </Text>
@@ -800,6 +830,15 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               {shownSalesParty?.ParCode || '-'}
               {!salesParty?.ParCode ? '  ·  Same as party' : ''}
             </Text>
+            {shownSalesParty?.Address ? (
+              <Text style={st.partySub} numberOfLines={3}>{shownSalesParty.Address}</Text>
+            ) : null}
+            {salesPlace ? (
+              <View style={st.placeRow}>
+                <Icon name="location-on" size={14} color={T.muted} />
+                <Text style={st.placeText} numberOfLines={2}>{salesPlace}</Text>
+              </View>
+            ) : null}
           </View>
           {!isViewMode ? (
             <View style={st.salesBtns}>
@@ -963,21 +1002,21 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
             }}
           >
             <Icon name="location-on" size={18} color={T.copper} />
-            <Text style={st.addrLabel}>Address</Text>
+            <Text style={st.addrLabel}>Delivery Address</Text>
             <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
-              <Text style={st.addrValue} numberOfLines={10}>{currentParty?.Address || '-'}</Text>
+              <Text style={st.addrValue} numberOfLines={10}>{currentParty?.DAdd || currentParty?.Address || '-'}</Text>
               <Text style={st.addrHint}>Tap to change</Text>
             </View>
           </TouchableOpacity>
-          <InfoRow icon="location-city" label="City" value={String(currentParty?.City || '-')} />
-          <InfoRow icon="map" label="State" value={String(currentParty?.DState || '-')} />
-          <InfoRow icon="public" label="Country" value={String(currentParty?.DCnty || '-')} />
-          <InfoRow icon="markunread-mailbox" label="Zip Code" value={String(currentParty?.DZip || '-')} />
+          <InfoRow icon="location-city" label="Delivery City" value={String(currentParty?.DCity || '-')} />
+          <InfoRow icon="map" label="Delivery State" value={String(currentParty?.DState || '-')} />
+          <InfoRow icon="public" label="Delivery Country" value={String(currentParty?.DCnty || '-')} />
+          <InfoRow icon="markunread-mailbox" label="Delivery Zip" value={cleanZip(currentParty?.DZip) || '-'} />
         </View>
       </Sheet>
 
       {/* Select address */}
-      <Sheet open={addressListVisible} onClose={() => setAddressListVisible(false)} title="Select Address" wideMax={520}>
+      <Sheet open={addressListVisible} onClose={() => setAddressListVisible(false)} title="Select Delivery Address" wideMax={520}>
         {addressLoading ? (
           <View style={st.addrState}>
             <ActivityIndicator size="large" color={T.copper} />
@@ -1153,6 +1192,8 @@ const st = StyleSheet.create({
   exeValue: { fontSize: 13, fontWeight: '800', color: T.nav },
   salesName: { fontSize: 14.5, fontWeight: '900', color: T.nav, marginTop: 3 },
   salesBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  placeText: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: T.ink },
   label: { fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' },
   readBox: {
     height: 44,
@@ -1233,7 +1274,7 @@ const st = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.hair,
   },
-  addrLabel: { width: 118, fontSize: 12.5, fontWeight: '700', color: T.muted },
+  addrLabel: { width: 136, fontSize: 12.5, fontWeight: '700', color: T.muted },
   addrValue: { textAlign: 'right', fontSize: 13.5, fontWeight: '800', color: T.ink },
   addrHint: { fontSize: 12, fontWeight: '800', color: T.copper, marginTop: 4 },
   addrState: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center', gap: 12 },

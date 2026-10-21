@@ -39,7 +39,7 @@ export default function PrintStep({ f, errors, printError, printers, printersBus
           disabled={!printers.length}
           onPress={() => setPickPrinter(true)}
           error={errors.printer}
-          hint={printerLocked ? 'Your label printer is fixed for your login.' : f.printer ? 'Remembered on this device.' : undefined} />
+          hint={printerLocked && f.printer ? 'Your label printer is fixed for your login.' : !printerLocked && f.printer ? 'Remembered on this device.' : undefined} />
         {offline ? <Notice tone="err" text={`${f.printer} is offline. Labels may not print until it is back.`} /> : null}
       </Section>
 

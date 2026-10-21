@@ -32,8 +32,7 @@
 //   2. Picking a delivery address ("Tap to change") changes the Address that is saved
 //      (`DAdd`) and sends the address SrNo as `QtyKgs`; its City / State / Zip are shown
 //      but the save still sends the party City (see 1).
-//   3. Delivery Date is shown (SO date + Delivery Days, or picked by hand) but only
-//      Delivery Days (`DDays`) is sent on save.
+//   3. (replaced) Delivery Days / Date are no longer on the form — see "Changes" below.
 //   4. Discount and Tax % have no input; the values loaded with a saved order are still
 //      used for DisAmt / TaxAmt / NetAmt.
 //   5. The list opens with From = To = today and no property / year; the dates shown in
@@ -44,6 +43,18 @@
 //      that were already saved in the order.
 //   7. Adding a shade whose Item + Grade + Shade is already on the order is skipped
 //      silently (the confirmation screen still shows it).
+//
+// Changes requested after the port (Oct 2026)
+//   - Due Days / Due Date replace Delivery Days / Date. Due Days starts from the party's
+//     credit days and is editable; Due Date = SO date + Due Days, and picking a Due Date
+//     sets Due Days. Saved as DueDay / DueDate. DDays: a saved order keeps its own value,
+//     a new order sends the Due Days.
+//   - Sales Executive can be changed on the order (saved as SExe).
+//   - Sales Party card after the main party. Saved in main[SALES_PARTY_KEYS] (model.ts) —
+//     CONFIRM those column names with the backend. Not picked = same as the main party.
+//   - Qty / Pcs / Rate pencils on every row (changed in place, Amount recalculated).
+//   - Available stock shown on every row (tap for the merchant-wise breakdown).
+//   - Search box over the order rows.
 //
 // Deliberate differences from legacy
 //   - No own header / StatusBar / SafeArea: the global AppHeader is used; every step

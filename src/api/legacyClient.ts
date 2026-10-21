@@ -817,7 +817,7 @@ export const GreyPackingAPI = {
   PackingList: (params: Record<string, any>) =>
     client.get('/greypackingbarcodebrowse', { params }),
 
-    openModify: (body: Record<string, any>) =>
+  openModify: (body: Record<string, any>) =>
     client.post('/greypacking/mobile_open_modify', body),
 
   deletePacking: (body: Record<string, any>) =>
@@ -825,3 +825,7 @@ export const GreyPackingAPI = {
 
 };
 
+export const ProductionBeamShortageAPI = {
+  report: (body: Record<string, any>) => client.post('/reports/production_beam_shortage', body, { timeout: 120000 }),
+  takas: (body: Record<string, any>) => client.post('/reports/production_beam_shortage/takas', body, { timeout: 120000 }),
+};

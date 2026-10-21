@@ -2822,8 +2822,14 @@ export default function OwnerDashboardScreen({
         if (!silent) setLoading(true);
         const res = await api.getOwnerDashboard(dateString, getUserPrptype);
         console.log('getOwnerDashboard', res);
-        if (res.success) setData(res.data);
-        else setError('Failed to load dashboard');
+        if (res?.success && res.data && typeof res.data === 'object') {
+          // Permission-filtered cards can legitimately be null. Keep them null:
+          // never fabricate zero-valued financial data for a denied card.
+          setData(res.data);
+        } else {
+          setData(null);
+          setError('Failed to load dashboard');
+        }
       } catch (e) {
         setError('Network error. Please retry.');
       } finally {
@@ -2922,7 +2928,11 @@ export default function OwnerDashboardScreen({
     return <>{leadNodes}<ErrorView message={error} onRetry={() => load(getUserPrptype)} /></>;
   if (!data) return <>{leadNodes}</>;
 
-  const { sales, production, collection, payment, outstanding } = data;
+  // Every card is optional: Laravel returns null when its permission is denied.
+  // The operational renderer must not dereference by_exec on a null card.
+  const { sales, production, collection, payment, outstanding } = data ?? {};
+  const hasCollectionRows = Array.isArray(collection?.by_exec);
+  const hasOutstandingRows = Array.isArray(outstanding?.by_exec);
 
 
   const openProductionReport = () => {
@@ -2956,7 +2966,7 @@ export default function OwnerDashboardScreen({
   };
 
 
-  const sortedCollection = [...collection.by_exec].sort((a, b) => {
+  const sortedCollection = [...(Array.isArray(collection?.by_exec) ? collection.by_exec : [])].sort((a, b) => {
     const aValue = Number(a?.[collectionSort.field] || 0);
     const bValue = Number(b?.[collectionSort.field] || 0);
 
@@ -3014,7 +3024,7 @@ export default function OwnerDashboardScreen({
     setPaymentSort(prev => prev === 'desc' ? 'asc' : 'desc');
   };
 
-  const sortedOutstanding = [...outstanding.by_exec].sort((a, b) => {
+  const sortedOutstanding = [...(Array.isArray(outstanding?.by_exec) ? outstanding.by_exec : [])].sort((a, b) => {
     const aValue = Number(a?.outstanding || 0);
     const bValue = Number(b?.outstanding || 0);
 
@@ -3101,7 +3111,7 @@ export default function OwnerDashboardScreen({
           </Slot>
           {/* ── PRODUCTION SECTION ── */}
           <Slot name="production">
-          {visibleSections.production && (
+          {visibleSections.production && production?.total && Array.isArray(production?.daily_trend) && Array.isArray(production?.by_machine) && (
             <SectionCard>
               <SectionHeader
                 icon="⚙️"
@@ -3165,7 +3175,7 @@ export default function OwnerDashboardScreen({
           </Slot>
           {/* ── PAYMENT COLLECTION SECTION ── */}
           <Slot name="collection">
-          {visibleSections.collection && (
+          {visibleSections.collection && collection?.total && Array.isArray(collection?.daily_trend) && hasCollectionRows && (
             <SectionCard>
               <SectionHeader
                 icon="💰"
@@ -3257,7 +3267,7 @@ export default function OwnerDashboardScreen({
           </Slot>
           {/* ── PAYMENT TO PAY SECTION ── */}
           <Slot name="payment">
-          {visibleSections.payment && payment && (
+          {visibleSections.payment && payment?.total && Array.isArray(payment?.by_party) && (
             <SectionCard>
               <SectionHeader
                 icon="💳"
@@ -3315,7 +3325,7 @@ export default function OwnerDashboardScreen({
           </Slot>
           {/* ── OUTSTANDING SECTION ── */}
           <Slot name="outstanding">
-          {visibleSections.outstanding && (
+          {visibleSections.outstanding && outstanding && hasOutstandingRows && (
             <SectionCard>
               <SectionHeader
                 icon="⚠️"

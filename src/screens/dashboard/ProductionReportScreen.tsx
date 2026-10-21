@@ -4,15 +4,20 @@ import { RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import WeavingDailyProduction from './WeavingDailyProduction';
+import OwnerWeavingConversionScreen from '../production/OwnerWeavingConversionScreen';
 import BeamStatusPanel, { BeamStatusRow } from './BeamStatusPanel';
+import ProductionBeamShortageScreen from '../reports/ProductionBeamShortageScreen';
+import { usePermission } from '@/src/core/permissions';
 
 type Tab = 'conv' | 'prod' | 'status' | 'short';
-const tabs: { id: Tab; title: string }[] = [
-  { id: 'conv', title: 'Conversion' }, { id: 'prod', title: 'Daily production' },
-  { id: 'status', title: 'Beam status' }, { id: 'short', title: 'Beam shortage' },
+const tabs: { id: Tab; title: string; resource: string }[] = [
+  { id: 'conv', title: 'Conversion', resource: 'reports.production_report.conversion' }, { id: 'prod', title: 'Daily Production', resource: 'reports.production_report.daily_production' },
+  { id: 'status', title: 'Beam Status', resource: 'reports.production_report.beam_status' }, { id: 'short', title: 'Beam Shortage', resource: 'reports.production_report.beam_shortage' },
 ];
 const navy = '#102132';
 export default function ProductionReportScreen() {
+  const { canAccess } = usePermission();
+  const allowedTabs = tabs.filter(t => canAccess(t.resource) || (t.id === 'prod' && canAccess('dashboard.production_detail')));
   const { width, height: windowHeight } = useWindowDimensions();
   const safeInsets = useSafeAreaInsets();
   const isPhone = width < 600;
@@ -55,16 +60,19 @@ export default function ProductionReportScreen() {
     router.replace({ pathname: '/new/(tabs)/reports/production', params: clean });
   }, [params.production, params.tab, date, prptype, router]);
   const [tab, setTab] = useState<Tab>(tabs.some(t => t.id === initial) ? initial as Tab : 'prod');
+  const activeTab = allowedTabs.some(t => t.id === tab) ? tab : allowedTabs[0]?.id;
+  const chooseTab = (id: Tab) => { if (allowedTabs.some(t => t.id === id)) { setTab(id); router.setParams({ tab: id }); } };
+  useEffect(() => { if (typeof initial === 'string' && tabs.some(t => t.id === initial)) setTab(initial as Tab); }, [initial]);
   const [refreshToken, setRefreshToken] = useState(0);
   const [beamTarget, setBeamTarget] = useState<{ prpcode: string; beam_uid: string; beam_no: string; last_checking_date?: number | null; nonce: number } | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const refreshReport = useCallback(() => {
-    if (tab !== 'prod' || pullRefreshing) return;
+    if (activeTab !== 'prod' || pullRefreshing) return;
     setPullRefreshing(true);
     setRefreshToken(v => v + 1);
-  }, [tab, pullRefreshing]);
+  }, [activeTab, pullRefreshing]);
   const finishRefresh = useCallback(() => setPullRefreshing(false), []);
-  useEffect(() => { if (tab !== 'prod') setPullRefreshing(false); }, [tab]);
+  useEffect(() => { if (activeTab !== 'prod') setPullRefreshing(false); }, [activeTab]);
   // React Native's RefreshControl is native-only. On phone-size RN Web,
   // provide the same pull gesture while keeping the toolbar Refresh fallback.
   const scrollY = useRef(0);
@@ -79,7 +87,7 @@ export default function ProductionReportScreen() {
   const onWebTouchStart = (e: any) => {
     webTouch.current = null;
     webPulled.current = false;
-    if (!webPhone || tab !== 'prod' || scrollY.current > 1) return;
+    if (!webPhone || activeTab !== 'prod' || scrollY.current > 1) return;
     const point = webTouchPoint(e);
     if (Number.isFinite(point.x) && Number.isFinite(point.y)) webTouch.current = point;
   };
@@ -116,7 +124,7 @@ export default function ProductionReportScreen() {
       keyboardShouldPersistTaps="handled"
       onScroll={e => {scrollY.current = e.nativeEvent.contentOffset.y;}}
       scrollEventThrottle={16}
-      refreshControl={isPhone && Platform.OS !== 'web' && tab === 'prod'
+      refreshControl={isPhone && Platform.OS !== 'web' && activeTab === 'prod'
         ? <RefreshControl refreshing={pullRefreshing} onRefresh={refreshReport} colors={['#742786']} tintColor="#742786" />
         : undefined}
       onTouchStart={onWebTouchStart}
@@ -136,21 +144,18 @@ export default function ProductionReportScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E6E0DA', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 9 }}><Text style={{ fontSize: 16, color: navy }}>‹</Text></TouchableOpacity>
         <Text style={{ fontSize: 12, fontWeight: '800', color: navy }}>Owner › Weaving production</Text>
       </View>
-      {tab !== 'prod' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-        {tabs.map(t => <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={{ backgroundColor: tab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: tab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: tab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}
+      {allowedTabs.length === 0 ? <View style={{ padding: 20 }}><Text style={{ color: navy }}>You do not have access to these reports.</Text></View> : null}
+      {activeTab !== 'prod' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        {allowedTabs.map(t => <TouchableOpacity key={t.id} onPress={() => chooseTab(t.id)} style={{ backgroundColor: activeTab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: activeTab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: activeTab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}
       </View>}
-      {tab === 'prod' ? <WeavingDailyProduction date={date} prptype={prptype} initialBeam={beamTarget} onReturnToBeamStatus={() => { setBeamTarget(null); setTab('status'); }} refreshToken={refreshToken} onRefreshComplete={finishRefresh} onSelectedDateChange={selectedDate => router.setParams({date: selectedDate})} tabControls={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 3 }}>{tabs.map(t => <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={{ backgroundColor: tab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: tab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}><Text style={{ color: tab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}</View>} /> :
-        tab === 'status' ? <BeamStatusPanel prptype={prptype} onOpenBeam={(beam: BeamStatusRow) => {
+      {!activeTab ? null : activeTab === 'prod' ? <WeavingDailyProduction date={date} prptype={prptype} initialBeam={beamTarget} onReturnToBeamStatus={() => { setBeamTarget(null); chooseTab('status'); }} refreshToken={refreshToken} onRefreshComplete={finishRefresh} onSelectedDateChange={selectedDate => router.setParams({date: selectedDate})} tabControls={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 3 }}>{allowedTabs.map(t => <TouchableOpacity key={t.id} onPress={() => chooseTab(t.id)} style={{ backgroundColor: activeTab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: activeTab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}><Text style={{ color: activeTab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}</View>} /> :
+        activeTab === 'status' ? <BeamStatusPanel prptype={prptype} onOpenBeam={(beam: BeamStatusRow) => {
           setBeamTarget({prpcode: beam.prpcode, beam_uid: beam.beam_uid, beam_no: beam.beam_no,
             last_checking_date: beam.last_checking_date, nonce: Date.now()});
-          setTab('prod');
+          if (allowedTabs.some(t => t.id === 'prod')) chooseTab('prod');
         }}/> :
-        <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E6E0DA', borderRadius: 12, padding: 22 }}>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: navy }}>{tabs.find(t => t.id === tab)?.title}</Text>
-          <Text style={{ color: '#667085', marginTop: 8, lineHeight: 21 }}>
-            {tab === 'conv' ? 'Conversion requires a verified design-specific monthly rate. No amount will be fabricated.' : 'Beam shortage requires verified checking completion; physical closure alone is not completion.'}
-          </Text>
-        </View>}
+        activeTab === 'short' ? <ProductionBeamShortageScreen /> :
+        <OwnerWeavingConversionScreen prptype={prptype} />}
       {/* Explicit scroll-content end marker. Unlike relying only on a style
           padding value, this occupies measurable layout space on RN Web. */}
       <View collapsable={false} accessible={false} style={{ height: 16, flexShrink: 0 }} />

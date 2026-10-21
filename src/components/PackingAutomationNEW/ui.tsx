@@ -10,7 +10,7 @@ import {
   ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import type { Form, Step } from './usePackingForm';
-import { prodTypeName, routeView, tubeWt } from './usePackingForm';
+import { leadZero, prodTypeName, routeView, tubeWt } from './usePackingForm';
 
 export const tab = { fontVariant: ['tabular-nums' as const] };
 type IconName = React.ComponentProps<typeof Icon>['name'];
@@ -316,7 +316,7 @@ export function SelectionsCard({ f, facility, upTo, onEdit, style }: {
           <KV label="Party" name={f.party?.parname} code={f.party?.parcode} wide />
           <KV label="Carton type" name={f.carton?.carname} code={f.carton?.carcode} wide />
           <KV label="Production type" name={prodTypeName(f.prodtype, f) || f.prodtype} code={f.prodtype} />
-          <KV label="Empty carton wt." name={f.carwt} />
+          <KV label="Empty carton wt." name={leadZero(f.carwt)} />
           <KV label="Print no." name={f.printno} />
           <KV label="Grade" name={f.grade?.name} code={f.grade?.code} />
           <KV label="Merge (route)" name={f.merge?.name} code={f.merge?.code} />

@@ -1,3 +1,5 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../ConversionTypography';
+ensureConversionWebFonts();
 import { API } from '@/src/api/client';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@/common/utils/compatibleStorage';
@@ -9,7 +11,7 @@ import {
     TextInput as RNTextInput,
     ScrollView,
     StyleSheet,
-    Text, TouchableOpacity,
+    TouchableOpacity,
     useWindowDimensions,
     View
 } from 'react-native';

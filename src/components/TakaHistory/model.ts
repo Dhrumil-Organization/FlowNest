@@ -5,12 +5,18 @@ import { T } from '@/src/theme';
 /** Store code sent to the API (store is no longer a filter). */
 export const TAKA_STR_CODE = '012';
 
+/** 'A' = As on date (every taka with its history up to that date) | 'S' = Sales between From and To date */
+export type DateMode = 'A' | 'S';
+
 export type TakaRun = {
   run_id: number;
   reused: boolean;
   prp_codes: string;
   str_codes: string;
+  date_mode?: DateMode;
   as_on_date: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
   created_at: string;
   takas: number;
   seconds: number;

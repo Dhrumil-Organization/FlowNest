@@ -8,7 +8,11 @@ export const PermissionKeys = {
     creditorDashboard: 'dashboard.creditor_dashboard',
     pendingAuthorizations: 'dashboard.pending_authorizations',
     reports: 'reports',
-    beamShortageReport: 'reports.beam_shortage',
+    beamShortageReport: 'reports.production_report.beam_shortage',
+    productionBeamShortageReport: 'reports.production_report.beam_shortage',
+    conversionReport: 'reports.production_report.conversion',
+    dailyProductionReport: 'reports.production_report.daily_production',
+    beamStatusReport: 'reports.production_report.beam_status',
   },
   design: {
     designs: 'designs',

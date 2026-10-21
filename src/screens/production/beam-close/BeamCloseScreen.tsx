@@ -1,3 +1,5 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../ConversionTypography';
+ensureConversionWebFonts();
 import AppAlert from '@/common/utils/appAlert';
 const theme = { BRAND_GRADIENT_START: '#1D4ED8', BRAND_GRADIENT_END: '#0F766E' };
 import SearchableDropdown from "../LegacySearchableDropdown";
@@ -5,7 +7,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { API } from '@/src/api/client';
 import { fetchAllYeardata } from "@/src/api/legacyFunctions";
 import SelectBeam from "./SelectBeam";

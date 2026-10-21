@@ -56,6 +56,7 @@ type Props = {
   executiveCode?: string;
   /** bump to reload (shared Refresh button) */
   refreshTick?: number;
+  onBusyChange?: (busy: boolean) => void;
   /** called with true when a production order detail is opened, false when it is closed (parent hides its tabs) */
   onDetailChange?: (open: boolean) => void;
 };
@@ -239,7 +240,7 @@ function ProdOrderDetail({
 /* Screen                                                              */
 /* ------------------------------------------------------------------ */
 
-export default function ProductionOrders({ token, API, prptype = 'S', onBack, executiveCode = '', refreshTick = 0, onDetailChange }: Props) {
+export default function ProductionOrders({ token, API, prptype = 'S', onBack, executiveCode = '', refreshTick = 0, onDetailChange, onBusyChange }: Props) {
   const [data, setData] = useState<ProdOrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -288,6 +289,11 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
       void load(true);
     }
   }, [refreshTick, load]);
+
+  // tell the shared Refresh button while a refresh is running
+  useEffect(() => {
+    onBusyChange?.(refreshing);
+  }, [refreshing, onBusyChange]);
 
   // new filter / search -> back to the first page
   useEffect(() => {
@@ -448,7 +454,7 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
               placeholder="Search production order, design, executive…"
               style={{ flex: 1, minWidth: 0 }}
             />
-            <IconBtn icon="refresh" label="Refresh" onPress={() => void load(true)} loading={refreshing} tone="soft" color={T.copper} />
+            {onBack ? <IconBtn icon="refresh" label="Refresh" onPress={() => void load(true)} loading={refreshing} tone="soft" color={T.copper} /> : null}
           </View>
 
           <Legend />
@@ -469,7 +475,7 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
               <MiniTable
                 columns={columns}
                 rows={shown}
-                rowKey={(r) => r.TrackId || r.ProductionOrderNo}
+                rowKey={(r, i) => `${r.TrackId || r.ProductionOrderNo}#${i}`}
                 minWidth={WIDE}
                 onRowPress={setSelected}
                 emptyText="No production order for this filter."
@@ -489,9 +495,9 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
               />
             </Card>
           ) : (
-            shown.map((r) => (
+            shown.map((r, idx) => (
               <TouchableOpacity
-                key={r.TrackId || r.ProductionOrderNo}
+                key={`${r.TrackId || r.ProductionOrderNo}#${idx}`}
                 activeOpacity={0.8}
                 onPress={() => setSelected(r)}
                 style={st.orderCard}

@@ -1,3 +1,5 @@
+import { ConversionText as Text, ensureConversionWebFonts } from '../production/ConversionTypography';
+ensureConversionWebFonts();
 import AppAlert from '@/common/utils/appAlert';
 // AvgPicksSection.js — React Native
 // Ports the web "Avg Picks" module (Salary.js + AvgPicksCalendar.jsx) into a
@@ -29,7 +31,6 @@ import {
     ActivityIndicator,
     Alert,
     StyleSheet,
-    Text,
     TextInput,
     TouchableOpacity,
     View,

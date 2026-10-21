@@ -36,6 +36,7 @@ export type Form = {
   carton: Carton | null; // the planned carton for `prodtype`
   masterCarWt: number | null; // master empty-carton weight (web ncarwt)
   carwt: string; // empty-carton weight, editable, ≤ master
+  carwtEdited: boolean; // true once the operator typed a weight — then it is kept when the production type changes
   grade: Pick | null;
   gradeBal: A.GradeBalance | null; // graded vs packed for this grade (web totbalpcs / totbalwt)
   merge: Pick | null;
@@ -59,6 +60,7 @@ const initial = (keep?: Partial<Form>): Form => ({
   carton: null,
   masterCarWt: null,
   carwt: '',
+  carwtEdited: false,
   grade: null,
   gradeBal: null,
   merge: null,
@@ -133,38 +135,70 @@ export function routeView(f: Form) {
     shdcode: pick(r, 'shdcode'),
     shdname: pick(r, 'shdname'),
     denier: pick(r, 'denier'),
-    cheeswt: pick(r, 'cheeswt'),
+    cheeswt: leadZero(pick(r, 'cheeswt')),
     stktype: stk,
     stkLabel: stk === 'P' ? 'Process house' : 'In house',
     raw: r,
   };
 }
 
+/**
+ * The planning party list sends the name with the production types glued on,
+ * e.g. "VASTRAANG TAXFAB PRIVATE LIMITED-PT,PB". That suffix is not part of the
+ * party name: it would print "-PT,PB" on a label packed as PT only. Strip a
+ * trailing "-<codes>" only when those codes are this party's production types,
+ * so a real hyphen in a name is never touched.
+ */
+export function cleanPartyName(name: string, types: string[]): string {
+  const n = String(name ?? '').trim();
+  const m = n.match(/^(.*?)\s*-\s*([A-Za-z0-9]+(?:\s*,\s*[A-Za-z0-9]+)*)\s*$/);
+  if (!m || !types.length) return n;
+  const suffix = splitTypes(m[2]).map((t) => t.toUpperCase());
+  const own = types.map((t) => t.toUpperCase());
+  return suffix.length && suffix.every((t) => own.includes(t)) ? m[1].trim() : n;
+}
+
 export const normParty = (row: Row, rows?: Row[]): Party => {
   const parcode = pick(row, 'acccode', 'parcode');
   const mine = (rows || []).filter((r) => pick(r, 'acccode', 'parcode') === parcode);
   const all = mine.length ? mine : [row];
+  const prodtypes = splitTypes(all.flatMap((r) => splitTypes(r?.prodtype)));
   return {
     parcode,
-    parname: pick(row, 'accountname', 'accname', 'parname', 'name'),
-    prodtypes: splitTypes(all.flatMap((r) => splitTypes(r?.prodtype))),
+    parname: cleanPartyName(pick(row, 'accountname', 'accname', 'parname', 'name'), prodtypes),
+    prodtypes,
     raw: row,
     rows: all,
   };
 };
 
+/**
+ * One carton per production type. Planning may plan ONE carton for several
+ * types together (e.g. "PT,PB" = Plastic Tube + Plastic Bottom → one carton).
+ * That carton is valid for each of those types, so it is split into one entry
+ * per type. The label still always gets exactly ONE type (the one chosen).
+ */
+export const expandCartons = (list: Carton[]): Carton[] =>
+  list.flatMap((c) => splitTypes(c.prodtype).map((t) => ({ ...c, prodtype: t })));
+
 /** Cartons from the party rows (web PartySelect set carcode / carname from the chosen row). */
 export function partyCartons(p: Party): Carton[] {
-  return p.rows
-    .filter((r) => pick(r, 'cartoncode') && splitTypes(r.prodtype).length === 1)
-    .map((r) => ({ prodtype: splitTypes(r.prodtype)[0], carcode: pick(r, 'cartoncode'), carname: pick(r, 'cartonname'), raw: r }));
+  return expandCartons(p.rows
+    .filter((r) => pick(r, 'cartoncode') && splitTypes(r.prodtype).length > 0)
+    .map((r) => ({ prodtype: String(r.prodtype ?? ''), carcode: pick(r, 'cartoncode'), carname: pick(r, 'cartonname'), raw: r })));
 }
+
+/** Adds the leading zero the server leaves out: ".165" → "0.165", "-.5" → "-0.5". Other text unchanged. */
+export const leadZero = (v: any): string => {
+  const t = String(v ?? '').trim();
+  return /^-?\.\d+$/.test(t) ? t.replace(/^(-?)\./, '$10.') : t;
+};
 
 /** Paper tube weight: from the party row for the chosen production type (web), else the route card. */
 export function tubeWt(f: Form): string {
   const rows = f.party?.rows || [];
   const forType = rows.find((r) => f.prodtype && splitTypes(r.prodtype).includes(f.prodtype) && pick(r, 'cheeswt'));
-  return pick(forType, 'cheeswt') || pick(f.party?.raw, 'cheeswt') || routeView(f).cheeswt;
+  return leadZero(pick(forType, 'cheeswt') || pick(f.party?.raw, 'cheeswt') || routeView(f).cheeswt);
 }
 
 /**
@@ -228,7 +262,7 @@ function reducer(s: Form, a: Act): Form {
       return {
         ...s,
         route: a.route,
-        party: null, cartons: [], prodtype: '', carton: null, masterCarWt: null, carwt: '',
+        party: null, cartons: [], prodtype: '', carton: null, masterCarWt: null, carwt: '', carwtEdited: false,
         // Like the web, the card's own grade and merge are filled in (still changeable).
         grade: pick(a.route, 'grdcode') ? { code: pick(a.route, 'grdcode'), name: pick(a.route, 'grdname') } : null,
         gradeBal: null,
@@ -240,13 +274,16 @@ function reducer(s: Form, a: Act): Form {
     }
     case 'party':
       // New party → its production type, carton and grade must be chosen again.
-      return { ...s, party: a.party, cartons: a.cartons, prodtype: '', carton: null, masterCarWt: null, carwt: '' };
+      return { ...s, party: a.party, cartons: a.cartons, prodtype: '', carton: null, masterCarWt: null, carwt: '', carwtEdited: false };
     case 'prodtype': {
+      // The empty carton weight has nothing to do with the production type:
+      // a weight the operator typed is kept (e.g. 1.35 stays when M → P).
+      // Only an auto-filled master weight is refreshed for the new carton.
       const carton = s.cartons.find((c) => c.prodtype === a.code) || null;
-      return { ...s, prodtype: a.code, carton, masterCarWt: null, carwt: '' };
+      return { ...s, prodtype: a.code, carton, masterCarWt: null, carwt: s.carwtEdited ? s.carwt : '' };
     }
     case 'masterWt':
-      return { ...s, masterCarWt: a.wt, carwt: String(a.wt) };
+      return { ...s, masterCarWt: a.wt, carwt: s.carwtEdited ? s.carwt : String(a.wt) };
     case 'grade':
       return { ...s, grade: a.v, gradeBal: s.grade?.code === a.v.code ? s.gradeBal : null };
     case 'gradeBal':
@@ -255,7 +292,7 @@ function reducer(s: Form, a: Act): Form {
     case 'merge':
       return { ...s, merge: a.v };
     case 'set':
-      return { ...s, [a.k]: a.v };
+      return a.k === 'carwt' ? { ...s, carwt: a.v, carwtEdited: true } : { ...s, [a.k]: a.v };
     case 'rpatti':
       return { ...s, rpatti: a.v };
     case 'newRoute':
@@ -453,7 +490,7 @@ export function usePackingForm(api: Api, ctx: Ctx, userId: string) {
     seq.current.carton++;
     flag('party', true); fail('party'); fail('carton');
     try {
-      const planned = await A.fetchPlannedCartons(api, ctx, party.parcode, planuid ?? routeView(fRef.current).planuid);
+      const planned = expandCartons(await A.fetchPlannedCartons(api, ctx, party.parcode, planuid ?? routeView(fRef.current).planuid));
       if (id !== seq.current.party) return;
       // Planned cartons first; the party rows' own cartons fill any type the plan lacks.
       const cartons = [...planned, ...partyCartons(party).filter((c) => !planned.some((p) => p.prodtype === c.prodtype))];

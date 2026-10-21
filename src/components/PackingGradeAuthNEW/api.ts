@@ -9,7 +9,60 @@ import axios from 'axios';
 export type Row = Record<string, any>;
 export type Tab = 'request' | 'history';
 
+/** Preserve the API's own message across common response shapes. */
+// export const getApiMessage = (data: any): string => {
+//   const candidates = [
+//     data?.response?.message,
+//     data?.message,
+//     data?.data?.response?.message,
+//     data?.data?.message,
+//   ];
+//   const message = candidates.find(
+//     value => typeof value === 'string' && value.trim().length > 0
+//   );
+//   return message ?? '';
+// };
+
+
+export const getApiMessage = (data: any): string => {
+  const candidates = [
+    data?.message,
+    data?.response?.message,
+    data?.data?.message,
+    data?.data?.response?.message,
+  ];
+
+  const message = candidates.find(
+    value =>
+      typeof value === 'string' &&
+      value.trim().length > 0
+  );
+
+  return message?.trim() ?? '';
+};
+
+
+export const isApiError = (data: any): boolean => {
+  // Check the outer response first. Error responses may contain data: []
+  // alongside success: false, so do not unwrap data before checking success.
+  const payloads = [
+    data,
+    data?.response,
+    data?.data,
+    data?.data?.response,
+  ];
+
+  return payloads.some(
+    payload =>
+      payload?.success === false ||
+      payload?.success === 'false' ||
+      payload?.success === 0 ||
+      payload?.error === true
+  );
+};
+
 /** legacy: atype 'B' for the Request tab, 'H' for History */
+
 export const atypeOf = (tab: Tab) => (tab === 'history' ? 'H' : 'B');
 
 /** legacy: `${y - i}-${y - i + 1}` for the last 5 years, first one selected */
@@ -72,7 +125,7 @@ export type Ctx = { API: string; token: string; selectedYear: string; strcode: s
 /* ------------------------------------------------------------------ */
 /* GET /api/prodpackingbrowse  fetch:'browsedata'  -> res.data.data.data */
 /* ------------------------------------------------------------------ */
-export async function fetchBrowse(c: Ctx): Promise<{ rows: Row[]; apiError: boolean }> {
+export async function fetchBrowse(c: Ctx): Promise<{ rows: Row[]; apiError: boolean; apiMessage: string }> {
   const userPtype = await AsyncStorage.getItem('user_prptype');
   const payload = {
     prptype: userPtype,
@@ -85,13 +138,17 @@ export async function fetchBrowse(c: Ctx): Promise<{ rows: Row[]; apiError: bool
   };
   console.log('[PackingGradeAuthNEW] prodpackingbrowse browsedata ->', payload);
   const res = await axios.get(`${c.API}/api/prodpackingbrowse`, { headers: browseHeaders(c.token), params: payload });
-  return { rows: res?.data?.data?.data || [], apiError: res?.data?.response?.error == true };
+  return {
+    rows: res?.data?.data?.data || [],
+    apiError: isApiError(res?.data),
+    apiMessage: getApiMessage(res?.data),
+  };
 }
 
 /* ------------------------------------------------------------------ */
 /* GET /api/prodpackingbrowse  fetch:'packdata', produid -> res.data.response.data */
 /* ------------------------------------------------------------------ */
-export async function fetchPackData(c: Ctx, item: Row): Promise<{ rows: Row[]; apiError: boolean }> {
+export async function fetchPackData(c: Ctx, item: Row): Promise<{ rows: Row[]; apiError: boolean; apiMessage: string }> {
   const userPtype = await AsyncStorage.getItem('user_prptype');
   const payload = {
     prptype: userPtype,
@@ -105,7 +162,11 @@ export async function fetchPackData(c: Ctx, item: Row): Promise<{ rows: Row[]; a
   };
   console.log('[PackingGradeAuthNEW] prodpackingbrowse packdata ->', payload);
   const res = await axios.get(`${c.API}/api/prodpackingbrowse`, { headers: browseHeaders(c.token), params: payload });
-  return { rows: res?.data?.response?.data || [], apiError: res?.data?.response?.error == true };
+  return {
+    rows: res?.data?.response?.data || [],
+    apiError: isApiError(res?.data),
+    apiMessage: getApiMessage(res?.data),
+  };
 }
 
 /* ------------------------------------------------------------------ */

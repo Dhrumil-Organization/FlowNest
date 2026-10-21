@@ -528,6 +528,20 @@ registerPermissionArea({
           displayOrder: 159,
           actions: [{ key: 'view', name: 'View' }],
         },
+        // Yarn Rates — rate book per main yarn (supplier = Dyeing shade party list), price trend with purchases,
+        // via POST /api/yarn_rates/* (YarnRateController, table TMSMASTER.dbo.FAMIYarnRate)
+        {
+          key: 'yarn_rates',
+          name: 'Yarn Rates',
+          type: 'screen',
+          displayOrder: 162,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'edit', name: 'Modify' },
+            { key: 'delete', name: 'Delete', dangerous: true },
+          ],
+        },
          {
           key: 'taka_history',
           name: 'Taka History',
@@ -1717,6 +1731,25 @@ registerUiNodes([
     permission: 'production.yarn_hub',
     action: 'view',
     order: 159,
+  },
+  // Yarn Rates (rate book per yarn: add / edit / delete rates, price trend with purchases)
+  {
+    id: 'nav.yarn_rates',
+    kind: 'navigation',
+    title: 'Yarn Rates',
+    permission: 'production.yarn_rates',
+    action: 'view',
+    route: 'yarn-rates',
+    icon: 'currency-rupee',
+    order: 162,
+  },
+  {
+    id: 'screen.yarn_rates',
+    kind: 'screen',
+    title: 'Yarn Rates',
+    permission: 'production.yarn_rates',
+    action: 'view',
+    order: 162,
   },
   // Outward Scan Sticker (fusion sticker scan -> grey job inward; browse / modify / delete)
   {

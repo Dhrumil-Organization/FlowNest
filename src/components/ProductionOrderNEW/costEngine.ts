@@ -102,6 +102,30 @@ export function computeBreakup(e: Engine, r: Rates): Breakup {
   return { yarnCost, dyeCost, rm, weavingCost, greigeMfg, greigeBrokAmt, greigePrice, shrinkImpact, dyeingProc, finBrokAmt, cutPack, finishedPrice };
 }
 
+/** The immutable revision is authoritative until the user actually edits a rate.
+ * Do not reconstruct its totals from yarn lines: historical consumption and
+ * per-line precision may differ from the current editable calculation. */
+export function savedBreakup(e: Engine): Breakup {
+  const snap = e.snap || {};
+  const rm = n(snap.rm);
+  const dyeCost = n(snap.yarn_dye_cost);
+  const greigeMfg = n(snap.greige_mfg);
+  const greigeBrokAmt = n(snap.greige_brok_amt);
+  const finishedPrice = n(snap.finished_price ?? snap.final_cost);
+  return {
+    yarnCost: rm - dyeCost,
+    dyeCost, rm,
+    weavingCost: n(snap.weaving_cost),
+    greigeMfg, greigeBrokAmt,
+    greigePrice: n(snap.greige_price),
+    shrinkImpact: n(snap.shrink_impact),
+    dyeingProc: n(snap.dye_proc_amount),
+    finBrokAmt: n(snap.fin_brok_amt),
+    cutPack: n(snap.cut_pack),
+    finishedPrice,
+  };
+}
+
 /** true when the engine reproduces the sheet's saved snapshot (sanity check). */
 export function matchesSnap(e: Engine): boolean {
   const b = computeBreakup(e, e.initial);

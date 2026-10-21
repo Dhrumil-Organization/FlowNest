@@ -216,7 +216,7 @@ function Breakup({ f }: { f: Row }) {
             </>
           ) : null}
           <Muted style={{ fontSize: 9.5, marginTop: 7 }}>
-            Derived from the rates above — figures recalculate as you edit. {fin ? 'Authorization is on finished cost; greige cost is internal.' : 'Authorization is on greige cost.'}
+            Saved revision values are retained until you edit a rate; edits recalculate the estimate. {fin ? 'Authorization is on finished cost; greige cost is internal.' : 'Authorization is on greige cost.'}
           </Muted>
         </>
       ) : p.costingReady ? (

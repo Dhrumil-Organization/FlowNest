@@ -192,15 +192,22 @@ export const filterParties = (parties: Row[], search: string): Row[] => {
 
 /*
  * Party object — two separate addresses (Oct 2026):
- *   Billing  (party master, /api/accountbasic) : Address, City, State, Cnty, Zip
+ *   Billing  (party master, /api/accountbasic) : Address (= master BAddress), City, State, Cnty, Zip
  *     -> shown on the Party and Sales Party cards; never changed by a delivery pick.
  *   Delivery (saved as DAdd / DCity / DState / DCnty / DZip)  : DAdd, DCity, DState, DCnty, DZip
  *     -> starts as the billing address, replaced by "Tap to change" (/api/getaddress).
  */
 
+/**
+ * Billing address text of a party-master row: its BAddress column.
+ * Falls back to Address only when the response has no BAddress key at all (older API).
+ */
+export const masterBillingAddress = (party: Row): string =>
+  party && Object.prototype.hasOwnProperty.call(party, 'BAddress') ? String(party.BAddress ?? '') : String(party?.Address ?? '');
+
 /** Billing address fields of a party-master row (/api/accountbasic). */
 export const billingFromMaster = (party: Row): Row => ({
-  Address: party?.Address || '',
+  Address: masterBillingAddress(party),
   City: party?.City || '',
   State: party?.State || '',
   Cnty: party?.Cnty || '',
@@ -238,8 +245,8 @@ export const buildSelectedParty = (party: Row, executives: Row[]): Row => {
     BAccCode: party.brkAcc || '',
     BAccName: party.brkname || '',
     DueDay: party.crday || '',
-    // delivery address starts as the billing address
-    DAdd: billing.Address,
+    // delivery address starts as the party master Address (legacy DAdd source)
+    DAdd: party.Address || billing.Address,
     DCity: billing.City,
     DState: billing.State,
     DCnty: billing.Cnty,
@@ -259,7 +266,7 @@ export const partyFromMain = (main: Row): Row => {
     ParName: main.ParName || '',
     SExe: main.SExe || '',
     SExeName: main.SExeName || '',
-    Address: main.address || main.Address || '',
+    Address: main.BAddress || main.address || main.Address || '',
     City: main.city || main.City || '',
     State: main.state || main.State || '',
     Cnty: main.cnty || main.Cnty || '',
@@ -302,11 +309,20 @@ export const salesPartyFromPick = (party: Row): Row => ({
   Zip: party?.Zip || '',
 });
 
-/** Picked Sales Party, or the main party when none was picked (a temp party '-1' is never sent). */
-export const effectiveSalesParty = (salesParty: Row | null, party: Row | null): Row | null => {
-  if (salesParty?.ParCode) return salesParty;
-  if (party?.ParCode && String(party.ParCode) !== '-1') return salesPartyFromPick(party);
-  return null;
+/**
+ * Sales Party of the order: only what the user picked. Not picked = blank
+ * (it no longer defaults to the main party). `party` is kept for the call signature.
+ */
+export const effectiveSalesParty = (salesParty: Row | null, _party?: Row | null): Row | null =>
+  salesParty?.ParCode ? salesParty : null;
+
+/** "Select Delivery Address" search: address, city, state, country or zip contains the text. */
+export const filterAddresses = (list: Row[], search: string): Row[] => {
+  const s = String(search || '').trim().toLowerCase();
+  if (!s) return list;
+  return list.filter((a) =>
+    [a?.DAdd, a?.DCity, a?.DState, a?.DCnty, a?.DZip].some((v) => String(v ?? '').toLowerCase().includes(s)),
+  );
 };
 
 /** Sales executive picked on the order -> fields stored on the party object (SExe is what is saved). */
@@ -787,7 +803,7 @@ export type SaveInput = {
   /** Due Days entered on the order (replaces the old Delivery Days input). */
   dueDays: any;
   dueDate: string;
-  /** Sales Party picked after the main party (null = same as the main party). */
+  /** Sales Party picked after the main party (null = none, saved blank). */
   salesParty: Row | null;
   /** mobappshow `main` of a saved order (null for a new order). */
   rawMain: Row | null;
@@ -847,8 +863,9 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     DueDay: dueDayText !== '' ? dueDayText : base?.DueDay || '',
     DueDate: input.dueDate || base.DueDate || '',
 
-    [SALES_PARTY_KEYS.code]: salesParty?.ParCode || base[SALES_PARTY_KEYS.code] || '',
-    [SALES_PARTY_KEYS.name]: salesParty?.ParName || base[SALES_PARTY_KEYS.name] || '',
+    // blank when no Sales Party is picked (or it was cleared on a saved order)
+    [SALES_PARTY_KEYS.code]: salesParty?.ParCode || '',
+    [SALES_PARTY_KEYS.name]: salesParty?.ParName || '',
 
     GrsAmt: fmt(totals.totalAmount),
     DisAmt: fmt(discountAmt),

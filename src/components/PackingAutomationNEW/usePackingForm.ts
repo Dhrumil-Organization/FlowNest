@@ -18,6 +18,16 @@
 //   • Cones / copies must be whole numbers > 0 (web could send NaN totals).
 //   • Nothing writes into state while rendering (web set carno / stktype /
 //     rpatti inside value={…}).
+//
+// Grade ↔ production type (Oct 2026): every time a grade is chosen (and when the
+// party changes under a chosen grade) GET get_criterion fetch=prdtype asks which
+// of the party's production types that grade may be packed as.
+//   • the grade allows exactly one of the party's types → that type is selected
+//     automatically (also replacing a type chosen before, e.g. M → B for grade B);
+//   • several allowed and the chosen one is not among them → it is cleared and the
+//     operator taps one of the allowed types (the others are greyed out);
+//   • a chosen type that does not match is never printed: Continue / Print blocked;
+//   • none of the party's types allowed, still checking, or the check failed → blocked.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import * as A from './api';
 import type { Api, Carton, Ctx, Row } from './api';
@@ -25,6 +35,8 @@ import type { Api, Carton, Ctx, Row } from './api';
 /** A party of the route card's plan. `rows` = all its plan rows (one per production type when the server splits them). */
 export type Party = { parcode: string; parname: string; prodtypes: string[]; raw: Row; rows: Row[] };
 export type Pick = { code: string; name: string };
+/** Result of the grade → production type check (fetch=prdtype) for `key` = grade|party types. */
+export type GradeTypeCheck = { key: string; status: 'loading' | 'ok' | 'failed'; types: string[]; names?: Record<string, string>; error?: string };
 export type Step = 1 | 2 | 3 | 4;
 
 export type Form = {
@@ -39,6 +51,7 @@ export type Form = {
   carwtEdited: boolean; // true once the operator typed a weight — then it is kept when the production type changes
   grade: Pick | null;
   gradeBal: A.GradeBalance | null; // graded vs packed for this grade (web totbalpcs / totbalwt)
+  gradeTypes: GradeTypeCheck | null; // production types allowed for the chosen grade
   merge: Pick | null;
   smarka: string; // shipping marka
   printno: string;
@@ -63,6 +76,7 @@ const initial = (keep?: Partial<Form>): Form => ({
   carwtEdited: false,
   grade: null,
   gradeBal: null,
+  gradeTypes: null,
   merge: null,
   smarka: '',
   printno: DEFAULT_PRINT_NO,
@@ -210,8 +224,10 @@ export const PRODTYPE_NAMES: Record<string, string> = {
   M: 'Market',
 };
 
-export function prodTypeName(code: string, f: { party: Party | null; cartons: Carton[] }): string {
+export function prodTypeName(code: string, f: { party: Party | null; cartons: Carton[]; gradeTypes?: GradeTypeCheck | null }): string {
   if (!code) return '';
+  const fromGrade = f.gradeTypes?.names?.[code];
+  if (fromGrade) return fromGrade;
   const rows = [...(f.party?.rows || []), ...f.cartons.map((c) => c.raw)];
   for (const r of rows) {
     if (splitTypes(r?.prodtype).length === 1 && splitTypes(r?.prodtype)[0] === code) {
@@ -226,13 +242,40 @@ export function prodTypeName(code: string, f: { party: Party | null; cartons: Ca
 export const isSameRoute = (a: Row | null | undefined, b: Row | null | undefined) =>
   !!a && !!b && pick(a, 'productionuid') === pick(b, 'productionuid') && pick(a, 'productionvouno') === pick(b, 'productionvouno');
 
+/** Key of the grade → production type check: '' when grade or party is missing. */
+export const gradeTypeKey = (f: { grade: Pick | null; party: Party | null }) =>
+  f.grade?.code && f.party ? `${f.grade.code}|${f.party.prodtypes.join(',')}` : '';
+
+const sameCode = (a: string, b: string) => a.trim().toUpperCase() === b.trim().toUpperCase();
+
+/**
+ * What blocks the chosen grade / production type, or null when they fit.
+ * `field` says where the message belongs. Used by validate() and shown live on Details.
+ */
+export function gradeTypeIssue(f: Form): { field: 'grade' | 'prodtype'; text: string; pending?: boolean } | null {
+  const key = gradeTypeKey(f);
+  if (!key) return null;
+  const g = f.grade?.name || f.grade?.code || '';
+  const c = f.gradeTypes;
+  if (!c || c.key !== key || c.status === 'loading') return { field: 'grade', text: `Checking production type for grade ${g}…`, pending: true };
+  if (c.status === 'failed') return { field: 'grade', text: `${c.error || 'Production type for this grade could not be checked.'} Choose the grade again to retry.` };
+  if (!c.types.length) return { field: 'grade', text: `Grade ${g} is not allowed for this party's production type (${f.party?.prodtypes.join(', ') || '-'}). Choose another grade.` };
+  if (f.prodtype && !c.types.some((t) => sameCode(t, f.prodtype))) {
+    return { field: 'prodtype', text: `Production type ${f.prodtype} does not match grade ${g} (allowed: ${c.types.join(', ')}). Choose a matching production type or another grade.` };
+  }
+  return null;
+}
+
 /** Production type choices: the party's types, each matched to its planned carton (or disabled). */
 export function prodTypeChoices(f: Form) {
   const types = f.party?.prodtypes.length ? f.party.prodtypes : splitTypes(f.cartons.map((c) => c.prodtype));
+  // Once the grade check has answered, types the grade does not allow are greyed out.
+  const check = f.gradeTypes && f.gradeTypes.key === gradeTypeKey(f) && f.gradeTypes.status === 'ok' ? f.gradeTypes : null;
   return types.map((code) => {
     const carton = f.cartons.find((c) => c.prodtype === code) || null;
-    // All types stay selectable; a type with no planned carton is caught by validation.
-    return { code, carton, disabled: false };
+    // A type with no planned carton stays selectable; validation catches it.
+    const notForGrade = !!check && !check.types.some((t) => sameCode(t, code));
+    return { code, carton, disabled: notForGrade };
   });
 }
 
@@ -246,6 +289,7 @@ type Act =
   | { t: 'masterWt'; wt: number }
   | { t: 'grade'; v: Pick }
   | { t: 'gradeBal'; v: A.GradeBalance | null; code: string; prcuid: string }
+  | { t: 'gradeTypes'; v: GradeTypeCheck }
   | { t: 'merge'; v: Pick }
   | { t: 'set'; k: 'smarka' | 'printno' | 'nocones' | 'noprint' | 'carwt' | 'printer'; v: string }
   | { t: 'rpatti'; v: 'Y' | 'N' }
@@ -289,6 +333,9 @@ function reducer(s: Form, a: Act): Form {
     case 'gradeBal':
       // Applied only if the same route card AND grade are still chosen (no stale balance after a change).
       return s.grade?.code === a.code && pick(s.route, 'productionuid', 'prcuid') === a.prcuid ? { ...s, gradeBal: a.v } : s;
+    case 'gradeTypes':
+      // Applied only while the same grade + party are chosen (a late answer for an old grade is dropped).
+      return gradeTypeKey(s) === a.v.key ? { ...s, gradeTypes: a.v } : s;
     case 'merge':
       return { ...s, merge: a.v };
     case 'set':
@@ -336,6 +383,13 @@ export function validate(f: Form, ctx: Ctx, step: Step): Errors {
       else if (w > f.masterCarWt) e.carwt = `Cannot be more than the master carton weight (${f.masterCarWt}).`;
     }
     if (!f.grade) e.grade = f.party ? 'Choose the grade.' : 'Choose the party first.';
+    else {
+      const issue = gradeTypeIssue(f);
+      if (issue) {
+        if (issue.field === 'prodtype' && !e.prodtype) e.prodtype = issue.text;
+        else if (issue.field === 'grade') e.grade = issue.text;
+      }
+    }
     if (!f.merge) e.merge = 'Choose the merge.';
     if (!isWhole(f.printno)) e.printno = 'Print no. must be a number.';
   }
@@ -417,7 +471,9 @@ export function usePackingForm(api: Api, ctx: Ctx, userId: string) {
   const fRef = useRef(f);
   fRef.current = f;
   // One counter per chain: a response is applied only if it is still the newest request.
-  const seq = useRef({ defaults: 0, routes: 0, parties: 0, party: 0, carton: 0 });
+  const seq = useRef({ defaults: 0, routes: 0, parties: 0, party: 0, carton: 0, gradeTypes: 0 });
+  // Bumped on every grade pick, so picking a grade always runs the check again (also the retry).
+  const [gradeTick, setGradeTick] = useState(0);
   const printing = useRef(false);
   const partyListRef = useRef<Row[]>([]);
 
@@ -459,7 +515,7 @@ export function usePackingForm(api: Api, ctx: Ctx, userId: string) {
   const loadCartonWeight = useCallback(async (party: Party, carton: Carton | null) => {
     const id = ++seq.current.carton;
     fail('carton');
-    if (!carton) return;
+    if (!carton) { flag('carton', false); return; } // an older weight request no longer counts
     flag('carton', true);
     try {
       const wt = await A.fetchCartonWeight(api, ctx, party.parcode, carton.carcode);
@@ -478,6 +534,38 @@ export function usePackingForm(api: Api, ctx: Ctx, userId: string) {
     dispatch({ t: 'prodtype', code });
     loadCartonWeight(cur.party, carton);
   }, [loadCartonWeight]);
+
+  /** Grade → production type check (fetch=prdtype). Runs when grade or party changes, and on every grade pick. */
+  const gradeKey = gradeTypeKey(f);
+  useEffect(() => {
+    const id = ++seq.current.gradeTypes;
+    const cur = fRef.current;
+    if (!gradeKey || !cur.grade || !cur.party) return;
+    const key = gradeKey;
+    const prdtypes = cur.party.prodtypes;
+    dispatch({ t: 'gradeTypes', v: { key, status: 'loading', types: [] } });
+    if (!prdtypes.length) { dispatch({ t: 'gradeTypes', v: { key, status: 'ok', types: [] } }); return; }
+    A.fetchGradeProdTypes(api, ctx, { grdcode: cur.grade.code, prdtypes })
+      .then(({ types, names }) => {
+        if (id !== seq.current.gradeTypes) return;
+        dispatch({ t: 'gradeTypes', v: { key, status: 'ok', types, names } });
+        const now = fRef.current;
+        if (gradeTypeKey(now) !== key) return;
+        const fits = !!now.prodtype && types.some((t) => sameCode(t, now.prodtype));
+        if (types.length === 1) {
+          // exactly one allowed → select it (replaces a non-matching choice)
+          if (!fits) chooseProdType(types[0]);
+        } else if (now.prodtype && !fits) {
+          // several allowed, current one is not → clear it; the operator taps an allowed one
+          chooseProdType('');
+        }
+      })
+      .catch((e) => {
+        if (id === seq.current.gradeTypes) {
+          dispatch({ t: 'gradeTypes', v: { key, status: 'failed', types: [], error: A.apiErrorText(e, 'Production type for this grade could not be checked.') } });
+        }
+      });
+  }, [gradeKey, gradeTick, api, ctx, chooseProdType]);
 
   /**
    * Choose a party row (from the plan's party list). `list` / `planuid` are passed
@@ -525,6 +613,7 @@ export function usePackingForm(api: Api, ctx: Ctx, userId: string) {
   const chooseGrade = useCallback((row: Row) => {
     const code = pick(row, 'GrdCode', 'grdcode', 'code');
     dispatch({ t: 'grade', v: { code, name: pick(row, 'GrdName', 'grdname', 'name') } });
+    setGradeTick((n) => n + 1); // run the production type check for this pick
     const cur = fRef.current;
     loadGradeBalance(code, cur.merge?.code || '', routeView(cur).prcuid);
   }, [loadGradeBalance]);

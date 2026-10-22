@@ -185,7 +185,11 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       }
       const salesMaster = salesCode ? find(salesCode) : undefined;
       if (salesMaster) {
-        setSalesParty((prev) => (prev && String(prev.ParCode) === String(salesCode) ? withBillingAddress(prev, salesMaster) : prev));
+        setSalesParty((prev) =>
+          prev && String(prev.ParCode) === String(salesCode)
+            ? { ...withBillingAddress(prev, salesMaster), ParName: prev.ParName || salesMaster.accountname || '' }
+            : prev,
+        );
       }
     } catch (error: any) {
       console.log('[YarnSalesOrderNEW] billing address error', error?.response?.data || error?.message);

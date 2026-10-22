@@ -51,6 +51,8 @@ export const SectionHeader = ({
   rightText,
   action,
   onAction,
+  badgeAction,
+  onBadgeAction,
 }) => (
   <View
     style={[
@@ -65,6 +67,15 @@ export const SectionHeader = ({
     {subtitle ? <Text style={styles.sectionHeaderSub}>{subtitle}</Text> : null}
     {rightText ? (
       <Text style={styles.sectionHeaderRight}>{rightText}</Text>
+    ) : null}
+    {badgeAction ? (
+      <TouchableOpacity
+        onPress={onBadgeAction}
+        activeOpacity={0.75}
+        style={styles.sectionHeaderBadgeAction}
+      >
+        <Text style={styles.sectionHeaderBadgeActionText}>{badgeAction} ›</Text>
+      </TouchableOpacity>
     ) : null}
     {action ? (
       <TouchableOpacity onPress={onAction} activeOpacity={0.75} style={styles.sectionHeaderAction}>
@@ -414,6 +425,21 @@ const styles = StyleSheet.create({
   },
   sectionHeaderSub: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
   sectionHeaderRight: { color: 'rgba(255,255,255,0.85)', fontSize: 11 },
+  sectionHeaderBadgeAction: {
+    marginLeft: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  sectionHeaderBadgeActionText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   sectionHeaderAction: { marginLeft: 8 },
   sectionHeaderActionText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   totalRow: {

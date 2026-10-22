@@ -25,6 +25,7 @@ export default function ReportsLayout() {
       <Stack.Screen name="monthly-target" />
       <Stack.Screen name="monthly-report" />
       <Stack.Screen name="sales-flow" />
+      <Stack.Screen name="financial-year" />
       <Stack.Screen name="collection-flow" />
       <Stack.Screen name="real-costing" />
       <Stack.Screen name="expense" />

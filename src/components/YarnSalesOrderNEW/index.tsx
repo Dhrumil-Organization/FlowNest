@@ -50,9 +50,10 @@
 //     sets Due Days. Saved as DueDay / DueDate. DDays: a saved order keeps its own value,
 //     a new order sends the Due Days.
 //   - Sales Executive can be changed on the order (saved as SExe).
-//   - Sales Party card after the main party. Saved in main[SALES_PARTY_KEYS] (model.ts) —
-//     CONFIRM those column names with the backend. Optional: not picked = saved blank
-//     (no longer defaults to the main party).
+//   - Sales Party card after the main party = ERP Print Party. Saved as main.PrintParty
+//     (code) + main.PrintAdd (address text), the FAMSO columns the web Sales Order uses.
+//     mobappsave / mobappmodify must write them (backend patch: SalesOrderController).
+//     Optional: not picked = saved blank (no longer defaults to the main party).
 //   - Qty / Pcs / Rate pencils on every row (changed in place, Amount recalculated).
 //   - Available stock shown on every row (tap for the merchant-wise breakdown).
 //   - Search box over the order rows.

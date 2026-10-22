@@ -9,7 +9,7 @@ import * as A from './api';
 import type { Api, Ctx, Row } from './api';
 import { Choice, ErrorText, FieldLabel, PickerField, Section, TextField } from './ui';
 import type { Errors, Form } from './usePackingForm';
-import { pick, prodTypeChoices, prodTypeName, routeView, splitTypes } from './usePackingForm';
+import { gradeTypeIssue, gradeTypeKey, pick, prodTypeChoices, prodTypeName, routeView, splitTypes } from './usePackingForm';
 
 type Sheet = '' | 'party' | 'grade' | 'merge';
 
@@ -27,6 +27,13 @@ export default function DetailsStep({ f, api, ctx, linked, busy, problem, errors
   const [sheet, setSheet] = useState<Sheet>('');
   const close = () => setSheet('');
   const choices = prodTypeChoices(f);
+  // Grade ↔ production type check, shown as soon as it answers (not only after Continue).
+  const issue = gradeTypeIssue(f);
+  const allowedForGrade = f.gradeTypes && f.gradeTypes.key === gradeTypeKey(f) && f.gradeTypes.status === 'ok' ? f.gradeTypes.types : null;
+  const gradeHint = [
+    issue?.pending ? 'Checking production type…' : '',
+    f.gradeBal ? `Balance ${f.gradeBal.balPcs} cones · ${f.gradeBal.balWt} kg (packed ${f.gradeBal.packchees} of ${f.gradeBal.gradechees})` : '',
+  ].filter(Boolean).join(' · ') || undefined;
 
   return (
     <>
@@ -44,18 +51,21 @@ export default function DetailsStep({ f, api, ctx, linked, busy, problem, errors
               <Choice horizontal={choices.length <= 4}
                 options={choices.map((c) => {
                   const name = prodTypeName(c.code, f);
-                  return { value: c.code, label: name || c.code, sub: name ? c.code : undefined };
+                  const sub = [name ? c.code : '', c.disabled ? 'Not for this grade' : ''].filter(Boolean).join(' · ');
+                  return { value: c.code, label: name || c.code, sub: sub || undefined, disabled: c.disabled };
                 })}
                 value={f.prodtype}
                 onChange={actions.chooseProdType}
               />
             )}
-            {!errors.prodtype && choices.length > 1 && !f.prodtype ? (
+            {!errors.prodtype && choices.length > 1 && !f.prodtype && !issue ? (
               <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '700', color: T.amber }}>
-                {`This party has ${choices.length} production types. Tap the one being packed — nothing is chosen for you.`}
+                {allowedForGrade && allowedForGrade.length > 1
+                  ? `Grade ${f.grade?.name || f.grade?.code} allows ${allowedForGrade.join(', ')}. Tap the one being packed.`
+                  : `This party has ${choices.length} production types. Tap the one being packed — nothing is chosen for you.`}
               </Text>
             ) : null}
-            <ErrorText>{errors.prodtype}</ErrorText>
+            <ErrorText>{errors.prodtype || (issue?.field === 'prodtype' ? issue.text : undefined)}</ErrorText>
           </View>
         ) : null}
 
@@ -81,8 +91,9 @@ export default function DetailsStep({ f, api, ctx, linked, busy, problem, errors
       <Section title="Grade & route">
         <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
           <PickerField label="Grade" required value={f.grade ? f.grade.name || f.grade.code : undefined} sub={f.grade?.name && f.grade.code !== f.grade.name ? f.grade.code : undefined} placeholder={f.party ? 'Choose' : 'Choose party first'}
-            disabled={!f.party} onPress={() => setSheet('grade')} error={f.party ? errors.grade : undefined}
-            hint={f.gradeBal ? `Balance ${f.gradeBal.balPcs} cones · ${f.gradeBal.balWt} kg (packed ${f.gradeBal.packchees} of ${f.gradeBal.gradechees})` : undefined} style={{ flex: 1, minWidth: 150 }} />
+            disabled={!f.party} onPress={() => setSheet('grade')}
+            error={f.party ? (issue?.field === 'grade' && !issue.pending ? issue.text : errors.grade) : undefined}
+            hint={gradeHint} style={{ flex: 1, minWidth: 150 }} />
           <TextField label="Print no." required numeric value={f.printno} onChangeText={(v) => actions.set('printno', v.replace(/[^0-9]/g, ''))}
             error={errors.printno} style={{ flex: 1, minWidth: 120 }} />
         </View>

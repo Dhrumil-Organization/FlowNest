@@ -56,6 +56,16 @@ const formatQty = value => {
 const cleanAmount = (value, amountMode = 'compact') =>
   formatAmount(Number(value || 0), amountMode);
 
+const financialYearShortLabel = value => {
+  const raw = String(value || '');
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const now = new Date();
+  const year = match ? Number(match[1]) : now.getFullYear();
+  const month = match ? Number(match[2]) : now.getMonth() + 1;
+  const start = month >= 4 ? year : year - 1;
+  return `${String(start).slice(-2)}-${String(start + 1).slice(-2)}`;
+};
+
 const coverageSubtitle = period => {
   if (!period) return '';
   if (period.type === 'live_balance') return period.freshness_label || 'Live current balance';
@@ -177,6 +187,18 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
     setExpandedKey(current => (current === key ? null : key));
   };
 
+  const openFinancialYear = () => {
+    router.push({
+      pathname: '/new/(tabs)/reports/financial-year',
+      params: {
+        metric: 'sales',
+        view: view === 'myview' ? 'my' : view,
+        date: dateString,
+        prptype,
+      },
+    });
+  };
+
   const openFullReport = extra => {
     router.push({
       pathname: '/new/(tabs)/reports/sales-flow',
@@ -205,6 +227,8 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
         title="SALES"
         bgColor={COLORS.salesBg}
         subtitle={coverageSubtitle(sales?.period)}
+        badgeAction={`FY ${financialYearShortLabel(dateString)}`}
+        onBadgeAction={openFinancialYear}
         action="Full report"
         onAction={() => openFullReport()}
       />

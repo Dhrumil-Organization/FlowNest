@@ -214,20 +214,49 @@ const buildQuery = (params = {}) =>
 
 const fetchJSON = async (endpoint: string, params = {}) => {
   const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}${endpoint}?${buildQuery(params)}`;
+  const query = buildQuery(params);
+  const url = `${baseUrl}${endpoint}${query ? `?${query}` : ''}`;
   console.log("API calling:", url);
+
+  const token = await AsyncStorage.getItem("access_token");
+  if (token == null || String(token).trim() === "") {
+    throw new Error("Authentication token is unavailable. Please sign in again.");
+  }
+
   try {
-    const token = await AsyncStorage.getItem("access_token");
-    if (token == null) return;
     const response = await fetch(url, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     });
-    console.log("API response:", response);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+
+    const raw = await response.text();
+    let payload: any = null;
+    if (raw.trim() !== "") {
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        payload = null;
+      }
+    }
+
+    console.log("API response:", { status: response.status, ok: response.ok, payload });
+
+    if (!response.ok) {
+      const backendMessage = payload?.message || payload?.error || payload?.code;
+      throw new Error(
+        backendMessage
+          ? `${backendMessage} (HTTP ${response.status}${payload?.code ? ` · ${payload.code}` : ''})`
+          : `HTTP ${response.status}`
+      );
+    }
+
+    if (payload == null) {
+      throw new Error(`Empty or invalid JSON response from ${endpoint}.`);
+    }
+
+    return payload;
   } catch (err) {
     console.error("API Error:", err);
     throw err;
@@ -252,6 +281,17 @@ export const api = {
    */
   getOwnerCardReport: (params = {}) =>
     fetchJSON(`/getOwnerDashboard`, params),
+
+  /**
+   * Financial-year Sales for one ERP financial-year database.
+   * The caller supplies an anchor date inside the same FY as from_date/to_date;
+   * Laravel resolves the database using its normal date-driven YearNo flow.
+   */
+  getOwnerFySales: (params = {}) =>
+    fetchJSON(`/getOwnerDashboard`, {
+      report_type: 'fy_sales',
+      ...params,
+    }),
 
   /**
    * Sales exec detail dashboard

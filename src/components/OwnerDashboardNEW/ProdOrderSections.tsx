@@ -3,12 +3,14 @@
 //   Beam-wise dates      -> getprodorderbeamwisedashboard
 //   Outward and inward   -> getprodorderinwoutdashboard
 //   Sales bills          -> getprodordersalesinvoicedashboard
+//   Sales orders         -> salesorderfromproductionorder
+//   Beam plan vs actual  -> getprodbeamplantrackid
 // Each one calls its API only when it is opened the first time (and keeps the rows until the detail closes).
 // Wide screens (web) draw a table, narrow screens (mobile) draw one card per row.
 import { T } from '@/src/theme';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { getProdOrderBeamwiseDashboard, getProdOrderInwOutDashboard, getProdOrderSalesInvoiceDashboard } from './api';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getProdOrderBeamwiseDashboard, getProdOrderInwOutDashboard, getProdOrderSalesInvoiceDashboard, getSalesOrderFromProductionOrder, getProdBeamPlanTrackId } from './api';
 import { Col, Fold, MiniTable, Pill, StateBox } from './OrderTracker';
 import {
   beamStatusOf,
@@ -19,9 +21,11 @@ import {
   splitList,
   stageYearNo,
   ymdList,
+  type BeamPlanTrackApiRow,
   type BeamwiseApiRow,
   type InvoiceApiRow,
   type InwOutApiRow,
+  type SalesOrderApiRow,
 } from './prodOrderModel';
 import { NOT_NEEDED, qty, ymd } from './trackerModel';
 import { FONT } from './fonts';
@@ -325,10 +329,156 @@ function InvoiceTable({ rows: allRows, wide }: { rows: InvoiceApiRow[]; wide: bo
   );
 }
 
+function SalesOrderTable({ rows, wide }: { rows: SalesOrderApiRow[]; wide: boolean }) {
+  // share = this sales order's qty out of the whole production order qty
+  const share = (r: SalesOrderApiRow) => {
+    const total = num(r.ProdQty);
+    return total > 0 ? `${Math.round((num(r.SOQty) / total) * 100)}%` : dash;
+  };
+  const q = (r: SalesOrderApiRow) => (num(r.SOQty) > 0 ? qty(num(r.SOQty)) : dash);
+
+  const cols = useMemo<Col<SalesOrderApiRow>[]>(
+    () => [
+      { key: 'so', label: 'Sales order', flex: 1.1, render: (r) => <Text style={st.strong}>{r.SONo || dash}</Text> },
+      { key: 'exe', label: 'Executive', flex: 1.6, render: (r) => r.LngName || dash },
+      { key: 'party', label: 'Party', flex: 1.8, render: (r) => r.AccName || dash },
+      { key: 'q', label: 'Qty', flex: 0.9, align: 'right', render: (r) => q(r) },
+      { key: 'sh', label: 'Share', flex: 0.7, align: 'right', render: (r) => share(r) },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const key = (r: SalesOrderApiRow, i: number) => `${r.TransactionId || r.SONo}-${i}`;
+  const empty = 'No sales order on this production order.';
+
+  if (wide) return <MiniTable columns={cols} rows={rows} rowKey={key} minWidth={760} emptyText={empty} />;
+  return (
+    <CardList
+      rows={rows}
+      rowKey={key}
+      emptyText={empty}
+      render={(r) => (
+        <>
+          <View style={st.cardHead}>
+            <Text style={[st.strong, { flex: 1 }]} numberOfLines={1}>
+              {r.SONo || dash}
+            </Text>
+            <Text style={st.text}>{r.LngName || dash}</Text>
+          </View>
+          <View style={st.grid}>
+            <KV label="Party" style={st.half}>
+              {r.AccName || dash}
+            </KV>
+            <KV label="Qty">{q(r)}</KV>
+            <KV label="Share">{share(r)}</KV>
+          </View>
+        </>
+      )}
+    />
+  );
+}
+
+/* ------------------------------ beam plan vs actual ------------------------------ */
+
+type PlanKind = 'as_planned' | 'more' | 'less' | 'unplanned';
+
+/** API "Result" text -> label + colour (the API's "Not in plan" is shown as "Unplanned beam"). */
+const planResultOf = (raw: string | null | undefined): { text: string; kind: PlanKind } => {
+  const t = String(raw ?? '').trim().toLowerCase();
+  if (t.includes('not in plan') || t.includes('unplanned')) return { text: 'Unplanned beam', kind: 'unplanned' };
+  if (t.includes('more')) return { text: 'More than plan', kind: 'more' };
+  if (t.includes('less')) return { text: 'Less than plan', kind: 'less' };
+  return { text: 'As planned', kind: 'as_planned' };
+};
+const planColor = (k: PlanKind) => (k === 'as_planned' ? T.green : k === 'more' ? T.pd : k === 'unplanned' ? T.red : T.blue);
+const PLAN_PAGE = 30;
+
+/** "Beam plan vs actual · 71% unplanned" (the % comes with the API rows, so it shows once the section has loaded). */
+const planTitle = (pct: number | null) => (pct === null ? 'Beam plan vs actual' : `Beam plan vs actual · ${Math.round(pct)}% unplanned`);
+
+function PlanSplitBar({ row }: { row: BeamPlanTrackApiRow }) {
+  return (
+    <View style={st.split}>
+      <View style={{ width: `${Math.min(num(row.OnPlanBarPct), 100)}%`, backgroundColor: T.blue }} />
+      <View style={{ width: `${Math.min(num(row.UnplannedBarPct), 100)}%`, backgroundColor: T.amber }} />
+    </View>
+  );
+}
+
+function BeamPlanTable({ rows, wide }: { rows: BeamPlanTrackApiRow[]; wide: boolean }) {
+  const [shown, setShown] = useState(PLAN_PAGE);
+
+  const unplannedCell = (r: BeamPlanTrackApiRow) =>
+    num(r.Unplanned) > 0 ? <Text style={[st.strong, { color: T.pd, textAlign: 'right' }]}>{qty(num(r.Unplanned))}</Text> : dash;
+  const resultPill = (r: BeamPlanTrackApiRow) => {
+    const res = planResultOf(r.Result);
+    return <Pill text={res.text} color={planColor(res.kind)} />;
+  };
+
+  const cols = useMemo<Col<BeamPlanTrackApiRow>[]>(
+    () => [
+      { key: 'beam', label: 'Beam', flex: 1.1, render: (r) => <Text style={st.strong}>{r.Beam}</Text> },
+      { key: 'p', label: 'Planned', flex: 0.8, align: 'right', render: (r) => qty(num(r.Planned)) },
+      { key: 'a', label: 'Actual', flex: 0.8, align: 'right', render: (r) => qty(num(r.Actual)) },
+      { key: 'o', label: 'On plan', flex: 0.8, align: 'right', render: (r) => qty(num(r.OnPlan)) },
+      { key: 'u', label: 'Unplanned', flex: 0.9, align: 'right', render: (r) => unplannedCell(r) },
+      { key: 'n', label: 'Not made', flex: 0.8, align: 'right', render: (r) => qty(num(r.NotMade)) },
+      { key: 's', label: 'Split', flex: 1.6, render: (r) => <PlanSplitBar row={r} /> },
+      { key: 'r', label: 'Result', flex: 1.4, render: (r) => resultPill(r) },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const key = (r: BeamPlanTrackApiRow, i: number) => `${r.BeamUId || r.Beam}-${i}`;
+  const empty = 'No beam plan found.';
+  const visible = rows.slice(0, shown);
+
+  return (
+    <View>
+      {wide ? (
+        <MiniTable columns={cols} rows={visible} rowKey={key} minWidth={900} emptyText={empty} />
+      ) : (
+        <CardList
+          rows={visible}
+          rowKey={key}
+          emptyText={empty}
+          render={(r) => (
+            <>
+              <View style={st.cardHead}>
+                <Text style={[st.strong, { flex: 1 }]} numberOfLines={1}>
+                  {r.Beam}
+                </Text>
+                {resultPill(r)}
+              </View>
+              <PlanSplitBar row={r} />
+              <View style={st.grid}>
+                <KV label="Planned">{qty(num(r.Planned))}</KV>
+                <KV label="Actual">{qty(num(r.Actual))}</KV>
+                <KV label="On plan">{qty(num(r.OnPlan))}</KV>
+              </View>
+              <View style={st.grid}>
+                <KV label="Unplanned">{unplannedCell(r)}</KV>
+                <KV label="Not made">{qty(num(r.NotMade))}</KV>
+              </View>
+            </>
+          )}
+        />
+      )}
+
+      {rows.length > shown ? (
+        <TouchableOpacity style={st.more} onPress={() => setShown((n) => n + PLAN_PAGE)} activeOpacity={0.8} accessibilityRole="button">
+          <Text style={st.moreText}>Show more ({rows.length - shown} left)</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
 /* ------------------------------ entry ------------------------------ */
 
 export function ProdOrderSections({ session, trackId, wide }: { session: Session; trackId: string; wide: boolean }) {
   const cache = useRef<Record<string, any[]>>({});
+  const [planPct, setPlanPct] = useState<number | null>(null);
   const { API, token } = session;
   const params = useMemo(() => ({ prpcode: PRP_CODE, yearno: stageYearNo(), trackid: trackId }), [trackId]);
 
@@ -350,8 +500,27 @@ export function ProdOrderSections({ session, trackId, wide }: { session: Session
     return rows;
   }, [API, token, params]);
 
+  const loadSalesOrders = useCallback(async () => {
+    const rows = rowsOf<SalesOrderApiRow>(await getSalesOrderFromProductionOrder(API, token, params));
+    if (!rows) throw new Error('Sales orders came back in a format this screen does not understand yet.');
+    return rows;
+  }, [API, token, params]);
+
+  const loadBeamPlan = useCallback(async () => {
+    const rows = rowsOf<BeamPlanTrackApiRow>(await getProdBeamPlanTrackId(API, token, params));
+    if (!rows) throw new Error('Beam plan came back in a format this screen does not understand yet.');
+    setPlanPct(rows.length ? num(rows[0].TotalUnplannedPercent) : null); // same value on every row
+    return rows;
+  }, [API, token, params]);
+
   return (
     <View style={{ gap: 12 }}>
+      <Fold title="Sales orders">
+        <LazyBody cache={cache} cacheKey="salesorder" load={loadSalesOrders}>
+          {(rows: SalesOrderApiRow[]) => <SalesOrderTable rows={rows} wide={wide} />}
+        </LazyBody>
+      </Fold>
+
       <Fold title="Beam-wise dates">
         <LazyBody cache={cache} cacheKey="beam" load={loadBeams}>
           {(rows: BeamwiseApiRow[]) => <BeamwiseTable rows={rows} wide={wide} />}
@@ -369,6 +538,12 @@ export function ProdOrderSections({ session, trackId, wide }: { session: Session
           {(rows: InvoiceApiRow[]) => <InvoiceTable rows={rows} wide={wide} />}
         </LazyBody>
       </Fold>
+
+      <Fold title={planTitle(planPct)}>
+        <LazyBody cache={cache} cacheKey="beamplan" load={loadBeamPlan}>
+          {(rows: BeamPlanTrackApiRow[]) => <BeamPlanTable rows={rows} wide={wide} />}
+        </LazyBody>
+      </Fold>
     </View>
   );
 }
@@ -383,6 +558,9 @@ const st = StyleSheet.create({
   half: { flexBasis: '45%', flexGrow: 1 },
   kv: { gap: 3, minWidth: 64 },
   kvLabel: { fontFamily: FONT, fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  split: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: T.border, alignSelf: 'stretch' },
+  more: { alignItems: 'center', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.border },
+  moreText: { fontFamily: FONT, fontSize: 13, fontWeight: '800', color: T.copper },
   empty: { padding: 18, alignItems: 'center' },
   emptyText: { fontFamily: FONT, fontSize: 13, fontWeight: '600', color: T.ink },
 });

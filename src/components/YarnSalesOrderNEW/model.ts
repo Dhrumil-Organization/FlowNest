@@ -215,7 +215,12 @@ export const billingFromMaster = (party: Row): Row => ({
 });
 
 /** Copy the billing address of a party-master row onto a party object (delivery fields untouched). */
-export const withBillingAddress = (party: Row, master: Row): Row => ({ ...party, ...billingFromMaster(master) });
+export const withBillingAddress = (party: Row, master: Row): Row => ({
+  ...party,
+  ...billingFromMaster(master),
+  // an order saved without the address SrNo (older app builds) gets it from the master
+  QtyKgs: party?.QtyKgs || partyAddressSrNo(master),
+});
 
 /** Zip as shown: blank for '', '0' and legacy rows where the City was saved as DZip. */
 export const cleanZip = (zip: any, city?: any): string => {
@@ -230,6 +235,12 @@ export const placeLine = (city: any, state: any, cnty: any, zip: any): string =>
   const place = [city, state, cnty].map((x) => String(x ?? '').trim()).filter(Boolean).join(', ');
   const z = cleanZip(zip);
   return [place, z].filter(Boolean).join(' - ');
+};
+
+/** Address SrNo of a party-master row (/api/accountbasic `SrNo`); '' when it has none. */
+export const partyAddressSrNo = (party: Row): string => {
+  const v = party?.SrNo ?? party?.srno ?? party?.AddSrNo;
+  return num(v) > 0 ? String(parseInt(String(v), 10)) : '';
 };
 
 /** Legacy selectParty(): the party object every later screen works with. */
@@ -251,6 +262,10 @@ export const buildSelectedParty = (party: Row, executives: Row[]): Row => {
     DState: billing.State,
     DCnty: billing.Cnty,
     DZip: billing.Zip,
+    // Web Sales Order (AllPartyData19) sets QtyKgs = party SrNo on party pick: it is the
+    // party address SrNo the print looks up (FAMACCDA) for the M/S billing address.
+    // Without it the order was saved with QtyKgs 0 and the print showed only the name.
+    QtyKgs: partyAddressSrNo(party),
   };
 };
 
@@ -266,7 +281,7 @@ export const partyFromMain = (main: Row): Row => {
     ParName: main.ParName || '',
     SExe: main.SExe || '',
     SExeName: main.SExeName || '',
-    Address: main.BAddress || main.address || main.Address || '',
+    Address: main.BAddress || main.BADDRESS || main.address || main.Address || '',
     City: main.city || main.City || '',
     State: main.state || main.State || '',
     Cnty: main.cnty || main.Cnty || '',
@@ -281,21 +296,51 @@ export const partyFromMain = (main: Row): Row => {
     DCnty: main.DCnty || '',
     // legacy saved the City as DZip — not shown as a zip
     DZip: cleanZip(main.DZip, dCity),
+    // SrNo of the picked delivery address (FAMACCDA) — must go back unchanged on save
+    QtyKgs: num(main.QtyKgs) > 0 ? String(parseInt(String(main.QtyKgs), 10)) : '',
   };
 };
 
 /**
- * Sales Party (second party, shown after the main party).
- * >>> CONFIRM WITH BACKEND: the column names in `main` that hold it. <<<
- * Change them here only — load and save both read these two keys.
+ * Sales Party (second party, shown after the main party) = the ERP "Print Party".
+ * FAMSO.PrintParty holds its account code and FAMSO.PrintAdd its billing address text
+ * (same columns the web Sales Order saves in saveso / modifyso). PrintPartyName is the
+ * FAMAcc name the backend may join in; when it does not, SummaryStep fills the name
+ * from the party master.
  */
-export const SALES_PARTY_KEYS = { code: 'SalesParCode', name: 'SalesParName' } as const;
+export const SALES_PARTY_KEYS = { code: 'PrintParty', name: 'PrintPartyName', address: 'PrintAdd' } as const;
+
+/**
+ * Address text saved in PrintAdd — same shape the web Sales Order builds
+ * (SaleDlvAddressSelect.SetAdd): "Add, City, State, Zip".
+ */
+export const printAddressText = (party: Row | null): string => {
+  if (!party) return '';
+  const part = (v: any, comma: boolean) => {
+    const t = toText(v);
+    return t === '' ? '' : comma ? `${t},` : t;
+  };
+  return `${part(party.Address, true)} ${part(party.City, true)} ${part(party.State, true)} ${part(cleanZip(party.Zip), false)}`.trim();
+};
 
 /** Sales Party saved on an order (null when the order has none). */
+/** Value of `key` in `row`, matching the key without case (the server may send SalesParCode / salesparcode / SALESPARCODE). */
+const pickCI = (row: Row, key: string): any => {
+  if (!row) return undefined;
+  if (row[key] !== undefined) return row[key];
+  const k = Object.keys(row).find((x) => x.toLowerCase() === key.toLowerCase());
+  return k ? row[k] : undefined;
+};
+
 export const salesPartyFromMain = (main: Row): Row | null => {
-  const code = main?.[SALES_PARTY_KEYS.code];
-  if (code === undefined || code === null || String(code).trim() === '') return null;
-  return { ParCode: String(code), ParName: main?.[SALES_PARTY_KEYS.name] || '' };
+  const code = pickCI(main, SALES_PARTY_KEYS.code);
+  if (code === undefined || code === null || String(code).trim() === '' || String(code).trim() === '0') return null;
+  return {
+    ParCode: String(code).trim(),
+    ParName: pickCI(main, SALES_PARTY_KEYS.name) || '',
+    // saved PrintAdd shown until the party master fills the split billing fields
+    Address: pickCI(main, SALES_PARTY_KEYS.address) || '',
+  };
 };
 
 /** Sales Party picked from the party list: code, name and billing address. */
@@ -866,6 +911,14 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     // blank when no Sales Party is picked (or it was cleared on a saved order)
     [SALES_PARTY_KEYS.code]: salesParty?.ParCode || '',
     [SALES_PARTY_KEYS.name]: salesParty?.ParName || '',
+    // A saved order keeps its own PrintAdd (on the web it can be any delivery address of
+    // the Print Party) as long as the same Print Party stays; a new / changed one gets
+    // its master address.
+    [SALES_PARTY_KEYS.address]: !salesParty?.ParCode
+      ? ''
+      : toText(base[SALES_PARTY_KEYS.code]) === toText(salesParty.ParCode) && toText(base[SALES_PARTY_KEYS.address]) !== ''
+        ? base[SALES_PARTY_KEYS.address]
+        : printAddressText(salesParty),
 
     GrsAmt: fmt(totals.totalAmount),
     DisAmt: fmt(discountAmt),
@@ -900,7 +953,8 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     SONo: uid > 0 ? base.SONo : '',
     SODate: uid > 0 ? base.SODate : '',
 
-    QtyKgs: currentParty?.QtyKgs || '',
+    // delivery-address SrNo; '0' = none (was '' and wiped the saved address SrNo on modify)
+    QtyKgs: currentParty?.QtyKgs || '0',
   };
 
   return { main, newsoparty };

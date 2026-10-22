@@ -271,6 +271,43 @@ export type InvoiceApiRow = {
   SaleDelayDays: string | null;
 };
 
+/** One row of salesorderfromproductionorder -> data[] (every value is a string). */
+export type SalesOrderApiRow = {
+  TrackId: string;
+  TransactionId: string;
+  ParentTransactionId: string;
+  SONo: string; // sales order no
+  SExe: string; // executive code
+  LngName: string; // executive name
+  ParCode: string;
+  ProdQty: string; // whole production order qty
+  SOQty: string; // qty of this sales order on the production order
+  AccName: string; // party
+};
+
+/** One row of getprodbeamplantrackid -> data[] (every value is a string). The API already sends the split bars and totals. */
+export type BeamPlanTrackApiRow = {
+  ProdOrdNo: string;
+  ProdOrdUId: string;
+  Beam: string;
+  BeamUId: string;
+  Planned: string;
+  Actual: string;
+  OnPlan: string;
+  Unplanned: string;
+  NotMade: string;
+  OnPlanBarPct: string; // '89.35' = width of the blue part of the split bar, %
+  UnplannedBarPct: string; // width of the amber part, %
+  NotMadeBarPct: string; // the grey rest, %
+  Result: string; // 'As planned' | 'Less than plan' | 'More than plan' | 'Not in plan'
+  TotalPlanned: string;
+  TotalActual: string;
+  TotalOnPlan: string;
+  TotalUnplanned: string;
+  TotalNotMade: string;
+  TotalUnplannedPercent: string; // same on every row -> "Beam plan vs actual · 71% unplanned"
+};
+
 /** The rows of a `{ data: [...] }` body (also accepts `{ response: { data } }` or a bare array). */
 export const rowsOf = <T,>(body: any): T[] | null => {
   if (Array.isArray(body)) return body as T[];

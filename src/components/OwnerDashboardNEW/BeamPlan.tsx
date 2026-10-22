@@ -12,10 +12,11 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { CONTENT_MAX, IconBtn, SearchBox } from '../erpUi';
-import { getBeamPlan, type BeamPlanApiRow, type BeamPlanSummaryApi } from './api';
+import { getBeamPlan, getProdBeamPlan, type BeamPlanApiRow, type BeamPlanSummaryApi } from './api';
 import { FONT, FONT_HEAD } from './fonts';
 import { Card, MiniTable, StateBox, type Col } from './OrderTracker';
 import { PRP_CODE, stageYearNo } from './prodOrderModel';
+import { ymd } from './trackerModel';
 
 type Props = { token: string; API: string; refreshTick?: number; onBusyChange?: (busy: boolean) => void };
 
@@ -25,6 +26,8 @@ type Row = {
   key: string;
   title: string; // BeamNo  /  DsnCode
   sub: string; // machines joined (beam view)
+  date: string; // production order date (production order view)
+  design: string; // planned design(s) (production order view)
   machines: string[]; // every machine this beam ran on
   planned: Chip[];
   made: Chip[];
@@ -73,15 +76,23 @@ const chipText = (c: Chip) => {
 };
 
 const toRow = (r: BeamPlanApiRow, view: ViewKey, i: number): Row => {
-  const planned = parseChips(s(r.PlannedFor));
-  const made = parseChips(s(r.MadeFor));
-  const title = view === 'beam' ? s(r.BeamNo) || s(r.BeamUId) : s(r.DsnCode) || '—';
-  const sub = view === 'beam' ? s(r.MachineName) : '';
+  const po = view === 'po';
+  // production order view (getprodbeamplan): planned = PlannedBeams, "made" = the UnplannedBeams (made on a beam it was not planned on)
+  const planned = parseChips(s(po ? r.PlannedBeams : r.PlannedFor));
+  const made = po ? parseChips(s(r.UnplannedBeams)).map((c) => ({ ...c, flag: true })) : parseChips(s(r.MadeFor));
+  const plannedDesigns = po ? parseChips(s(r.PlannedDesigns)) : [];
+  const madeDesigns = po ? parseChips(s(r.MadeDesigns)) : [];
+  const title = po ? s(r.ProdOrdNo) || s(r.ProdOrdUId) || '—' : s(r.BeamNo) || s(r.BeamUId);
+  const sub = po ? '' : s(r.MachineName);
   const machines = sub ? sub.split(',').map((x) => x.trim()).filter(Boolean) : [];
+  const date = po ? ymd(Number(s(r.ProdOrdDate).replace(/\D/g, ''))) : '';
+  const design = plannedDesigns.map((c) => c.label).filter((x) => x && x !== '0').join(', ');
   return {
-    key: `${view}|${view === 'beam' ? s(r.BeamUId) : s(r.DsnCode)}|${i}`,
+    key: `${view}|${po ? s(r.ProdOrdUId) || s(r.ProdOrdNo) : s(r.BeamUId)}|${i}`,
     title,
     sub,
+    date,
+    design,
     machines,
     planned,
     made,
@@ -92,7 +103,10 @@ const toRow = (r: BeamPlanApiRow, view: ViewKey, i: number): Row => {
     notMade: n(r.NotMadeQty),
     unplannedPct: n(r.UnplannedPercent),
     hasUnplanned: n(r.HasUnplannedFlag) > 0 || n(r.UnplannedQty) > 0,
-    search: [title, sub, ...planned.map((c) => c.label), ...made.map((c) => c.label)].filter((x) => x && x !== '0').join(' ').toLowerCase(),
+    search: [title, sub, design, ...plannedDesigns.map((c) => c.label), ...madeDesigns.map((c) => c.label), ...planned.map((c) => c.label), ...made.map((c) => c.label)]
+      .filter((x) => x && x !== '0')
+      .join(' ')
+      .toLowerCase(),
   };
 };
 
@@ -235,20 +249,33 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
   const [shown, setShown] = useState(PAGE);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const seq = useRef<Record<ViewKey, number>>({ beam: 0, po: 0 });
-  const lastTick = useRef(-1);
+  const started = useRef<Record<ViewKey, boolean>>({ beam: false, po: false }); // each view calls its API only once
 
   const load = useCallback(
     async (v: ViewKey, silent = false) => {
       const id = ++seq.current[v];
+      started.current[v] = true;
       setPending((p) => ({ ...p, [v]: true }));
       if (silent) setRefreshing(true);
       setError('');
       try {
-        const res = await getBeamPlan(API, token, { prpcode: PRP_CODE, yearno: stageYearNo(), mode: v === 'beam' ? 'BEAM' : 'PRODORDER' });
+        // By beam -> getbeamplan (mode BEAM).  By production order -> getprodbeamplan (trackid blank = all production orders)
+        const res =
+          v === 'beam'
+            ? await getBeamPlan(API, token, { prpcode: PRP_CODE, yearno: stageYearNo(), mode: 'BEAM' })
+            : await getProdBeamPlan(API, token, { prpcode: PRP_CODE, yearno: stageYearNo(), trackid: '' });
         if (id !== seq.current[v]) return;
-        setStore((cur) => ({ ...cur, [v]: { summary: toSummary(res.summary), rows: res.data.map((r, i) => toRow(r, v, i)) } }));
+        // production orders: most unplanned metres first, then newest order no
+        const data =
+          v === 'po'
+            ? [...res.data].sort((a, b) => n(b.UnplannedQty) - n(a.UnplannedQty) || s(b.ProdOrdNo).localeCompare(s(a.ProdOrdNo)))
+            : res.data;
+        setStore((cur) => ({ ...cur, [v]: { summary: toSummary(res.summary), rows: data.map((r, i) => toRow(r, v, i)) } }));
       } catch (e: any) {
-        if (id === seq.current[v]) setError(e?.message || 'Unable to load beam plan.');
+        if (id === seq.current[v]) {
+          started.current[v] = false; // failed -> next time this view opens it tries again
+          setError(e?.message || 'Unable to load beam plan.');
+        }
       } finally {
         if (id === seq.current[v]) {
           setPending((p) => ({ ...p, [v]: false }));
@@ -259,17 +286,12 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
     [API, token],
   );
 
-  // tab har baar khulne par (refreshTick) reload; view badalne par us view ka data (agar abhi nahi hai) load
+  // Har view (By beam / By production order) ki API sirf EK baar lagti hai - pehli baar jab wo view khulta hai.
+  // Dobara view badalne ya Beam plan tab dobara kholne par purana data hi dikhta hai; naya data sirf refresh button / pull-to-refresh se.
   useEffect(() => {
-    if (lastTick.current !== refreshTick) {
-      lastTick.current = refreshTick;
-      setStore((cur) => ({ [view]: cur[view] }) as Partial<Record<ViewKey, Bucket>>); // dusre view ka purana data hata do
-      void load(view, !!store[view]);
-      return;
-    }
-    if (!store[view] && !pending[view]) void load(view);
+    if (!started.current[view]) void load(view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshTick, view]);
+  }, [view]);
 
   useEffect(() => {
     onBusyChange?.(pending.beam || pending.po);
@@ -297,6 +319,7 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
   };
   const toggle = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
   const refresh = () => {
+    started.current[view === 'beam' ? 'po' : 'beam'] = false; // the other view's old data is dropped -> it loads again when opened
     setStore((c) => ({ [view]: c[view] }) as Partial<Record<ViewKey, Bucket>>);
     void load(view, true);
   };
@@ -310,7 +333,21 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
     const first: Col<Row> =
       view === 'beam'
         ? { key: 'beam', label: 'Beam', flex: 1, render: (r) => r.title }
-        : { key: 'po', label: 'Production order', flex: 1.3, render: (r) => r.title };
+        : {
+            key: 'po',
+            label: 'Production order',
+            flex: 1.6,
+            render: (r) => (
+              <View style={{ gap: 2 }}>
+                <Text style={st.poNo}>{r.title}</Text>
+                {r.date || r.design ? (
+                  <Text style={st.poSub} numberOfLines={2}>
+                    {[r.date, r.design].filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
+              </View>
+            ),
+          };
     return [
       first,
       ...(view === 'beam' ? ([{ key: 'mac', label: 'Machine', flex: 1.3, render: (r: Row) => <Machines list={r.machines} open={!!expanded[`${r.key}|c`]} onToggle={() => toggle(`${r.key}|c`)} limit={3} /> }] as Col<Row>[]) : []),
@@ -322,9 +359,9 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
       },
       {
         key: 'mf',
-        label: view === 'beam' ? 'Actually made for' : 'Made on beams',
+        label: view === 'beam' ? 'Actually made for' : 'Made on other beams (unplanned)',
         flex: 2.3,
-        render: (r) => <Chips chips={r.made} kind="made" open={!!expanded[`${r.key}|m`]} onToggle={() => toggle(`${r.key}|m`)} limit={CHIP_LIMIT_WEB} empty="nothing made" />,
+        render: (r) => <Chips chips={r.made} kind="made" open={!!expanded[`${r.key}|m`]} onToggle={() => toggle(`${r.key}|m`)} limit={CHIP_LIMIT_WEB} empty={view === 'beam' ? 'nothing made' : 'no unplanned beam'} />,
       },
       { key: 'pl', label: 'Planned', flex: 0.9, align: 'right', render: num((r) => r.plannedQty) },
       { key: 'ma', label: 'Made', flex: 0.9, align: 'right', render: num((r) => r.madeQty) },
@@ -391,6 +428,11 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
             <Text style={st.pTitle} numberOfLines={1}>
               {r.title}
             </Text>
+            {r.date || r.design ? (
+              <Text style={st.poSub} numberOfLines={2}>
+                {[r.date, r.design].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
             {r.machines.length > 0 ? (
               <View style={st.macRow}>
                 <Icon name="precision-manufacturing" size={14} color={T.muted} style={{ marginTop: 3 }} />
@@ -433,8 +475,8 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
           <Chips chips={r.planned} kind="planned" open={!!expanded[kP]} onToggle={() => toggle(kP)} limit={CHIP_LIMIT_PHONE} empty="nothing planned" />
         </View>
         <View style={st.secBlock}>
-          <Text style={st.secLbl}>{view === 'beam' ? 'ACTUALLY MADE FOR' : 'MADE ON BEAMS'}</Text>
-          <Chips chips={r.made} kind="made" open={!!expanded[kM]} onToggle={() => toggle(kM)} limit={CHIP_LIMIT_PHONE} empty="nothing made" />
+          <Text style={st.secLbl}>{view === 'beam' ? 'ACTUALLY MADE FOR' : 'MADE ON OTHER BEAMS (UNPLANNED)'}</Text>
+          <Chips chips={r.made} kind="made" open={!!expanded[kM]} onToggle={() => toggle(kM)} limit={CHIP_LIMIT_PHONE} empty={view === 'beam' ? 'nothing made' : 'no unplanned beam'} />
         </View>
       </View>
     );
@@ -622,6 +664,8 @@ const st = StyleSheet.create({
   num: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.ink, textAlign: 'right' },
   numStrong: { fontFamily: FONT, fontSize: 12.5, fontWeight: '900', color: T.ink, textAlign: 'right' },
   verdict: { fontFamily: FONT, fontSize: 12, fontWeight: '900' },
+  poNo: { fontFamily: FONT, fontSize: 13, fontWeight: '900', color: T.ink },
+  poSub: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: T.muted, marginTop: 1 },
   none: { fontFamily: FONT, fontSize: 12, fontWeight: '600', color: T.muted, fontStyle: 'italic' },
 
   bar: { width: '100%', flexDirection: 'row', overflow: 'hidden', backgroundColor: `${T.border}88` },

@@ -231,6 +231,8 @@ export async function getProdOrderStageDashboard(
 //   GET {API}/api/getprodorderbeamwisedashboard?prpcode&yearno&trackid      -> Beam-wise dates
 //   GET {API}/api/getprodorderinwoutdashboard?prpcode&yearno&trackid        -> Outward and inward
 //   GET {API}/api/getprodordersalesinvoicedashboard?prpcode&yearno&trackid  -> Sales bills
+//   GET {API}/api/salesorderfromproductionorder?prpcode&yearno&trackid      -> Sales orders on this production order
+//   GET {API}/api/getprodbeamplantrackid?prpcode&yearno&trackid             -> Beam plan vs actual
 //   All three return { data: [...] }; ./prodOrderModel.ts parses each row type.
 type ProdOrderPartParams = { prpcode: string; yearno: string; trackid: string };
 
@@ -270,6 +272,12 @@ export const getProdOrderInwOutDashboard = (API: string, token: string, params: 
 
 export const getProdOrderSalesInvoiceDashboard = (API: string, token: string, params: ProdOrderPartParams) =>
   prodOrderPartGet(API, token, 'getprodordersalesinvoicedashboard', params, 'sales bills');
+
+export const getSalesOrderFromProductionOrder = (API: string, token: string, params: ProdOrderPartParams) =>
+  prodOrderPartGet(API, token, 'salesorderfromproductionorder', params, 'sales orders');
+
+export const getProdBeamPlanTrackId = (API: string, token: string, params: ProdOrderPartParams) =>
+  prodOrderPartGet(API, token, 'getprodbeamplantrackid', params, 'beam plan');
 
 /* ------------------------------------------------------------------ */
 /* Executive dropdown (get_criterion)                                  */
@@ -492,8 +500,16 @@ export type BeamPlanApiRow = {
   BeamNo?: string | null;
   MachineName?: string | null;
   BeamWarpLen?: number | string | null;
-  // PRODORDER mode
+  // PRODORDER mode (old getbeamplan)
   DsnCode?: string | null;
+  // getprodbeamplan (By production order)
+  ProdOrdUId?: string | null;
+  ProdOrdNo?: string | null;
+  ProdOrdDate?: string | null; // 'YYYYMMDD'
+  PlannedDesigns?: string | null; // 'design|qty, design|qty'
+  MadeDesigns?: string | null;
+  PlannedBeams?: string | null; // 'beam|qty, beam|qty'
+  UnplannedBeams?: string | null; // beams it was made on without being planned
   // both
   PlannedFor?: string | null;
   MadeFor?: string | null;
@@ -526,6 +542,37 @@ export async function getBeamPlan(
     const e = new OwnerSummaryError(
       status === 404 && !err?.response?.data?.message
         ? 'Beam plan API is not available on this server yet (route getbeamplan).'
+        : err?.response?.data?.message || err?.message || 'Unable to load beam plan.',
+    );
+    e.status = status;
+    throw e;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Beam plan tab -> "By production order"                              */
+/* ------------------------------------------------------------------ */
+//   GET {API}/api/getprodbeamplan?prpcode=SIP&yearno=27&trackid=      (trackid stays BLANK -> every production order)
+//   -> { summary: BeamPlanSummaryApi, data: BeamPlanApiRow[] }   (also accepted wrapped as { response: { summary, data } })
+export async function getProdBeamPlan(
+  API: string,
+  token: string,
+  p: { prpcode: string; yearno: string; trackid?: string },
+): Promise<{ summary: BeamPlanSummaryApi; data: BeamPlanApiRow[] }> {
+  try {
+    const r = await axios.get(`${API}/api/getprodbeamplan`, { params: { prpcode: p.prpcode, yearno: p.yearno, trackid: p.trackid ?? '' }, headers: authHdr(token) });
+    const b = r.data;
+    const pl = b?.response?.data || b?.response?.summary ? b.response : b;
+    if (!b || b.success === false || !pl?.summary || !Array.isArray(pl?.data)) {
+      throw new OwnerSummaryError(b?.message || 'Unable to load beam plan.');
+    }
+    return { summary: pl.summary, data: pl.data };
+  } catch (err: any) {
+    if (err instanceof OwnerSummaryError) throw err;
+    const status: number | undefined = err?.response?.status;
+    const e = new OwnerSummaryError(
+      status === 404 && !err?.response?.data?.message
+        ? 'Beam plan API is not available on this server yet (route getprodbeamplan).'
         : err?.response?.data?.message || err?.message || 'Unable to load beam plan.',
     );
     e.status = status;

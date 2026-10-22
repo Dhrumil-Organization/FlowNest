@@ -165,6 +165,41 @@ export async function fetchGradeBalance(a: Api, c: Ctx, p: { productionuid: any;
 }
 
 /**
+ * Production types a grade may be packed as, out of the party's types.
+ * GET /api/get_criterion fetch=prdtype (txntype production_packing_automation), e.g.
+ *   ?prpcode=MTX&yearno=27&strcode=002&txntype=production_packing_automation&prptype=&fetch=prdtype&grdcode=23&prdtype=M,B
+ * Response: { data: [{ PrdType: 'B', PrdTypeName: 'Bottom', prodtype: 'B', prodtypename: 'Bottom' }], message }
+ * (also accepted inside the usual { response: { data } } envelope).
+ * Returns the allowed codes (only those of `prdtypes`, in the party's spelling) and their names.
+ */
+export type GradeProdTypes = { types: string[]; names: Record<string, string> };
+export async function fetchGradeProdTypes(a: Api, c: Ctx, p: { grdcode: string; prdtypes: string[] }): Promise<GradeProdTypes> {
+  const r = await axios.get(`${a.API}/api/get_criterion`, {
+    headers: headers(a.token),
+    params: { ...base(c), prptype: '', fetch: 'prdtype', grdcode: p.grdcode, prdtype: p.prdtypes.join(',') },
+  });
+  const body = r?.data;
+  const fallback = 'Production type for this grade could not be checked.';
+  let rows: Row[];
+  if (body?.response) rows = okResponse(body, fallback);
+  else if (body && Array.isArray(body.data)) {
+    if (body.success === false) throw new Error(body.message || fallback);
+    rows = body.data;
+  } else throw new Error(body?.message || fallback);
+
+  const up = (v: any) => String(v ?? '').trim().toUpperCase();
+  const found = new Map<string, string>(); // CODE -> name
+  for (const row of rows) {
+    const code = up(row?.PrdType ?? row?.prodtype ?? row?.prdtype ?? row?.ProdType);
+    if (code) found.set(code, String(row?.PrdTypeName ?? row?.prodtypename ?? row?.ProdTypeName ?? '').trim());
+  }
+  const types = p.prdtypes.filter((t) => found.has(up(t)));
+  const names: Record<string, string> = {};
+  types.forEach((t) => { const n = found.get(up(t)); if (n) names[t] = n; });
+  return { types, names };
+}
+
+/**
  * Web: ProductionMergeSelect → MergeSelect dialog (onlyForProdPackingMod = true)
  * → GET /api/getmerge fetch=merge for the route card's item / grade / shade and current merge.
  * Rows: MerCode, MerName, Qty. Searched on the server (`search`), 20 at a time like the web.

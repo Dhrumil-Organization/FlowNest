@@ -293,6 +293,10 @@ export const api = {
       ...params,
     }),
 
+  /** FY Outstanding: historical dates must be verified by Laravel; no client-side balance reconstruction. */
+  getOwnerFyOutstanding: (params = {}) =>
+    fetchJSON(`/getOwnerDashboard`, { report_type: 'fy_outstanding', ...params }),
+
   /** Financial-year checked Production, using the same dashboard endpoint. */
   getOwnerFyProduction: (params = {}) =>
     fetchJSON(`/getOwnerDashboard`, {

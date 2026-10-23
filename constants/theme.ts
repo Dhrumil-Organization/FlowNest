@@ -1,53 +1,55 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+// ─────────────────────────────────────────────────────────────────────────
+// SINGLE SOURCE OF THEME TRUTH.
+// Previously this project had two theme files (this one, and
+// `src/theme.ts`) that had drifted apart — different color sets and
+// different font token shapes. `src/theme.ts` is now just a thin
+// re-export of this file (see that file's comment) so every existing
+// `from '../../theme'` / `from '@/src/theme'` / `from '@/src/constants/theme'`
+// import keeps working unchanged, but there is only one place to edit.
+// ─────────────────────────────────────────────────────────────────────────
+export const T = {
+  nav:      '#0D1B2A',
+  bg:       '#F5F2EE',
+  surface:  '#FFFFFF',
+  border:   '#E5E0DA',
+  muted:    '#9A9590',
+  sub:      '#F8F5F1',
+  alt:      '#F0EDE8',
+  ink:      '#1A1514',
+  hair:     '#EFEAE4',
+  copper:   '#C87533',
+  yd:       '#1C567A',
+  pd:       '#9A4A10',
+  green:    '#2A6044',
+  red:      '#B23A2A',
+  amber:    '#C98A1A',
+  blue:     '#3A568A',
+  purple:   '#652880',
+  // Kept alongside FONTS below for back-compat with call sites that read
+  // T.fontUI / T.fontMono directly instead of importing FONTS.
+  fontUI:   'System',
+  fontMono: 'Courier',
+} as const
 
-import { Platform } from 'react-native';
+// NEW ERP UI font = Inter (bundled, applied automatically — src/core/fonts/erpFont.tsx).
+export const FONTS = {
+  sans: 'Inter-Regular',
+  mono: 'DMMono',
+} as const
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+export const S = {
+  card: {
+    shadowColor: '#1A1514',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+  sheet: {
+    shadowColor: '#0D1B2A',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 12,
   },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+} as const

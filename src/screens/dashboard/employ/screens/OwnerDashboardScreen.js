@@ -2905,6 +2905,11 @@ export default function OwnerDashboardScreen({
     });
   };
 
+  const openOutstandingFy = () => router.push({
+    pathname: '/new/(tabs)/reports/financial-year',
+    params: { metric: 'outstanding', prptype: getUserPrptype, view: 'owner' },
+  });
+
   const openOutstandingReport = exec => {
     router.push({
       pathname: '/new/(tabs)/reports/collection-flow',
@@ -3339,10 +3344,11 @@ export default function OwnerDashboardScreen({
                 title="OUTSTANDING"
                 bgColor={COLORS.outsBg}
                 subtitle={coverageSubtitle(outstanding?.period)}
+                badgeAction={`FY ${(() => { const selected = String(dateString || '').slice(0, 10); const year = Number(selected.slice(0, 4)) || new Date().getFullYear(); const month = Number(selected.slice(5, 7)) || new Date().getMonth() + 1; const start = month >= 4 ? year : year - 1; return `${String(start).slice(-2)}–${String(start + 1).slice(-2)}`; })()}`}
+                onBadgeAction={openOutstandingFy}
                 action="Full report"
                 onAction={() => openOutstandingReport()}
               />
-
               <View style={styles.outsTotalRow}>
                 <Text style={styles.outsTotalLabel}>Total Due</Text>
                 <LongPressValue

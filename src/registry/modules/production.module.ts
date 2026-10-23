@@ -542,6 +542,23 @@ registerPermissionArea({
             { key: 'delete', name: 'Delete', dangerous: true },
           ],
         },
+        // Sampling Hub — samples with permanent type-prefixed IDs (GAR / HNG / BKL / FAB / SWC) + QR sticker, movement
+        // log (dispatch / showing / return / internal / consumed / split) with the singlet no.; status read off the log.
+        // POST /api/sampling_hub/* (SamplingHubController; TMSMASTER SmpSample / SmpSampleDsn / SmpMove / SmpPhoto)
+        {
+          key: 'sampling_hub',
+          name: 'Sampling Hub',
+          type: 'screen',
+          displayOrder: 163,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'New sample / split' },
+            { key: 'edit', name: 'Modify sample / movement' },
+            { key: 'delete', name: 'Delete sample / movement', dangerous: true },
+            { key: 'move', name: 'Record movement (scan & move)' },
+            { key: 'print', name: 'Print QR sticker' },
+          ],
+        },
         {
           key: 'taka_history',
           name: 'Taka History',
@@ -1762,6 +1779,25 @@ registerUiNodes([
     permission: 'production.yarn_rates',
     action: 'view',
     order: 162,
+  },
+  // Sampling Hub (samples + QR stickers, scan & move, movement log)
+  {
+    id: 'nav.sampling_hub',
+    kind: 'navigation',
+    title: 'Sampling Hub',
+    permission: 'production.sampling_hub',
+    action: 'view',
+    route: 'sampling-hub',
+    icon: 'qr-code-2',
+    order: 163,
+  },
+  {
+    id: 'screen.sampling_hub',
+    kind: 'screen',
+    title: 'Sampling Hub',
+    permission: 'production.sampling_hub',
+    action: 'view',
+    order: 163,
   },
   // Outward Scan Sticker (fusion sticker scan -> grey job inward; browse / modify / delete)
   {

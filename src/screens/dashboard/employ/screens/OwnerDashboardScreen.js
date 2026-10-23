@@ -2932,7 +2932,14 @@ export default function OwnerDashboardScreen({
   // The operational renderer must not dereference by_exec on a null card.
   const { sales, production, collection, payment, outstanding } = data ?? {};
   const hasCollectionRows = Array.isArray(collection?.by_exec);
-  const hasOutstandingRows = Array.isArray(outstanding?.by_exec);
+
+  // Outstanding is an Owner card. Its visibility must never depend on whether
+  // an executive-wise allocation array happens to be present. The total balance
+  // remains valid even when by_exec is empty/unavailable. Prefer Laravel's
+  // explicit card permission when present; fall back to the session permission
+  // snapshot only for older API responses that do not return `permitted`.
+  const outstandingPermitted = outstanding?.permitted === true
+    || (outstanding?.permitted !== false && visibleSections.outstanding);
 
 
   const openProductionReport = () => {
@@ -3325,7 +3332,7 @@ export default function OwnerDashboardScreen({
           </Slot>
           {/* ── OUTSTANDING SECTION ── */}
           <Slot name="outstanding">
-          {visibleSections.outstanding && outstanding && hasOutstandingRows && (
+          {outstanding && outstandingPermitted && (
             <SectionCard>
               <SectionHeader
                 icon="⚠️"
@@ -3378,7 +3385,7 @@ export default function OwnerDashboardScreen({
               {/* <TableWrapper rowCount={outstanding.by_exec.length}>
                 {outstanding.by_exec.map(exec => ( */}
               <TableWrapper rowCount={sortedOutstanding.length}>
-                {sortedOutstanding.map(exec => (
+                {sortedOutstanding.length > 0 ? sortedOutstanding.map(exec => (
                   <RankRow
                     key={exec.exec_id}
                     name={exec.name}
@@ -3388,7 +3395,13 @@ export default function OwnerDashboardScreen({
                     trendUp={false}
                     onPress={() => openOutstandingReport(exec)}
                   />
-                ))}
+                )) : (
+                  <View style={{ paddingVertical: 14, paddingHorizontal: 12 }}>
+                    <Text style={{ fontSize: 11, color: '#8C837B' }}>
+                      Executive allocation is not available for this balance.
+                    </Text>
+                  </View>
+                )}
               </TableWrapper>
             </SectionCard>
           )}

@@ -81,7 +81,7 @@ export default function TakaDataGrid({ columns, colIndex, rows, totals, sort, fi
           {columns.map((c, i) => (
             <View key={c.name} style={[st.cell, { width: widths[i] }]}>
               <Text style={[st.totalText, c.type === 'number' && st.num]} numberOfLines={1}>
-                {i === 0 ? 'Total' : c.type === 'number' ? fmtNum(totals[c.name]) : ''}
+                {i === 0 ? 'Total' : c.type === 'number' && c.total !== false ? fmtNum(totals[c.name], c.decimals) : ''}
               </Text>
             </View>
           ))}
@@ -125,7 +125,7 @@ const Row = memo(function Row({ row, index, columns, colIndex, widths }: { row: 
                 c.name === 'Taka No' && { fontWeight: '900', color: T.nav },
               ]}
             >
-              {c.type === 'number' ? fmtNum(v) : v || ''}
+              {c.type === 'number' ? fmtNum(v, c.decimals) : v || ''}
             </Text>
           </View>
         );

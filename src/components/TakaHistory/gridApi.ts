@@ -24,7 +24,7 @@ export type GridCreate = {
 };
 export type GridRun = { run_id: number; as_on_date?: string | null; from_date?: string | null; to_date?: string | null; prp_codes?: string; str_codes?: string };
 export type GridColType = 'text' | 'number' | 'date';
-export type GridColumn = { name: string; label: string; group?: string | null; type: GridColType };
+export type GridColumn = { name: string; label: string; group?: string | null; type: GridColType; decimals?: number; total?: boolean };
 export type GridFilter = { col: string; op: string; value?: string; value2?: string };
 export type GridRowsPage = {
   columns: string[];

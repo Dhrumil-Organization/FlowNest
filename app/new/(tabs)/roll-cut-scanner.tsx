@@ -1,12 +1,10 @@
 import { PermissionRouteGuard } from '@/src/core/navigation/PermissionRouteGuard';
-import { CheckingScannerNewScreen } from '@/src/screens/production/CheckingScannerNewScreen';
+import { RollCutScannerScreen } from '@/src/screens/production/RollCutScannerScreen';
 
-// NEW ERP — Checking Scanner (QR scan · manual entry · scanner list · faults · print).
-// Legacy screen (app/(tabs)) is unchanged; this is the NEW ERP route.
-export default function Route() {
+export default function RollCutRoute() {
   return (
-    <PermissionRouteGuard resource="production.checking_scanner_new" action="view">
-      <CheckingScannerNewScreen />
+    <PermissionRouteGuard resource="production.roll_cut_scanner" action="view">
+      <RollCutScannerScreen />
     </PermissionRouteGuard>
   );
 }

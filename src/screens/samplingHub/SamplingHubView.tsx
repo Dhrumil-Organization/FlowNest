@@ -116,14 +116,15 @@ export function SamplingHubView() {
   const desName = (id: string) => { for (const s of samples) { if (s.md_id === id && s.design) return s.design; for (const c of s.contents) if (c.md_id === id && c.design) return c.design; } return id; };
   const desCat = (id: string) => { for (const s of samples) { if (s.md_id === id) return s.category; for (const c of s.contents) if (c.md_id === id) return c.category; } return ''; };
 
-  /** apply a server answer (every write returns the fresh list) */
-  const applyAnswer = (d: any) => { if (d && Array.isArray(d.samples)) setData(normalizeList(d)); };
+  /** apply a server answer (every write returns the fresh list); anything else → read the latest list again */
+  const applyAnswer = (d: any) => { if (d && Array.isArray(d.samples)) setData(normalizeList(d)); else void load(); };
   const openSample = (id: string, opts?: { move?: boolean }) => {
     setPage({ kind: 'sample', id }); setMoveOpen(opts?.move ? { edit: null } : null); setSticker(null); setEditing(null); setFlash('');
     scrollRef.current?.scrollTo?.({ y: 0, animated: false });
   };
   const goPage = (p: Page | null) => { setPage(p); setMoveOpen(null); setSticker(null); setEditing(null); scrollRef.current?.scrollTo?.({ y: 0, animated: false }); };
-  const fail = (e: any, what: string) => AppAlert.alert('Sampling Hub', errText(e, what));
+  // a refused write may mean someone else changed the data → show why, then read the latest list
+  const fail = (e: any, what: string) => { AppAlert.alert('Sampling Hub', errText(e, what)); void load(); };
 
   // garment photos are fetched when the sample page opens
   useEffect(() => {
@@ -151,7 +152,12 @@ export function SamplingHubView() {
   /* ------------------------------ actions ------------------------------ */
   const delSample = (s: Sample) => {
     const n = movesOf(moves, s.id).length;
-    confirmDelete(`Delete ${s.id}?`, `${s.name}\n\nThis removes the sample${n ? ` and its ${plural(n, 'movement')}` : ''} permanently from the database. Its QR sticker will no longer open anything.`, async () => {
+    // rule (same in the API): a sample with movements is never deleted — its movements go first, latest first
+    if (n) {
+      AppAlert.alert(`${s.id} cannot be deleted`, `It has ${plural(n, 'movement')}. A sample with movements cannot be deleted.\n\nDelete its movements first — the latest one first, step by step — then delete the sample.`);
+      return;
+    }
+    confirmDelete(`Delete ${s.id}?`, `${s.name}\n\nNo movements. This removes the sample permanently from the database. Its QR sticker will no longer open anything.`, async () => {
       try {
         const r = await SamplingHubAPI.remove({ ...ctx, id: s.id });
         applyAnswer(unwrap(r)); goPage(null); setFlash('✓ ' + (r?.data?.message || 'Deleted.'));
@@ -160,7 +166,12 @@ export function SamplingHubView() {
   };
   const delMove = (m: Move) => {
     const s = byId[m.sample];
-    confirmDelete(`Delete movement ${m.no}?`, `${PURPOSE[m.purpose].lbl}${m.party ? ' → ' + m.party : ''} · ${dateFull(m.date)} · singlet #${m.singlet || '—'}${s ? `\n${s.id} ${s.name}` : ''}\n\nRemoved permanently; the sample's status is read again from the remaining movements.`, async () => {
+    const last = s ? movesOf(moves, s.id).slice(-1)[0] : null;
+    if (last && last.id !== m.id) {
+      AppAlert.alert('Only the latest movement', `${last.no} (${dateFull(last.date)}) is the latest movement of ${m.sample}. Delete step by step from the latest — not from the middle.`);
+      return;
+    }
+    confirmDelete(`Delete movement ${m.no}?`, `${PURPOSE[m.purpose].lbl}${m.party ? ' → ' + m.party : ''} · ${dateFull(m.date)} · singlet #${m.singlet || '—'}${s ? `\n${s.id} ${s.name}` : ''}\n\nThe latest movement is removed permanently; the sample's status goes back to the step before.`, async () => {
       try {
         const r = await SamplingHubAPI.moveRemove({ ...ctx, id: m.id });
         applyAnswer(unwrap(r)); setFlash('✓ ' + (r?.data?.message || 'Deleted.'));
@@ -288,8 +299,14 @@ export function SamplingHubView() {
         </View>
         {sticker ? <StickerCard key={sticker.join(',')} samples={sticker.map((k) => byId[k]).filter(Boolean)} ctx={ctx} canPrint={canPrint} onDone={(m) => setFlash('✓ ' + m)} onError={(m) => AppAlert.alert('Print', m)} /> : null}
         {editing ? (
-          <SampleForm key={'e' + s.id} ctx={ctx} masters={masters} edit={editing} onOpen={(k) => openSample(k)}
-            onDone={(d, m) => { setEditing(null); if (d) { applyAnswer(d); setFlash('✓ ' + m); } }} />
+          <SampleForm key={'e' + s.id} ctx={ctx} masters={masters} edit={editing} savedPhoto={photos[s.id] || undefined} onOpen={(k) => openSample(k)}
+            onDone={(d, m) => {
+              setEditing(null);
+              if (!d) return;
+              // the saved photo may have been replaced / removed → forget the cached one, the page reads it again
+              setPhotos((p) => { const n = { ...p }; delete n[s.id]; return n; });
+              applyAnswer(d); setFlash('✓ ' + m);
+            }} />
         ) : null}
         {moveOpen ? (
           <MoveForm key={'m' + s.id + (moveOpen.edit?.id || '')} ctx={ctx} sample={s} state={x} me={me} today={today} masters={masters} edit={moveOpen.edit}
@@ -297,11 +314,13 @@ export function SamplingHubView() {
         ) : null}
         <View style={P.card}>
           <Head t={`MOVEMENT HISTORY · ${hist.length}`} right={<Text style={P.lbl}>SINGLET</Text>} />
-          {hist.map((m) => (
+          {hist.map((m, i) => (
             <MoveRow key={m.id} m={m}
               onEdit={canEdit && m.purpose !== 'split' ? () => { setMoveOpen({ edit: m }); setEditing(null); } : undefined}
-              onDelete={canDel ? () => delMove(m) : undefined} />
+              onDelete={canDel && i === 0 ? () => delMove(m) : undefined} />
           ))}
+          {canDel && hist.length > 1 ? <Text style={[P.note, { marginTop: 6 }]}>Only the latest movement can be deleted — step by step from the top.</Text> : null}
+          {canDel && hist.length ? <Text style={[P.note, { marginTop: 2 }]}>The sample can be deleted only after all its movements are deleted.</Text> : null}
           {!hist.length ? <Empty t="No movements yet — the sample is in the sampling store." /> : null}
           {kids.length ? <Text style={[P.note, { marginTop: 6 }]}>Split out: {kids.map((k) => <Text key={k.id} onPress={() => openSample(k.id)} style={{ fontFamily: MF, fontWeight: '800', color: C.prod }}>{k.id} </Text>)}</Text> : null}
         </View>

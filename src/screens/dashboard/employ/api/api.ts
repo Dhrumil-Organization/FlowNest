@@ -293,6 +293,13 @@ export const api = {
       ...params,
     }),
 
+  /** Financial-year checked Production, using the same dashboard endpoint. */
+  getOwnerFyProduction: (params = {}) =>
+    fetchJSON(`/getOwnerDashboard`, {
+      report_type: 'fy_production',
+      ...params,
+    }),
+
   /**
    * Sales exec detail dashboard
    * @param {number} execId

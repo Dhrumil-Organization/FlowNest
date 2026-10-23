@@ -1,5 +1,6 @@
 import { getCurrentFinancialYear } from '@/common/commonfunction';
 import AppAlert from '@/common/utils/appAlert';
+import { AppAccessAPI, unwrapAccessResponse } from '@/src/api/accessControl';
 import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
 import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { columnsForWidth, DASH_GAP, DashboardGrid, DashboardInsetContext, DashCols, Slot } from '@/src/components/dashboard/DashboardGrid';
@@ -163,11 +164,44 @@ function renderDashboardLayout(items: RegistryLayoutItem[], columns: DashCols) {
 
 export function DashboardScreen(token: any, getUserPrptype: any) {
   const router = useRouter();
-  const { canAccess } = usePermission();
+  const { canAccess, isSuperAdmin } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
   const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
   const sessionUser = useAppSessionStore((state) => state.user);
   const logout = useAppSessionStore((state) => state.logout);
+
+  /*
+   * Permissions are editable while a user is logged in. The login-time
+   * app_session snapshot therefore cannot be treated as permanent. Refresh the
+   * effective permission map whenever this dashboard regains focus so newly
+   * allowed/denied card permissions (for example Outstanding Detail) are
+   * applied immediately without a logout/login cycle.
+   */
+  const refreshPermissionSession = useCallback(async () => {
+    try {
+      const raw = unwrapAccessResponse<any>(await AppAccessAPI.session());
+      const freshSession = raw?.app_session && typeof raw.app_session === 'object'
+        ? raw.app_session
+        : null;
+      const freshPermissions = freshSession?.permissions ?? raw?.permissions;
+      if (!freshPermissions) return;
+
+      const store = useAppSessionStore.getState();
+      const current = store.appSession;
+      if (!current) return;
+
+      await store.setAppSession({
+        ...current,
+        ...(freshSession || {}),
+        business_context: freshSession?.business_context ?? current.business_context,
+        permissions: freshPermissions,
+      } as any);
+    } catch (permissionError) {
+      // Dashboard data can still load with the existing session; do not turn a
+      // transient permission-refresh failure into a dashboard failure.
+      console.warn('Dashboard permission refresh failed:', permissionError);
+    }
+  }, []);
 
   const context = appSession?.business_context;
   // Card-driven Owner access: derived from the registered dashboard cards.
@@ -208,13 +242,25 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   // Backend scope flags cannot override explicit per-card grants.
   const ownerAllowed = hasOwnerCardPermission;
 
-  // My View is the ONLY view that depends on the Sales Executive mapping.
-  // When the session does not carry the field at all, keep My View available
-  // (unknown ≠ unmapped); when it is present but blank/0, My View is off.
+  // My View scope differs by authority:
+  // - SuperAdmin / Director: management My View is allowed even without a
+  //   personal Sales Executive mapping. SalesExecDashboardScreen will ask the
+  //   manager to select an executive when needed.
+  // - Normal user: My View still requires users.saleexeid when that field is
+  //   known; unknown legacy sessions remain compatible.
   const rawSaleExec = sessionUser?.saleexeid ?? rawLoginResponse?.user?.saleexeid;
   const saleExecKnown = rawSaleExec !== undefined;
   const saleExecCode = String(rawSaleExec ?? '').trim();
-  const myViewAllowed = !saleExecKnown || (saleExecCode !== '' && saleExecCode !== '0');
+  const isDirector = Number(
+    sessionUser?.is_director
+      ?? rawLoginResponse?.is_director
+      ?? rawLoginResponse?.user?.is_director
+      ?? 0,
+  ) === 1;
+  const isManagementUser = isSuperAdmin || isDirector;
+  const myViewAllowed = isManagementUser
+    || !saleExecKnown
+    || (saleExecCode !== '' && saleExecCode !== '0');
 
   // Permissions arrive asynchronously after login, so the initial useState
   // value can be computed before they exist. Until the user picks a view
@@ -273,6 +319,14 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   // screen mounted-but-hidden on other tabs rather than unmounting it.
   const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
   const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPermissionSession();
+      return undefined;
+    }, [refreshPermissionSession]),
+  );
+
   useFocusEffect(
     useCallback(() => {
       setHeaderExtras({

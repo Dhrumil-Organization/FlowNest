@@ -41,8 +41,10 @@ function useColourways(ctx: Ctx) {
 /* ====================================================================== */
 /*  new / modify sample                                                    */
 /* ====================================================================== */
-export function SampleForm({ ctx, masters, edit, onDone, onOpen }: {
+export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
   ctx: Ctx; masters: Masters | null; edit: Sample | null;
+  /** modify: the photo already saved (data URL), shown until replaced / removed */
+  savedPhoto?: string;
   onDone: (data: any | null, msg: string) => void; onOpen: (id: string) => void;
 }) {
   const [type, setType] = useState<SmpTypeKey>(edit?.type || 'garment');
@@ -58,7 +60,12 @@ export function SampleForm({ ctx, masters, edit, onDone, onOpen }: {
   const [qty, setQty] = useState(String(edit?.qty || 1));
   const [tracked, setTracked] = useState(edit ? edit.tracked : true);
   const [name, setName] = useState(edit?.name || '');
-  const [touched, setTouched] = useState(!!edit);
+  // modify: a name that is still the automatic one keeps following the fields (size, design, colourway…);
+  // only a name the user typed himself stays as it is
+  const [touched, setTouched] = useState(() => !!edit && edit.name !== autoName({
+    type: edit.type, design: edit.design, colourway: edit.colourway, colour: edit.sd_id ? '' : edit.colour, garment: edit.garment,
+    size: edit.size, metres: edit.metres, range: edit.range, nContents: edit.contents.length,
+  }));
   const [note, setNote] = useState(edit?.note || '');
   const [photo, setPhoto] = useState<string | null>(null);     // null = unchanged (edit) / none (new)
   const [photoCleared, setPhotoCleared] = useState(false);
@@ -263,7 +270,7 @@ export function SampleForm({ ctx, masters, edit, onDone, onOpen }: {
         <>
           <L t="PHOTO · FOR IDENTIFICATION" />
           <View style={[f.wrap, { alignItems: 'center' }]}>
-            {photo ? <Image source={{ uri: photo }} style={f.photo} /> : <View style={[f.photo, f.noPhoto]}><Icon name="photo-camera" size={22} color={T.muted} /></View>}
+            {photo || (savedPhoto && !photoCleared) ? <Image source={{ uri: photo || savedPhoto }} style={f.photo} accessibilityLabel={photo ? 'New photo' : 'Saved photo'} /> : <View style={[f.photo, f.noPhoto]}><Icon name="photo-camera" size={22} color={T.muted} /></View>}
             <Pressable onPress={() => choosePhoto(false)} style={f.ghost} accessibilityRole="button"><Text style={f.ghostT}>{photo || (edit?.photo && !photoCleared) ? 'Replace photo' : Platform.OS === 'web' ? 'Choose photo' : 'Take photo'}</Text></Pressable>
             {Platform.OS !== 'web' ? <Pressable onPress={() => choosePhoto(true)} style={f.ghost}><Text style={f.ghostT}>Gallery</Text></Pressable> : null}
             {photo || (edit?.photo && !photoCleared) ? <Text onPress={() => { setPhoto(null); setPhotoCleared(true); }} style={[f.ghostT, { color: T.red }]}>Remove</Text> : null}

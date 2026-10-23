@@ -4,7 +4,7 @@ import type { GridColumn, GridFilter } from './gridApi';
 // column widths by type / name
 export function columnWidth(col: GridColumn): number {
   const l = col.label || col.name;
-  if (col.type === 'number') return 96;
+  if (col.type === 'number') return (col.name || '').startsWith('Days ') ? 110 : 96;
   if (col.type === 'date') return 98;
   if (l === 'Process' || l === 'Inward From') return 112;
   if (l === 'Property') return 80;
@@ -14,8 +14,10 @@ export function columnWidth(col: GridColumn): number {
   return 120;
 }
 
-export const fmtNum = (n: any) =>
-  n === null || n === undefined || n === '' ? '' : Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const fmtNum = (n: any, decimals: number = 2) =>
+  n === null || n === undefined || n === ''
+    ? ''
+    : Number(n).toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 type Op = { op: string; label: string };
 export const OPS: Record<string, Op[]> = {

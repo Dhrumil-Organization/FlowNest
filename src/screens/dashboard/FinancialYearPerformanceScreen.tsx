@@ -1,9 +1,10 @@
 import { api } from '@/src/screens/dashboard/employ/api/api';
 import { useDashboardAmountMode, formatDashboardAmount } from '@/src/components/dashboard/AmountDisplayModeControl';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -25,6 +26,18 @@ type FyMonth = {
   qty: number | null;
   bills: number | null;
   avg_rate: number | null;
+  stage_amount?: number | null;
+  stage_qty?: number | null;
+  stage_bills?: number | null;
+};
+
+type FyExecutiveMonth = {
+  month_key?: string;
+  executive_code?: string;
+  executive_name?: string;
+  qty?: number;
+  amount?: number;
+  bills?: number;
 };
 
 type FyLine = {
@@ -45,7 +58,9 @@ type FyReport = {
   from_date?: number;
   to_date?: number;
   total?: { amount?: number; qty?: number; bills?: number; avg_rate?: number };
+  stage?: { to_date?: number; amount?: number; qty?: number; bills?: number; avg_rate?: number };
   months?: FyMonth[];
+  executive_months?: FyExecutiveMonth[];
   dimensions?: Record<string, any[]>;
   lines?: FyLine[];
   status?: string;
@@ -66,12 +81,17 @@ type YearSpec = {
 
 type LoadedYear = YearSpec & {
   report: FyReport;
+  summaryOnly?: boolean;
 };
 
 type DetailPath = { dim: DimensionKey; code: string; name: string };
 type DimensionKey = 'executive' | 'party' | 'category' | 'design';
 
 type GroupRow = { code: string; name: string; amount: number; qty: number; count: number };
+type FyDrilldownMonthRow = GroupRow & { month_key?: string };
+type FyDrilldownBlock = { total?: { amount?: number; qty?: number; bills?: number }; rows?: GroupRow[]; monthly_rows?: FyDrilldownMonthRow[]; start_year?: number };
+type FyDrilldownData = { current?: FyDrilldownBlock; previous?: FyDrilldownBlock | null; dimension?: DimensionKey };
+type ExecutiveOverviewRow = { executive_code?: string; executive_name?: string; amount?: number };
 
 const C = {
   bg: '#F5F2EE',
@@ -124,6 +144,14 @@ const fyLabel = (startYear: number): string => `FY ${fyId(startYear)}`;
 const fyRange = (startYear: number): string => `Apr ${startYear} – Mar ${startYear + 1}`;
 const fyStartDate = (startYear: number): string => `${startYear}-04-01`;
 const fyEndDate = (startYear: number): string => `${startYear + 1}-03-31`;
+const shiftYmdToFy = (anchorDate: string, anchorStartYear: number, targetStartYear: number): string => {
+  const d = parseYmd(anchorDate);
+  const offset = targetStartYear - anchorStartYear;
+  const targetYear = d.getFullYear() + offset;
+  const targetMonth = d.getMonth();
+  const maxDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return toYmd(new Date(targetYear, targetMonth, Math.min(d.getDate(), maxDay)));
+};
 
 const monthDate = (startYear: number, index: number): { year: number; month: number; key: string; label: string } => {
   const raw = 4 + index;
@@ -154,7 +182,14 @@ const formatRate = (value: any): string => `₹${n(value).toLocaleString('en-IN'
 const pctChange = (a: number, b: number): number | null => b !== 0 ? ((a - b) / b) * 100 : null;
 const pctText = (value: number | null): string => value == null ? '—' : `${value >= 0 ? '+' : '−'}${Math.abs(Math.round(value))}%`;
 
-const availableMonths = (report?: FyReport): FyMonth[] => (report?.months || []).filter(m => m?.available !== false);
+const monthHasData = (row?: FyMonth | null): boolean => Boolean(
+  row
+  && row.available !== false
+  && (Math.abs(n(row.amount)) > 0.0001 || Math.abs(n(row.qty)) > 0.0001 || n(row.bills) > 0)
+);
+
+const availableMonths = (report?: FyReport, maxMonthIndex: number | null = null): FyMonth[] =>
+  (report?.months || []).filter((row, index) => monthHasData(row) && (maxMonthIndex == null || index <= maxMonthIndex));
 const monthMetric = (report: FyReport | undefined, index: number, field: 'amount' | 'qty' | 'bills'): number => {
   const row = report?.months?.[index];
   if (!row || row.available === false) return 0;
@@ -168,7 +203,9 @@ const fullMetric = (report: FyReport | undefined, field: 'amount' | 'qty' | 'bil
 };
 
 const averageMonths = (report: FyReport | undefined, maxMonthIndex: number | null = null): number => {
-  const months = (report?.months || []).filter((row, index) => row?.available !== false && (maxMonthIndex == null || index <= maxMonthIndex));
+  // Claude FYPage averages only months which actually contain metric data (S.has),
+  // not every calendar month which merely exists in the FY range.
+  const months = availableMonths(report, maxMonthIndex);
   return months.length ? months.reduce((sum, row) => sum + n(row.amount), 0) / months.length : 0;
 };
 
@@ -179,6 +216,10 @@ const stageMetric = (
   monthFraction: number,
 ): number => {
   if (!report) return 0;
+  const exact = report.stage?.[field];
+  if (exact !== undefined && exact !== null) return n(exact);
+  // Backward-compatible fallback for an older API response. New responses
+  // return exact same-date stage totals from SQL and do not use this estimate.
   let total = 0;
   for (let i = 0; i < 12; i += 1) {
     if (i < currentMonthIndex) total += monthMetric(report, i, field);
@@ -187,13 +228,17 @@ const stageMetric = (
   return total;
 };
 
-const cumulative = (report?: FyReport): Array<number | null> => {
-  let total = 0;
+const cumulative = (report?: FyReport, stageIndex: number | null = null): Array<number | null> => {
+  let fullTotal = 0;
   return Array.from({ length: 12 }, (_, i) => {
     const row = report?.months?.[i];
     if (!row || row.available === false) return null;
-    total += n(row.amount);
-    return total;
+    fullTotal += n(row.amount);
+    if (stageIndex != null && i === stageIndex && row.stage_amount !== undefined && row.stage_amount !== null) {
+      const before = fullTotal - n(row.amount);
+      return before + n(row.stage_amount);
+    }
+    return fullTotal;
   });
 };
 
@@ -246,11 +291,38 @@ const groupLines = (lines: FyLine[], dim: DimensionKey, path: DetailPath[]): Gro
   return [...map.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
 };
 
-function Delta({ value, label }: { value: number | null; label?: string }) {
-  if (value == null) return <Text style={styles.deltaMuted}>—{label ? ` ${label}` : ''}</Text>;
+const groupExecutiveMonths = (
+  report: FyReport | undefined,
+  startYear: number,
+  maxMonthIndex: number | null = null,
+): GroupRow[] => {
+  const rows = report?.executive_months || [];
+  const map = new Map<string, GroupRow>();
+
+  rows.forEach(item => {
+    const idx = lineMonthIndex({ month_key: item.month_key }, startYear);
+    if (idx < 0 || (maxMonthIndex != null && idx > maxMonthIndex)) return;
+
+    const code = String(item.executive_code ?? '').trim();
+    const name = String(item.executive_name ?? '').trim() || 'Unassigned';
+    if (!code && name === 'Unassigned') return;
+
+    const key = code || name;
+    const row = map.get(key) || { code, name, amount: 0, qty: 0, count: 0 };
+    row.amount += n(item.amount);
+    row.qty += n(item.qty);
+    row.count += Math.max(0, Math.round(n(item.bills)));
+    map.set(key, row);
+  });
+
+  return [...map.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+};
+
+function Delta({ value, label, size }: { value: number | null; label?: string; size?: number }) {
+  if (value == null) return <Text style={[styles.deltaMuted, size ? { fontSize: size } : null]}>—{label ? ` ${label}` : ''}</Text>;
   const good = value >= 0;
   return (
-    <Text style={[styles.delta, { color: good ? C.today : C.over }]}>
+    <Text style={[styles.delta, size ? { fontSize: size } : null, { color: good ? C.today : C.over }]}>
       {value >= 0 ? '▲ ' : '▼ '}{pctText(value)}{label ? <Text style={styles.deltaMuted}> {label}</Text> : null}
     </Text>
   );
@@ -265,7 +337,7 @@ function SectionLabel({ children, right }: { children: React.ReactNode; right?: 
   );
 }
 
-function YearChips({ years, selected, onSelect, loadingId }: { years: YearSpec[]; selected: number; onSelect: (index: number) => void; loadingId?: string | null }) {
+function YearChips({ years, selected, onSelect }: { years: YearSpec[]; selected: number; onSelect: (index: number) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
       {years.map((year, index) => {
@@ -273,7 +345,7 @@ function YearChips({ years, selected, onSelect, loadingId }: { years: YearSpec[]
         return (
           <TouchableOpacity key={year.id} activeOpacity={0.76} onPress={() => onSelect(index)} style={[styles.chip, active && styles.chipActive]}>
             <Text style={[styles.chipText, active && styles.chipTextActive]}>
-              {fyLabel(year.startYear)}{index === 0 ? ' · current' : ''}{loadingId === year.id ? ' · loading' : ''}
+              {fyLabel(year.startYear)}{index === 0 ? ' · current' : ''}
             </Text>
           </TouchableOpacity>
         );
@@ -282,45 +354,77 @@ function YearChips({ years, selected, onSelect, loadingId }: { years: YearSpec[]
   );
 }
 
+function SkeletonBlock({ width = '100%', height = 10, radius = 5, style }: { width?: any; height?: number; radius?: number; style?: any }) {
+  return <View pointerEvents="none" style={[styles.skeletonBlock, { width, height, borderRadius: radius }, style]} />;
+}
+
+function UnloadedYearCard({ spec, active }: { spec: YearSpec; active?: boolean }) {
+  return (
+    <View style={[styles.yearCard, active && styles.yearCardActive]}>
+      <Text style={[styles.yearCardLabel, active && styles.yearCardLabelActive]}>
+        {fyLabel(spec.startYear)}{spec.isCurrent ? ' · to date' : ''}
+      </Text>
+      <Text style={[styles.yearCardValue, active && styles.yearCardTextActive]}>—</Text>
+      {!spec.isCurrent ? (
+        <>
+          <Text style={[styles.yearCardStageLabel, active && styles.yearCardStageActive]}>at this stage</Text>
+          <Text style={[styles.yearCardStageValue, active && styles.yearCardStageActive]}>—</Text>
+        </>
+      ) : null}
+      <Text style={[styles.yearCardDeltaMuted, active && styles.yearCardStageActive]}>—</Text>
+    </View>
+  );
+}
+
 function YearStrip({
-  years,
+  specs,
+  loadedYears,
   selected,
   currentMonthIndex,
   monthFraction,
   amount,
   onSelect,
 }: {
-  years: LoadedYear[];
+  specs: YearSpec[];
+  loadedYears: LoadedYear[];
   selected: number;
   currentMonthIndex: number;
   monthFraction: number;
   amount: (value: any) => string;
   onSelect: (index: number) => void;
 }) {
-  // Claude Artifact lays the strip out chronologically: oldest → current.
-  const chronological = years.slice().reverse();
+  const chronological = specs.slice().reverse();
   const focusIsCurrent = selected === 0;
 
   return (
     <View style={styles.yearStrip}>
-      {chronological.map((year, chronologicalIndex) => {
-        const originalIndex = years.findIndex(item => item.id === year.id);
+      {chronological.map((spec, chronologicalIndex) => {
+        const originalIndex = specs.findIndex(item => item.id === spec.id);
         const focus = originalIndex === selected;
+        const year = loadedYears.find(item => item.id === spec.id);
+        const previousSpec = chronological[chronologicalIndex - 1];
+        const previousYear = previousSpec ? loadedYears.find(item => item.id === previousSpec.id) : undefined;
+
+        if (!year) {
+          return (
+            <TouchableOpacity key={spec.id} activeOpacity={0.8} onPress={() => onSelect(originalIndex)} style={{ flex: 1, minWidth: 0 }}>
+              <UnloadedYearCard spec={spec} active={focus} />
+            </TouchableOpacity>
+          );
+        }
+
         const fullValue = fullMetric(year.report, 'amount');
-        const stageValue = originalIndex === 0
+        const stageValue = year.isCurrent
           ? fullValue
           : stageMetric(year.report, 'amount', currentMonthIndex, monthFraction);
-        const previousChronological = chronological[chronologicalIndex - 1];
-        const useStage = focusIsCurrent || originalIndex === 0;
+        const useStage = focusIsCurrent || year.isCurrent;
         const compareValue = useStage ? stageValue : fullValue;
-        const previousValue = previousChronological
+        const previousValue = previousYear
           ? (useStage
-            ? stageMetric(previousChronological.report, 'amount', currentMonthIndex, monthFraction)
-            : fullMetric(previousChronological.report, 'amount'))
+            ? stageMetric(previousYear.report, 'amount', currentMonthIndex, monthFraction)
+            : fullMetric(previousYear.report, 'amount'))
           : 0;
-        const delta = previousChronological && previousValue > 0
-          ? pctChange(compareValue, previousValue)
-          : null;
+        const delta = previousYear && previousValue > 0 ? pctChange(compareValue, previousValue) : null;
 
         return (
           <TouchableOpacity
@@ -329,16 +433,16 @@ function YearStrip({
             onPress={() => onSelect(originalIndex)}
             style={[styles.yearCard, focus && styles.yearCardActive]}
           >
-            <Text style={[styles.yearCardLabel, focus && styles.yearCardTextActive]}>
-              {fyLabel(year.startYear)}{originalIndex === 0 ? ' · to date' : ''}
+            <Text style={[styles.yearCardLabel, focus && styles.yearCardLabelActive]}>
+              {fyLabel(year.startYear)}{year.isCurrent ? ' · to date' : ''}
             </Text>
             <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.yearCardValue, focus && styles.yearCardTextActive]}>
               {amount(fullValue)}
             </Text>
-            {originalIndex !== 0 ? (
+            {!year.isCurrent ? (
               <>
-                <Text style={[styles.yearCardStageLabel, focus && styles.yearCardTextActive]}>at this stage</Text>
-                <Text style={[styles.yearCardStageValue, focus && styles.yearCardTextActive]}>{amount(stageValue)}</Text>
+                <Text style={[styles.yearCardStageLabel, focus && styles.yearCardStageActive]}>at this stage</Text>
+                <Text style={[styles.yearCardStageValue, focus && styles.yearCardStageActive]}>{amount(stageValue)}</Text>
               </>
             ) : null}
             <Text
@@ -349,11 +453,32 @@ function YearStrip({
               ]}
             >
               {delta == null ? '—' : `${delta >= 0 ? '▲ ' : '▼ '}${pctText(delta)}`}
-              {delta != null && previousChronological ? ` vs ${fyId(previousChronological.startYear)}` : ''}
+              {delta != null && previousYear ? ` vs ${fyId(previousYear.startYear)}` : ''}
             </Text>
           </TouchableOpacity>
         );
       })}
+    </View>
+  );
+}
+
+function MiniSpark({ values, highlight }: { values: Array<number | null>; highlight: number | null }) {
+  const clean = values.map(value => value == null ? 0 : n(value));
+  const max = Math.max(1, ...clean);
+  return (
+    <View style={styles.miniSpark} pointerEvents="none">
+      {clean.map((value, index) => (
+        <View
+          key={index}
+          style={[
+            styles.miniSparkBar,
+            {
+              height: Math.max(2, Math.round((value / max) * 22)),
+              backgroundColor: index === highlight ? C.bill : `${C.bill}55`,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -363,24 +488,32 @@ function KpiTile({
   value,
   sub,
   delta,
+  deltaLabel,
   open,
   onPress,
   children,
+  spark,
 }: {
   label: string;
   value: string;
   sub?: string;
   delta?: number | null;
+  deltaLabel?: string;
   open: boolean;
   onPress: () => void;
   children?: React.ReactNode;
+  spark?: { values: Array<number | null>; highlight: number | null };
 }) {
   return (
     <TouchableOpacity activeOpacity={0.82} onPress={onPress} style={[styles.kpiTile, open && styles.kpiTileOpen]}>
-      <Text style={styles.kpiLabel}>{label}</Text>
+      <View style={styles.kpiTitleRow}>
+        <Text style={styles.kpiLabel}>{label}</Text>
+        <Text style={[styles.kpiChevron, open && styles.kpiChevronOpen]}>▾</Text>
+      </View>
       <Text numberOfLines={1} adjustsFontSizeToFit style={styles.kpiValue}>{value}</Text>
+      {delta !== undefined ? <Delta value={delta ?? null} label={delta == null ? undefined : deltaLabel} /> : null}
       {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
-      {delta !== undefined ? <Delta value={delta ?? null} /> : null}
+      {spark ? <MiniSpark values={spark.values} highlight={spark.highlight} /> : null}
       {open ? <View style={styles.kpiExpanded}>{children}</View> : null}
     </TouchableOpacity>
   );
@@ -424,6 +557,7 @@ function FyLineChart({
   amount,
   selectedMonth,
   onMonth,
+  chartWidth,
 }: {
   years: LoadedYear[];
   selectedYear: number;
@@ -431,10 +565,22 @@ function FyLineChart({
   amount: (value: any) => string;
   selectedMonth: number | null;
   onMonth: (index: number) => void;
+  chartWidth: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  const width = 640;
-  const height = 188;
+  const hoverLeaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setHoverStable = (index: number) => {
+    if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current);
+    hoverLeaveRef.current = null;
+    setHover(index);
+  };
+  const clearHoverStable = () => {
+    if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current);
+    hoverLeaveRef.current = setTimeout(() => setHover(null), 120);
+  };
+  useEffect(() => () => { if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current); }, []);
+  const width = chartWidth;
+  const height = 200;
   const left = 16;
   const right = 16;
   const top = 14;
@@ -443,12 +589,12 @@ function FyLineChart({
   const innerH = height - top - bottom;
   const chartYears = years.slice().reverse();
   const selectedId = years[selectedYear]?.id;
-  const series = chartYears.map(y => cumulative(y.report));
+  const series = chartYears.map(y => cumulative(y.report, currentMonthIndex));
   const max = Math.max(1, ...series.flat().filter((v): v is number => v != null));
   const x = (i: number) => left + (innerW * i) / 11;
   const y = (v: number) => top + innerH - (v / max) * innerH;
   const colors = chartYears.map((year, i) => year.id === selectedId ? C.bill : (year.isCurrent ? C.ink : i === 0 ? C.grey1 : C.grey2));
-  const activeIndex = hover ?? selectedMonth;
+  const activeIndex = hover ?? (Platform.OS === 'web' ? null : selectedMonth);
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -463,23 +609,29 @@ function FyLineChart({
             return points ? (
               <React.Fragment key={chartYears[yi].id}>
                 <Polyline points={points} fill="none" stroke={colors[yi]} strokeWidth={chartYears[yi].id === selectedId ? 3 : (chartYears[yi].isCurrent ? 2.5 : 2)} />
-                {vals.map((v, i) => v == null ? null : (
-                  <Circle key={i} cx={x(i)} cy={y(v)} r={chartYears[yi].isCurrent ? 2.4 : 1.8} fill={colors[yi]} />
-                ))}
+                {chartYears[yi].isCurrent ? vals.map((v, i) => v == null ? null : (
+                  <Circle key={i} cx={x(i)} cy={y(v)} r={2.5} fill={colors[yi]} />
+                )) : null}
               </React.Fragment>
             ) : null;
           })}
         </Svg>
-        <View style={[StyleSheet.absoluteFill, { left, right, bottom }]}> 
+        <View pointerEvents="box-none" style={{ position: 'absolute', left, top, width: innerW, height: innerH }}>
           {Array.from({ length: 12 }, (_, i) => {
-            const cellW = innerW / 12;
+            // The plotted points are spaced by innerW / 11. Build hit zones
+            // from the midpoints between adjacent points so the 12 regions are
+            // perfectly contiguous. The old innerW / 12 zones left dead gaps
+            // that caused the multi-year tooltip to flicker while crossing months.
+            const step = innerW / 11;
+            const zoneLeft = i === 0 ? 0 : (i - 0.5) * step;
+            const zoneRight = i === 11 ? innerW : (i + 0.5) * step;
             return (
               <Pressable
                 key={i}
                 onPress={() => onMonth(i)}
-                onHoverIn={() => setHover(i)}
-                onHoverOut={() => setHover(null)}
-                style={{ position: 'absolute', left: Math.max(0, x(i) - left - cellW / 2), top: 0, bottom: 0, width: cellW }}
+                onHoverIn={() => setHoverStable(i)}
+                onHoverOut={clearHoverStable}
+                style={{ position: 'absolute', left: zoneLeft, top: 0, bottom: 0, width: zoneRight - zoneLeft }}
               />
             );
           })}
@@ -488,7 +640,18 @@ function FyLineChart({
           {Array.from({ length: 12 }, (_, i) => <Text key={i} style={styles.chartXLabel}>{monthDate(chartYears[0].startYear, i).label}</Text>)}
         </View>
         {activeIndex != null ? (
-          <View style={[styles.tooltipPos, { left: Math.min(width - 184, Math.max(6, x(activeIndex) - 80)) }]}>
+          <View
+            pointerEvents="none"
+            style={[
+              styles.tooltipPos,
+              {
+                left: Math.min(
+                  width - 184,
+                  Math.max(6, x(activeIndex) < width / 2 ? x(activeIndex) + 14 : x(activeIndex) - 192),
+                ),
+              },
+            ]}
+          >
             <ChartTooltip index={activeIndex} years={chartYears} values={series} cumulativeMode amount={amount} colors={colors} />
           </View>
         ) : null}
@@ -503,17 +666,30 @@ function FyBarChart({
   amount,
   selectedMonth,
   onMonth,
+  chartWidth,
 }: {
   years: LoadedYear[];
   selectedYear: number;
   amount: (value: any) => string;
   selectedMonth: number | null;
   onMonth: (index: number) => void;
+  chartWidth: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  const width = 660;
-  const height = 180;
-  const chartH = 138;
+  const hoverLeaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setHoverStable = (index: number) => {
+    if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current);
+    hoverLeaveRef.current = null;
+    setHover(index);
+  };
+  const clearHoverStable = () => {
+    if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current);
+    hoverLeaveRef.current = setTimeout(() => setHover(null), 120);
+  };
+  useEffect(() => () => { if (hoverLeaveRef.current) clearTimeout(hoverLeaveRef.current); }, []);
+  const width = chartWidth;
+  const height = 190;
+  const chartH = 148;
   const chartYears = years.slice().reverse();
   const selectedId = years[selectedYear]?.id;
   const series = chartYears.map(y => Array.from({ length: 12 }, (_, i) => y.report?.months?.[i]?.available === false ? null : monthMetric(y.report, i, 'amount')));
@@ -521,18 +697,16 @@ function FyBarChart({
   const colors = chartYears.map((year, i) => year.id === selectedId ? C.bill : (year.isCurrent ? C.ink : i === 0 ? C.grey1 : C.grey2));
   const groupW = width / 12;
   const barW = 9;
-  const active = hover ?? selectedMonth;
+  const active = hover ?? (Platform.OS === 'web' ? null : selectedMonth);
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <View style={{ width, height }}>
         <View style={[styles.barArea, { height: chartH }]}> 
           {Array.from({ length: 12 }, (_, i) => (
-            <Pressable
+            <View
               key={i}
-              onPress={() => onMonth(i)}
-              onHoverIn={() => setHover(i)}
-              onHoverOut={() => setHover(null)}
+              pointerEvents="none"
               style={[styles.barGroup, { width: groupW, opacity: selectedMonth != null && selectedMonth !== i ? 0.35 : 1 }]}
             >
               <View style={styles.barCluster}>
@@ -542,28 +716,93 @@ function FyBarChart({
                   return <View key={year.id} style={{ width: barW, height: h, borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: colors[yi] }} />;
                 })}
               </View>
-            </Pressable>
+            </View>
           ))}
+          <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+            {Array.from({ length: 12 }, (_, i) => (
+              <Pressable
+                key={i}
+                onPress={() => onMonth(i)}
+                onHoverIn={() => setHoverStable(i)}
+                onHoverOut={clearHoverStable}
+                style={{ position: 'absolute', left: i * groupW, top: 0, bottom: 0, width: groupW }}
+              />
+            ))}
+          </View>
         </View>
         <View style={styles.chartXAxis}>
           {Array.from({ length: 12 }, (_, i) => <Text key={i} style={styles.chartXLabel}>{monthDate(chartYears[0].startYear, i).label}</Text>)}
         </View>
-        {active != null ? (
-          <View style={[styles.tooltipPos, { left: Math.min(width - 184, Math.max(6, active * groupW + groupW / 2 - 80)) }]}>
-            <ChartTooltip index={active} years={chartYears} values={series} amount={amount} colors={colors} />
-          </View>
-        ) : null}
+        {active != null ? (() => {
+          const cx = active * groupW + groupW / 2;
+          const tooltipLeft = Math.min(width - 184, Math.max(6, cx < width / 2 ? cx + 14 : cx - 192));
+          return (
+            <View pointerEvents="none" style={[styles.tooltipPos, { left: tooltipLeft }]}>
+              <ChartTooltip index={active} years={chartYears} values={series} amount={amount} colors={colors} />
+            </View>
+          );
+        })() : null}
       </View>
     </ScrollView>
   );
 }
 
+function FinancialYearLoadingSkeleton({ specs, selected, anchorDate, onBack, onClose }: { specs: YearSpec[]; selected: number; anchorDate: string; onBack: () => void; onClose: () => void }) {
+  const spec = specs[selected] || specs[0];
+  const anchor = parseYmd(anchorDate);
+  return (
+    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && styles.webOverlay]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.75}><Text style={styles.backText}>‹</Text></TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text numberOfLines={1} style={styles.headerTitle}>🧵 Sales</Text>
+          <Text numberOfLines={1} style={styles.headerSub}>{`${fyLabel(spec.startYear)} · ${fyRange(spec.startYear)}${spec.isCurrent ? ` · to ${anchor.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}`}</Text>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn}><Text style={styles.closeText}>✕</Text></TouchableOpacity>
+      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.chipsRowStatic}>
+          {specs.map((year, index) => <View key={year.id} style={[styles.chip, index === selected && styles.chipActive]}><Text style={[styles.chipText, index === selected && styles.chipTextActive]}>{fyLabel(year.startYear)}{index === 0 ? ' · current' : ''}</Text></View>)}
+        </View>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroMain}>
+              <SkeletonBlock width={170} height={8} />
+              <SkeletonBlock width={150} height={28} style={{ marginTop: 8 }} />
+              <View style={styles.heroDeltaSkeletonRow}><SkeletonBlock width={48} height={9} /><SkeletonBlock width={190} height={9} /></View>
+              {spec.isCurrent ? <SkeletonBlock width="90%" height={9} style={{ marginTop: 7 }} /> : null}
+            </View>
+            <View style={styles.insightBox}>
+              {[0,1,2].map(i => <View key={i} style={styles.insightRow}><Text style={styles.insightBullet}>•</Text><SkeletonBlock width={i === 1 ? '84%' : '72%'} height={8} style={{ marginTop: 4 }} /></View>)}
+            </View>
+          </View>
+          <View style={styles.yearStrip}>
+            {specs.slice().reverse().map((year) => year.id === spec.id
+              ? <View key={year.id} style={{ flex: 1, minWidth: 0 }}><View style={[styles.yearCard, styles.yearCardActive]}><SkeletonBlock width={year.isCurrent ? '72%' : '58%'} height={8} style={styles.skeletonOnBlue} /><SkeletonBlock width="64%" height={14} style={[{ marginTop: 7 }, styles.skeletonOnBlueStrong]} />{!year.isCurrent ? <><SkeletonBlock width="48%" height={7} style={[{ marginTop: 5 }, styles.skeletonOnBlue]} /><SkeletonBlock width="42%" height={8} style={[{ marginTop: 4 }, styles.skeletonOnBlue]} /></> : null}<SkeletonBlock width="50%" height={8} style={[{ marginTop: 6 }, styles.skeletonOnBlue]} /></View></View>
+              : <View key={year.id} style={{ flex: 1, minWidth: 0 }}><UnloadedYearCard spec={year} /></View>)}
+          </View>
+        </View>
+        <View style={styles.kpiGrid}>
+          {Array.from({ length: 5 }, (_, i) => <View key={i} style={styles.kpiTile}><SkeletonBlock width="58%" height={7} /><SkeletonBlock width="72%" height={16} style={{ marginTop: 7 }} /><SkeletonBlock width="46%" height={7} style={{ marginTop: 6 }} />{i === 0 ? <SkeletonBlock width="100%" height={22} style={{ marginTop: 7 }} /> : null}</View>)}
+        </View>
+        <SectionLabel right="dashed line = today’s stage">CUMULATIVE · THE CHASE</SectionLabel>
+        <View style={[styles.chartCard, styles.skeletonChart]}><SkeletonBlock width="88%" height={2} /><SkeletonBlock width="68%" height={2} style={{ marginTop: 42 }} /><SkeletonBlock width="48%" height={2} style={{ marginTop: 42 }} /></View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 export default function FinancialYearPerformanceScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const { mode: amountMode } = useDashboardAmountMode();
   const amount = useCallback((value: any) => formatDashboardAmount(n(value), amountMode), [amountMode]);
+  // Claude FY charts fill the available 860px page on desktop and only
+  // become horizontally scrollable below their 560/600px minimum widths.
+  const lineChartWidth = Math.max(560, Math.min(824, Math.max(0, width - 36)));
+  const barChartWidth = Math.max(600, Math.min(824, Math.max(0, width - 36)));
 
   const metric = one(params.metric) || 'sales';
   const prptype = one(params.prptype) || 'S';
@@ -582,7 +821,9 @@ export default function FinancialYearPerformanceScreen() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [loadingYearId, setLoadingYearId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'detail'>('overview');
-  const [detailReport, setDetailReport] = useState<FyReport | null>(null);
+  const [detailData, setDetailData] = useState<FyDrilldownData | null>(null);
+  const detailCacheRef = useRef<Record<string, FyDrilldownData>>({});
+  const detailActiveKeyRef = useRef('');
   const [detailMonth, setDetailMonth] = useState<number | null>(null);
   const [detailPath, setDetailPath] = useState<DetailPath[]>([]);
   const [detailDimension, setDetailDimension] = useState<DimensionKey>('executive');
@@ -590,7 +831,17 @@ export default function FinancialYearPerformanceScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [executiveOverview, setExecutiveOverview] = useState<Record<string, ExecutiveOverviewRow[]>>({});
+  const [executiveLoadingId, setExecutiveLoadingId] = useState<string | null>(null);
+  const executiveRequestedRef = useRef<Set<string>>(new Set());
   const initialLoadKeyRef = useRef('');
+
+  const exitFinancialYear = useCallback(() => {
+    // FY Sales is launched from the main dashboard. Replace the FY route
+    // instead of browser-history back so Expo Router fully unmounts the fixed
+    // web overlay; otherwise stale FY chips can remain above /new.
+    router.replace('/new' as any);
+  }, [router]);
 
   const specs = useMemo<YearSpec[]>(() => Array.from({ length: 3 }, (_, offset) => {
     const startYear = anchorStartYear - offset;
@@ -605,18 +856,9 @@ export default function FinancialYearPerformanceScreen() {
     };
   }), [anchorStartYear, anchorDate]);
 
-  const upsertYear = useCallback((year: LoadedYear) => {
-    setYears(current => {
-      const next = current.filter(item => item.id !== year.id);
-      next.push(year);
-      next.sort((a, b) => b.startYear - a.startYear);
-      return next;
-    });
-  }, []);
-
   const loadYear = useCallback(async (
     specIndex: number,
-    options: { refresh?: boolean; includeDetails?: boolean } = {},
+    options: { refresh?: boolean } = {},
   ): Promise<LoadedYear | null> => {
     const spec = specs[specIndex];
     if (!spec) return null;
@@ -634,21 +876,57 @@ export default function FinancialYearPerformanceScreen() {
     setError('');
 
     try {
+      const stageToDate = shiftYmdToFy(anchorDate, anchorStartYear, spec.startYear);
       const response: any = await api.getOwnerFySales({
         date: spec.toDate,
         from_date: spec.fromDate,
         to_date: spec.toDate,
+        stage_to_date: spec.isCurrent ? spec.toDate : stageToDate,
         prptype,
         view: 'owner',
-        include_details: options.includeDetails ? 1 : 0,
+        include_details: 0,
+        // Initial/current FY gets only the tiny month-level summaries for the
+        // two prior FYs. Historical hierarchy/transactions are NOT preloaded.
+        include_comparisons: specIndex === 0 ? 1 : 0,
       });
 
       if (!response?.success || !response?.data?.report) {
         throw new Error(response?.message || response?.code || `Unable to load ${fyLabel(spec.startYear)}.`);
       }
 
-      const loaded: LoadedYear = { ...spec, report: response.data.report as FyReport };
-      upsertYear(loaded);
+      const loaded: LoadedYear = {
+        ...spec,
+        report: response.data.report as FyReport,
+        summaryOnly: !Boolean(response.data.report?.details_loaded),
+      };
+
+      const comparisonYears: LoadedYear[] = (Array.isArray(response?.data?.comparisons) ? response.data.comparisons : [])
+        .filter((item: any) => item?.available && item?.report)
+        .map((item: any) => {
+          const startYear = Number(item.start_year);
+          const comparisonSpec = specs.find(candidate => candidate.startYear === startYear);
+          if (!comparisonSpec) return null;
+          return {
+            ...comparisonSpec,
+            report: item.report as FyReport,
+            summaryOnly: true,
+          } as LoadedYear;
+        })
+        .filter(Boolean) as LoadedYear[];
+
+      setYears(current => {
+        const byId = new Map<string, LoadedYear>();
+        current.forEach(item => byId.set(item.id, item));
+        byId.set(loaded.id, loaded);
+        comparisonYears.forEach(item => {
+          const existing = byId.get(item.id);
+          // Never overwrite a detail-loaded historical year with summary-only
+          // data from a later current-FY refresh.
+          if (!existing || !existing.report?.details_loaded) byId.set(item.id, item);
+        });
+        return [...byId.values()].sort((a, b) => b.startYear - a.startYear);
+      });
+
       return loaded;
     } catch (e: any) {
       setError(e?.message || `Unable to load ${fyLabel(spec.startYear)}.`);
@@ -658,7 +936,7 @@ export default function FinancialYearPerformanceScreen() {
       setRefreshing(false);
       setLoadingYearId(null);
     }
-  }, [metric, prptype, specs, upsertYear, view, years.length]);
+  }, [metric, prptype, specs, view, years.length, anchorDate, anchorStartYear]);
 
   useEffect(() => {
     // Initial entry intentionally loads ONLY the current FY. Historical FYs are
@@ -674,11 +952,56 @@ export default function FinancialYearPerformanceScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric, prptype, view, anchorDate]);
 
+  const loadExecutiveOverview = useCallback(async (specIndex: number) => {
+    const spec = specs[specIndex];
+    if (!spec || metric !== 'sales' || view !== 'owner') return;
+    if (executiveOverview[spec.id] || executiveRequestedRef.current.has(spec.id)) return;
+
+    executiveRequestedRef.current.add(spec.id);
+    setExecutiveLoadingId(spec.id);
+    const stageToDate = shiftYmdToFy(anchorDate, anchorStartYear, spec.startYear);
+    try {
+      const response: any = await api.getOwnerFySales({
+        date: stageToDate,
+        from_date: spec.fromDate,
+        to_date: spec.fullEndDate,
+        stage_to_date: stageToDate,
+        prptype,
+        view: 'owner',
+        overview_executives: 1,
+        include_comparisons: 1,
+      });
+      const ov = response?.data?.executive_overview;
+      if (!response?.success || !ov) throw new Error(response?.message || 'Unable to load FY executive overview.');
+      const updates: Record<string, ExecutiveOverviewRow[]> = {
+        [spec.id]: Array.isArray(ov.top_executives) ? ov.top_executives : [],
+      };
+      (Array.isArray(ov.comparisons) ? ov.comparisons : []).forEach((item: any) => {
+        const startYear = Number(item?.start_year);
+        if (!item?.available || !Number.isFinite(startYear)) return;
+        updates[fyId(startYear)] = Array.isArray(item.top_executives) ? item.top_executives : [];
+      });
+      setExecutiveOverview(current => ({ ...current, ...updates }));
+    } catch {
+      // Do not fail the FY page for a preview-only section. The user can still
+      // open the full breakdown, which uses the existing detailed report path.
+      setExecutiveOverview(current => ({ ...current, [spec.id]: [] }));
+    } finally {
+      setExecutiveLoadingId(current => current === spec.id ? null : current);
+    }
+  }, [specs, metric, view, executiveOverview, anchorDate, anchorStartYear, prptype]);
+
   const selectedSpec = specs[selectedYear];
   const focus = selectedSpec ? years.find(year => year.id === selectedSpec.id) : undefined;
   const previous = focus ? years.find(year => year.startYear === focus.startYear - 1) : undefined;
   const currentPrior = years.find(year => year.id === specs[1]?.id);
   const loadedSelectedIndex = focus ? Math.max(0, years.findIndex(year => year.id === focus.id)) : 0;
+
+  useEffect(() => {
+    if (!focus || viewMode !== 'overview') return;
+    const index = specs.findIndex(spec => spec.id === focus.id);
+    if (index >= 0) void loadExecutiveOverview(index);
+  }, [focus?.id, viewMode, loadExecutiveOverview, specs]);
 
   const focusTotal = fullMetric(focus?.report, 'amount');
   const previousComparable = previous
@@ -702,10 +1025,10 @@ export default function FinancialYearPerformanceScreen() {
     : null;
   const stageLabel = `Apr–${monthDate(anchorStartYear, currentMonthIndex).label} to ${anchor.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`;
 
-  const focusMonths = availableMonths(focus?.report);
+  const focusMonths = availableMonths(focus?.report, focus?.isCurrent ? currentMonthIndex : null);
   const avg = averageMonths(focus?.report, focus?.isCurrent ? currentMonthIndex : null);
   const bestIndex = focus?.report?.months?.reduce((best, row, index, arr) => {
-    if (!row || row.available === false) return best;
+    if (!monthHasData(row)) return best;
     if (best < 0 || n(row.amount) > n(arr[best]?.amount)) return index;
     return best;
   }, -1) ?? -1;
@@ -718,73 +1041,61 @@ export default function FinancialYearPerformanceScreen() {
     () => previous ? linesForRange(previous.report, previous.startYear, focus?.isCurrent ? currentMonthIndex : null) : [],
     [previous, focus?.isCurrent, currentMonthIndex],
   );
-  const topExecutives = useMemo(
-    () => groupLines(focusRangeLines, 'executive', []).slice(0, 5),
-    [focusRangeLines],
-  );
-  const topPreviousExecutives = useMemo(
-    () => new Map(groupLines(previousRangeLines, 'executive', []).map(row => [row.code || row.name, row])),
-    [previousRangeLines],
-  );
+  const executiveRows = useMemo<GroupRow[]>(() => {
+    if (!focus) return [];
+    const preview = executiveOverview[focus.id] || [];
+    if (preview.length) {
+      return preview.map(row => ({
+        code: String(row.executive_code || '').trim(),
+        name: String(row.executive_name || '').trim() || 'Unassigned',
+        amount: n(row.amount),
+        qty: 0,
+        count: 0,
+      })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+    }
+    // Detail-loaded years can still supply the overview locally.
+    return focus.report?.details_loaded ? groupLines(focusRangeLines, 'executive', []) : [];
+  }, [focus, focusRangeLines, executiveOverview]);
+  const topExecutives = executiveRows.slice(0, 5);
 
-  const resetYearView = () => {
-    setSelectedMonth(null);
-    setOpenTile(null);
-    setViewMode('overview');
-    setDetailReport(null);
-    setDetailMonth(null);
-    setDetailPath([]);
-  };
+  const topPreviousExecutives = useMemo(() => {
+    if (!previous) return new Map<string, GroupRow>();
+    const preview = executiveOverview[previous.id] || [];
+    const rows: GroupRow[] = preview.length
+      ? preview.map(row => ({
+          code: String(row.executive_code || '').trim(),
+          name: String(row.executive_name || '').trim() || 'Unassigned',
+          amount: n(row.amount), qty: 0, count: 0,
+        }))
+      : (previous.report?.details_loaded ? groupLines(previousRangeLines, 'executive', []) : []);
+    return new Map(rows.map(row => [row.code || row.name, row]));
+  }, [previous, previousRangeLines, executiveOverview]);
 
   const selectYear = async (index: number) => {
     const spec = specs[index];
-    if (!spec || loadingYearId) return;
-    resetYearView();
+    if (!spec || loadingYearId || index === selectedYear) return;
 
-    const cached = years.find(year => year.id === spec.id);
-    if (cached) {
-      setSelectedYear(index);
-      return;
+    // FY is data context, not navigation context. Preserve month/path/dimension.
+    const keepDetail = viewMode === 'detail';
+    if (keepDetail) {
+      setDetailLoading(true);
+      setDetailData(null);
     }
 
-    // Lazy FY loading: only the year the user selected is requested.
-    const loaded = await loadYear(index);
-    if (loaded) setSelectedYear(index);
+    setSelectedYear(index);
+    setError('');
+
+    const existing = years.find(year => year.id === spec.id) || null;
+    if (!existing) {
+      const target = await loadYear(index);
+      if (!target && keepDetail) setDetailLoading(false);
+    }
+    // Progressive detail reload is driven by the effect below once `focus`
+    // points at the newly selected FY. No full-hierarchy request is made here.
   };
-
-  const loadMonthReport = useCallback(async (index: number): Promise<FyReport | null> => {
-    if (!focus) return null;
-    const period = monthPeriod(focus.startYear, index, anchorDate, focus.isCurrent);
-    const row = focus.report?.months?.[index];
-    if (!row || row.available === false) return null;
-    const key = `${focus.id}|${index}`;
-    if (monthReports[key]) return monthReports[key];
-    setMonthLoading(true);
-    try {
-      const response = await api.getOwnerFySales({
-        date: period.last,
-        from_date: period.first,
-        to_date: period.last,
-        prptype,
-        view: 'owner',
-        include_details: 1,
-      });
-      if (!response?.success || !response?.data?.report) throw new Error(response?.message || 'Unable to load month detail.');
-      const report = response.data.report as FyReport;
-      setMonthReports(current => ({ ...current, [key]: report }));
-      return report;
-    } catch (e: any) {
-      setError(e?.message || 'Unable to load month detail.');
-      return null;
-    } finally {
-      setMonthLoading(false);
-    }
-  }, [anchorDate, focus, monthReports, prptype]);
 
   const selectMonth = (index: number) => {
     if (!focus?.report?.months?.[index] || focus.report.months[index].available === false) return;
-    // Month selection is chart interaction only. Do not hit the API until the
-    // user explicitly opens that month in the detailed breakdown.
     setSelectedMonth(current => current === index ? null : index);
   };
 
@@ -795,50 +1106,165 @@ export default function FinancialYearPerformanceScreen() {
     setDetailMonth(monthIndex);
     const remaining = DIMENSIONS.find(d => !initialPath.some(p => p.dim === d.key));
     setDetailDimension(remaining?.key || 'design');
-
+    setDetailData(null);
     setDetailLoading(true);
-    try {
-      if (monthIndex == null) {
-        if (focus.report?.details_loaded) {
-          setDetailReport(focus.report);
-          return;
-        }
-        const loaded = await loadYear(selectedYear, { includeDetails: true });
-        setDetailReport(loaded?.report || null);
-        return;
-      }
-      const report = await loadMonthReport(monthIndex);
-      setDetailReport(report || null);
-    } finally {
-      setDetailLoading(false);
-    }
   };
 
-  const detailLines = useMemo(() => {
-    if (!focus || !detailReport) return [];
-    return detailMonth == null
-      ? linesForRange(detailReport, focus.startYear, focus.isCurrent ? currentMonthIndex : null)
-      : linesForRange(detailReport, focus.startYear, null, detailMonth);
-  }, [focus, detailReport, detailMonth, currentMonthIndex]);
-  const previousDetailLines = useMemo(() => {
-    if (!previous) return [];
-    if (detailMonth != null) return linesForRange(previous.report, previous.startYear, null, detailMonth);
-    return linesForRange(previous.report, previous.startYear, focus?.isCurrent ? currentMonthIndex : null);
-  }, [previous, focus?.isCurrent, detailMonth, currentMonthIndex]);
   const detailDimsLeft = DIMENSIONS.filter(d => !detailPath.some(p => p.dim === d.key));
   const activeDetailDim = detailDimsLeft.some(d => d.key === detailDimension)
     ? detailDimension
     : (detailDimsLeft[0]?.key || 'design');
-  const detailRows = useMemo(() => groupLines(detailLines, activeDetailDim, detailPath), [detailLines, activeDetailDim, detailPath]);
-  const previousDetailRows = useMemo(
-    () => new Map(groupLines(previousDetailLines, activeDetailDim, detailPath).map(row => [row.code || row.name, row])),
-    [previousDetailLines, activeDetailDim, detailPath],
-  );
-  const detailScopedLines = useMemo(() => filterPath(detailLines, detailPath), [detailLines, detailPath]);
-  const previousDetailScopedLines = useMemo(() => filterPath(previousDetailLines, detailPath), [previousDetailLines, detailPath]);
-  const detailScopeTotal = detailScopedLines.reduce((sum, line) => sum + n(line.amount), 0);
-  const detailScopeQty = detailScopedLines.reduce((sum, line) => sum + n(line.qty), 0);
-  const previousDetailScopeTotal = previousDetailScopedLines.reduce((sum, line) => sum + n(line.amount), 0);
+
+  // Month is a FILTER on the current hierarchy, never a hierarchy node.
+  // Progressive SQL returns month-wise rows for this path/dimension in the same
+  // response, so changing month is local and never issues another API request.
+  const changeDetailMonth = (monthIndex: number | null) => {
+    if (!focus || viewMode !== 'detail') return;
+    if (monthIndex != null) {
+      const row = focus.report?.months?.[monthIndex];
+      if (!row || row.available === false) return;
+    }
+    const nextMonth = monthIndex != null && detailMonth === monthIndex ? null : monthIndex;
+    if (nextMonth === detailMonth) return;
+    setDetailMonth(nextMonth);
+    setError('');
+  };
+
+  const detailCacheKey = useMemo(() => {
+    if (!focus || viewMode !== 'detail') return '';
+    const pathKey = detailPath.map(p => `${p.dim}:${p.code}`).join('|');
+    // Month intentionally excluded: one progressive response contains all
+    // month buckets for the current path/dimension.
+    return `${focus.id}|${activeDetailDim}|${pathKey}`;
+  }, [focus?.id, viewMode, activeDetailDim, detailPath]);
+
+  const loadProgressiveDetail = useCallback(async () => {
+    if (!focus || viewMode !== 'detail' || !detailCacheKey) return;
+    const requestKey = detailCacheKey;
+    detailActiveKeyRef.current = requestKey;
+
+    const cached = detailCacheRef.current[requestKey];
+    if (cached?.current) {
+      setDetailData(cached);
+      setDetailLoading(false);
+      return;
+    }
+
+    // Always load the path/dimension for the FY period once. Month switching
+    // is handled from `monthly_rows` locally and must never trigger SQL again.
+    const period = { first: focus.fromDate, last: focus.toDate };
+
+    const pathParams: Record<string, string> = {};
+    detailPath.forEach(p => { pathParams[`${p.dim}_code`] = p.code; });
+
+    setDetailLoading(true);
+    setDetailData(null);
+    setError('');
+    try {
+      // 1) Current selected FY/path first. This is the data the user is waiting
+      // for, so never block it behind the previous-FY comparison.
+      const response: any = await api.getOwnerFySales({
+        date: period.last,
+        from_date: period.first,
+        to_date: period.last,
+        stage_to_date: period.last,
+        prptype,
+        view: 'owner',
+        drilldown: 1,
+        dimension: activeDetailDim,
+        include_previous: 0,
+        ...pathParams,
+      });
+      const currentBlock = response?.data?.drilldown?.current as FyDrilldownBlock | undefined;
+      if (!response?.success || !currentBlock) {
+        throw new Error(response?.message || 'Unable to load FY Sales breakdown.');
+      }
+
+      const firstData: FyDrilldownData = { current: currentBlock, previous: null, dimension: activeDetailDim };
+      detailCacheRef.current[requestKey] = firstData;
+      if (detailActiveKeyRef.current === requestKey) {
+        setDetailData(firstData);
+        setDetailLoading(false);
+      }
+
+      // 2) Previous FY comparison is secondary UI. Load it after the current
+      // rows are already visible, and do not let failure hide the drilldown.
+      const previousStartYear = focus.startYear - 1;
+      const previousFirst = shiftYmdToFy(period.first, focus.startYear, previousStartYear);
+      const previousLast = shiftYmdToFy(period.last, focus.startYear, previousStartYear);
+      try {
+        const previousResponse: any = await api.getOwnerFySales({
+          date: previousLast,
+          from_date: previousFirst,
+          to_date: previousLast,
+          stage_to_date: previousLast,
+          prptype,
+          view: 'owner',
+          drilldown: 1,
+          dimension: activeDetailDim,
+          include_previous: 0,
+          ...pathParams,
+        });
+        const previousBlock = previousResponse?.data?.drilldown?.current as FyDrilldownBlock | undefined;
+        if (previousResponse?.success && previousBlock) {
+          const merged: FyDrilldownData = {
+            current: currentBlock,
+            previous: { ...previousBlock, start_year: previousStartYear },
+            dimension: activeDetailDim,
+          };
+          detailCacheRef.current[requestKey] = merged;
+          if (detailActiveKeyRef.current === requestKey) setDetailData(merged);
+        }
+      } catch {
+        // Comparison is optional for responsiveness; current rows stay visible.
+      }
+    } catch (e: any) {
+      if (detailActiveKeyRef.current === requestKey) {
+        setError(e?.message || 'Unable to load FY Sales breakdown.');
+        setDetailData(null);
+        setDetailLoading(false);
+      }
+    }
+  }, [focus, viewMode, detailCacheKey, anchorDate, detailPath, prptype, activeDetailDim]);
+
+  useEffect(() => {
+    if (viewMode !== 'detail' || !focus || !detailCacheKey) return;
+    void loadProgressiveDetail();
+  }, [viewMode, focus?.id, detailCacheKey, loadProgressiveDetail]);
+
+  const normalizeDrillRows = (rows: any[]): GroupRow[] => rows.map(row => ({
+    code: String(row.code || '').trim(),
+    name: String(row.name || '').trim() || String(row.code || '').trim() || '—',
+    amount: n(row.amount),
+    qty: n(row.qty),
+    count: n(row.count),
+  })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+
+  const currentDetailRowsRaw = useMemo(() => {
+    if (!focus || !detailData?.current) return [] as any[];
+    if (detailMonth == null) return Array.isArray(detailData.current.rows) ? detailData.current.rows : [];
+    const key = monthDate(focus.startYear, detailMonth).key;
+    return (Array.isArray(detailData.current.monthly_rows) ? detailData.current.monthly_rows : [])
+      .filter(row => String(row.month_key || '') === key);
+  }, [detailData, detailMonth, focus?.startYear]);
+  const detailRows: GroupRow[] = useMemo(() => normalizeDrillRows(currentDetailRowsRaw), [currentDetailRowsRaw]);
+
+  const previousDetailRowsRaw = useMemo(() => {
+    if (!focus || !detailData?.previous) return [] as any[];
+    if (detailMonth == null) return Array.isArray(detailData.previous.rows) ? detailData.previous.rows : [];
+    const previousStartYear = Number(detailData.previous.start_year ?? (focus.startYear - 1));
+    const key = monthDate(previousStartYear, detailMonth).key;
+    return (Array.isArray(detailData.previous.monthly_rows) ? detailData.previous.monthly_rows : [])
+      .filter(row => String(row.month_key || '') === key);
+  }, [detailData, detailMonth, focus?.startYear]);
+  const previousDetailRows = useMemo(() => {
+    const rows = normalizeDrillRows(previousDetailRowsRaw);
+    return new Map(rows.map(row => [String(row.code || row.name || '').trim(), row]));
+  }, [previousDetailRowsRaw]);
+
+  const detailScopeTotal = detailRows.reduce((sum, row) => sum + row.amount, 0);
+  const detailScopeQty = detailRows.reduce((sum, row) => sum + row.qty, 0);
+  const previousDetailScopeTotal = Array.from(previousDetailRows.values()).reduce((sum, row) => sum + row.amount, 0);
 
   const openInvoiceRecords = () => {
     if (!focus || detailMonth == null) return;
@@ -865,32 +1291,64 @@ export default function FinancialYearPerformanceScreen() {
 
   const back = () => {
     if (viewMode === 'detail') {
-      if (detailPath.length) setDetailPath(p => p.slice(0, -1));
-      else setViewMode('overview');
+      // Breadcrumb order is hierarchy first, month last. Therefore Back first
+      // removes the month filter, returning to the same hierarchy/all months.
+      if (detailMonth != null) {
+        changeDetailMonth(null);
+        return;
+      }
+      if (detailPath.length) {
+        const nextPath = detailPath.slice(0, -1);
+        setDetailPath(nextPath);
+        const nextDim = DIMENSIONS.find(d => !nextPath.some(p => p.dim === d.key));
+        if (nextDim) setDetailDimension(nextDim.key);
+        setDetailData(null);
+        setDetailLoading(true);
+      } else {
+        setViewMode('overview');
+      }
       return;
     }
     if (selectedMonth != null) setSelectedMonth(null);
-    else router.back();
+    else exitFinancialYear();
   };
 
+  // Defensive web guard: Expo Router may keep a nested Stack screen mounted
+  // briefly while the URL has already returned to /new. A fixed-position FY
+  // overlay must render nothing outside its own route.
+  const fyRouteActive = String(pathname || '').includes('/reports/financial-year');
+  if (!fyRouteActive) return null;
+
   if (loading) {
-    return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color={C.owner} /><Text style={styles.loadingText}>Loading financial-year Sales…</Text></View></SafeAreaView>;
+    return <FinancialYearLoadingSkeleton specs={specs} selected={selectedYear} anchorDate={anchorDate} onBack={exitFinancialYear} onClose={exitFinancialYear} />;
   }
 
   if (error && years.length === 0) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}><TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backText}>‹</Text></TouchableOpacity><Text style={styles.headerTitle}>🧵 Sales</Text></View>
+      <SafeAreaView style={[styles.safe, Platform.OS === 'web' && styles.webOverlay]}>
+        <View style={styles.header}><TouchableOpacity onPress={exitFinancialYear} style={styles.backBtn}><Text style={styles.backText}>‹</Text></TouchableOpacity><Text style={styles.headerTitle}>🧵 Sales</Text></View>
         <View style={styles.center}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryBtn} onPress={() => void loadYear(selectedYear)}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View>
       </SafeAreaView>
     );
   }
 
-  if (!focus) return null;
+  if (!focus) {
+    if (loadingYearId === selectedSpec?.id) {
+      return <FinancialYearLoadingSkeleton specs={specs} selected={selectedYear} anchorDate={anchorDate} onBack={exitFinancialYear} onClose={exitFinancialYear} />;
+    }
+    return (
+      <SafeAreaView style={[styles.safe, Platform.OS === 'web' && styles.webOverlay]}>
+        <View style={styles.header}><TouchableOpacity onPress={exitFinancialYear} style={styles.backBtn}><Text style={styles.backText}>‹</Text></TouchableOpacity><Text style={styles.headerTitle}>🧵 Sales</Text></View>
+        <View style={styles.center}><Text style={styles.errorText}>{error || `Unable to load ${selectedSpec ? fyLabel(selectedSpec.startYear) : 'financial year'}.`}</Text><TouchableOpacity style={styles.retryBtn} onPress={() => void loadYear(selectedYear)}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View>
+      </SafeAreaView>
+    );
+  }
 
-  const detailPeriodLabel = detailMonth != null ? monthDate(focus.startYear, detailMonth).label : fyLabel(focus.startYear);
+  const detailMonthLabel = detailMonth != null ? monthDate(focus.startYear, detailMonth).label : null;
   const selectedMonthValue = selectedMonth != null ? monthMetric(focus.report, selectedMonth, 'amount') : 0;
-  const topTotal = topExecutives.reduce((sum, row) => sum + row.amount, 0);
+  // Claude computes row share/concentration against ALL executive billing,
+  // while only rendering the first five rows.
+  const topTotal = executiveRows.reduce((sum, row) => sum + row.amount, 0);
   const topScaleMax = Math.max(
     1,
     ...topExecutives.map(row => row.amount),
@@ -921,7 +1379,7 @@ export default function FinancialYearPerformanceScreen() {
     let best = -1;
     for (let i = 0; i <= limit; i += 1) {
       const row = year.report?.months?.[i];
-      if (!row || row.available === false) continue;
+      if (!monthHasData(row)) continue;
       if (best < 0 || monthMetric(year.report, i, 'amount') > monthMetric(year.report, best, 'amount')) best = i;
     }
     return best;
@@ -953,25 +1411,25 @@ export default function FinancialYearPerformanceScreen() {
 
   const kpis = [
     { key: 'avg', label: 'Monthly average', value: amount(avg), sub: `${focusMonths.length} months`, raw: tileValueForYear('avg', focus), compare: previous ? tileValueForYear('avg', previous) : 0, fmt: amount },
-    { key: 'best', label: 'Best month', value: bestIndex >= 0 ? amount(monthMetric(focus.report, bestIndex, 'amount')) : amount(0), sub: bestLabel, raw: tileValueForYear('best', focus), compare: 0, fmt: amount },
+    { key: 'best', label: 'Best month', value: bestIndex >= 0 ? amount(monthMetric(focus.report, bestIndex, 'amount')) : amount(0), sub: bestLabel, raw: tileValueForYear('best', focus), compare: previous ? tileValueForYear('best', previous) : 0, fmt: amount },
     { key: 'bills', label: 'Bills', value: formatCount(fullMetric(focus.report, 'bills')), sub: 'Invoices', raw: tileValueForYear('bills', focus), compare: previous ? tileValueForYear('bills', previous) : 0, fmt: formatCount },
     { key: 'qty', label: 'Metres', value: formatQty(fullMetric(focus.report, 'qty')), sub: 'Billed quantity', raw: tileValueForYear('qty', focus), compare: previous ? tileValueForYear('qty', previous) : 0, fmt: formatQty },
     { key: 'rate', label: 'Avg rate', value: formatRate(focus.report?.total?.avg_rate), sub: 'Amount ÷ metres', raw: tileValueForYear('rate', focus), compare: previous ? tileValueForYear('rate', previous) : 0, fmt: formatRate },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && styles.webOverlay]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={back} style={styles.backBtn} activeOpacity={0.75}><Text style={styles.backText}>‹</Text></TouchableOpacity>
         <View style={styles.headerCopy}>
           <Text numberOfLines={1} style={styles.headerTitle}>🧵 Sales</Text>
           <Text numberOfLines={1} style={styles.headerSub}>
             {viewMode === 'detail'
-              ? [fyLabel(focus.startYear), detailPeriodLabel, ...detailPath.map(p => p.name)].join(' › ')
+              ? [fyLabel(focus.startYear), ...detailPath.map(p => p.name), detailMonthLabel].filter(Boolean).join(' › ')
               : `${fyLabel(focus.startYear)} · ${fyRange(focus.startYear)}${focus.isCurrent ? ` · to ${anchor.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}`}
           </Text>
         </View>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}><Text style={styles.closeText}>✕</Text></TouchableOpacity>
+        <TouchableOpacity onPress={exitFinancialYear} style={styles.closeBtn}><Text style={styles.closeText}>✕</Text></TouchableOpacity>
       </View>
 
       <ScrollView
@@ -979,7 +1437,7 @@ export default function FinancialYearPerformanceScreen() {
         contentContainerStyle={[styles.content, width > 900 && styles.contentWide]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadYear(selectedYear, { refresh: true })} tintColor={C.owner} />}
       >
-        <YearChips years={specs} selected={selectedYear} onSelect={(index) => void selectYear(index)} loadingId={loadingYearId} />
+        <YearChips years={specs} selected={selectedYear} onSelect={(index) => void selectYear(index)} />
 
         {error ? <View style={styles.inlineError}><Text style={styles.inlineErrorText}>{error}</Text></View> : null}
 
@@ -992,26 +1450,30 @@ export default function FinancialYearPerformanceScreen() {
                   <Text style={styles.heroValue}>{amount(focusTotal)}</Text>
                   {previous ? (
                     <View style={styles.heroDeltaRow}>
-                      <Delta value={gapPct} />
+                      <Delta value={gapPct} size={12} />
                       <Text style={styles.heroCompare}>{gap != null && gap >= 0 ? '+' : '−'}{amount(Math.abs(gap || 0))} vs {fyLabel(previous.startYear)}{focus.isCurrent ? ' at this stage' : ''}</Text>
                     </View>
                   ) : null}
-                  {pace != null && currentPrior ? <Text style={styles.paceText}>Pace <Text style={styles.boldMono}>{amount(pace)}</Text> for the full year (seasonal) · {fyLabel(currentPrior.startYear)} closed at <Text style={styles.boldMono}>{amount(previousFull)}</Text></Text> : null}
+                  {focus.isCurrent ? (
+                    pace != null && currentPrior
+                      ? <Text style={styles.paceText}>Pace <Text style={styles.boldMono}>{amount(pace)}</Text> for the full year (seasonal) · {fyLabel(currentPrior.startYear)} closed at <Text style={styles.boldMono}>{amount(previousFull)}</Text></Text>
+                      : null
+                  ) : null}
                 </View>
-                {heroInsights.length ? (
-                  <View style={styles.insightBox}>
-                    {heroInsights.slice(0, 3).map((text, index) => <Text key={index} style={styles.insightLine}>• {text}</Text>)}
-                  </View>
-                ) : null}
+                {heroInsights.length > 0 ? <View style={styles.insightBox}>
+                  {heroInsights.slice(0, 3).map((text, index) => (
+                    <View key={index} style={styles.insightRow}><Text style={styles.insightBullet}>•</Text><Text style={styles.insightLine}>{text}</Text></View>
+                  ))}
+                </View> : null}
               </View>
-              <YearStrip years={years} selected={loadedSelectedIndex} currentMonthIndex={currentMonthIndex} monthFraction={monthFraction} amount={amount} onSelect={(loadedIndex) => { const year = years[loadedIndex]; const specIndex = specs.findIndex(spec => spec.id === year?.id); if (specIndex >= 0) void selectYear(specIndex); }} />
+              <YearStrip specs={specs} loadedYears={years} selected={selectedYear} currentMonthIndex={currentMonthIndex} monthFraction={monthFraction} amount={amount} onSelect={(specIndex) => void selectYear(specIndex)} />
             </View>
 
             <View style={styles.kpiGrid}>
               {kpis.map(tile => {
                 const delta = previous && tile.compare > 0 ? pctChange(tile.raw, tile.compare) : null;
                 return (
-                  <KpiTile key={tile.key} label={tile.label} value={tile.value} sub={tile.sub} delta={delta} open={openTile === tile.key} onPress={() => setOpenTile(v => v === tile.key ? null : tile.key)}>
+                  <KpiTile key={tile.key} label={tile.label} value={tile.value} sub={tile.sub} delta={delta} deltaLabel={previous ? `vs ${fyId(previous.startYear)}` : undefined} spark={tile.key === 'avg' ? { values: (focus.report?.months || []).map(row => row?.available === false ? null : n(row?.amount)), highlight: selectedMonth } : undefined} open={openTile === tile.key} onPress={() => setOpenTile(v => v === tile.key ? null : tile.key)}>
                     <View style={styles.kpiTableHead}>
                       <Text style={[styles.kpiTableHeadText, styles.kpiTableYearCol]}>YEAR</Text>
                       <Text style={[styles.kpiTableHeadText, styles.kpiTableValueCol]}>{tile.label.toUpperCase()}</Text>
@@ -1043,9 +1505,26 @@ export default function FinancialYearPerformanceScreen() {
 
             <SectionLabel right="dashed line = today’s stage">CUMULATIVE · THE CHASE</SectionLabel>
             <View style={styles.chartCard}>
-              <FyLineChart years={years} selectedYear={loadedSelectedIndex} currentMonthIndex={currentMonthIndex} amount={amount} selectedMonth={selectedMonth} onMonth={selectMonth} />
+              <FyLineChart years={years} selectedYear={loadedSelectedIndex} currentMonthIndex={currentMonthIndex} amount={amount} selectedMonth={selectedMonth} onMonth={selectMonth} chartWidth={lineChartWidth} />
               <View style={styles.legendRow}>
-                {years.map((year, yi) => <View key={year.id} style={styles.legendItem}><View style={[styles.legendBar, { backgroundColor: yi === loadedSelectedIndex ? C.bill : yi === 0 ? C.ink : yi === 1 ? C.grey2 : C.grey1 }]} /><Text style={styles.legendText}>{fyLabel(year.startYear)}</Text></View>)}
+                {years.map((year, yi) => {
+                  const value = year.isCurrent
+                    ? fullMetric(year.report, 'amount')
+                    : stageMetric(year.report, 'amount', currentMonthIndex, monthFraction);
+                  const nextOlder = years.find(item => item.startYear === year.startYear - 1);
+                  const olderValue = nextOlder
+                    ? (nextOlder.isCurrent ? fullMetric(nextOlder.report, 'amount') : stageMetric(nextOlder.report, 'amount', currentMonthIndex, monthFraction))
+                    : 0;
+                  const legendDelta = nextOlder && olderValue > 0 ? pctChange(value, olderValue) : null;
+                  return (
+                    <View key={year.id} style={styles.legendItem}>
+                      <View style={[styles.legendBar, { backgroundColor: yi === loadedSelectedIndex ? C.bill : yi === 0 ? C.ink : yi === 1 ? C.grey2 : C.grey1 }]} />
+                      <Text style={styles.legendText}>{fyLabel(year.startYear)}</Text>
+                      <Text style={styles.legendValue}>{amount(value)}</Text>
+                      {legendDelta != null ? <Delta value={legendDelta} /> : null}
+                    </View>
+                  );
+                })}
                 <Text style={styles.legendStage}>at this stage · {stageLabel}</Text>
               </View>
               {focus.isCurrent && currentPrior && paceRate != null ? (
@@ -1058,8 +1537,8 @@ export default function FinancialYearPerformanceScreen() {
             </View>
 
             <SectionLabel right="tap a month">MONTH BY MONTH · THREE YEARS</SectionLabel>
-            <View style={styles.chartCard}>
-              <FyBarChart years={years} selectedYear={loadedSelectedIndex} amount={amount} selectedMonth={selectedMonth} onMonth={selectMonth} />
+            <View style={[styles.chartCard, styles.barChartCard]}>
+              <FyBarChart years={years} selectedYear={loadedSelectedIndex} amount={amount} selectedMonth={selectedMonth} onMonth={selectMonth} chartWidth={barChartWidth} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthChipRow}>
                 {Array.from({ length: 12 }, (_, i) => {
                   const row = focus.report?.months?.[i];
@@ -1114,27 +1593,64 @@ export default function FinancialYearPerformanceScreen() {
                   </TouchableOpacity>
                 );
               })}
-              {!topExecutives.length ? <Text style={styles.emptyText}>{focus.report?.details_loaded ? `No billing recorded in ${fyLabel(focus.startYear)}.` : 'Detailed breakdown loads only when opened.'}</Text> : null}
+              {executiveLoadingId === focus.id && !topExecutives.length ? (
+                <View style={styles.executiveSkeletonWrap}>
+                  {[0, 1, 2, 3, 4].map(i => <View key={i} style={styles.executiveSkeletonRow}><View style={[styles.skeletonBlock, { width: 10, height: 10, borderRadius: 3 }]} /><View style={{ flex: 1, gap: 5 }}><View style={[styles.skeletonBlock, { width: `${72 - i * 5}%`, height: 10, borderRadius: 4 }]} /><View style={[styles.skeletonBlock, { width: '58%', height: 5, borderRadius: 3 }]} /></View><View style={[styles.skeletonBlock, { width: 72, height: 12, borderRadius: 4 }]} /></View>)}
+                </View>
+              ) : null}
+              {executiveLoadingId !== focus.id && !topExecutives.length ? <Text style={styles.emptyText}>{`No executive billing recorded in ${fyLabel(focus.startYear)} for this period.`}</Text> : null}
               <TouchableOpacity onPress={() => void openDetail(null)} style={styles.fullBreakdown}><Text style={styles.fullBreakdownText}>Full breakdown · Executive · Customer · Category · Design ›</Text><Text style={styles.fullBreakdownArrow}>›</Text></TouchableOpacity>
             </View>
 
-            <Text style={styles.footerNote}>Billing by invoice date. A bill belongs to the executive of its sales order. Each financial year is read on demand from its actual ERP financial-year database and cached for this screen. “At this stage” compares the same elapsed Apr–Mar position.</Text>
+            <Text style={styles.footerNote}>Billing by invoice date. A bill belongs to the executive of its sales order. The three FY month-level summaries and overview executive totals come from their actual ERP financial-year databases; Customer · Category · Design hierarchy and transactions load only when opened and are cached for this screen. “At this stage” compares the same elapsed Apr–Mar position.</Text>
           </>
         ) : (
           <>
             <View style={styles.detailSummary}>
               <View style={styles.detailBreadcrumb}>
-                <TouchableOpacity onPress={() => { setDetailPath([]); setDetailReport(detailMonth == null ? focus.report : detailReport); }}><Text style={styles.crumbStrong}>{detailPeriodLabel}</Text></TouchableOpacity>
-                {detailPath.map((p, i) => <React.Fragment key={`${p.dim}-${p.code}-${i}`}><Text style={styles.crumbSep}>›</Text><TouchableOpacity onPress={() => setDetailPath(detailPath.slice(0, i + 1))}><Text numberOfLines={1} style={styles.crumbStrong}>{p.name}</Text></TouchableOpacity></React.Fragment>)}
+                <TouchableOpacity onPress={() => {
+                  setDetailPath([]);
+                  setDetailMonth(null);
+                  setDetailDimension(DIMENSIONS[0]?.key || 'executive');
+                  const rootKey = `${focus.id}|${DIMENSIONS[0]?.key || 'executive'}|`;
+                  const cached = detailCacheRef.current[rootKey];
+                  if (cached?.current) {
+                    detailActiveKeyRef.current = rootKey;
+                    setDetailData(cached);
+                    setDetailLoading(false);
+                  } else {
+                    setDetailData(null);
+                    setDetailLoading(true);
+                  }
+                }}><Text style={styles.crumbStrong}>{fyLabel(focus.startYear)}</Text></TouchableOpacity>
+                {detailPath.map((p, i) => <React.Fragment key={`${p.dim}-${p.code}-${i}`}><Text style={styles.crumbSep}>›</Text><TouchableOpacity onPress={() => {
+                  const nextPath = detailPath.slice(0, i + 1);
+                  setDetailPath(nextPath);
+                  const nextDim = DIMENSIONS.find(d => !nextPath.some(x => x.dim === d.key));
+                  if (nextDim) setDetailDimension(nextDim.key);
+                  setDetailData(null);
+                  setDetailLoading(true);
+                }}><Text numberOfLines={1} style={styles.crumbStrong}>{p.name}</Text></TouchableOpacity></React.Fragment>)}
+                {detailMonthLabel ? <React.Fragment><Text style={styles.crumbSep}>›</Text><TouchableOpacity onPress={() => changeDetailMonth(null)}><Text style={styles.crumbStrong}>{detailMonthLabel}</Text></TouchableOpacity></React.Fragment> : null}
               </View>
-              <Text style={styles.detailTotal}>{amount(detailLines.length ? detailScopeTotal : detailReport?.total?.amount)}</Text>
-              <Text style={styles.detailMeta}>{formatQty(detailLines.length ? detailScopeQty : detailReport?.total?.qty)}</Text>
-              {previous ? (
-                <View style={styles.detailCompareRow}>
-                  <Text style={styles.detailCompareText}>vs {fyLabel(previous.startYear)}{focus.isCurrent && detailMonth == null ? ' at this stage' : ''}: {amount(previousDetailScopeTotal)}</Text>
-                  {previousDetailScopeTotal > 0 ? <Delta value={pctChange(detailScopeTotal, previousDetailScopeTotal)} /> : null}
+              {detailLoading && !detailData ? (
+                <View style={{ marginTop: 8, gap: 6 }}>
+                  <SkeletonBlock width={118} height={18} style={styles.skeletonOnBlueStrong} />
+                  <SkeletonBlock width={76} height={8} style={styles.skeletonOnBlue} />
+                  <SkeletonBlock width={170} height={8} style={styles.skeletonOnBlue} />
                 </View>
-              ) : null}
+              ) : (
+                <>
+                  <Text style={styles.detailTotal}>{amount(detailScopeTotal)}</Text>
+                  <Text style={styles.detailMeta}>{formatQty(detailScopeQty)}</Text>
+                  {previous && detailData?.previous ? (
+                    <View style={styles.detailCompareRow}>
+                      <Text style={styles.detailCompareText}>vs {fyLabel(previous.startYear)}{focus.isCurrent && detailMonth == null ? ' at this stage' : ''}: {amount(previousDetailScopeTotal)}</Text>
+                      {previousDetailScopeTotal > 0 ? <Delta value={pctChange(detailScopeTotal, previousDetailScopeTotal)} /> : null}
+                    </View>
+                  ) : null}
+                </>
+              )}
             </View>
 
             {detailLoading ? (
@@ -1144,21 +1660,20 @@ export default function FinancialYearPerformanceScreen() {
               </View>
             ) : null}
 
-            {detailMonth == null ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthChipRowDetail}>
-                {Array.from({ length: 12 }, (_, i) => {
-                  const row = focus.report?.months?.[i];
-                  const disabled = !row || row.available === false;
-                  return <TouchableOpacity key={i} disabled={disabled} onPress={() => void openDetail(i, detailPath)} style={[styles.monthChip, disabled && styles.monthChipDisabled]}><Text style={styles.monthChipText}>{monthDate(focus.startYear, i).label}</Text></TouchableOpacity>;
-                })}
-              </ScrollView>
-            ) : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthChipRowDetail}>
+              {Array.from({ length: 12 }, (_, i) => {
+                const row = focus.report?.months?.[i];
+                const disabled = !row || row.available === false;
+                const active = detailMonth === i;
+                return <TouchableOpacity key={i} disabled={disabled} onPress={() => changeDetailMonth(i)} style={[styles.monthChip, active && styles.monthChipActive, disabled && styles.monthChipDisabled]}><Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>{monthDate(focus.startYear, i).label}</Text></TouchableOpacity>;
+              })}
+            </ScrollView>
 
             {detailDimsLeft.length ? (
               <View style={styles.dimRow}>
                 <Text style={styles.byLabel}>BY</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {detailDimsLeft.map(d => <TouchableOpacity key={d.key} onPress={() => setDetailDimension(d.key)} style={[styles.dimChip, activeDetailDim === d.key && styles.dimChipActive]}><Text style={[styles.dimChipText, activeDetailDim === d.key && styles.dimChipTextActive]}>{d.label}</Text></TouchableOpacity>)}
+                  {detailDimsLeft.map(d => <TouchableOpacity key={d.key} onPress={() => { setDetailDimension(d.key); setDetailData(null); setDetailLoading(true); }} style={[styles.dimChip, activeDetailDim === d.key && styles.dimChipActive]}><Text style={[styles.dimChipText, activeDetailDim === d.key && styles.dimChipTextActive]}>{d.label}</Text></TouchableOpacity>)}
                 </ScrollView>
               </View>
             ) : null}
@@ -1174,6 +1689,8 @@ export default function FinancialYearPerformanceScreen() {
                 return (
                   <TouchableOpacity key={`${row.code || row.name}-${i}`} activeOpacity={canOpen ? 0.72 : 1} onPress={canOpen ? () => {
                     const nextPath = [...detailPath, { dim: activeDetailDim, code: row.code, name: row.name }];
+                    setDetailData(null);
+                    setDetailLoading(true);
                     setDetailPath(nextPath);
                     const next = DIMENSIONS.find(d => !nextPath.some(p => p.dim === d.key));
                     if (next) setDetailDimension(next.key);
@@ -1184,7 +1701,7 @@ export default function FinancialYearPerformanceScreen() {
                       <View style={styles.detailShareLine}><View style={[styles.detailShareFill, { width: `${Math.min(100, share)}%` }]} /></View>
                       <View style={styles.detailCompareMeta}>
                         <Text style={styles.detailShareTextInline}>{Math.round(share)}%</Text>
-                        {previous ? <Text style={styles.detailPreviousText}>{fyLabel(previous.startYear).replace('FY ', 'FY ')} {amount(previousValue)}</Text> : null}
+                        {previous && detailData?.previous ? <Text style={styles.detailPreviousText}>{fyLabel(previous.startYear).replace('FY ', 'FY ')} {amount(previousValue)}</Text> : null}
                         {rowDelta != null ? <Delta value={rowDelta} /> : null}
                       </View>
                     </View>
@@ -1208,57 +1725,75 @@ export default function FinancialYearPerformanceScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
+  skeletonBlock: { backgroundColor: '#E4E0DB', overflow: 'hidden' },
+  skeletonOnBlue: { backgroundColor: 'rgba(255,255,255,0.30)' },
+  skeletonOnBlueStrong: { backgroundColor: 'rgba(255,255,255,0.48)' },
+  chipsRowStatic: { flexDirection: 'row', gap: 7, paddingVertical: 2, paddingBottom: 10 },
+  heroDeltaSkeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 },
+  skeletonChart: { height: 200, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 24 },
+  executiveSkeletonWrap: { paddingVertical: 4 },
+  executiveSkeletonRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: C.hair },
+  webOverlay: { position: 'fixed' as any, top: 0, right: 0, bottom: 0, left: 0, zIndex: 9999 },
   scroll: { flex: 1 },
   content: { width: '100%', maxWidth: 860, alignSelf: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 34 },
-  contentWide: { paddingHorizontal: 16 },
+  contentWide: { paddingHorizontal: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   loadingText: { marginTop: 12, fontSize: 12, color: C.mut },
   errorText: { fontSize: 13, color: C.over, textAlign: 'center', marginBottom: 14 },
   retryBtn: { backgroundColor: C.owner, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 9 },
   retryText: { color: '#fff', fontWeight: '800' },
-  header: { minHeight: 56, backgroundColor: C.owner, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header: { minHeight: 54, backgroundColor: C.owner, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   backBtn: { width: 34, height: 34, borderRadius: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' },
-  backText: { color: '#fff', fontSize: 25, lineHeight: 27 },
+  backText: { color: '#fff', fontSize: 20, lineHeight: 20 },
   headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.80)', fontSize: 10.5, marginTop: 2 },
   closeBtn: { paddingHorizontal: 7, paddingVertical: 4 },
-  closeText: { color: '#fff', fontSize: 18 },
+  closeText: { color: '#fff', fontSize: 20 },
   chipsRow: { gap: 7, paddingVertical: 2, paddingBottom: 10 },
-  chip: { flexShrink: 0, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: C.border },
-  chipActive: { backgroundColor: C.bill, borderColor: C.bill },
+  chip: { flexShrink: 0, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: C.border },
+  chipActive: { backgroundColor: C.bill, borderColor: C.bill, shadowColor: C.bill, shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   chipText: { fontSize: 12, fontWeight: '700', color: C.mut },
   chipTextActive: { color: '#fff' },
   inlineError: { padding: 9, borderRadius: 8, backgroundColor: '#FBEAEA', marginBottom: 10 },
   inlineErrorText: { color: C.over, fontSize: 11 },
-  heroCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: C.bill },
+  heroCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 12, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: C.bill, shadowColor: '#141514', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   heroTop: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  heroMain: { flexGrow: 1, flexBasis: 260, minWidth: 0 },
+  heroMain: { flexGrow: 1, flexBasis: 200, minWidth: 0 },
   eyebrow: { fontSize: 9.5, fontWeight: '800', color: C.faint, letterSpacing: 0.8 },
   heroValue: { fontSize: 30, lineHeight: 34, fontWeight: '800', color: C.ink, marginTop: 4, fontVariant: ['tabular-nums'] },
   heroDeltaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   heroCompare: { fontSize: 11, color: C.mut },
   paceText: { fontSize: 11, color: C.mut, marginTop: 4, lineHeight: 16 },
   boldMono: { fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  insightBox: { flexGrow: 1, flexBasis: 240, minWidth: 0, backgroundColor: C.bg, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8 },
-  insightLine: { fontSize: 11, color: C.ink, lineHeight: 17, marginVertical: 1 },
+  insightBox: { flexGrow: 1, flexBasis: 220, minWidth: 0, backgroundColor: C.bg, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9 },
+  insightRow: { flexDirection: 'row', gap: 7, paddingVertical: 2 },
+  insightBullet: { color: C.bill, fontSize: 11, lineHeight: 16, flexShrink: 0 },
+  insightLine: { flex: 1, fontSize: 11, color: C.ink, lineHeight: 16 },
   delta: { fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   deltaMuted: { color: C.faint, fontWeight: '500' },
   yearStrip: { flexDirection: 'row', gap: 6, marginTop: 12 },
-  yearCard: { flex: 1, minWidth: 0, paddingHorizontal: 9, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.bg },
+  yearCard: { flex: 1, minWidth: 0, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.bg },
   yearCardActive: { backgroundColor: C.bill, borderColor: C.bill },
-  yearCardLabel: { fontSize: 9, fontWeight: '800', color: C.ink, opacity: 0.75 },
-  yearCardValue: { fontSize: 13.5, fontWeight: '800', color: C.ink, marginTop: 2, fontVariant: ['tabular-nums'] },
-  yearCardStageLabel: { fontSize: 8.5, color: C.faint, marginTop: 2 },
-  yearCardStageValue: { fontSize: 9, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  yearCardLabel: { fontSize: 9, fontWeight: '800', color: C.ink, opacity: 0.7 },
+  yearCardLabelActive: { color: '#fff', opacity: 0.85 },
+  yearCardValue: { fontSize: 14, fontWeight: '700', color: C.ink, marginTop: 2, fontVariant: ['tabular-nums'] },
+  yearCardStageLabel: { fontSize: 9, color: C.ink, opacity: 0.65, marginTop: 2, lineHeight: 12 },
+  yearCardStageValue: { fontSize: 9, color: C.ink, fontWeight: '700', opacity: 0.65, fontVariant: ['tabular-nums'] },
+  yearCardStageActive: { color: '#fff', opacity: 0.85 },
   yearCardDelta: { minHeight: 13, marginTop: 3, fontSize: 9.5, fontWeight: '800', color: C.faint },
   yearCardTextActive: { color: '#fff' },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  kpiTile: { flexGrow: 1, flexBasis: 150, minWidth: 145, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 11, paddingVertical: 10 },
-  kpiTileOpen: { flexBasis: 300 },
-  kpiLabel: { fontSize: 9, color: C.faint, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  kpiValue: { fontSize: 17, fontWeight: '800', color: C.ink, marginTop: 4, fontVariant: ['tabular-nums'] },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  kpiTile: { flexGrow: 1, flexBasis: 150, minWidth: 145, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10, shadowColor: '#141514', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  kpiTileOpen: { flexBasis: '100%' as any, width: '100%', borderColor: C.bill, shadowColor: '#0D1B2A', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  kpiTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kpiChevron: { fontSize: 9, color: C.faint, marginLeft: 'auto' },
+  kpiChevronOpen: { transform: [{ rotate: '180deg' }] },
+  kpiLabel: { fontSize: 8.5, color: C.mut, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 11 },
+  kpiValue: { fontSize: 17, fontWeight: '700', color: C.bill, marginTop: 3, fontVariant: ['tabular-nums'] },
   kpiSub: { fontSize: 9.5, color: C.faint, marginTop: 2 },
+  miniSpark: { height: 22, maxWidth: 240, marginTop: 6, flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  miniSparkBar: { flex: 1, borderRadius: 1 },
   kpiExpanded: { marginTop: 9, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
   kpiTableHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 3 },
   kpiTableHeadText: { fontSize: 8, color: C.faint, fontWeight: '800' },
@@ -1274,11 +1809,12 @@ const styles = StyleSheet.create({
   sectionLabelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 16, marginBottom: 6, paddingHorizontal: 2 },
   sectionLabel: { fontSize: 9.5, fontWeight: '800', color: C.faint, letterSpacing: 0.7 },
   sectionLabelRight: { fontSize: 9.5, color: C.faint, textAlign: 'right' },
-  chartCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 6, paddingTop: 10, paddingBottom: 6 },
+  chartCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 6, paddingTop: 10, paddingBottom: 6, marginBottom: 10, shadowColor: '#141514', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  barChartCard: { paddingBottom: 4 },
   chartXAxis: { position: 'absolute', left: 4, right: 4, bottom: 1, height: 22, flexDirection: 'row', alignItems: 'flex-end' },
   chartXLabel: { width: `${100 / 12}%`, textAlign: 'center', fontSize: 9.5, color: C.faint },
   tooltipPos: { position: 'absolute', top: 6, zIndex: 20 },
-  chartTooltip: { width: 178, backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
+  chartTooltip: { width: 170, backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
   chartTooltipTitle: { fontSize: 10, color: C.faint, fontWeight: '800', marginBottom: 4 },
   chartTooltipRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 2 },
   legendDot: { width: 7, height: 7, borderRadius: 2 },
@@ -1289,13 +1825,14 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendBar: { width: 10, height: 3, borderRadius: 2 },
   legendText: { fontSize: 10, color: C.mut },
+  legendValue: { fontSize: 10.5, color: C.ink, fontWeight: '800', fontVariant: ['tabular-nums'] },
   legendStage: { marginLeft: 'auto', fontSize: 9.5, color: C.faint },
   chaseNote: { fontSize: 10.5, color: C.mut, lineHeight: 15, paddingHorizontal: 8, paddingTop: 4, paddingBottom: 4 },
   barArea: { flexDirection: 'row', alignItems: 'flex-end', paddingTop: 8 },
   barGroup: { height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
   barCluster: { height: '100%', flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   monthChipRow: { gap: 5, paddingHorizontal: 6, paddingVertical: 8 },
-  monthChip: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 13, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff' },
+  monthChip: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff' },
   monthChipActive: { backgroundColor: C.bill, borderColor: C.bill },
   monthChipDisabled: { opacity: 0.35 },
   monthChipText: { fontSize: 9.5, fontWeight: '700', color: C.mut },
@@ -1316,7 +1853,7 @@ const styles = StyleSheet.create({
   monthTopShare: { width: 36, textAlign: 'right', fontSize: 9.5, color: C.faint },
   monthTopValue: { minWidth: 76, textAlign: 'right', fontSize: 10.5, fontWeight: '800', color: C.ink },
   openMonthLink: { marginTop: 7, fontSize: 11, fontWeight: '800', color: C.bill },
-  topCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 7 },
+  topCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 7, shadowColor: '#141514', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.hair },
   topBody: { flex: 1, minWidth: 0 },
   topName: { fontSize: 12, color: C.ink, fontWeight: '700' },
@@ -1349,7 +1886,7 @@ const styles = StyleSheet.create({
   dimChipActive: { backgroundColor: C.bill, borderColor: C.bill },
   dimChipText: { fontSize: 9.5, color: C.mut, fontWeight: '700' },
   dimChipTextActive: { color: '#fff' },
-  detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, overflow: 'hidden' },
+  detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.border, borderRadius: 14, overflow: 'hidden', shadowColor: '#141514', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   detailHeaderRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
   detailHeadName: { flex: 1, fontSize: 9, fontWeight: '800', color: C.faint, textTransform: 'uppercase' },
   detailHeadQty: { width: 88, textAlign: 'right', fontSize: 9, fontWeight: '800', color: C.faint, textTransform: 'uppercase' },

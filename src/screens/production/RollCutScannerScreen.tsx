@@ -1,12 +1,11 @@
 import React from 'react';
+import RollCutScanner from '../../components/RollCutScanner';
 import { ErpSessionGate } from '../../core/session/erpSession';
-import Module from '../checkingScannerNew/CheckingScannerModule';
-// import RollCutScanner from '../index/RollCutScanner'; 
-// NEW ERP — Checking Scanner: QR / manual taka checking entry, scanner list, faults, sticker print. Token + API host from ErpSessionGate.
-export function CheckingScannerNewScreen() {
+
+export function RollCutScannerScreen() {
   return (
     <ErpSessionGate>
-      {(s) => <Module token={s.token} API={s.API} username={s.username} />}
+      {(s) => <RollCutScanner token={s.token} API={s.API} username={s.username} />}
     </ErpSessionGate>
   );
 }

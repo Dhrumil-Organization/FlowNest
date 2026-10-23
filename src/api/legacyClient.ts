@@ -404,6 +404,7 @@ export const LEGACY_ROUTES = {
   yarnHubItem: '/yarn_hub/item',
   yarnRates: (action: string) => `/yarn_rates/${action}`,
   realCostChain: (action: string) => `/real_cost_chain/${action}`,
+  samplingHub: (action: string) => `/sampling_hub/${action}`,
   greyScanInward: (action: string) => `/grey_scan_inward/${action}`,
 } as const;
 
@@ -766,6 +767,29 @@ export const YarnHubAPI = {
 // body { prptype, prpcode, yearno, month? 'YYYY-MM' } — group / property / year of the login.
 export const RealCostChainAPI = {
   report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.realCostChain('report'), body, { timeout: 600000 }),
+};
+
+// Sampling Hub (SamplingHubController) — samples with permanent IDs + QR, movement log (TMSMASTER SmpSample / SmpMove).
+// Every body carries { prptype, yearno } of the login. Rights: production.sampling_hub (checked by the API too).
+//   list       -> samples + movements of the group, rights, me, today
+//   masters    -> designs (Design module catalogue rule), categories, customers (Sales Order party rule)
+//   colourways -> { md_id } active colourways of a design
+//   photo      -> { id } garment photo (data URL)
+//   save       -> new sample(s) / { id } edit;  delete -> { id } HARD delete with its movements
+//   split      -> { id, n } items of a batch get their own IDs
+//   move_save  -> record / { id } modify a movement;  move_delete -> { id } HARD delete
+//   sticker    -> { ids } label rows for the Checking Scanner print path (PRINTSTICKER, PrintFormat 4)
+export const SamplingHubAPI = {
+  list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('list'), body, { timeout: 120000 }),
+  masters: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('masters'), body, { timeout: 120000 }),
+  colourways: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('colourways'), body),
+  photo: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('photo'), body),
+  save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('save'), body, { timeout: 60000 }),
+  remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('delete'), body, { timeout: 60000 }),
+  split: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('split'), body, { timeout: 60000 }),
+  moveSave: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_save'), body, { timeout: 60000 }),
+  moveRemove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_delete'), body, { timeout: 60000 }),
+  sticker: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('sticker'), body, { timeout: 60000 }),
 };
 
 // Yarn Rates (YarnRateController) — rate book per main yarn (TMSMASTER.dbo.FAMIYarnRate).

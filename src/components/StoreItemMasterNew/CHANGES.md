@@ -61,3 +61,8 @@ Response is wrapped as `{ success, response: {...} }` — now read from `respons
 - Added `MakSrNo` support when mapping Make/Model lookup rows and stable row IDs.
 - Existing Add / Update / Remove actions operate on Make/Model rows within the current Store Item draft and are submitted using the existing `makes` / `deleted_makes` fields when the Store Item is saved.
 - No Shift dropdown is rendered; Status remains beside Inward extra qty and defaults to Active for new rows.
+
+### Model dropdown overlay follow-up
+- Replaced the in-form dropdown layer with a transparent Modal portal to prevent the make grid from overlapping dropdown rows/actions.
+- Dropdown position is measured from the model field and clamped to viewport bounds; model options remain independently scrollable.
+- No API payloads or CRUD handlers were intentionally changed.

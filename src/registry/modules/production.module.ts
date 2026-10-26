@@ -601,6 +601,17 @@ registerPermissionArea({
             },
           ],
         },
+        {
+          key: 'roll_cut_scanner',
+          name: 'Roll Cut Scanner',
+          type: 'screen',
+          displayOrder: 166,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'delete', name: 'Delete' },
+          ],
+        },
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -1878,6 +1889,24 @@ registerUiNodes([
     permission: 'production.sales_challan_packing_slip',
     action: 'view',
     order: 165,
+  },
+  {
+    id: 'nav.roll_cut_scanner',
+    kind: 'navigation',
+    title: 'Roll Cut Scanner',
+    permission: 'production.roll_cut_scanner',
+    action: 'view',
+    route: 'roll-cut-scanner',
+    icon: 'qr-code-scanner',
+    order: 166,
+  },
+  {
+    id: 'screen.roll_cut_scanner',
+    kind: 'screen',
+    title: 'Roll Cut Scanner',
+    permission: 'production.roll_cut_scanner',
+    action: 'view',
+    order: 166,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

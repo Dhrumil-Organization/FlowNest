@@ -18,7 +18,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Btn, CONTENT_MAX, PanelHeader, SearchBox } from '../erpUi';
-import { getOwnerSummaryOrderDetail, getOwnerSummaryOrders, OwnerSummaryError } from './api';
+import { getOwnerSummaryOrderDetail, getOwnerSummaryOrders, getSalesOrderDashboard, OwnerSummaryError } from './api';
 import {
   dueText,
   nowText,
@@ -55,14 +55,15 @@ type Session = { API: string; token: string; prptype: string; date: string };
 /* Small shared pieces                                                 */
 /* ------------------------------------------------------------------ */
 
-function useHardwareBack(onBack: () => void) {
+export function useHardwareBack(onBack: () => void, enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       onBack();
       return true;
     });
     return () => sub.remove();
-  }, [onBack]);
+  }, [onBack, enabled]);
 }
 
 /** One stage dot. Filled = done, half = in progress, ringed red = overdue, dark grey = not started, dashed blue ring = not needed. */
@@ -348,14 +349,22 @@ function DeliveryText({ order, align = 'left' }: { order: { due_ymd: number | nu
 
 type ListFilter = 'all' | 'overdue' | 'past' | 'unplanned';
 
+const EMBED_PAGE = 20; // expanded executive list (web): ek baar me itne orders
+const EMBED_PAGE_PHONE = 10; // phone: ek baar me itne order cards
+
 export function ExecutiveOrders({
   session,
   executive,
   onBack,
+  embedded = false,
+  onOpenOrder,
 }: {
   session: Session;
-  executive: { code: string; name: string };
+  executive: { code: string; name: string; /** sexeid (default = code) */ id?: string };
   onBack: () => void;
+  /** true = grid ki row ke niche expand hone wala hissa (header / back / page scroll nahi); order click -> onOpenOrder */
+  embedded?: boolean;
+  onOpenOrder?: (o: TrackerOrder) => void;
 }) {
   const [data, setData] = useState<TrackerOrdersData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -371,25 +380,26 @@ export function ExecutiveOrders({
     setLoading(true);
     setError('');
     try {
-      const result = await getOwnerSummaryOrders(session.API, session.token, {
-        date: session.date,
-        prptype: session.prptype,
-        executive_code: executive.code,
-      });
+      const base = { date: session.date, prptype: session.prptype, executive_code: executive.code };
+      // grid row expand (embedded) -> getsalesorderdashboard (wahi payload + sexeid); full page -> purani API
+      const result = embedded
+        ? await getSalesOrderDashboard(session.API, session.token, { ...base, sexeid: executive.id ?? executive.code })
+        : await getOwnerSummaryOrders(session.API, session.token, base);
       if (id === seq.current) setData(result);
     } catch (err: any) {
       if (id === seq.current) setError((err as OwnerSummaryError)?.message || 'Unable to load sales orders.');
     } finally {
       if (id === seq.current) setLoading(false);
     }
-  }, [session.API, session.token, session.date, session.prptype, executive.code]);
+  }, [session.API, session.token, session.date, session.prptype, executive.code, executive.id, embedded]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const closeDetail = useCallback(() => setSelected(null), []);
-  useHardwareBack(selected ? closeDetail : onBack);
+  useHardwareBack(selected ? closeDetail : onBack, !embedded);
+  const openOrder = (o: TrackerOrder) => (embedded ? onOpenOrder?.(o) : setSelected(o));
 
   const defs = data?.stages || [];
   const wide = width >= 900;
@@ -404,6 +414,23 @@ export function ExecutiveOrders({
       return `${o.so_no} ${o.party} ${o.design} ${o.item}`.toLowerCase().includes(q);
     });
   }, [data?.orders, search, filter]);
+
+  // embedded (grid ke andar expand): pehle EMBED_PAGE orders, baaki "Show more" se; list ki apni scroll
+  const pageSize = wide ? EMBED_PAGE : EMBED_PAGE_PHONE;
+  const [shown, setShown] = useState(pageSize);
+  useEffect(() => {
+    setShown(pageSize);
+  }, [search, filter, data, pageSize]);
+  const shownRows = embedded ? rows.slice(0, shown) : rows;
+  // web: list ki apni scroll; phone: andar scroll nahi (page scroll hi), sirf "Show more"
+  const scrollWrap = (node: React.ReactNode) =>
+    embedded && wide ? (
+      <ScrollView style={st.embedScroll} nestedScrollEnabled showsVerticalScrollIndicator>
+        {node}
+      </ScrollView>
+    ) : (
+      node
+    );
 
   const columns = useMemo<Col<TrackerOrder>[]>(
     () => [
@@ -447,7 +474,7 @@ export function ExecutiveOrders({
     [defs],
   );
 
-  if (selected) {
+  if (selected && !embedded) {
     return <OrderDetail session={session} order={selected} executiveName={executive.name} onBack={closeDetail} />;
   }
 
@@ -461,23 +488,15 @@ export function ExecutiveOrders({
       ]
     : [];
 
-  return (
-    <View style={st.screen}>
-      <PanelHeader
-        onBack={onBack}
-        crumbs={['Owner Dashboard', 'Executive Summary']}
-        title={executive.name}
-        subtitle={s ? `${s.orders} open sales order${s.orders === 1 ? '' : 's'}  ·  as on ${session.date.split('-').reverse().join('-')}` : 'Open sales orders'}
-      />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
-        <View style={st.content} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+  const body = (
+    <>
           <StateBox loading={loading && !data} error={error} onRetry={() => void load()} />
 
           {data ? (
             <>
-              <View style={st.toolbar}>
-                <SearchBox value={search} onChangeText={setSearch} placeholder="Search order, party, design…" style={wide ? { width: 320 } : { flex: 1 }} />
-                <View style={[st.chipRow, !wide && { width: '100%' }]}>
+              <View style={[st.toolbar, !wide && st.toolbarCol]}>
+                <SearchBox value={search} onChangeText={setSearch} placeholder="Search order, party, design…" style={wide ? { width: 320 } : { width: '100%' }} />
+                <View style={[st.chipRow, !wide && { flex: 0, width: '100%' }]}>
                   {chips.map((c) => {
                     const on = filter === c.key;
                     return (
@@ -506,14 +525,16 @@ export function ExecutiveOrders({
                 </View>
               ) : null}
 
+              {scrollWrap(
+                <View style={{ gap: 12 }}>
               {wide ? (
                 <Card>
                   <MiniTable
                     columns={columns}
-                    rows={rows}
+                    rows={shownRows}
                     rowKey={(o) => o.uid}
                     minWidth={900}
-                    onRowPress={setSelected}
+                    onRowPress={openOrder}
                     emptyText="No sales order for this filter."
                     headerExtra={(c) =>
                       c.key === 'stages' ? (
@@ -535,8 +556,8 @@ export function ExecutiveOrders({
                   <Text style={st.stateText}>No sales order for this filter.</Text>
                 </View>
               ) : (
-                rows.map((o) => (
-                  <TouchableOpacity key={o.uid} activeOpacity={0.8} onPress={() => setSelected(o)} style={st.orderCard} accessibilityRole="button">
+                shownRows.map((o) => (
+                  <TouchableOpacity key={o.uid} activeOpacity={0.8} onPress={() => openOrder(o)} style={st.orderCard} accessibilityRole="button">
                     <View style={st.orderTop}>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={st.orderNo} numberOfLines={1}>
@@ -565,10 +586,52 @@ export function ExecutiveOrders({
                   </TouchableOpacity>
                 ))
               )}
+                </View>,
+              )}
+
+              {embedded && rows.length > 0 ? (
+                <View style={st.embedFoot}>
+                  <Text style={st.embedFootTx}>
+                    Showing {shownRows.length} of {rows.length}
+                  </Text>
+                  {rows.length > shownRows.length ? (
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity style={st.moreBtn} activeOpacity={0.8} onPress={() => setShown((x) => x + pageSize)} accessibilityRole="button">
+                        <Text style={st.moreBtnTx}>Show more (+{Math.min(pageSize, rows.length - shownRows.length)})</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={st.moreBtn} activeOpacity={0.8} onPress={() => setShown(rows.length)} accessibilityRole="button">
+                        <Text style={st.moreBtnTx}>Show all</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
 
               {s?.truncated ? <Text style={st.footNote}>Showing the first {data.orders.length} orders by delivery date.</Text> : null}
             </>
           ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <View style={st.embed} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <View style={st.screen}>
+      <PanelHeader
+        onBack={onBack}
+        crumbs={['Owner Dashboard', 'Executive Summary']}
+        title={executive.name}
+        subtitle={s ? `${s.orders} open sales order${s.orders === 1 ? '' : 's'}  ·  as on ${session.date.split('-').reverse().join('-')}` : 'Open sales orders'}
+      />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+        <View style={st.content} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+          {body}
         </View>
       </ScrollView>
     </View>
@@ -1068,6 +1131,12 @@ const st = StyleSheet.create({
   screen: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg, zIndex: 20, elevation: 20 },
   scroll: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 32 },
   content: { width: '100%', maxWidth: CONTENT_MAX, alignSelf: 'center', gap: 12 },
+  embed: { width: '100%', gap: 12 },
+  embedScroll: { maxHeight: 440 }, // expanded list ki apni scroll - upar ka main page lamba nahi hota
+  embedFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+  embedFootTx: { fontFamily: FONT, fontSize: 12, fontWeight: '700', color: T.muted },
+  moreBtn: { height: 32, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center' },
+  moreBtnTx: { fontFamily: FONT, fontSize: 12, fontWeight: '800', color: T.copper },
 
   stateBox: {
     alignItems: 'center',
@@ -1082,6 +1151,7 @@ const st = StyleSheet.create({
   stateText: { marginTop: 8, fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.muted },
 
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  toolbarCol: { flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch', gap: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
   chip: {
     height: 32,

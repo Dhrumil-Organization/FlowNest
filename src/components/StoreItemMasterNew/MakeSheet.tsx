@@ -3,15 +3,10 @@
 import { T } from '@/src/theme';
 import React, { useState } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
-import { DP, ItemMake, MakeErrors, makeStatusLabel, NumKey, Opt, sanitizeDecimal, validateMake } from './model';
+import type { MakeModelOption } from './api';
+import MakeMasterSheet from './MakeMasterSheet';
+import { DP, ItemMake, MakeErrors, makeStatusLabel, NumKey, Opt, sanitizeDecimal, Scope, validateMake } from './model';
 import { Btn, Cell, CheckChip, Field, SelectField, Sheet, StatusPill } from './ui';
-
-type MakeModelOption = {
-  makeCode: string;
-  makeName: string;
-  model: string;
-  makeSrNo: number;
-};
 
 const Section = ({ title }: { title: string }) => (
   <Text style={{ fontSize: 12.5, fontWeight: '800', color: T.copper, marginTop: 6, marginBottom: 10, paddingHorizontal: 6 }}>{title}</Text>
@@ -28,7 +23,17 @@ export default function MakeSheet({
   statuses = [],
   rateEditable = true,
   makeOptions = [],
+  API,
+  token,
+  scope,
+  onMakeOptionsChange,
 }: {
+  /** Needed for the Make / Model master (+ button next to Make name). */
+  API?: string;
+  token?: string;
+  scope?: Scope;
+  /** Called with the fresh make/model list after the master dialog adds / updates / deletes. */
+  onMakeOptionsChange?: (options: MakeModelOption[]) => void;
   locations?: Opt[];
   statuses?: Opt[];
   rateEditable?: boolean;
@@ -44,6 +49,31 @@ export default function MakeSheet({
   const cols = width >= 700 ? 3 : 2;
   const [m, setM] = useState<ItemMake>(make);
   const [errors, setErrors] = useState<MakeErrors>({});
+  const [masterOpen, setMasterOpen] = useState(false);
+  const canManageMasters = editable && !!API && !!token && !!scope && !!onMakeOptionsChange;
+
+  /** Row picked / created in the master dialog -> fill Make + Model (and the SrNo the save payload needs). */
+  const applyOption = (o: MakeModelOption) =>
+    setM((prev) => ({
+      ...prev,
+      makeCode: o.makeCode,
+      makeName: o.makeName,
+      model: o.model,
+      apiFields: { ...(prev.apiFields ?? {}), SrNo: Number(o.makeSrNo) || 0, MakSrNo: Number(o.makeSrNo) || 0, make_srno: Number(o.makeSrNo) || 0 },
+    }));
+
+  /** After a master change: drop a selection whose make / model no longer exists. */
+  const reconcile = (list: MakeModelOption[]) =>
+    setM((prev) => {
+      if (!prev.makeCode) return prev;
+      const ofMake = list.filter((x) => String(x.makeCode) === String(prev.makeCode));
+      const clearSr = { SrNo: 0, MakSrNo: 0, make_srno: 0 };
+      if (!ofMake.length) return { ...prev, makeCode: '', makeName: '', model: '', apiFields: { ...(prev.apiFields ?? {}), ...clearSr } };
+      const mk = ofMake[0].makeName;
+      if (prev.model && !ofMake.some((x) => String(x.model).trim() === String(prev.model).trim()))
+        return { ...prev, makeName: mk, model: '', apiFields: { ...(prev.apiFields ?? {}), ...clearSr } };
+      return prev.makeName === mk ? prev : { ...prev, makeName: mk };
+    });
 
   const makeNameOptions: Opt[] = Array.from(
     new Map(
@@ -53,7 +83,7 @@ export default function MakeSheet({
           String(x.makeCode),
           {
             id: String(x.makeCode),
-            label: `${x.makeCode} - ${x.makeName}`,
+            label: String(x.makeName).trim(),
           },
         ]),
     ).values(),
@@ -129,38 +159,52 @@ export default function MakeSheet({
           </Cell>
 
           <Cell cols={cols} span={cols - 1}>
-            <SelectField
-              label="Make name"
-              value={m.makeCode}
-              options={makeNameOptions}
-              disabled={!editable}
-              onChange={(id) => {
-                const selected = makeOptions.find(
-                  (x) => String(x.makeCode) === String(id),
-                );
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <SelectField
+                  label="Make name"
+                  value={m.makeCode}
+                  options={makeNameOptions}
+                  disabled={!editable}
+                  error={errors.makeName}
+                  onChange={(id) => {
+                    const selected = makeOptions.find(
+                      (x) => String(x.makeCode) === String(id),
+                    );
 
-                if (!selected) return;
+                    if (!selected) return;
 
-                setM((prev) => ({
-                  ...prev,
-                  makeCode: selected.makeCode,
-                  makeName: selected.makeName,
-                  model: '',
-                  // Clear the previously selected model's SrNo when the make changes.
-                  apiFields: {
-                    ...(prev.apiFields ?? {}),
-                    SrNo: 0,
-                    MakSrNo: 0,
-                    make_srno: 0,
-                  },
-                }));
+                    // A make that has no named model (only a blank-model row) can be saved without
+                    // picking a model, so take that row's SrNo right away.
+                    const ofMake = makeOptions.filter((x) => String(x.makeCode) === String(id));
+                    const blankOnly = ofMake.length > 0 && ofMake.every((x) => !x.model?.trim());
+                    const sr = blankOnly ? Number(ofMake[0].makeSrNo) || 0 : 0;
 
-                setErrors((prev) => ({
-                  ...prev,
-                  makeName: undefined,
-                }));
-              }}
-            />
+                    setM((prev) => ({
+                      ...prev,
+                      makeCode: selected.makeCode,
+                      makeName: selected.makeName,
+                      model: '',
+                      // Clear the previously selected model's SrNo when the make changes.
+                      apiFields: {
+                        ...(prev.apiFields ?? {}),
+                        SrNo: sr,
+                        MakSrNo: sr,
+                        make_srno: sr,
+                      },
+                    }));
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      makeName: undefined,
+                    }));
+                  }}
+                />
+              </View>
+              {canManageMasters ? (
+                <Btn icon="add" iconOnly kind="primary" onPress={() => setMasterOpen(true)} accessibilityLabel="Add or manage make and model" />
+              ) : null}
+            </View>
           </Cell>
 
           <Cell cols={cols} span={cols}>
@@ -193,18 +237,10 @@ export default function MakeSheet({
               }}
             />
           </Cell>
-          <Cell cols={cols}>
-            <Field label="Short name" value={m.shortName} readOnly={!editable} onChangeText={text('shortName')} autoCapitalize="characters" />
-          </Cell>
-          <Cell cols={cols}>
-            <SelectField label="Location" value={m.location} options={locations} disabled={!editable} allowClear onChange={(id) => set('location', id)} />
-          </Cell>
         </View>
 
         <Section title="Stock levels" />
         <View style={g.grid}>
-          {numF('roLevel', 'R.O. level')}
-          {numF('roQty', 'R.O. qty')}
           {numF('opQty', 'Opening qty')}
           {numF('opRate', 'Opening rate')}
           {numF('surplusLevel', 'Surplus level')}
@@ -221,8 +257,6 @@ export default function MakeSheet({
 
         <Section title="Inward tolerance" />
         <View style={g.grid}>
-          {numF('inwardExtraQtyPct', 'Inward extra qty (%)')}
-          {numF('inwardExtraQty', 'Inward extra qty')}
           <Cell cols={cols}>
             <SelectField
               label="Status"
@@ -242,6 +276,20 @@ export default function MakeSheet({
           })()}
         </View>
       </View>
+
+      {masterOpen && canManageMasters ? (
+        <MakeMasterSheet
+          API={API as string}
+          token={token as string}
+          scope={scope as Scope}
+          onClose={() => setMasterOpen(false)}
+          onChanged={(list) => {
+            onMakeOptionsChange?.(list);
+            reconcile(list);
+          }}
+          onPick={applyOption}
+        />
+      ) : null}
     </Sheet>
   );
 }

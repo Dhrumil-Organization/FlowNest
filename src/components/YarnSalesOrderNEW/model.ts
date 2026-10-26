@@ -191,11 +191,17 @@ export const filterParties = (parties: Row[], search: string): Row[] => {
 };
 
 /*
- * Party object — two separate addresses (Oct 2026):
- *   Billing  (party master, /api/accountbasic) : Address (= master BAddress), City, State, Cnty, Zip
- *     -> shown on the Party and Sales Party cards; never changed by a delivery pick.
- *   Delivery (saved as DAdd / DCity / DState / DCnty / DZip)  : DAdd, DCity, DState, DCnty, DZip
- *     -> starts as the billing address, replaced by "Tap to change" (/api/getaddress).
+ * Party object — two separate addresses (Oct 2026), same as the web Sales Order:
+ *   Billing  -> FAMSO.QtyKgs = FAMACCDA.SrNo (a row NUMBER). SP_FAMSOS rebuilds the text
+ *               from that row as BADDRESS and the print shows it. Party object: QtyKgs +
+ *               BillText (that row's text). New order: the party's DDefault = 1 row.
+ *               Changed ONLY by "Change billing address". Party master fields Address /
+ *               City / State / Cnty / Zip are the master address (shown when BillText is
+ *               not known).
+ *   Delivery -> FAMSO.DAdd / DCity / DState / DCnty / DZip (TEXT, no row number kept).
+ *               Changed ONLY by "Change delivery address" — it never touches QtyKgs.
+ *   (Bug fixed: a delivery pick used to set QtyKgs too, so the print showed the consignee
+ *    as the party's billing address — order 510020407.)
  */
 
 /**
@@ -265,7 +271,11 @@ export const buildSelectedParty = (party: Row, executives: Row[]): Row => {
     // Web Sales Order (AllPartyData19) sets QtyKgs = party SrNo on party pick: it is the
     // party address SrNo the print looks up (FAMACCDA) for the M/S billing address.
     // Without it the order was saved with QtyKgs 0 and the print showed only the name.
+    // SummaryStep then replaces it with the party's DDefault = 1 row (applyBillingAddress).
     QtyKgs: partyAddressSrNo(party),
+    BillText: '',
+    // party group — mobappsave writes GrpCode '' when the app does not send it
+    GrpCode: party.GrpCode ?? '',
   };
 };
 
@@ -296,8 +306,11 @@ export const partyFromMain = (main: Row): Row => {
     DCnty: main.DCnty || '',
     // legacy saved the City as DZip — not shown as a zip
     DZip: cleanZip(main.DZip, dCity),
-    // SrNo of the picked delivery address (FAMACCDA) — must go back unchanged on save
+    // BILLING address row (FAMACCDA SrNo -> BADDRESS) — goes back unchanged unless the
+    // user changes the billing address
     QtyKgs: num(main.QtyKgs) > 0 ? String(parseInt(String(main.QtyKgs), 10)) : '',
+    BillText: num(main.QtyKgs) > 0 ? String(main.BADDRESS || main.BAddress || '').replace(/\r\n|\r|\n/g, ', ').trim() : '',
+    GrpCode: main.GrpCode ?? '',
   };
 };
 
@@ -377,16 +390,60 @@ export const applyExecutive = (party: Row | null, exe: Row): Row => ({
   SExeName: exe?.SalesExecutive || '',
 });
 
-/** Legacy "Select Address" tap: delivery fields copied from a /api/getaddress row (billing Address is kept). */
+/** "Change delivery address": ONLY the delivery fields (QtyKgs / billing is not touched). */
 export const applyDeliveryAddress = (party: Row | null, address: Row): Row => ({
   ...(party || {}),
   DAdd: address?.DAdd || '',
   DCity: address?.DCity || '',
   DState: address?.DState || '',
   DCnty: address?.DCnty || '',
-  DZip: address?.DZip || '',
-  QtyKgs: address?.SrNo || '',
+  DZip: cleanZip(address?.DZip),
 });
+
+/** Text of a /api/getaddress row, web format "DAdd, DCity, DState, DZip" ('0' parts skipped). */
+export const addressRowText = (row: Row | null | undefined): string => {
+  if (!row) return '';
+  const part = (v: any) => {
+    const t = toText(v);
+    return t === '0' ? '' : t;
+  };
+  return [part(row.DAdd), part(row.DCity), part(row.DState), cleanZip(row.DZip)].filter(Boolean).join(', ');
+};
+
+/** "Change billing address" (or the default row on a new order): ONLY QtyKgs + its text. */
+export const applyBillingAddress = (party: Row | null, address: Row): Row => ({
+  ...(party || {}),
+  QtyKgs: num(address?.SrNo) > 0 ? String(Math.round(num(address.SrNo))) : '',
+  BillText: addressRowText(address),
+});
+
+/** Billing address text to show: the QtyKgs row text, else the party master address. */
+export const billingTextOf = (party: Row | null): string =>
+  toText(party?.BillText) || toText(party?.Address);
+
+/**
+ * Default billing row of a party from its /api/getaddress rows:
+ *   1. the first DDefault = 1 row (lowest SrNo),
+ *   2. else the row the party list pointed at (party SrNo / QtyKgs),
+ *   3. else the row whose text is the party master address.
+ * null when none fits (the user picks one by hand).
+ */
+export const pickDefaultAddress = (rows: Row[], party: Row | null): Row | null => {
+  const list = (rows || []).filter((r) => num(r?.SrNo) > 0).sort((a, b) => num(a.SrNo) - num(b.SrNo));
+  const def = list.find((r) => num(r?.DDefault) === 1);
+  if (def) return def;
+  const sr = num(party?.QtyKgs) || num(party?.SrNo);
+  if (sr > 0) {
+    const bySr = list.find((r) => num(r.SrNo) === sr);
+    if (bySr) return bySr;
+  }
+  const masterAdd = toText(party?.Address).toUpperCase();
+  if (masterAdd) {
+    const byText = list.find((r) => toText(r.DAdd).toUpperCase() === masterAdd);
+    if (byText) return byText;
+  }
+  return null;
+};
 
 export const initials = (name: any): string => {
   const words = String(name || '').trim().split(' ');
@@ -857,6 +914,13 @@ export type SaveInput = {
   rawExtra: Row;
 };
 
+/**
+ * Entry type of a new order. >>> CONFIRM: must exist in FAMEType for the property
+ * (SELECT EntType FROM FAMEType WHERE PrpCode = '...'). The web order 510000351 has 'G02';
+ * mobappsave's own default 'G2' left mobile orders without TaxStru / EntName.
+ */
+export const DEFAULT_ENT_TYPE = 'G02';
+
 /** Legacy buildMainPayload() — same keys, same value sources, same fallbacks. */
 export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row[] } => {
   const { mode, uid, ctx, party: currentParty, remark, dueDays } = input;
@@ -934,9 +998,12 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     D1NetAmt: fmt(totals.totalAmount) || '.00',
 
     Remark: remark || '',
-    // Delivery Days is no longer entered. A saved order keeps its own value; a new
-    // order sends the Due Days so the column is not left blank.
-    DDays: base.DDays || dueDayText || '',
+    // Delivery Days is no longer entered: a saved order keeps its own value, a new one
+    // sends '0' (never '' — DDays is numeric; the web leaves it 0 for Rayons).
+    DDays: toText(base.DDays) !== '' ? base.DDays : '0',
+
+    // party group (web: party GrpCode); mobappsave writes '' when it is missing
+    GrpCode: toText(currentParty?.GrpCode) || base.GrpCode || '',
 
     // Delivery address (falls back to the billing address when none is set).
     DAdd: currentParty?.DAdd || currentParty?.Address || base.DAdd || '',
@@ -947,14 +1014,15 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     Station: currentParty?.DCity || currentParty?.City || base.Station || '',
 
     Status: base.Status || 'P',
-    EntType: base.EntType || '',
+    // mobappsave falls back to 'G2' when this is blank; the web saves 'G02'.
+    EntType: base.EntType || DEFAULT_ENT_TYPE,
     TaxStru: base.TaxStru || '',
 
     SONo: uid > 0 ? base.SONo : '',
     SODate: uid > 0 ? base.SODate : '',
 
-    // delivery-address SrNo; '0' = none (was '' and wiped the saved address SrNo on modify)
-    QtyKgs: currentParty?.QtyKgs || '0',
+    // BILLING address row (number). A delivery pick never changes it. 0 = none.
+    QtyKgs: num(currentParty?.QtyKgs) > 0 ? Math.round(num(currentParty?.QtyKgs)) : Math.round(num(base.QtyKgs)),
   };
 
   return { main, newsoparty };

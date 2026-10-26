@@ -411,7 +411,7 @@ export function ExecutiveOrders({
       if (filter === 'past' && !(typeof o.days_to_due === 'number' && o.days_to_due < 0)) return false;
       if (filter === 'unplanned' && (o.production_orders || []).length > 0) return false;
       if (!q) return true;
-      return `${o.so_no} ${o.party} ${o.design} ${o.item}`.toLowerCase().includes(q);
+      return `${o.so_no} ${o.party} ${o.designs_text || o.design} ${o.item}`.toLowerCase().includes(q);
     });
   }, [data?.orders, search, filter]);
 
@@ -455,11 +455,10 @@ export function ExecutiveOrders({
         flex: 2,
         render: (o) => (
           <View>
-            <Text style={st.tdStrong} numberOfLines={1}>
-              {o.design || '—'}
-              {o.more_designs > 0 ? `  +${o.more_designs}` : ''}
+            <Text style={st.tdStrong} numberOfLines={3}>
+              {o.designs_text || o.design || '—'}
             </Text>
-            <Text style={st.sub} numberOfLines={1}>
+            <Text style={st.sub} numberOfLines={2}>
               {o.item || ' '}
             </Text>
           </View>
@@ -569,12 +568,16 @@ export function ExecutiveOrders({
                       </View>
                       <DeliveryText order={o} align="right" />
                     </View>
-                    <Text style={[st.tdStrong, { marginTop: 8 }]} numberOfLines={1}>
-                      {o.design || '—'}
-                      {o.more_designs > 0 ? `  +${o.more_designs}` : ''}
+                    <Text style={[st.tdStrong, { marginTop: 8 }]} numberOfLines={3}>
+                      {o.designs_text || o.design || '—'}
                     </Text>
+                    {o.item ? (
+                      <Text style={st.sub} numberOfLines={2}>
+                        {o.item}
+                      </Text>
+                    ) : null}
                     <Text style={st.sub} numberOfLines={1}>
-                      {[o.item, `${qty(o.qty)} m`, `Sold ${pct(o.sold_pct)}`].filter(Boolean).join('  ·  ')}
+                      {[`${qty(o.qty)} m`, `Sold ${pct(o.sold_pct)}`].join('  ·  ')}
                     </Text>
                     <View style={{ marginTop: 12 }}>
                       <StageStrip defs={defs} stages={o.stages} labels />

@@ -217,6 +217,8 @@ function normalizeSalesOrderGroup(rows: ApiSalesOrderRow[]): any {
   // SalesDesignName can be a long comma list -> show the first design + "+N"
   const designList = asText(header.SalesDesignName).split(',').map((x) => x.trim()).filter(Boolean);
   const design = asText(header.dsnname).trim() || designList[0] || '';
+  // SalesItemName is a comma list too ('LINEN SHIRTING, LINEN SUITINGS')
+  const itemList = asText(header.SalesItemName || header.itmname || header.ItemName).split(',').map((x) => x.trim()).filter(Boolean);
 
   const qty = asNumber(header.SalesOrderQty) ?? asNumber(header.SalesOrderTotalQty) ?? 0;
   const soldQty = asNumber(header.SalesOrderSoldQty) ?? 0;
@@ -234,7 +236,9 @@ function normalizeSalesOrderGroup(rows: ApiSalesOrderRow[]): any {
     design,
     designs_text: designList.join(', '),
     more_designs: asText(header.dsnname).trim() ? 0 : Math.max(designList.length - 1, 0),
-    item: asText(header.itmname || header.ItemName).trim(),
+    item: itemList.join(', '),
+    items: itemList,
+    designs: designList,
     qty,
     pending_qty: Math.max(qty - soldQty, 0),
     sold_qty: soldQty,

@@ -46,6 +46,9 @@ export type TrackerOrder = {
   now?: NowAt;
   /** full comma list of designs (the list shows only the first one + "+N") */
   designs_text?: string;
+  /** every design / item of the sales order (SalesDesignName / SalesItemName split on ',') */
+  designs?: string[];
+  items?: string[];
   delivery_text?: string;
   so_uid?: string;
   raw?: Record<string, any>;

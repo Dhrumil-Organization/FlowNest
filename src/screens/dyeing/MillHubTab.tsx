@@ -511,12 +511,14 @@ import { DyeingDateField } from './DyeingDateField';
 import { addDaysISO, todayISO } from './dyeingModel';
 import {
   buildDesignRows,
+  buildItemRows,
   failMessage,
   filterLots,
   HubAgg,
   HubLot,
   HubLotDetail,
   lotsOfDesign,
+  lotsOfItem,
   LotStatus,
   normalizeLotDetail,
   normalizeLots,
@@ -566,7 +568,8 @@ export function MillHubTab() {
   const [party, setParty] = useState('ALL');
   const [partyOpen, setPartyOpen] = useState(false);
   const [status, setStatus] = useState<StatusFilter>('COMPLETE');
-  const [dsel, setDsel] = useState<string | null>(null);
+  const [isel, setIsel] = useState<string | null>(null);   // item (parent level)
+  const [dsel, setDsel] = useState<string | null>(null);   // design inside that item
   const [lsel, setLsel] = useState<HubLot | null>(null);
   const reqId = useRef(0);
 
@@ -602,6 +605,7 @@ export function MillHubTab() {
     const nf = f > nt ? nt : f;
     setFrom(nf);
     setTo(nt);
+    setIsel(null);
     setDsel(null);
     setLsel(null);
     void load(nf, nt);
@@ -611,7 +615,9 @@ export function MillHubTab() {
   const partyLots = useMemo(() => filterLots(lots, party, 'ALL'), [lots, party]);
   const counts = useMemo(() => statusCounts(partyLots), [partyLots]);
   const shown = useMemo(() => filterLots(lots, party, status), [lots, party, status]);
-  const hub = useMemo(() => buildDesignRows(shown), [shown]);
+  const items = useMemo(() => buildItemRows(shown), [shown]);
+  const itemLots = useMemo(() => (isel ? lotsOfItem(shown, isel) : []), [shown, isel]);
+  const hub = useMemo(() => buildDesignRows(itemLots), [itemLots]);
   const challans = useMemo(() => new Set(shown.map((l) => l.outUId)).size, [shown]);
 
   const tableMin = narrow ? 420 : undefined;
@@ -653,15 +659,15 @@ export function MillHubTab() {
 
   /* ------------------------------ lot-wise -------------------------------- */
   if (dsel) {
-    const rows = lotsOfDesign(shown, dsel);
+    const rows = lotsOfDesign(itemLots, dsel);
     const CT = buildDesignRows(rows).G;
     return (
       <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
         <View style={st.drillHead}>
-          <TouchableOpacity onPress={() => setDsel(null)} hitSlop={HIT}><Text style={st.back}>‹ Designs</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setDsel(null)} hitSlop={HIT}><Text style={st.back}>‹ {isel}</Text></TouchableOpacity>
           <Text style={st.drillTitle}>{dsel}</Text>
           <Text style={st.drillSub}>
-            challan / lot-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}
+            {isel} · challan / lot-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}
           </Text>
         </View>
         {Rng}
@@ -682,9 +688,16 @@ export function MillHubTab() {
     );
   }
 
-  /* ------------------------------ design-wise ------------------------------ */
+  /* ------------------------- item-wise → design-wise ------------------------- */
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
+      {isel ? (
+        <View style={st.drillHead}>
+          <TouchableOpacity onPress={() => setIsel(null)} hitSlop={HIT}><Text style={st.back}>‹ Items</Text></TouchableOpacity>
+          <Text style={st.drillTitle}>{isel}</Text>
+          <Text style={st.drillSub}>design-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}</Text>
+        </View>
+      ) : null}
       {Rng}
       <View style={st.sumRow}>
         <Text style={st.sumRange}>{fmtD(from)} → {fmtD(to)}</Text>
@@ -717,7 +730,7 @@ export function MillHubTab() {
           </Text>
           <Text style={st.helpH}>Drill down</Text>
           <Text style={st.helpP}>
-            Tap a design → its outward lots (challan no., date, shade, chart no., party, takas received). Tap a lot → the challan
+            Tap an item → its designs. Tap a design → its outward lots (challan no., date, shade, chart no., party, takas received). Tap a lot → the challan
             details, its inward entries and the taka-wise list of what was sent and what came back. Use the party box and the
             status chips to narrow the view; change the dates or use the presets to move the window.
           </Text>
@@ -750,8 +763,8 @@ export function MillHubTab() {
 
       <HScroll on={!!tableMin}>
         <View style={[st.card, { paddingVertical: 4, minWidth: tableMin, flex: 1 }]}>
-          <HeadRow first="DESIGN" />
-          {hub.rows.length === 0 && !loading && !error && (
+          <HeadRow first={isel ? 'DESIGN' : 'ITEM'} />
+          {(isel ? hub.rows : items.rows).length === 0 && !loading && !error && (
             <View style={st.emptyBox}>
               <Text style={st.emptyText}>
                 No job outward between <Text style={st.bold}>{fmtD(from)}</Text> and <Text style={st.bold}>{fmtD(to)}</Text>
@@ -764,15 +777,24 @@ export function MillHubTab() {
               )}
             </View>
           )}
-          {hub.rows.map((r) => <DesignLine key={r.design} r={r} onPress={() => setDsel(r.design)} />)}
-          {hub.rows.length > 0 && <DesignLine r={hub.G} total />}
+          {isel ? (
+            <>
+              {hub.rows.map((r) => <DesignLine key={r.design} r={r} onPress={() => setDsel(r.design)} />)}
+              {hub.rows.length > 0 && <DesignLine r={{ ...hub.G, design: `TOTAL · ${isel}` }} total />}
+            </>
+          ) : (
+            <>
+              {items.rows.map((r) => <DesignLine key={r.design} r={r} onPress={() => setIsel(r.design)} />)}
+              {items.rows.length > 0 && <DesignLine r={items.G} total />}
+            </>
+          )}
         </View>
       </HScroll>
 
       <Text style={st.footer}>
         Built from job outward and job inward. Lots are picked by outward challan date; inward is counted whenever it came.
         Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
-        Tap a design for the lot-wise breakdown.
+        {isel ? ' Tap a design for the lot-wise breakdown.' : ' Tap an item for its designs, then a design for the lot-wise breakdown.'}
       </Text>
     </ScrollView>
   );
@@ -1062,7 +1084,7 @@ function DesignLine({ r, onPress, total }: { r: HubAgg; onPress?: () => void; to
         <Text style={[st.designName, total && { fontWeight: '800' }]} numberOfLines={2}>
           {r.design}{!total && <Text style={{ color: T.copper }}> ›</Text>}
         </Text>
-        {!total && <Text style={st.designMeta}>{plural(r.lots, 'lot')}</Text>}
+        {!total && <Text style={st.designMeta}>{r.designs != null ? `${plural(r.designs, 'design')} · ` : ''}{plural(r.lots, 'lot')}</Text>}
       </View>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.out }]}>{fmt(r.outM)}</Text>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.in }]}>{fmt(r.inM)}</Text>

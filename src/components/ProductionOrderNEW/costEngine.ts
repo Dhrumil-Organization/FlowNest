@@ -133,4 +133,101 @@ export function matchesSnap(e: Engine): boolean {
   return close(b.greigePrice, e.snap.greige_price) && (!e.hasFin || close(b.finishedPrice, e.snap.finished_price));
 }
 
-export const ratesEdited = (e: Engine | null, r: Rates | null) => !!e && !!r && JSON.stringify(e.initial) !== JSON.stringify(r);
+export const ratesEdited = (e: Engine | null, r: Rates | null) => {
+  if (!e || !r) return false;
+  const same = (a: any, b: any) => Math.abs(n(a) - n(b)) < 0.0000001;
+  for (const key of ['weavingRate', 'dyeingProc', 'greigeBrok', 'finishedBrok', 'cutPack'] as const) {
+    if (!same(e.initial[key], r[key])) return true;
+  }
+  const yarnKeys = new Set([...Object.keys(e.initial.price || {}), ...Object.keys(r.price || {}),
+    ...Object.keys(e.initial.dye || {}), ...Object.keys(r.dye || {})]);
+  for (const key of yarnKeys) {
+    if (!same(e.initial.price[key], r.price[key]) || !same(e.initial.dye[key], r.dye[key])) return true;
+  }
+  return false;
+};
+
+
+/** Persist the exact PO-specific rates in a backend-friendly, stable schema.
+ * Design Costing remains untouched; this object belongs only to the PO snapshot. */
+export function snapshotRates(e: Engine, r: Rates): Row {
+  const yarns = e.yarns.map((y) => ({
+    key: y.key,
+    direction: y.type,
+    name: y.name,
+    kg_per_metre: y.kg,
+    rate: n(r.price[y.key]),
+    dye_rate: n(r.dye[y.key]),
+    sizing_cost: y.sizing,
+  }));
+  const priceMap: Row = {};
+  const dyeMap: Row = {};
+  e.yarns.forEach((y) => {
+    priceMap[y.key] = n(r.price[y.key]);
+    dyeMap[y.key] = n(r.dye[y.key]);
+  });
+  return {
+    price_map: priceMap,
+    dye_map: dyeMap,
+    weaving_rate: n(r.weavingRate),
+    processing_rate: n(r.dyeingProc),
+    greige_brokerage_pct: n(r.greigeBrok),
+    finished_brokerage_pct: n(r.finishedBrok),
+    cut_pack_rate: n(r.cutPack),
+    finish_shrink_pct: e.gfPct,
+    ppi_table: e.ppiTable,
+    is_override: ratesEdited(e, r) ? 1 : 0,
+    yarns,
+  };
+}
+
+/** Persist the exact calculated/saved cost result approved for the PO. */
+export function snapshotDerived(b: Breakup): Row {
+  return {
+    yarn_cost: b.yarnCost,
+    dye_cost: b.dyeCost,
+    rm_cost: b.rm,
+    weaving_cost: b.weavingCost,
+    greige_mfg: b.greigeMfg,
+    greige_brokerage_amount: b.greigeBrokAmt,
+    greige_cost: b.greigePrice,
+    shrinkage_impact: b.shrinkImpact,
+    processing_amount: b.dyeingProc,
+    finished_brokerage_amount: b.finBrokAmt,
+    cut_pack_amount: b.cutPack,
+    finished_cost: b.finishedPrice,
+  };
+}
+
+/** Restore a previously saved PO override into the editable costing review.
+ * Accepts both the new snake_case snapshot and the older RN camelCase shape. */
+export function ratesFromSnapshot(e: Engine, saved: Row | null | undefined): Rates {
+  if (!saved || typeof saved !== 'object') return e.initial;
+  const priceMap: Row = (saved.price_map && typeof saved.price_map === 'object') ? saved.price_map
+    : ((saved.price && typeof saved.price === 'object') ? saved.price : {});
+  const dyeMap: Row = (saved.dye_map && typeof saved.dye_map === 'object') ? saved.dye_map
+    : ((saved.dye && typeof saved.dye === 'object') ? saved.dye : {});
+  const yarns: Row[] = Array.isArray(saved.yarns) ? saved.yarns : [];
+  const savedYarnByKey: Record<string, Row> = {};
+  yarns.forEach((y: Row) => { if (y && y.key != null) savedYarnByKey[String(y.key)] = y; });
+
+  const price = { ...e.initial.price };
+  const dye = { ...e.initial.dye };
+  e.yarns.forEach((y) => {
+    const row = savedYarnByKey[y.key] || {};
+    const pv = priceMap[y.key] != null ? priceMap[y.key] : row.rate;
+    const dv = dyeMap[y.key] != null ? dyeMap[y.key] : row.dye_rate;
+    if (pv !== undefined && pv !== null && pv !== '') price[y.key] = s(pv);
+    if (dv !== undefined && dv !== null && dv !== '') dye[y.key] = s(dv);
+  });
+
+  return {
+    price,
+    dye,
+    weavingRate: s(saved.weaving_rate ?? saved.weavingRate ?? e.initial.weavingRate),
+    dyeingProc: s(saved.processing_rate ?? saved.dyeingProc ?? e.initial.dyeingProc),
+    greigeBrok: s(saved.greige_brokerage_pct ?? saved.greigeBrok ?? e.initial.greigeBrok),
+    finishedBrok: s(saved.finished_brokerage_pct ?? saved.finishedBrok ?? e.initial.finishedBrok),
+    cutPack: s(saved.cut_pack_rate ?? saved.cutPack ?? e.initial.cutPack),
+  };
+}

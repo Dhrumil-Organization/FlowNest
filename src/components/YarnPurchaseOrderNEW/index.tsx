@@ -27,10 +27,9 @@ import { fetchAllStoredata } from '../../common/API/Functions';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
 import { useRouter } from 'expo-router';
 // NEW ERP theme (presentation only — every API call / handler below is unchanged)
-import { S, T } from '@/src/theme';
 import {
-    BusyOverlay,
     Btn,
+    BusyOverlay,
     CONTENT_MAX,
     EmptyState,
     Field,
@@ -45,6 +44,7 @@ import {
     cellWidth,
     useSotLayout,
 } from '@/src/components/erpUi';
+import { S, T } from '@/src/theme';
 interface CardData {
     [key: string]: string;
     isProcessed: boolean;
@@ -1201,6 +1201,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         <Metric label="Qty" value={showVal(d1Item.Qty)} style={styles.itemBox} />
                         <Metric label="Rate" value={showMoney(d1Item.UnitRate)} style={styles.itemBox} />
                         <Metric label="Amount" value={showMoney(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
+                        <Metric label="Last Rate" value={showVal(d1Item.LatestUnitRate)} style={styles.itemBox} />
                     </View>
                 </View>
             ))}
@@ -1712,6 +1713,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     <Metric label="Rate" value={showVal(d1Item.UnitRate)} style={styles.itemBox} />
                                     <Metric label="Amount" value={showVal(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
                                     <Metric label="Disc. %" value={showVal(d1Item.DisPer)} style={styles.itemBox} />
+                                    
                                     {activeTab1YPO === 'requests' && (
                                         <>
                                             <Metric label="Current Stock" value={showVal(d1Item.CurrentStock)} style={styles.itemBox} />

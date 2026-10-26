@@ -30,8 +30,12 @@
 //      It now sends the delivery address: DAdd / DCity / DState / DCnty / DZip (and
 //      Station = delivery city), falling back to the billing address. Old orders whose
 //      DZip holds the city show a blank zip.
-//   2. Picking a delivery address ("Tap to change") sets only the delivery fields and
-//      sends the address SrNo as `QtyKgs`; the party's billing address is not changed.
+//   2. (fixed 26 Oct 2026) Picking a delivery address used to send its SrNo as `QtyKgs`
+//      too. `QtyKgs` is the BILLING address row (SP_FAMSOS prints it as BADDRESS), so the
+//      print showed the consignee as the party's address (order 510020407). A delivery pick
+//      now sets only DAdd / DCity / DState / DCnty / DZip; the billing row has its own
+//      picker ("Change billing address") and a new order starts on the party's
+//      DDefault = 1 row.
 //   3. (replaced) Delivery Days / Date are no longer on the form — see "Changes" below.
 //   4. Discount and Tax % have no input; the values loaded with a saved order are still
 //      used for DisAmt / TaxAmt / NetAmt.
@@ -48,7 +52,9 @@
 //   - Due Days / Due Date replace Delivery Days / Date. Due Days starts from the party's
 //     credit days and is editable; Due Date = SO date + Due Days, and picking a Due Date
 //     sets Due Days. Saved as DueDay / DueDate. DDays: a saved order keeps its own value,
-//     a new order sends the Due Days.
+//     a new order sends '0' (as the web for Rayons; never '' — the column is numeric).
+//   - A new order sends the party GrpCode and EntType 'G02' (model.DEFAULT_ENT_TYPE —
+//     confirm it exists in FAMEType; mobappsave's own default 'G2' does not match the web).
 //   - Sales Executive can be changed on the order (saved as SExe).
 //   - Sales Party card after the main party = ERP Print Party. Saved as main.PrintParty
 //     (code) + main.PrintAdd (address text), the FAMSO columns the web Sales Order uses.

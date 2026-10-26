@@ -10,7 +10,7 @@ export function computePlan(st: Row): Row {
   const {
     sourceMode, selfFabricType, stockType, selectedOrders, selectedGroup, selfDesign,
     baseQtyInput, selfGreigeQtyInput, shrinkage, stockMeters, stockMetersTouched,
-    legacyCostingData, legacyCostChoice, newCostChoice, costingResult, resolvedCostingMeta,
+    legacyCostingData, legacyCostChoice, newCostChoice, costingResult, resolvedCostingMeta, savedPoCostSnapshot,
     costingLoading, costingError, main
   } = st;
 
@@ -117,12 +117,26 @@ export function computePlan(st: Row): Row {
   const weightedRateQty = selectedOrders.reduce((s: number, r: Row) => s + Number(r.qty || 0), 0);
   const weightedRate = weightedRateQty > 0
     ? selectedOrders.reduce((s: number, r: Row) => s + Number(r.qty || 0) * Number(r.rate || 0), 0) / weightedRateQty : 0;
+  const savedSnapshotSource = String((savedPoCostSnapshot && savedPoCostSnapshot.costing_source) || '').toUpperCase();
+  const savedDerived = (savedPoCostSnapshot && savedPoCostSnapshot.derived) || {};
+  const selectedNewCostingId = String((newCostChoice && (newCostChoice.costing_id || newCostChoice.costuid)) || '');
+  const savedSnapshotMatches = isNewDesignCosting
+    ? (savedSnapshotSource === 'NEW' && String((savedPoCostSnapshot && savedPoCostSnapshot.design_costing_id) || '') === selectedNewCostingId)
+    : (savedSnapshotSource === 'LEGACY' && Number((savedPoCostSnapshot && savedPoCostSnapshot.costuid) || 0) === effectiveLegacyCostUid);
   const plannedGreigeCost = isNewDesignCosting
-    ? (costingResult ? Number(costingResult.snap_greige_price || 0) : 0)
-    : Number(legacyMain.Total || legacyMain.total || legacyMain.FabCost || legacyMain.fabcost || 0);
+    ? (costingResult && Number(costingResult.snap_greige_price || 0) > 0
+      ? Number(costingResult.snap_greige_price)
+      : (savedSnapshotMatches ? Number(savedDerived.greige_cost || 0) : 0))
+    : (savedSnapshotMatches && Number(savedDerived.greige_cost || 0) > 0
+      ? Number(savedDerived.greige_cost)
+      : Number(legacyMain.Total || legacyMain.total || legacyMain.FabCost || legacyMain.fabcost || 0));
   const plannedFinishedCost = isNewDesignCosting
-    ? (costingResult ? Number(costingResult.snap_final_cost || 0) : 0)
-    : Number(legacyMain.FinTotAmt || legacyMain.fintotamt || legacyMain.Total || legacyMain.total || 0);
+    ? (costingResult && Number(costingResult.snap_final_cost || 0) > 0
+      ? Number(costingResult.snap_final_cost)
+      : (savedSnapshotMatches ? Number(savedDerived.finished_cost || 0) : 0))
+    : (savedSnapshotMatches && Number(savedDerived.finished_cost || 0) > 0
+      ? Number(savedDerived.finished_cost)
+      : Number(legacyMain.FinTotAmt || legacyMain.fintotamt || legacyMain.Total || legacyMain.total || 0));
   const productionYield = sourceMode === 'sales' && recipeApplied ? Math.max(0.000001, 1 - Number(appliedRecipeShrink || 0) / 100) : 1;
   const plannedCost = fabricType === 'Finish' ? plannedFinishedCost
     : (sourceMode === 'sales' ? plannedGreigeCost / productionYield : plannedGreigeCost);

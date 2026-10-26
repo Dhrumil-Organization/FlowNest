@@ -542,23 +542,6 @@ registerPermissionArea({
             { key: 'delete', name: 'Delete', dangerous: true },
           ],
         },
-        // Sampling Hub — samples with permanent type-prefixed IDs (GAR / HNG / BKL / FAB / SWC) + QR sticker, movement
-        // log (dispatch / showing / return / internal / consumed / split) with the singlet no.; status read off the log.
-        // POST /api/sampling_hub/* (SamplingHubController; TMSMASTER SmpSample / SmpSampleDsn / SmpMove / SmpPhoto)
-        {
-          key: 'sampling_hub',
-          name: 'Sampling Hub',
-          type: 'screen',
-          displayOrder: 163,
-          actions: [
-            { key: 'view', name: 'View' },
-            { key: 'add', name: 'New sample / split' },
-            { key: 'edit', name: 'Modify sample / movement' },
-            { key: 'delete', name: 'Delete sample / movement', dangerous: true },
-            { key: 'move', name: 'Record movement (scan & move)' },
-            { key: 'print', name: 'Print QR sticker' },
-          ],
-        },
         {
           key: 'taka_history',
           name: 'Taka History',
@@ -616,6 +599,17 @@ registerPermissionArea({
               name: 'Assign (single select)',
               description: 'Web right "assign": pending orders are added without copying the print party (PendingOrderSingleSelect).',
             },
+          ],
+        },
+        {
+          key: 'roll_cut_scanner',
+          name: 'Roll Cut Scanner',
+          type: 'screen',
+          displayOrder: 166,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            { key: 'delete', name: 'Delete' },
           ],
         },
         // <-- add your new feature's resource object here (step 1)
@@ -1805,25 +1799,6 @@ registerUiNodes([
     action: 'view',
     order: 162,
   },
-  // Sampling Hub (samples + QR stickers, scan & move, movement log)
-  {
-    id: 'nav.sampling_hub',
-    kind: 'navigation',
-    title: 'Sampling Hub',
-    permission: 'production.sampling_hub',
-    action: 'view',
-    route: 'sampling-hub',
-    icon: 'qr-code-2',
-    order: 163,
-  },
-  {
-    id: 'screen.sampling_hub',
-    kind: 'screen',
-    title: 'Sampling Hub',
-    permission: 'production.sampling_hub',
-    action: 'view',
-    order: 163,
-  },
   // Outward Scan Sticker (fusion sticker scan -> grey job inward; browse / modify / delete)
   {
     id: 'nav.outward_scan_sticker',
@@ -1914,6 +1889,24 @@ registerUiNodes([
     permission: 'production.sales_challan_packing_slip',
     action: 'view',
     order: 165,
+  },
+  {
+    id: 'nav.roll_cut_scanner',
+    kind: 'navigation',
+    title: 'Roll Cut Scanner',
+    permission: 'production.roll_cut_scanner',
+    action: 'view',
+    route: 'roll-cut-scanner',
+    icon: 'qr-code-scanner',
+    order: 166,
+  },
+  {
+    id: 'screen.roll_cut_scanner',
+    kind: 'screen',
+    title: 'Roll Cut Scanner',
+    permission: 'production.roll_cut_scanner',
+    action: 'view',
+    order: 166,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

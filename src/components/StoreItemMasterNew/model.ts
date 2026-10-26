@@ -93,6 +93,8 @@ export type BrowseRow = {
   subGroup: string;
   rate: number;
   location: string;
+  /** Entire original browse API record, retained for automatic future columns. */
+  apiData?: Record<string, any>;
 };
 
 export type Mode = 'view' | 'add' | 'modify';
@@ -253,9 +255,9 @@ export const itemStatus = (item: Pick<StoreItem, 'stopInward' | 'stopIssue'>): {
 /* Validation                                                          */
 /* ------------------------------------------------------------------ */
 
-export type ItemErrors = Partial<Record<'prpCode' | 'yearNo' | 'store' | 'code' | 'name' | 'groupId' | 'purchaseUom' | 'salesUom' | 'makes', string>>;
+export type ItemErrors = Partial<Record<'prpCode' | 'yearNo' | 'store' | 'code' | 'name' | 'groupId' | 'subGroupId' | 'purchaseUom' | 'salesUom' | 'makes', string>>;
 
-export function validateItem(item: StoreItem, mode: Mode): ItemErrors {
+export function validateItem(item: StoreItem, mode: Mode, subGroups: SubGroupOpt[] = []): ItemErrors {
   const e: ItemErrors = {};
   if (!item.prpCode) e.prpCode = 'Select a property';
   if (!item.yearNo) e.yearNo = 'Select a year';
@@ -263,6 +265,8 @@ export function validateItem(item: StoreItem, mode: Mode): ItemErrors {
   if (mode === 'add' && item.code && !/^\d+$/.test(item.code)) e.code = 'Digits only';
   if (item.name.trim().length < 2) e.name = 'Enter the item name';
   if (!item.groupId) e.groupId = 'Select an item group';
+  // Sub groups are listed per item group: when the chosen group has any, one must be picked.
+  else if (!item.subGroupId && subGroups.some((s) => s.groupId === item.groupId)) e.subGroupId = 'Select an item sub group';
   if (!item.purchaseUom) e.purchaseUom = 'Select a purchase UOM';
   if (!item.salesUom) e.salesUom = 'Select a sales UOM';
 

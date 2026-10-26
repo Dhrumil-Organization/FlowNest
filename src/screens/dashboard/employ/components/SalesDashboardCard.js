@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   UIManager,
   View,
+  ScrollView,
 } from 'react-native';
 import { formatAmount } from '../api/api';
 import InteractiveDailyTrendChart from './InteractiveDailyTrendChart';
@@ -273,6 +274,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
         </TouchableOpacity>
       </View>
 
+      <ScrollView style={styles.salesRowsScroll} nestedScrollEnabled showsVerticalScrollIndicator>
       {/* {rows.map((row, index) => { */}
       {sortedRows.map((row, index) => {
         const key = `${dimension}:${row.code || row.name}`;
@@ -316,6 +318,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
         );
       })}
 
+      </ScrollView>
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <MetricValue
@@ -338,6 +341,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
 }
 
 const styles = StyleSheet.create({
+  salesRowsScroll: { height: 280, maxHeight: 280, flexGrow: 0 },
   summaryRow: { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 },
   summaryBlock: { flex: 1 },
   summaryLabel: { fontSize: 9, letterSpacing: 1.1, color: '#8C837B', fontWeight: '700' },

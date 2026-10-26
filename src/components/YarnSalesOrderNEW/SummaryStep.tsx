@@ -21,6 +21,10 @@
 //     picking a Due Date by hand sets Due Days to match. Due Days must be a whole number >= 0.
 //   - Sales Executive can be changed on the order (GET /api/get_criterion fetch:'salesexe').
 //   - Sales Party card after the main party (party list reused); optional, blank when not picked.
+//   - Billing and delivery address are separate (model.ts "Party object"):
+//       Billing  = QtyKgs (FAMACCDA row, printed as BADDRESS). New order: the party's
+//                  DDefault = 1 row. "Change billing address" changes only QtyKgs.
+//       Delivery = DAdd / DCity / DState / DCnty / DZip. "Tap to change" changes only these.
 //   - Qty / Pcs / Rate have a pencil on every row (like the Item pencil) — the value is
 //     changed in place, Amount is recalculated, nothing else on the row changes.
 //   - Every row shows its available stock (POST /api/get_so_current_stock, one request per
@@ -38,10 +42,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { deleteOrder, errorMessage, fetchAddresses, fetchCurrentStock, fetchExecutives, fetchParties, printOrder, saveOrder, showOrder } from './api';
 import {
+  applyBillingAddress,
   applyDeliveryAddress,
   applyExecutive,
   applyWorkingRows,
   buildSavePayload,
+  billingTextOf,
   buildStockLines,
   canAskStock,
   cleanZip,
@@ -59,6 +65,7 @@ import {
   OrderCtx,
   OrderMode,
   parseOrderResponse,
+  pickDefaultAddress,
   placeLine,
   reSrNo,
   Row,
@@ -146,6 +153,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const [addressList, setAddressList] = useState<Row[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressSearch, setAddressSearch] = useState('');
+  /** Which address the "Select Address" sheet changes: billing (QtyKgs) or delivery (DAdd ...). */
+  const [addressMode, setAddressMode] = useState<'billing' | 'delivery'>('delivery');
+  const [billingLoading, setBillingLoading] = useState(false);
   const [actionRow, setActionRow] = useState<Row | null>(null);
 
   const [executives, setExecutives] = useState<Row[]>([]);
@@ -430,8 +440,9 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       purpose: 'replace',
       onPick: (party: Row) => {
         setCurrentParty(party);
-        // a new party brings its own credit days
+        // a new party brings its own credit days and its own billing address row
         setDueDays(dueDayText(party?.DueDay));
+        applyDefaultBilling(party);
         setDirty(true);
       },
     });
@@ -488,11 +499,52 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       if (aliveRef.current) setAddressList(data);
     } catch (error: any) {
       console.log('[YarnSalesOrderNEW] address error', error?.response?.data || error?.message);
-      AppAlert.alert('Error', errorMessage(error, 'Unable to load delivery address'));
+      AppAlert.alert('Error', errorMessage(error, 'Unable to load address list'));
     } finally {
       if (aliveRef.current) setAddressLoading(false);
     }
   };
+
+  /** Opens the address list for the billing address (QtyKgs) or the delivery address (DAdd ...). */
+  const openAddressPicker = (modeOf: 'billing' | 'delivery') => {
+    setAddressMode(modeOf);
+    setAddressSearch('');
+    setAddressListVisible(true);
+    loadDeliveryAddress();
+  };
+
+  /** Bumped on every party change so a late answer for an older party is dropped. */
+  const billingSeq = useRef(0);
+
+  /**
+   * New party: billing address = its DDefault = 1 address row (as the web print expects).
+   * The delivery address is not touched. Not a user change, so it does not mark the order dirty.
+   */
+  const applyDefaultBilling = async (party: Row | null) => {
+    const seq = ++billingSeq.current;
+    if (!party?.ParCode || String(party.ParCode) === '-1') return;
+    try {
+      setBillingLoading(true);
+      const rows = await fetchAddresses(API, token, ctx, uid, party.ParCode);
+      if (!aliveRef.current || seq !== billingSeq.current) return;
+      const def = pickDefaultAddress(rows, party);
+      if (def) {
+        setCurrentParty((prev) =>
+          prev && String(prev.ParCode) === String(party.ParCode) ? applyBillingAddress(prev, def) : prev,
+        );
+      }
+    } catch (error: any) {
+      console.log('[YarnSalesOrderNEW] default billing address error', error?.response?.data || error?.message);
+    } finally {
+      if (aliveRef.current && seq === billingSeq.current) setBillingLoading(false);
+    }
+  };
+
+  // new order opened from the party list
+  useEffect(() => {
+    if (initialMode === 'ADD' && Number(uid) <= 0 && params.party) applyDefaultBilling(params.party);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------------- save / delete / print ---------------- */
 
@@ -776,15 +828,27 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={st.eyebrow}>Party</Text>
               <Text style={st.partyName} numberOfLines={2}>{currentParty?.ParName || '-'}</Text>
-              {/* billing address (party master) — a delivery address pick does not change it */}
+              {/* billing address = the QtyKgs row (printed as BADDRESS); a delivery pick never changes it */}
               <Text style={st.partySub} numberOfLines={3}>
-                {currentParty?.ParCode || '-'} | {currentParty?.Address || '-'}
+                {currentParty?.ParCode || '-'} | {billingLoading ? 'Loading billing address…' : billingTextOf(currentParty) || '-'}
               </Text>
-              {partyPlace ? (
+              {partyPlace && !currentParty?.BillText ? (
                 <View style={st.placeRow}>
                   <Icon name="location-on" size={14} color={T.muted} />
                   <Text style={st.placeText} numberOfLines={2}>{partyPlace}</Text>
                 </View>
+              ) : null}
+              {!isViewMode && currentParty?.ParCode && String(currentParty.ParCode) !== '-1' ? (
+                <TouchableOpacity
+                  style={st.billLink}
+                  onPress={() => openAddressPicker('billing')}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change billing address"
+                >
+                  <Icon name="edit" size={13} color={T.copper} />
+                  <Text style={st.billLinkText}>Change billing address</Text>
+                </TouchableOpacity>
               ) : null}
               <TouchableOpacity
                 style={[st.exePick, isViewMode && st.exePickOff]}
@@ -1008,28 +1072,37 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
           <InfoRow icon="handshake" label="Broker" value={String(currentParty?.BAccName || '-')} />
           <InfoRow icon="calendar-today" label="Due Days" value={dueDays || '-'} />
           <InfoRow icon="event" label="Due Date" value={dueDate || '-'} />
-          {/* Billing address (party master) — read-only, same layout as the delivery address */}
-          <View style={st.addrRow}>
-            <Icon name="receipt-long" size={18} color={T.copper} />
-            <Text style={st.addrLabel}>Billing Address</Text>
-            <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
-              <Text style={st.addrValue} numberOfLines={10}>{currentParty?.Address || '-'}</Text>
-            </View>
-          </View>
-          <InfoRow icon="location-city" label="Billing City" value={String(currentParty?.City || '-')} />
-          <InfoRow icon="map" label="Billing State" value={String(currentParty?.State || '-')} />
-          <InfoRow icon="public" label="Billing Country" value={String(currentParty?.Cnty || '-')} />
-          <InfoRow icon="markunread-mailbox" label="Billing Zip" value={cleanZip(currentParty?.Zip) || '-'} />
+          {/* Billing address = the QtyKgs row (printed as BADDRESS) — its own picker */}
           <TouchableOpacity
             style={st.addrRow}
             activeOpacity={0.8}
+            disabled={isViewMode || !currentParty?.ParCode || String(currentParty?.ParCode) === '-1'}
+            accessibilityRole="button"
+            accessibilityLabel="Change billing address"
+            onPress={() => openAddressPicker('billing')}
+          >
+            <Icon name="receipt-long" size={18} color={T.copper} />
+            <Text style={st.addrLabel}>Billing Address</Text>
+            <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
+              <Text style={st.addrValue} numberOfLines={10}>{billingTextOf(currentParty) || '-'}</Text>
+              {!isViewMode ? <Text style={st.addrHint}>Tap to change</Text> : null}
+            </View>
+          </TouchableOpacity>
+          {!currentParty?.BillText ? (
+            <>
+              <InfoRow icon="location-city" label="Billing City" value={String(currentParty?.City || '-')} />
+              <InfoRow icon="map" label="Billing State" value={String(currentParty?.State || '-')} />
+              <InfoRow icon="public" label="Billing Country" value={String(currentParty?.Cnty || '-')} />
+              <InfoRow icon="markunread-mailbox" label="Billing Zip" value={cleanZip(currentParty?.Zip) || '-'} />
+            </>
+          ) : null}
+          <TouchableOpacity
+            style={st.addrRow}
+            activeOpacity={0.8}
+            disabled={isViewMode}
             accessibilityRole="button"
             accessibilityLabel="Change delivery address"
-            onPress={() => {
-              setAddressSearch('');
-              setAddressListVisible(true);
-              loadDeliveryAddress();
-            }}
+            onPress={() => openAddressPicker('delivery')}
           >
             <Icon name="location-on" size={18} color={T.copper} />
             <Text style={st.addrLabel}>Delivery Address</Text>
@@ -1046,7 +1119,12 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       </Sheet>
 
       {/* Select address */}
-      <Sheet open={addressListVisible} onClose={() => setAddressListVisible(false)} title="Select Delivery Address" wideMax={520}>
+      <Sheet
+        open={addressListVisible}
+        onClose={() => setAddressListVisible(false)}
+        title={addressMode === 'billing' ? 'Select Billing Address' : 'Select Delivery Address'}
+        wideMax={520}
+      >
         <SearchInput
           value={addressSearch}
           onChangeText={setAddressSearch}
@@ -1062,22 +1140,37 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
           </View>
         ) : shownAddresses.length > 0 ? (
           <View>
-            {shownAddresses.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={st.addrItem}
-                accessibilityRole="button"
-                onPress={() => {
-                  setCurrentParty((prev) => applyDeliveryAddress(prev, item));
-                  setDirty(true);
-                  setAddressListVisible(false);
-                }}
-              >
-                <Text style={st.addrItemTitle}>{item?.DAdd || '-'}</Text>
-                <Text style={st.addrItemSub}>{item?.DCity || '-'} , {item?.DState || '-'}</Text>
-                <Text style={st.addrItemSub}>{item?.DCnty || '-'} - {item?.DZip || '-'}</Text>
-              </TouchableOpacity>
-            ))}
+            {shownAddresses.map((item, index) => {
+              const on =
+                addressMode === 'billing'
+                  ? num(item?.SrNo) > 0 && num(item?.SrNo) === num(currentParty?.QtyKgs)
+                  : String(item?.DAdd || '').trim() !== '' && String(item?.DAdd || '').trim() === String(currentParty?.DAdd || '').trim();
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[st.addrItem, on && st.addrItemOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => {
+                    // billing changes ONLY QtyKgs; delivery changes ONLY DAdd / DCity / DState / DCnty / DZip
+                    setCurrentParty((prev) =>
+                      addressMode === 'billing' ? applyBillingAddress(prev, item) : applyDeliveryAddress(prev, item),
+                    );
+                    setDirty(true);
+                    setAddressListVisible(false);
+                  }}
+                >
+                  <View style={st.addrItemHead}>
+                    <Text style={st.addrItemNo}>#{item?.SrNo ?? '-'}</Text>
+                    {num(item?.DDefault) === 1 ? <Text style={st.addrDefault}>DEFAULT</Text> : null}
+                    {on ? <Icon name="check-circle" size={18} color={T.copper} /> : null}
+                  </View>
+                  <Text style={st.addrItemTitle}>{item?.DAdd || '-'}</Text>
+                  <Text style={st.addrItemSub}>{item?.DCity || '-'} , {item?.DState || '-'}</Text>
+                  <Text style={st.addrItemSub}>{item?.DCnty || '-'} - {cleanZip(item?.DZip) || '-'}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ) : (
           <View style={st.addrState}>
@@ -1316,6 +1409,12 @@ const st = StyleSheet.create({
   addrValue: { textAlign: 'right', fontSize: 13.5, fontWeight: '800', color: T.ink },
   addrHint: { fontSize: 12, fontWeight: '800', color: T.copper, marginTop: 4 },
   addrSearch: { marginBottom: 6 },
+  addrItemOn: { backgroundColor: `${T.copper}10`, borderRadius: 8, paddingHorizontal: 6 },
+  addrItemHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  addrItemNo: { fontSize: 11, fontWeight: '900', color: T.muted },
+  addrDefault: { fontSize: 10, fontWeight: '900', color: T.green, letterSpacing: 0.4 },
+  billLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-start' },
+  billLinkText: { fontSize: 12, fontWeight: '800', color: T.copper },
   addrState: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center', gap: 12 },
   addrStateText: { fontSize: 14, fontWeight: '600', color: T.muted },
   addrItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: T.hair },

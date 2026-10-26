@@ -232,6 +232,7 @@ export function Field({
   align,
   maxLength,
   onSubmitEditing,
+  onFocus,
 }: {
   label: string;
   value: string;
@@ -246,6 +247,7 @@ export function Field({
   align?: 'right';
   maxLength?: number;
   onSubmitEditing?: () => void;
+  onFocus?: () => void;
 }) {
   const [focus, setFocus] = useState(false);
   return (
@@ -261,7 +263,7 @@ export function Field({
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
         maxLength={maxLength}
-        onFocus={() => setFocus(true)}
+        onFocus={() => { setFocus(true); onFocus?.(); }}
         onBlur={() => setFocus(false)}
         onSubmitEditing={onSubmitEditing}
         accessibilityLabel={label}
@@ -386,8 +388,10 @@ export function Sheet({
   headerRight?: React.ReactNode;
 }) {
   const { width, height } = useWindowDimensions();
-  const wide = width >= 700;
+  const wide = width >= 760;
+  const tablet = width >= 560 && width < 760;
   const boxW = size === 'sm' ? 440 : size === 'md' ? 640 : 1080;
+  const horizontalInset = tablet ? 16 : 24;
 
   useWebKeys(
     useCallback(
@@ -414,7 +418,7 @@ export function Sheet({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <Pressable
-          style={[u.backdrop, { justifyContent: wide ? 'center' : 'flex-end', alignItems: 'center', padding: wide ? 24 : 0 }]}
+          style={[u.backdrop, { justifyContent: wide || tablet ? 'center' : 'flex-end', alignItems: 'center', paddingHorizontal: wide || tablet ? horizontalInset : 0, paddingVertical: wide || tablet ? 16 : 0 } ]}
           onPress={onClose}
           accessibilityLabel="Close"
         >
@@ -425,13 +429,13 @@ export function Sheet({
               u.sheet,
               S.sheet,
               {
-                width: wide ? Math.min(boxW, width - 48) : '100%',
-                maxHeight: wide ? height - 48 : height * 0.92,
-                borderRadius: wide ? 18 : 0,
+                width: wide ? Math.min(boxW, width - 48) : tablet ? Math.min(boxW, width - 32) : '100%',
+                maxHeight: wide ? height - 48 : height * 0.94,
+                borderRadius: wide || tablet ? 18 : 0,
                 borderTopLeftRadius: 18,
                 borderTopRightRadius: 18,
               },
-              fill && { height: wide ? Math.min(height - 48, 760) : height * 0.92 },
+              fill && { height: wide ? Math.min(height - 48, 760) : height * 0.94 },
             ]}
           >
             {!wide ? <View style={u.grabber} /> : null}

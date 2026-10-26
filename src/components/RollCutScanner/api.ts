@@ -11,7 +11,7 @@ import axios from 'axios';
 
 export const TXN_ROLL_CUT = 'roll_cut_scanner';
 
-export const SAVE_ENDPOINT = '/api/add_auto_checking_detail';
+export const SAVE_ENDPOINT = '/api/add_roll_cut_detail';
 export const LIST_ENDPOINT = '/api/show_beam_checking';
 export const BEAM_HELP_ENDPOINT = '/api/get_auto_checking_help';
 

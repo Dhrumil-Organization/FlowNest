@@ -177,8 +177,13 @@ const toItem = (r: any, sc: Scope): StoreItem => ({
   makes: (r.makes ?? r.Makes ?? []).map(toMake),
 });
 const toBrowseRow = (r: any, i: number): BrowseRow => ({
-  key: `${s(r.ItmCode ?? r.MItmCode)}-${i}`, store: s(r.str_code ?? r.StrCode), code: s(r.ItmCode ?? r.MItmCode), name: s(r.item_name ?? r.ItmName),
-  uom: s(r.uom ?? r.UOM ?? r.PUOM), group: s(r.group_name ?? r.GroupName ?? r.IGName), subGroup: s(r.sub_group_name ?? r.SubGroupName), rate: toNum(r.rate ?? r.Rate ?? r.LastRate ?? r.last_rate), location: s(r.location ?? r.StrLoc),
+  key: `${s(r.ItmCode ?? r.MItmCode ?? r.itmcode ?? r.code)}-${i}`,
+  store: s(r.str_code ?? r.StrCode), code: s(r.ItmCode ?? r.MItmCode ?? r.itmcode ?? r.code),
+  name: s(r.item_name ?? r.ItmName ?? r.itmname ?? r.name),
+  uom: s(r.uom ?? r.UOM ?? r.PUOM), group: s(r.group_name ?? r.GroupName ?? r.IGName ?? r.itmgrp),
+  subGroup: s(r.sub_group_name ?? r.SubGroupName ?? r.ISGName),
+  rate: toNum(r.rate ?? r.Rate ?? r.LastRate ?? r.last_rate), location: s(r.location ?? r.StrLoc),
+  apiData: r && typeof r === 'object' ? { ...r } : {},
 });
 const safeDefaultForApiValue = (value: any) => {
   if (typeof value === 'number') return 0;
@@ -242,15 +247,18 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
         Model: m.model || '',
         MakSrNo: Number(m.apiFields?.MakSrNo ?? m.apiFields?.make_srno ?? m.apiFields?.SrNo) || 0,
         SrNo: Number(m.apiFields?.SrNo ?? m.apiFields?.MakSrNo ?? m.apiFields?.make_srno) || 0,
-        ShtName: m.shortName || '',
-        StrLoc: m.location || '',
+        // Short name / Location are no longer captured: blank string goes to the backend.
+        ShtName: '',
+        StrLoc: '',
         // Backend contract: send a hyphen for Remarks on every make row.
         Remarks: '-',
         Status: (m.status === 'Active' ? 'A' : m.status === 'Passive' ? 'P' : m.status) || 'A',
         IsDead: m.dead ? 1 : 0,
-        ROLevel: Number(m.roLevel) || 0, ROQty: Number(m.roQty) || 0,
+        // R.O. level / R.O. qty are no longer captured: 0 goes to the backend.
+        ROLevel: 0, ROQty: 0,
         OpQty: Number(m.opQty) || 0, OpRate: Number(m.opRate) || 0,
-        OLPerc: Number(m.inwardExtraQtyPct) || 0, OLQty: Number(m.inwardExtraQty) || 0,
+        // Inward extra qty (%) / qty are no longer captured: 0 goes to the backend.
+        OLPerc: 0, OLQty: 0,
         Shift: m.shift || '', shift: m.shift || '',
         SurplusLevel: Number(m.surplusLevel) || 0,
         LastRate: Number(m.rate1) || 0, PRate1: Number(m.rate2) || 0,
@@ -258,13 +266,13 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
         SLRate: Number(m.saleRate) || 0,
         make_code: Number(m.makeCode) || 0, make_name: m.makeName || '', model: m.model || '',
         make_srno: Number(m.apiFields?.MakSrNo ?? m.apiFields?.make_srno ?? m.apiFields?.SrNo) || 0,
-        short_name: m.shortName || '', ro_level: Number(m.roLevel) || 0,
-        ro_qty: Number(m.roQty) || 0, op_qty: Number(m.opQty) || 0,
+        short_name: '', ro_level: 0,
+        ro_qty: 0, op_qty: Number(m.opQty) || 0,
         op_rate: Number(m.opRate) || 0, rate1: Number(m.rate1) || 0,
         rate2: Number(m.rate2) || 0, rate3: Number(m.rate3) || 0,
         rate4: Number(m.rate4) || 0, sale_rate: Number(m.saleRate) || 0,
-        store_loc: m.location || '', inward_extra_perc: Number(m.inwardExtraQtyPct) || 0,
-        inward_extra_qty: Number(m.inwardExtraQty) || 0, is_dead: m.dead ? 1 : 0,
+        store_loc: '', inward_extra_perc: 0,
+        inward_extra_qty: 0, is_dead: m.dead ? 1 : 0,
         surplus_level: Number(m.surplusLevel) || 0,
         status: (m.status === 'Active' ? 'A' : m.status === 'Passive' ? 'P' : m.status) || 'A',
         contra: Number(m.apiFields?.Contra) || 0,
@@ -379,7 +387,7 @@ export async function fetchNextCode(API: string, token: string, sc: Scope): Prom
   } catch (e) { throw new ApiError(messageOf(e, 'Could not get the next item code.')); }
 }
 export async function fetchBrowse(API: string, token: string, sc: Scope): Promise<BrowseRow[]> {
-  try { const res = await get(API, token, ENDPOINTS.browse, { ...scopePayload(sc, 'browse_data'), type: 'items', page: 1, per_page: 200 }); assertOk(res); const d = bodyData(res); return (Array.isArray(d) ? d : d.items ?? []).map(toBrowseRow); }
+  try { const res = await get(API, token, ENDPOINTS.browse, { ...scopePayload(sc, 'browse_data'), type: 'items', page: 1, per_page: 200 }); assertOk(res); const d = bodyData(res); const list = Array.isArray(d) ? d : (d?.items ?? d?.data ?? d?.main ?? d?.rows ?? []); return (Array.isArray(list) ? list : []).map(toBrowseRow); }
   catch (e) { throw new ApiError(messageOf(e, 'Could not load the item list.')); }
 }
 export async function fetchItem(API: string, token: string, sc: Scope, code: string): Promise<StoreItem> {
@@ -409,6 +417,152 @@ export async function saveItem(API: string, token: string, mode: Mode, item: Sto
 export async function deleteItem(API: string, token: string, sc: Scope, code: string): Promise<string> {
   try { const res = await post(API, token, ENDPOINTS.remove, { ...scopePayload(sc, 'delete_data'), MItmCode: Number(code) }); assertOk(res); return serverMessage(res.data); }
   catch (e) { throw new ApiError(messageOf(e, 'Could not delete the item.')); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Make / Model MASTER  (global DAPMake records — NOT the item's rows)  */
+/*   GET  make-model-master/browse-data  -> list of make/model rows     */
+/*   GET  make-model-master/show-data    -> MakCode = 0 -> empty record */
+/*   POST make-model-master/add-data | modify-data | delete-data        */
+/* Same idea as Color Item Master's inline masters (Fibre, UOM, ...):   */
+/* one dialog = add / rename / delete + a browse list, refreshed after  */
+/* every write.                                                         */
+/* ------------------------------------------------------------------ */
+export const MAKE_MASTER_ENDPOINTS = {
+  browse: '/api/make-model-master/browse-data',
+  show: '/api/make-model-master/show-data',
+  add: '/api/make-model-master/add-data',
+  modify: '/api/make-model-master/modify-data',
+  remove: '/api/make-model-master/delete-data',
+} as const;
+/** txntype sent with the make/model master calls. Change here if your backend expects another value. */
+export const MAKE_TXN_TYPE = 'store_item_master';
+
+/** One row of the make master = one Make + one Model (DAPMake composite key: MakCode + SrNo). */
+export type MakeMasterRow = { key: string; makeCode: string; makeName: string; shortName: string; status: string; model: string; srNo: number };
+export type MakeMasterInput = {
+  makeCode: string; makeName: string; shortName?: string; status?: string; model: string; srNo: number;
+  /** Several models of the SAME make in one save (add-data). When given, `model` / `srNo` mirror the first entry. */
+  models?: Array<{ model: string; srNo: number }>;
+};
+
+const toMakeMasterRows = (r: any, i: number): MakeMasterRow[] => {
+  // Some backends return one row per make with a nested models list — flatten it.
+  const nested = r?.models ?? r?.Models;
+  if (Array.isArray(nested)) {
+    return nested.flatMap((m: any, j: number) => toMakeMasterRows({ ...r, ...m, models: undefined, Models: undefined }, i * 1000 + j));
+  }
+  const makeCode = s(r?.make_code ?? r?.MakCode ?? r?.makeCode);
+  const srNo = Number(r?.make_srno ?? r?.MakSrNo ?? r?.SrNo ?? r?.srno ?? r?.sr_no) || 0;
+  return [{
+    key: `${makeCode}-${srNo}-${i}`,
+    makeCode,
+    makeName: s(r?.make_name ?? r?.MakName ?? r?.MakNameJ ?? r?.makeName),
+    shortName: s(r?.short_name ?? r?.ShtName ?? r?.shortName),
+    status: s(r?.status ?? r?.Status) || 'A',
+    model: s(r?.model ?? r?.Model ?? r?.ModelJ),
+    srNo,
+  }];
+};
+/** Dropdown option shape used by MakeSheet. */
+export const toMakeOption = (r: MakeMasterRow): MakeModelOption => ({ makeCode: r.makeCode, makeName: r.makeName, model: r.model, makeSrNo: r.srNo });
+
+// Delete from the Makes grid: backend needs only the make code + scope/action.
+const makespayload = (sc: Scope, action: string, m: MakeMasterInput) => ({
+  ...scopePayload(sc, action),
+  txntype: MAKE_TXN_TYPE,
+  MakCode: Number(m.makeCode) || 0,
+});
+
+// Delete a model from the model dropdown: backend needs the make and model keys only.
+const modelMasterPayload = (sc: Scope, action: string, m: MakeMasterInput) => ({
+  ...scopePayload(sc, action),
+  txntype: MAKE_TXN_TYPE,
+  MakCode: Number(m.makeCode) || 0,
+  MakName: m.makeName.trim().toUpperCase(),
+  SrNo: Number(m.srNo) || 0,
+});
+
+const makeMasterPayload = (sc: Scope, action: string, m: MakeMasterInput) => ({
+  ...scopePayload(sc, action),
+  txntype: MAKE_TXN_TYPE,
+  // PascalCase (DB style) + snake_case (controller style) — same approach as the Store Item payload.
+  MakCode: Number(m.makeCode) || 0,
+  MakName: m.makeName.trim().toUpperCase(),
+  ShtName: (m.shortName ?? '').trim().toUpperCase(),
+  Status: m.status || 'A',
+  Model: m.model.trim().toUpperCase(),
+  SrNo: Number(m.srNo) || 0,
+  MakSrNo: Number(m.srNo) || 0,
+  make_code: Number(m.makeCode) || 0,
+  make_name: m.makeName.trim().toUpperCase(),
+  short_name: (m.shortName ?? '').trim().toUpperCase(),
+  status: m.status || 'A',
+  model: m.model.trim().toUpperCase(),
+  make_srno: Number(m.srNo) || 0,
+  // ARRAY of model objects (same keys as the show-data `models` object): one object per model, all under this MakCode.
+  models: (m.models && m.models.length ? m.models : [{ model: m.model, srNo: m.srNo }]).map((x) => ({
+    PrpCode: (scopePayload(sc, action) as any).PrpCode,
+    MakCode: Number(m.makeCode) || 0,
+    SrNo: Number(x.srNo) || 0,
+    Model: (x.model ?? '').trim().toUpperCase(),
+  })),
+});
+
+/** Whole make/model list (browse-data). Pages until the server stops returning new rows. */
+export async function fetchMakeMasterList(API: string, token: string, sc: Scope): Promise<MakeMasterRow[]> {
+  try {
+    const res = await get(API, token, MAKE_MASTER_ENDPOINTS.browse, { ...scopePayload(sc, 'browse_data'), txntype: MAKE_TXN_TYPE, search: '', page: 1, per_page: 50000 });
+    assertOk(res);
+    const d = bodyData(res);
+    // The supplied API returns separate `makes` and `models` arrays.
+    if (d && !Array.isArray(d) && Array.isArray(d.makes)) {
+      const makes: any[] = d.makes;
+      const models: any[] = Array.isArray(d.models) ? d.models : [];
+      return makes.flatMap((mk: any, i: number) => {
+        const code = s(mk?.MakCode ?? mk?.make_code ?? mk?.makeCode);
+        const related = models.filter((m: any) => String(m?.MakCode ?? m?.make_code ?? m?.makeCode) === code);
+        const common = { makeCode: code, makeName: s(mk?.MakName ?? mk?.make_name ?? mk?.makeName), shortName: s(mk?.ShtName ?? mk?.short_name ?? mk?.shortName), status: s(mk?.Status ?? mk?.status) || 'A' };
+        if (!related.length) return [{ key: `${code}-0-${i}`, ...common, model: '', srNo: 0 }];
+        return related.map((m: any, j: number) => ({ key: `${code}-${Number(m?.SrNo ?? m?.srno ?? 0)}-${i}-${j}`, ...common, model: s(m?.Model ?? m?.model ?? m?.ModelJ), srNo: Number(m?.SrNo ?? m?.srno ?? m?.sr_no) || 0 }));
+      });
+    }
+    const raw: any[] = Array.isArray(d) ? d : d?.items ?? d?.rows ?? d?.data ?? [];
+    return (Array.isArray(raw) ? raw : []).flatMap(toMakeMasterRows);
+  } catch (e) { throw new ApiError(messageOf(e, 'Could not load the make / model list.')); }
+}
+
+/** SHOW with MakCode = 0 -> next make code ('' when the server does not send one; add-data then assigns it). */
+export async function fetchMakeMasterNextCode(API: string, token: string, sc: Scope): Promise<string> {
+  const pick = (d: any) => {
+    const r = Array.isArray(d) ? d[0] : (d?.make ?? d?.item ?? d);
+    const c = s(r?.MakCode ?? r?.make_code ?? r?.next_code ?? r?.code);
+    return c && c !== '0' ? c : '';
+  };
+  try {
+    const res = await get(API, token, MAKE_MASTER_ENDPOINTS.show, { ...makeMasterPayload(sc, 'show_data', { makeCode: '0', makeName: '', model: '', srNo: 0 }) });
+    assertOk(res);
+    return pick(bodyData(res));
+  } catch (e) { throw new ApiError(messageOf(e, 'Could not get the next make code.')); }
+}
+
+/** Add a make (next MakCode, SrNo 1) or a new model under an existing make (its MakCode, SrNo = last + 1). Resolves with the server message. */
+export async function addMakeMaster(API: string, token: string, sc: Scope, m: MakeMasterInput): Promise<string> {
+  try { const res = await post(API, token, MAKE_MASTER_ENDPOINTS.add, makeMasterPayload(sc, 'add_data', m)); assertOk(res); return serverMessage(res.data); }
+  catch (e) { throw new ApiError(messageOf(e, 'Could not add the make.')); }
+}
+export async function modifyMakeMaster(API: string, token: string, sc: Scope, m: MakeMasterInput): Promise<string> {
+  try { const res = await post(API, token, MAKE_MASTER_ENDPOINTS.modify, makeMasterPayload(sc, 'modify_data', m)); assertOk(res); return serverMessage(res.data); }
+  catch (e) { throw new ApiError(messageOf(e, 'Could not update the make.')); }
+}
+export async function deleteMakeMaster(API: string, token: string, sc: Scope, m: MakeMasterInput): Promise<string> {
+  try { const res = await post(API, token, MAKE_MASTER_ENDPOINTS.remove, makespayload(sc, 'delete_data', m)); assertOk(res); return serverMessage(res.data); }
+  catch (e) { throw new ApiError(messageOf(e, 'Could not delete the make.')); }
+}
+
+export async function deleteModelMaster(API: string, token: string, sc: Scope, m: MakeMasterInput): Promise<string> {
+  try { const res = await post(API, token, MAKE_MASTER_ENDPOINTS.remove, modelMasterPayload(sc, 'delete_data', m)); assertOk(res); return serverMessage(res.data); }
+  catch (e) { throw new ApiError(messageOf(e, 'Could not delete the model.')); }
 }
 
 // Mock implementation intentionally removed from the active adapter; all actions use Laravel endpoints.

@@ -36,7 +36,6 @@ export const PermissionKeys = {
     // payable: 'production.payable',
     sudamoProductionOrder: 'production.sudamo_production_order',
     creditLimitRequest: 'production.credit_limit_request',
-    samplingHub: 'production.sampling_hub',
   },
   commercial: {
     costing: 'costing',

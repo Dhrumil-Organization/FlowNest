@@ -7,7 +7,7 @@
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { FlatList, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import {
   BP_DESKTOP,
   BP_TABLET,
@@ -21,15 +21,15 @@ import {
 import { BrowseSkeleton } from './Skeleton';
 import { Btn, EmptyState, FilterChip, SearchBox, Sheet, useWebKeys } from './ui';
 
-type ColKey = 'code' | 'name' | 'uom' | 'group' | 'subGroup' | 'rate' | 'location';
+type ColKey = string;
 type Col = { key: ColKey; label: string; flex?: number; w?: number; right?: boolean; sort?: BrowseSortKey; filter?: keyof BrowseFilters };
 
 const DESKTOP_COLS: Col[] = [
   { key: 'code', label: 'Code', w: 84, right: true, sort: 'code', filter: 'code' },
   { key: 'name', label: 'Item name', flex: 2.6, sort: 'name', filter: 'name' },
   { key: 'uom', label: 'UOM', w: 76, filter: 'uom' },
-  { key: 'group', label: 'Group', flex: 1.3, sort: 'group', filter: 'group' },
-  { key: 'subGroup', label: 'Sub group', flex: 1.3, filter: 'subGroup' },
+  { key: 'group', label: 'Item Group', flex: 1.3, sort: 'group', filter: 'group' },
+  { key: 'subGroup', label: 'Item Sub Group', flex: 1.3, filter: 'subGroup' },
   { key: 'rate', label: 'Rate', w: 100, right: true, sort: 'rate', filter: 'rate' },
   { key: 'location', label: 'Location', flex: 1, filter: 'location' },
 ];
@@ -37,11 +37,43 @@ const TABLET_COLS: Col[] = [
   { key: 'code', label: 'Code', w: 70, right: true, sort: 'code' },
   { key: 'name', label: 'Item name', flex: 2.4, sort: 'name' },
   { key: 'uom', label: 'UOM', w: 64 },
-  { key: 'group', label: 'Group', flex: 1.4, sort: 'group' },
+  { key: 'group', label: 'Item Group', flex: 1.4, sort: 'group' },
   { key: 'rate', label: 'Rate', w: 92, right: true, sort: 'rate' },
 ];
 
 const ROW_H = { desktop: 44, tablet: 56 };
+
+/** API keys already shown by the fixed columns. */
+const KNOWN_KEYS = ['ItmCode','MItmCode','itmcode','code','item_name','ItmName','itmname','name','uom','UOM','PUOM','group_name','GroupName','IGName','itmgrp','sub_group_name','SubGroupName','ISGName','ItmSGrp','rate','Rate','LastRate','last_rate','location','StrLoc','str_code','StrCode'];
+/** Extra API columns that only carry a code (ItmGrp, ItmSGrp, StrLoc, ...) are not shown — only the leading item Code column stays. */
+const isCodeKey = (k: string) => /code/i.test(k) || /^(itmgrp|itmsgrp|strloc|yearno|srno|maksrno|make_srno)$/i.test(k);
+const showApiKey = (k: string) => !KNOWN_KEYS.includes(k) && !isCodeKey(k);
+
+const MIN_COL_W = 50;
+/** Drag handle on the right edge of a header cell: lets the user widen / narrow that column. */
+function ResizeHandle({ getWidth, onResize }: { getWidth: () => number; onResize: (w: number) => void }) {
+  const live = useRef({ getWidth, onResize });
+  live.current = { getWidth, onResize };
+  const start = useRef(0);
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => { start.current = live.current.getWidth(); },
+      onPanResponderMove: (_e, gs) => live.current.onResize(Math.max(MIN_COL_W, Math.round(start.current + gs.dx))),
+    }),
+  ).current;
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityLabel="Resize column"
+      style={[{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, zIndex: 5, alignItems: 'center', justifyContent: 'center' }, Platform.OS === 'web' ? ({ cursor: 'col-resize' } as any) : null]}
+    >
+      <View style={{ width: 2, height: 18, borderRadius: 1, backgroundColor: T.border }} />
+    </View>
+  );
+}
 
 export default function BrowseSheet({
   storeLabel,
@@ -59,19 +91,30 @@ export default function BrowseSheet({
   const { width: win } = useWindowDimensions();
   const inner = win >= 700 ? Math.min(1080, win - 48) : win;
   const layout: 'desktop' | 'tablet' | 'phone' = inner >= BP_DESKTOP ? 'desktop' : inner >= BP_TABLET ? 'tablet' : 'phone';
-  const cols = layout === 'desktop' ? DESKTOP_COLS : TABLET_COLS;
-
+  const [groupBy, setGroupBy] = useState('');
+  const [groupPickerIndex, setGroupPickerIndex] = useState(0);
   const [rows, setRows] = useState<BrowseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('');
   const [colF, setColF] = useState<BrowseFilters>(NO_COLUMN_FILTERS);
+  // Filters for API-provided columns are kept separately because their keys are dynamic.
+  const [dynamicColF, setDynamicColF] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState<BrowseSortKey>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [active, setActive] = useState(0);
   const seq = useRef(0);
+  // user-resized column widths (px) by column key; unresized columns use their default width
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const [wrapW, setWrapW] = useState(0);
   const listRef = useRef<FlatList<BrowseRow>>(null);
+
+  const dynamicCols = useMemo<Col[]>(() => {
+    const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.apiData || {}))));
+    return keys.filter(showApiKey).map((k) => ({ key: `api:${k}`, label: k, flex: 1.2 }));
+  }, [rows]);
+  const cols = layout === 'desktop' ? [...DESKTOP_COLS, ...dynamicCols] : TABLET_COLS;
 
   const load = useCallback(async () => {
     const id = ++seq.current;
@@ -96,15 +139,41 @@ export default function BrowseSheet({
   }, []);
 
   const groups = useMemo(() => Array.from(new Set(rows.map((r) => r.group).filter(Boolean))).sort(), [rows]);
-  const data = useMemo(() => filterBrowse(rows, q, group, colF, sortKey, sortDir), [rows, q, group, colF, sortKey, sortDir]);
-  const filtering = !!(q || group || Object.values(colF).some(Boolean));
+  const data = useMemo(() => {
+    const baseFiltered = filterBrowse(rows, q, group, colF, sortKey, sortDir);
+    const filtered = baseFiltered.filter((r) => dynamicCols.every((c) => {
+      const needle = (dynamicColF[c.key.slice(4)] || '').trim().toLowerCase();
+      if (!needle) return true;
+      return String((r.apiData || {})[c.key.slice(4)] ?? '').toLowerCase().includes(needle);
+    }));
+    if (!groupBy) return filtered;
+    const value = (r: BrowseRow) => String((r.apiData || {})[groupBy] ?? (r as any)[groupBy] ?? '—');
+    return [...filtered].sort((a, b) => value(a).localeCompare(value(b), undefined, { numeric: true }) || a.name.localeCompare(b.name));
+  }, [rows, q, group, colF, dynamicColF, dynamicCols, sortKey, sortDir, groupBy]);
+  const filtering = !!(q || group || Object.values(colF).some(Boolean) || Object.values(dynamicColF).some(Boolean));
+  const exportRows = (format: 'csv' | 'pdf') => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const exportCols = cols.map((c) => ({ key: c.key, label: c.label }));
+    const value = (r: BrowseRow, key: string) => key.startsWith('api:') ? (r.apiData || {})[key.slice(4)] : key === 'rate' ? fmtRate(r.rate) : (r as any)[key] ?? '';
+    if (format === 'csv') {
+      const quote = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csv = [exportCols.map((c) => quote(c.label)).join(','), ...data.map((r) => exportCols.map((c) => quote(value(r, c.key))).join(','))].join('\r\n');
+      const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'store-item-master-browse.csv'; a.click(); URL.revokeObjectURL(url);
+    } else {
+      const escape = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
+      const html = `<!doctype html><html><head><title>Store Item Master</title><style>body{font:12px Arial;padding:16px}h2{margin-bottom:4px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:5px;text-align:left;overflow-wrap:anywhere}th{background:#eee} @page{size:landscape}</style></head><body><h2>Store Item Master - Browse</h2><p>${data.length} records</p><table><thead><tr>${exportCols.map(c=>`<th>${escape(c.label)}</th>`).join('')}</tr></thead><tbody>${data.map(r=>`<tr>${exportCols.map(c=>`<td>${escape(value(r,c.key))}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`;
+      const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); }
+    }
+  };
 
-  useEffect(() => setActive(0), [q, group, colF, sortKey, sortDir]);
+  useEffect(() => setActive(0), [q, group, colF, dynamicColF, sortKey, sortDir, groupBy]);
 
   const clearFilters = () => {
     setQ('');
     setGroup('');
     setColF(NO_COLUMN_FILTERS);
+    setDynamicColF({});
   };
 
   const toggleSort = (k: BrowseSortKey) => {
@@ -151,7 +220,14 @@ export default function BrowseSheet({
   );
 
   /* ---------------------------------- cells --------------------------------- */
-  const cellStyle = (c: Col) => (c.w ? { width: c.w } : { flex: c.flex ?? 1, minWidth: 0 });
+  const baseW = (c: Col) => c.w ?? Math.round((c.flex ?? 1) * 110);
+  const GRID_PAD = 30;
+  const sumBase = cols.reduce((n, c) => n + (widths[c.key] ?? baseW(c)), 0);
+  // spare room (wide screens) goes to the Item name column until the user sizes it themselves
+  const spare = Math.max(0, wrapW - GRID_PAD - sumBase);
+  const colW = (c: Col) => widths[c.key] ?? baseW(c) + (c.key === 'name' ? spare : 0);
+  const tableW = cols.reduce((n, c) => n + colW(c), 0) + GRID_PAD;
+  const cellStyle = (c: Col) => ({ width: colW(c) });
 
   const renderGridRow = ({ item, index }: { item: BrowseRow; index: number }) => {
     const isActive = index === active;
@@ -171,8 +247,7 @@ export default function BrowseSheet({
         ]}
       >
         {cols.map((c) => {
-          const v =
-            c.key === 'rate' ? fmtRate(item.rate) : c.key === 'uom' ? item.uom : c.key === 'code' ? item.code : (item as any)[c.key] || '';
+          const v = c.key.startsWith('api:') ? (item.apiData || {})[c.key.slice(4)] : c.key === 'rate' ? fmtRate(item.rate) : (item as any)[c.key] ?? ''; 
           const muted = !v && c.key !== 'rate';
           return (
             <View key={c.key} style={[cellStyle(c), { paddingRight: 10 }]}>
@@ -224,6 +299,9 @@ export default function BrowseSheet({
           </View>
           <Text style={g.cardRate}>{fmtRate(item.rate)}</Text>
         </View>
+        {Object.entries(item.apiData || {}).filter(([k]) => showApiKey(k)).map(([k, v]) => (
+          <Text key={k} style={g.cardMeta} numberOfLines={2}>{k}: {String(v ?? '—')}</Text>
+        ))}
       </Pressable>
     );
   };
@@ -244,19 +322,22 @@ export default function BrowseSheet({
               {arrow ? <Icon name={arrow as any} size={13} color={T.copper} /> : null}
             </View>
           );
-          return c.sort ? (
+          const body = c.sort ? (
             <Pressable
-              key={c.key}
               onPress={() => toggleSort(c.sort!)}
               accessibilityRole="button"
               accessibilityLabel={`Sort by ${c.label}`}
-              style={[cellStyle(c), { paddingRight: 10, minHeight: 40, justifyContent: 'center' }]}
+              style={{ paddingRight: 14, minHeight: 40, justifyContent: 'center' }}
             >
               {inside}
             </Pressable>
           ) : (
-            <View key={c.key} style={[cellStyle(c), { paddingRight: 10, minHeight: 40, justifyContent: 'center' }]}>
-              {inside}
+            <View style={{ paddingRight: 14, minHeight: 40, justifyContent: 'center' }}>{inside}</View>
+          );
+          return (
+            <View key={c.key} style={[cellStyle(c), { position: 'relative' }]}>
+              {body}
+              <ResizeHandle getWidth={() => colW(c)} onResize={(w) => setWidths((p) => ({ ...p, [c.key]: w }))} />
             </View>
           );
         })}
@@ -265,7 +346,18 @@ export default function BrowseSheet({
         <View style={g.filterRow}>
           {cols.map((c) => (
             <View key={c.key} style={[cellStyle(c), { paddingRight: 8 }]}>
-              {c.filter ? (
+              {c.key.startsWith('api:') ? (
+                <TextInput
+                  value={dynamicColF[c.key.slice(4)] || ''}
+                  onChangeText={(v) => setDynamicColF((p) => ({ ...p, [c.key.slice(4)]: v }))}
+                  placeholder="Filter"
+                  placeholderTextColor={T.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel={`Filter by ${c.label}`}
+                  style={[g.filterInput, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null]}
+                />
+              ) : c.filter ? (
                 <TextInput
                   value={colF[c.filter]}
                   onChangeText={(v) => setColF((p) => ({ ...p, [c.filter!]: v }))}
@@ -299,6 +391,27 @@ export default function BrowseSheet({
     />
   );
 
+  const table = (
+    <>
+      {header}
+      <FlatList
+        ref={listRef}
+        data={loading || error ? [] : data}
+        keyExtractor={(r) => r.key}
+        renderItem={layout === 'phone' ? renderCard : renderGridRow}
+        getItemLayout={layout === 'phone' ? undefined : (_, index) => ({ length: rowH, offset: rowH * index, index })}
+        ListEmptyComponent={empty}
+        initialNumToRender={24}
+        windowSize={9}
+        maxToRenderPerBatch={24}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={layout === 'phone' ? { padding: 16, paddingTop: 4, gap: 10 } : undefined}
+        onScrollToIndexFailed={() => { }}
+        extraData={{ active, widths, wrapW }}
+      />
+    </>
+  );
+
   return (
     <Sheet
       visible
@@ -326,6 +439,14 @@ export default function BrowseSheet({
         {/* search + group chips + (phone) sort chips */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
           <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item, group or location" autoFocus={Platform.OS === 'web'} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+            <Text style={{ color: T.muted, fontSize: 12, fontWeight: '700' }}>Group by</Text>
+            <Pressable onPress={() => { const fields = ['']; setGroupBy(fields[0]); }} style={g.toolBtn}><Text style={g.toolText}>None</Text></Pressable>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {cols.map((c) => { const fieldKey = c.key.startsWith('api:') ? c.key.slice(4) : c.key; return <FilterChip key={c.key} label={c.label} active={groupBy === fieldKey} onPress={() => setGroupBy(groupBy === fieldKey ? '' : fieldKey)} />; })}
+            </ScrollView>
+            {Platform.OS === 'web' ? <><Btn compact label="Excel / CSV" onPress={() => exportRows('csv')} /><Btn compact label="PDF / Print" onPress={() => exportRows('pdf')} /></> : null}
+          </View>
           {groups.length > 1 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }} keyboardShouldPersistTaps="handled">
               <FilterChip label="All groups" active={!group} onPress={() => setGroup('')} />
@@ -349,23 +470,17 @@ export default function BrowseSheet({
           ) : null}
         </View>
 
-        <View style={[{ flex: 1, minHeight: 0, marginTop: 12 }, layout !== 'phone' && { borderTopWidth: 1, borderTopColor: T.border }]}>
-          {header}
-          <FlatList
-            ref={listRef}
-            data={loading || error ? [] : data}
-            keyExtractor={(r) => r.key}
-            renderItem={layout === 'phone' ? renderCard : renderGridRow}
-            getItemLayout={layout === 'phone' ? undefined : (_, index) => ({ length: rowH, offset: rowH * index, index })}
-            ListEmptyComponent={empty}
-            initialNumToRender={24}
-            windowSize={9}
-            maxToRenderPerBatch={24}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={layout === 'phone' ? { padding: 16, paddingTop: 4, gap: 10 } : undefined}
-            onScrollToIndexFailed={() => { }}
-            extraData={active}
-          />
+        <View
+          onLayout={(e) => setWrapW(e.nativeEvent.layout.width)}
+          style={[{ flex: 1, minHeight: 0, marginTop: 12 }, layout !== 'phone' && { borderTopWidth: 1, borderTopColor: T.border }]}
+        >
+          {layout === 'phone' ? (
+            table
+          ) : (
+            <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator style={{ flex: 1 }} contentContainerStyle={{ width: tableW }}>
+              <View style={{ flex: 1, minHeight: 0 }}>{table}</View>
+            </ScrollView>
+          )}
         </View>
       </View>
     </Sheet>
@@ -386,6 +501,8 @@ const g = {
   codeBadgeText: { fontSize: 12, fontWeight: '800' as const, color: T.muted },
   cardMeta: { fontSize: 12.5, color: T.muted, marginTop: 1 },
   cardRate: { fontSize: 16, fontWeight: '800' as const, color: T.ink },
+  toolBtn: { borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  toolText: { color: T.ink, fontSize: 12, fontWeight: '700' as const },
   count: { fontSize: 12.5, fontWeight: '600' as const, color: T.muted },
   hint: { fontSize: 11.5, color: T.muted, marginTop: 2 },
 };

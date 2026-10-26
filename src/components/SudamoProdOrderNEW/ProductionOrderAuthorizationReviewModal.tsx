@@ -133,14 +133,24 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
         const main = (Array.isArray(data.main) && data.main[0]) || item || {};
         const meta = data.webmeta || {};
         const d1 = Array.isArray(data.d1) ? data.d1 : [];
-        const snapshot = data.stock_costing_snapshot && typeof data.stock_costing_snapshot === 'object'
-            ? data.stock_costing_snapshot
-            : null;
+        const snapshot = data.po_costing_snapshot && typeof data.po_costing_snapshot === 'object'
+            ? data.po_costing_snapshot
+            : (data.stock_costing_snapshot && typeof data.stock_costing_snapshot === 'object'
+                ? data.stock_costing_snapshot
+                : null);
 
-        const mode = String(first(data.source_mode, snapshot ? 'self' : '', Number(main.prodtype) === 1 ? 'sales' : 'self')).toLowerCase();
+        const mode = String(first(data.source_mode, snapshot?.source_mode, Number(main.prodtype) === 1 ? 'sales' : 'self')).toLowerCase();
         const isStockSell = mode === 'self';
-        const fabricType = String(first(data.fabric_type, snapshot?.fabric_type, main.stktype === 'I' ? 'Greige' : 'Finish'));
-        const isFinish = fabricType.toLowerCase() !== 'greige';
+        // StkType is source/location ownership, never Greige/Finish.
+        const fabricType = String(first(
+            data.fabric_type,
+            snapshot?.fabric_type,
+            meta.fabric_type,
+            d1[0]?.fabric_type,
+            d1[0]?.FabricType,
+            ''
+        ));
+        const isFinish = fabricType.toLowerCase() === 'finish';
 
         const finishedQty = toNumber(first(meta.base_qty, main.orderqty, 0));
         // Saved total is the authoritative production basis and includes stock.
@@ -185,6 +195,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
         // SO-based authorization must review the exact costing reference already
         // attached to the Production Order. Never infer a cost from the sale rate.
         const costingSource = String(first(
+            snapshot?.costing_source,
             data.design_costing_source,
             meta.design_costing_source,
             main.design_costing_source,
@@ -201,12 +212,13 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
             design_costing_source: costingSource,
             md_id: first(data.md_id, meta.md_id, main.md_id, item?.md_id),
             design_costing_id: first(
+                snapshot?.design_costing_id,
                 data.design_costing_id,
                 meta.design_costing_id,
                 main.design_costing_id,
                 item?.design_costing_id
             ),
-            costuid: first(main.costuid, item?.costuid),
+            costuid: first(snapshot?.costuid, main.costuid, item?.costuid),
             costdsncode: first(main.costdsncode, item?.costdsncode),
             costdsnname: first(main.costdsnname, item?.costdsnname),
             costdate: first(main.costdate, item?.costdate)
@@ -236,6 +248,7 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
             approvalCost,
             margin,
             belowCost: false,
+            isOverride: Number(rates.is_override || 0) === 1,
             costingSource,
             costingItem,
             costingAvailable
@@ -319,11 +332,6 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
         void loadYarns();
         return () => { active = false; cancellation.cancel('Production Order review changed.'); };
     }, [visible, loading, detail, yarnReferenceKey, token]);
-
-    const verifiedSavedSnap = model.costingSource === 'NEW' && yarnState.key === yarnReferenceKey && !yarnState.loading
-        ? yarnState.savedSnap : undefined;
-    const savedCostMismatch = verifiedSavedSnap && model.snapshot && model.isFinish
-        && Math.abs(toNumber(model.derived.finished_cost) - toNumber(verifiedSavedSnap.final_cost)) > 0.011;
 
     const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
         <View style={[styles.row, strong && styles.strongRow]}>
@@ -418,12 +426,14 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                             ) : (
                                 <View style={styles.infoSo}>
                                     <Text style={styles.infoSoText}>
-                                        ✓ Costing verified at Sales-Order approval — approve production only.
+                                        {model.isOverride
+                                            ? 'PO-specific costing override — review the frozen PO snapshot below. Design Costing master is unchanged.'
+                                            : '✓ Master costing verified at Sales-Order approval. This PO snapshot is the production authorization basis.'}
                                     </Text>
                                 </View>
                             )}
 
-                            {model.isStockSell && model.snapshot && (
+                            {model.snapshot && (
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>COSTING BASIS · SAVED WITH THIS PO</Text>
                                     <Row
@@ -441,6 +451,54 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                         <Row label="Sample" value={first(model.main?.sampleno, item?.sampleno)} />
                                     )}
                                 </View>
+                            )}
+
+                            {!model.isStockSell && model.snapshot && (
+                                <>
+                                    <View style={styles.section}>
+                                        <Text style={styles.sectionTitle}>INPUT RATES · SAVED WITH THIS PO</Text>
+                                        {model.isOverride && (
+                                            <Text style={[styles.infoSoText, { marginBottom: 8 }]}>
+                                                PO OVERRIDE · These rates belong only to this Production Order.
+                                            </Text>
+                                        )}
+                                        {model.yarns.length > 0 && (
+                                            <>
+                                                <Text style={styles.subTitle}>YARN RATES (₹/KG)</Text>
+                                                {model.yarns.map((yarn: any, index: number) => (
+                                                    <View key={`${yarn.key || index}`} style={styles.yarnRow}>
+                                                        <View style={{ flex: 1, minWidth: 0 }}>
+                                                            <Text style={styles.yarnName} numberOfLines={1}>
+                                                                {[yarn.direction, yarn.name].filter(Boolean).join(' · ')}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={styles.yarnRate}>{money(yarn.rate)}/kg</Text>
+                                                    </View>
+                                                ))}
+                                            </>
+                                        )}
+                                        <Row label="Weaving rate" value={`${money(model.rates.weaving_rate)}/pick`} />
+                                        {model.isFinish && <Row label="Processing / finishing" value={`${money(model.rates.processing_rate)}/m`} />}
+                                        {model.isFinish && <Row label="Finished brokerage" value={pct(model.rates.finished_brokerage_pct)} />}
+                                        {model.isFinish && <Row label="Cut & pack" value={`${money(model.rates.cut_pack_rate)}/m`} />}
+                                        {!model.isFinish && <Row label="Greige brokerage" value={pct(model.rates.greige_brokerage_pct)} />}
+                                    </View>
+
+                                    <View style={styles.section}>
+                                        <Text style={styles.sectionTitle}>COSTING BREAKUP · FROZEN PO SNAPSHOT</Text>
+                                        <Row label="Yarn cost" value={`${money(model.derived.yarn_cost)}/m`} />
+                                        {!!toNumber(model.derived.dye_cost) && <Row label="Dyeing cost (yarn)" value={`${money(model.derived.dye_cost)}/m`} />}
+                                        <Row label="Weaving cost" value={`${money(model.derived.weaving_cost)}/m`} />
+                                        <Row label="Total greige cost" value={`${money(model.derived.greige_cost)}/m`} strong />
+                                        {model.isFinish && (
+                                            <>
+                                                <Row label="Shrinkage gross-up" value={`${money(first(model.derived.shrinkage_impact, model.derived.shrink_impact))}/m`} />
+                                                <Row label="Processing / finishing" value={`${money(first(model.derived.processing_amount, model.derived.processing_cost))}/m`} />
+                                                <Row label="Total finished cost" value={`${money(model.derived.finished_cost)}/m`} strong />
+                                            </>
+                                        )}
+                                    </View>
+                                </>
                             )}
 
                             {model.isStockSell && model.snapshot ? (
@@ -479,48 +537,16 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
                                     </View>
 
                                     <View style={styles.section}>
-                                        <Text style={styles.sectionTitle}>COSTING BREAKUP · SAVED SNAPSHOT</Text>
-                                        {model.costingSource === 'NEW' ? (
-                                            verifiedSavedSnap ? (
-                                                <>
-                                                    <Row label="Total yarn cost" value={`${money(verifiedSavedSnap.rm)}/m`} />
-                                                    <Row label="Weaving cost" value={`${money(verifiedSavedSnap.weaving_cost)}/m`} />
-                                                    <Row label="Greige mfg cost" value={`${money(verifiedSavedSnap.greige_mfg)}/m`} />
-                                                    <Row label="Greige brokerage" value={`${money(verifiedSavedSnap.greige_brok_amt)}/m`} />
-                                                    <Row label="Greige price" value={`${money(verifiedSavedSnap.greige_price)}/m`} strong />
-                                                    {model.isFinish && (
-                                                        <>
-                                                            <Row label="Shrinkage impact" value={`${money(verifiedSavedSnap.shrink_impact)}/m`} />
-                                                            <Row label="Dyeing / processing" value={`${money(verifiedSavedSnap.dye_proc_amount)}/m`} />
-                                                            <Row label="Finished brokerage" value={`${money(verifiedSavedSnap.fin_brok_amt)}/m`} />
-                                                            <Row label="Cutting / packing" value={`${money(verifiedSavedSnap.cut_pack)}/m`} />
-                                                            <Row label="Finished price" value={`${money(verifiedSavedSnap.final_cost)}/m`} strong />
-                                                        </>
-                                                    )}
-                                                    {savedCostMismatch && (
-                                                        <Text style={styles.costingMissingText}>
-                                                            Saved design costing and the Production Order authorization snapshot differ. Verify the PO costing snapshot before approval.
-                                                        </Text>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <Text style={styles.costingMissingText}>
-                                                    {yarnState.key === yarnReferenceKey && yarnState.error
-                                                        ? yarnState.error : 'Loading the linked saved costing breakdown…'}
-                                                </Text>
-                                            )
-                                        ) : (
+                                        <Text style={styles.sectionTitle}>COSTING BREAKUP · FROZEN PO SNAPSHOT</Text>
+                                        <Row label="Yarn cost" value={`${money(model.derived.yarn_cost)}/m`} />
+                                        {!!toNumber(model.derived.dye_cost) && <Row label="Dyeing cost (yarn)" value={`${money(model.derived.dye_cost)}/m`} />}
+                                        <Row label="Weaving cost" value={`${money(model.derived.weaving_cost)}/m`} />
+                                        <Row label="Total greige cost" value={`${money(model.derived.greige_cost)}/m`} strong />
+                                        {model.isFinish && (
                                             <>
-                                                <Row label="Yarn cost" value={`${money(model.derived.yarn_cost)}/m`} />
-                                                <Row label="Weaving cost" value={`${money(model.derived.weaving_cost)}/m`} />
-                                                <Row label="Total greige cost" value={`${money(model.derived.greige_cost)}/m`} strong />
-                                                {model.isFinish && (
-                                                    <>
-                                                        <Row label="Shrinkage gross-up" value={`${money(model.derived.shrink_impact)}/m`} />
-                                                        <Row label="Processing / finishing" value={`${money(model.derived.processing_cost)}/m`} />
-                                                        <Row label="Total finished cost" value={`${money(model.derived.finished_cost)}/m`} strong />
-                                                    </>
-                                                )}
+                                                <Row label="Shrinkage gross-up" value={`${money(first(model.derived.shrinkage_impact, model.derived.shrink_impact))}/m`} />
+                                                <Row label="Processing / finishing" value={`${money(first(model.derived.processing_amount, model.derived.processing_cost))}/m`} />
+                                                <Row label="Total finished cost" value={`${money(model.derived.finished_cost)}/m`} strong />
                                             </>
                                         )}
                                     </View>

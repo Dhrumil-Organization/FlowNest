@@ -66,6 +66,7 @@ import {
 
 const RES = 'production.yarn_rates';
 const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
+type Chip = 'all' | 'with' | 'none';
 type Tab = 'rates' | 'entries';
 type Period = 'month' | '3m' | 'fy' | 'all';
 type Form = { itm: string; par: string; date: string; rate: string; remark: string; edit: RateRow | null };
@@ -95,6 +96,7 @@ export function YarnRatesView() {
   const [period, setPeriod] = useState<Period>('all');
   const [eMax, setEMax] = useState(100);
   const [q, setQ] = useState('');
+  const [chip, setChip] = useState<Chip>('all');
   const [open, setOpen] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, ItemData>>({});
   const [detailErr, setDetailErr] = useState<Record<string, string>>({});
@@ -189,9 +191,12 @@ export function YarnRatesView() {
 
   /* ------------------------------ rows ------------------------------ */
   const rows: YarnRow[] = useMemo(() => (data ? yarnRows(data.items, data.rates) : []), [data]);
-  // the list shows ONLY yarns that have a rate entered (the yarn picker of Add rate still offers every yarn)
-  const rated = useMemo(() => rows.filter((y) => !!y.lf), [rows]);
-  const withRate = useMemo(() => rated.filter((y) => matches(searchText(y), q)), [rated, q]);
+  const shown = useMemo(
+    () => rows.filter((y) => matches(searchText(y), q) && (chip === 'all' || (chip === 'with' ? !!y.lf : !y.lf))),
+    [rows, q, chip],
+  );
+  const withRate = shown.filter((y) => y.lf);
+  const without = shown.filter((y) => !y.lf);
 
   const itemOpts: Opt[] = useMemo(
     () => rows.map((y) => ({ value: y.itmcode, label: `${y.name}  ·  ${y.itmcode}`, searchText: `${y.itmcode} ${y.name} ${y.catsub} ${y.subs.join(' ')}` })),
@@ -512,7 +517,8 @@ export function YarnRatesView() {
     </View>
   );
 
-  const filtered = !!q.trim();
+  const total = rows.length;
+  const filtered = !!q.trim() || chip !== 'all';
   const list = (
     <View style={{ flex: 1, minWidth: 0 }}>
       <View style={st.fBar}>
@@ -521,13 +527,29 @@ export function YarnRatesView() {
             value={q} onChangeText={setQ} placeholder="Search yarn, code or supplier…" placeholderTextColor={T.muted}
             style={[st.input, { flex: 1 }, !!q && { borderColor: T.copper }]} autoCorrect={false} autoCapitalize="none" accessibilityLabel="Search yarn"
           />
-          {filtered ? <Text onPress={() => setQ('')} style={st.link}>Clear</Text> : null}
+          {filtered ? <Text onPress={() => { setQ(''); setChip('all'); }} style={st.link}>Clear</Text> : null}
         </View>
-        {filtered ? <Text style={st.count}>{withRate.length} of {rated.length} shown</Text> : null}
+        <View style={st.chipRow}>
+          {([['all', 'All'], ['with', 'With rate'], ['none', 'No rate yet']] as [Chip, string][]).map(([k, l]) => (
+            <Text key={k} onPress={() => setChip(k)} style={[st.chip, chip === k && st.chipOn]}>{l}</Text>
+          ))}
+        </View>
+        {filtered ? <Text style={st.count}>{shown.length} of {total} shown</Text> : null}
       </View>
-      <Text style={st.head}>LATEST RATE BY YARN · {withRate.length}</Text>
-      {withRate.map(yarnRow)}
-      {!withRate.length && data ? <Text style={st.note}>{q.trim() ? 'No rates match.' : 'No rates entered yet — add the first one above.'}</Text> : null}
+      {chip !== 'none' ? (
+        <>
+          <Text style={st.head}>LATEST RATE BY YARN · {withRate.length}</Text>
+          {withRate.map(yarnRow)}
+          {!withRate.length && data ? <Text style={st.note}>{q.trim() ? 'No rates match.' : 'No rates entered yet — add the first one above.'}</Text> : null}
+        </>
+      ) : null}
+      {chip !== 'with' && without.length ? (
+        <>
+          <Text style={st.head}>NO RATE YET · {without.length}</Text>
+          {without.map(yarnRow)}
+        </>
+      ) : null}
+      {chip === 'none' && !without.length && data ? <Text style={st.note}>Every yarn shown has a rate.</Text> : null}
     </View>
   );
 

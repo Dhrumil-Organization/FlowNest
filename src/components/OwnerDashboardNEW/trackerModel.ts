@@ -39,10 +39,16 @@ export type TrackerOrder = {
   sold_pct: number;
   due_ymd: number | null;
   days_to_due: number | null;
-  production_orders?: string[];
+  /** production orders of this sales order: uid = TrackId; row = the raw API row of that production order */
+  production_orders?: { uid: string; no: string; row?: Record<string, any> }[];
   beams?: number;
   stages?: StageCell[];
   now?: NowAt;
+  /** full comma list of designs (the list shows only the first one + "+N") */
+  designs_text?: string;
+  delivery_text?: string;
+  so_uid?: string;
+  raw?: Record<string, any>;
 };
 
 export type TrackerOrdersData = {

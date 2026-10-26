@@ -9,7 +9,7 @@ import {
   fetchCostingDetail, fetchCostings, fetchDesignDetail, fetchGroups, fetchLegacyCosting, fetchParties,
   mapLegacyCosting, prepareVoucher, saveOrder, showOrder
 } from './api';
-import { buildEngine, computeBreakup, Engine, matchesSnap, Rates, ratesEdited, savedBreakup } from './costEngine';
+import { buildEngine, computeBreakup, Engine, matchesSnap, Rates, ratesEdited, ratesFromSnapshot, savedBreakup, snapshotDerived, snapshotRates } from './costEngine';
 import { firstValue, Row, rowKey, todayDMY } from './format';
 import { authorizationReason, computePlan, sourcingFromRows, validatePlan } from './plan';
 
@@ -82,6 +82,7 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
   const [legacyCostChoice, setLegacyCostChoice] = useState<Row | null>(null);
   const [newCostChoice, setNewCostChoice] = useState<Row | null>(null);
   const [resolvedCostingMeta, setResolvedCostingMeta] = useState<Row>({});
+  const [savedPoCostSnapshot, setSavedPoCostSnapshot] = useState<Row | null>(null);
   const [costOptions, setCostOptions] = useState<Row[]>([]);
   const [costNeedsMapping, setCostNeedsMapping] = useState(false);
   const [costDesignOptions, setCostDesignOptions] = useState<Row[]>([]);
@@ -131,7 +132,13 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       // Greige store from the server (get_grey_str). Never fall back to the login store (e.g. 002).
       const store = String(m.greystrcode || '012');
       const meta = data.webmeta || {};
-      const src = data.source_mode || (Number(m.prodtype || 0) === 1 ? 'sales' : 'self');
+      const poSnapshot = data.po_costing_snapshot && typeof data.po_costing_snapshot === 'object'
+        ? data.po_costing_snapshot
+        : (data.stock_costing_snapshot && typeof data.stock_costing_snapshot === 'object'
+          ? data.stock_costing_snapshot : null);
+      setSavedPoCostSnapshot(poSnapshot);
+      const src = data.source_mode || (poSnapshot && poSnapshot.source_mode)
+        || (Number(m.prodtype || 0) === 1 ? 'sales' : 'self');
       const fab = data.fabric_type || meta.fabric_type || 'Finish';
       const orders = (data.d1 || []).map((row: Row) => ({
         ...row,
@@ -158,7 +165,10 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
         : '');
       setSelfDesign({
         dsncode: m.dsncode, dsnname: m.dsnname, itmcode: m.itmcode, itmname: m.itmname, grdcode: m.grdcode,
-        shdcode: m.shdcode, shdname: m.shdname, md_id: m.md_id || '', design_costing_source: m.design_costing_source || 'LEGACY'
+        shdcode: m.shdcode, shdname: m.shdname, md_id: m.md_id || '',
+        design_costing_source: (poSnapshot && poSnapshot.costing_source) || m.design_costing_source || 'LEGACY',
+        design_costing_id: (poSnapshot && poSnapshot.design_costing_id) || m.design_costing_id || '',
+        legacy_costuid: (poSnapshot && poSnapshot.costuid) || m.costuid || 0
       });
       setBaseQtyInput(String(meta.base_qty || m.orderqty || ''));
       if (src === 'self') setSelfGreigeQtyInput(String(m.totqty || ''));
@@ -221,6 +231,7 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
 
   const clearCosting = () => {
     setLegacyCostChoice(null); setNewCostChoice(null); setResolvedCostingMeta({});
+    setSavedPoCostSnapshot(null);
     setCostOptions([]); setLegacyCostingData(null); setCostingError('');
   };
 
@@ -297,7 +308,12 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
         setResolvedCostingMeta({ design_costing_source: src || 'LEGACY', md_id: data.md_id || '', design_costing_count: Number(data.costing_count || rows.length || 0) });
         setCostNeedsMapping(Boolean(data.needs_mapping)); setCostDesignOptions(data.cost_designs || []); setCostOptions(rows);
         if (src === 'NEW') {
-          const wanted = String((newCostChoice && newCostChoice.costing_id) || metaBaseForCosting.design_costing_id || main.design_costing_id || '').trim();
+          const savedNewId = String(
+            savedPoCostSnapshot && String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'NEW'
+              ? (savedPoCostSnapshot.design_costing_id || '') : ''
+          ).trim();
+          const wanted = String((newCostChoice && newCostChoice.costing_id) || savedNewId
+            || metaBaseForCosting.design_costing_id || main.design_costing_id || '').trim();
           const chosen = rows.find((r: Row) => String(r.costing_id || r.costuid) === wanted) || rows[0] || null;
           if (!chosen) throw new Error('No saved costing revision found for this design.');
           setNewCostChoice(chosen);
@@ -309,7 +325,11 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
           });
           return;
         }
-        const legacyUid = Number((legacyCostChoice && legacyCostChoice.costuid) || metaBaseForCosting.legacy_costuid ||
+        const savedLegacyUid = Number(
+          savedPoCostSnapshot && String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'LEGACY'
+            ? (savedPoCostSnapshot.costuid || 0) : 0
+        );
+        const legacyUid = Number((legacyCostChoice && legacyCostChoice.costuid) || savedLegacyUid || metaBaseForCosting.legacy_costuid ||
           metaBaseForCosting.LegacyCostUId || main.costuid || main.CostUId || 0);
         if (!(legacyUid > 0)) {
           setCostingError(data.needs_mapping ? 'Link this ERP design to its matching legacy costing design once.' : 'Choose a costing sheet to preview costing.');
@@ -321,7 +341,11 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       finally { if (!cancelled) setCostingLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [designForCosting.dsncode, metaBaseForCosting.legacy_costuid, main.costuid, main.design_costing_id, legacyCostChoice, newCostChoice && newCostChoice.costing_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [designForCosting.dsncode, metaBaseForCosting.legacy_costuid, main.costuid, main.design_costing_id,
+    savedPoCostSnapshot && savedPoCostSnapshot.costing_source,
+    savedPoCostSnapshot && savedPoCostSnapshot.design_costing_id,
+    savedPoCostSnapshot && savedPoCostSnapshot.costuid,
+    legacyCostChoice, newCostChoice && newCostChoice.costing_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load the selected NEW costing sheet in full so rates can be verified / edited.
   const engineCostingId = String((newCostChoice && (newCostChoice.costing_id || newCostChoice.costuid)) || '');
@@ -341,13 +365,24 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
         const e = buildEngine(detail, design);
         if (!e.yarns.length) { setEngineNote('This costing sheet has no yarn lines — showing its saved totals.'); return; }
         if (!matchesSnap(e)) setEngineNote('Saved costing revision is displayed unchanged. Editing a rate will calculate a new estimate.');
-        setEngine(e); setRates(e.initial);
+        const savedMatches = !!savedPoCostSnapshot
+          && String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'NEW'
+          && String(savedPoCostSnapshot.design_costing_id || '') === engineCostingId;
+        setEngine(e);
+        setRates(savedMatches ? ratesFromSnapshot(e, savedPoCostSnapshot.rates || {}) : e.initial);
+        if (savedMatches && Number(savedPoCostSnapshot.is_frozen || 0) === 1) {
+          setEngineNote('Frozen PO costing snapshot loaded. Design Costing remains unchanged.');
+        } else if (savedMatches && Number((savedPoCostSnapshot.rates || {}).is_override || 0) === 1) {
+          setEngineNote('PO-specific costing override restored. Design Costing remains unchanged.');
+        }
       } catch (err) {
         if (!cancelled) setEngineNote(errorMessage(err, 'Costing detail could not be loaded — showing saved totals.'));
       } finally { if (!cancelled) setEngineLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [engineCostingId, engineMdId, resolvedCostingMeta.design_costing_source]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [engineCostingId, engineMdId, resolvedCostingMeta.design_costing_source,
+    savedPoCostSnapshot && savedPoCostSnapshot.costing_source,
+    savedPoCostSnapshot && savedPoCostSnapshot.design_costing_id]); // eslint-disable-line react-hooks/exhaustive-deps
   const breakup = useMemo(() => (engine && rates ? (ratesEdited(engine, rates) ? computeBreakup(engine, rates) : savedBreakup(engine)) : null), [engine, rates]);
   // The saved revision is authoritative; only actual rate edits recalculate.
   const effectiveCostingResult = breakup ? {
@@ -369,7 +404,17 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
 
   const chooseCosting = (row: Row) => {
     if (row.__mapping) return;
-    if (String(row.design_costing_source || '').toUpperCase() === 'NEW') { setNewCostChoice(row); setLegacyCostChoice(null); }
+    const source = String(row.design_costing_source || '').toUpperCase();
+    const chosenId = source === 'NEW' ? String(row.costing_id || row.costuid || '') : String(row.costuid || '');
+    const savedId = savedPoCostSnapshot
+      ? (String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'NEW'
+        ? String(savedPoCostSnapshot.design_costing_id || '')
+        : String(savedPoCostSnapshot.costuid || ''))
+      : '';
+    if (!savedPoCostSnapshot || source !== String(savedPoCostSnapshot.costing_source || '').toUpperCase() || chosenId !== savedId) {
+      setSavedPoCostSnapshot(null);
+    }
+    if (source === 'NEW') { setNewCostChoice(row); setLegacyCostChoice(null); }
     else { setLegacyCostChoice(row); setNewCostChoice(null); }
     setCostingError('');
   };
@@ -383,7 +428,8 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
   const state: Row = {
     sourceMode, selfFabricType, stockType, selectedOrders, selectedGroup, selfDesign, baseQtyInput,
     selfGreigeQtyInput, shrinkage, stockMeters, stockMetersTouched, legacyCostingData, legacyCostChoice,
-    newCostChoice, costingResult: effectiveCostingResult, resolvedCostingMeta, costingLoading: costingLoading || engineLoading, costingError, main,
+    newCostChoice, costingResult: effectiveCostingResult, resolvedCostingMeta, savedPoCostSnapshot,
+    costingLoading: costingLoading || engineLoading, costingError, main,
     jobList, purchaseList, inhouseQtyInput, inhouseTouched, readOnly, lock, selfFinishedCost, selfGreigeCost, ownerLoading, poOwnerCode, isAdd, voucher, greigeRate
   };
   const plan = useMemo(() => computePlan(state), Object.values(state)); // eslint-disable-line react-hooks/exhaustive-deps
@@ -397,6 +443,44 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     const p = plan;
     const s = { prpcode: ctx.prpcode, yearno: ctx.yearno };
     const voudate = main.voudate || todayDMY();
+
+    // Exact PO-specific costing basis. The selected Design Costing is the
+    // master/prefill only; edits below never write back to Design Costing.
+    let poCostingSnapshot: Row | null = null;
+    if (p.isNewDesignCosting && newCostChoice) {
+      const selectedCostingId = String(newCostChoice.costing_id || newCostChoice.costuid || '');
+      const savedMatches = !!savedPoCostSnapshot
+        && String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'NEW'
+        && String(savedPoCostSnapshot.design_costing_id || '') === selectedCostingId;
+      poCostingSnapshot = {
+        source: 'NEW',
+        design_costing_id: selectedCostingId,
+        md_id: p.costingMdId,
+        rates: engine && rates
+          ? snapshotRates(engine, rates)
+          : (savedMatches ? (savedPoCostSnapshot!.rates || {}) : {}),
+        derived: breakup
+          ? snapshotDerived(breakup)
+          : (savedMatches ? (savedPoCostSnapshot!.derived || {}) : {
+              greige_cost: Number(p.plannedGreigeCost || 0),
+              finished_cost: Number(p.plannedFinishedCost || 0)
+            })
+      };
+    } else if (!p.isNewDesignCosting && p.effectiveLegacyCostUid > 0) {
+      const savedMatches = !!savedPoCostSnapshot
+        && String(savedPoCostSnapshot.costing_source || '').toUpperCase() === 'LEGACY'
+        && Number(savedPoCostSnapshot.costuid || 0) === Number(p.effectiveLegacyCostUid);
+      poCostingSnapshot = {
+        source: 'LEGACY',
+        costuid: Number(p.effectiveLegacyCostUid),
+        rates: savedMatches ? (savedPoCostSnapshot!.rates || {}) : {},
+        derived: savedMatches ? (savedPoCostSnapshot!.derived || {}) : {
+          greige_cost: Number(p.plannedGreigeCost || 0),
+          finished_cost: Number(p.plannedFinishedCost || 0)
+        }
+      };
+    }
+
     const payload: Row = {
       uid: recordUid, prpcode: s.prpcode, yearno: s.yearno, strcode: storeCode,
       source_mode: sourceMode, order_source: stockType, fabric_type: p.fabricType, selected_orders: selectedOrders,
@@ -428,6 +512,9 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       picks: engine ? engine.ppiTable : undefined,
       voucher, voudate,
       expected_date: main.expdate || main.deliverydate || voudate,
+      po_costing_snapshot: poCostingSnapshot,
+      // Compatibility alias for older Laravel/RN builds.
+      stock_costing_snapshot: sourceMode === 'self' ? poCostingSnapshot : null,
       commercial_snapshot: sourceMode === 'sales' ? {
         basis: 'GREIGE_METRE', booked_so_qty: p.bookedSoQty, planned_so_qty: p.plannedSoQty,
         finished_qty: p.finishRequirement ? p.baseQty : 0, required_greige_qty: p.totalQty,

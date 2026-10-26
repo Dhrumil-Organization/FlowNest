@@ -63,7 +63,9 @@ import {
   type OwnerSummaryData
 } from './model';
 import DelaysByPerson from './DelaysByPerson';
-import { ExecutiveOrders } from './OrderTracker';
+import { ExecutiveOrders, useHardwareBack } from './OrderTracker';
+import SalesOrderDetail from './SalesOrderDetail';
+import type { TrackerOrder } from './trackerModel';
 import { PRP_CODE, stageYearNo } from './prodOrderModel';
 import ProductionOrders from './ProductionOrders';
 import StageAssignment from './StageAssignment';
@@ -105,7 +107,7 @@ function Tile({
           {label}
         </Text>
         <View style={[st.tileIcon, { backgroundColor: `${c}16` }]}>
-          <Icon name={icon as any} size={15} color={c} />
+          <Icon name={icon as any} size={13} color={c} />
         </View>
       </View>
       <Text
@@ -194,6 +196,10 @@ type Col<R> = {
   flex: number;
   align?: 'left' | 'right';
   danger?: boolean;
+  /** phone card me label (chhota / saaf naam, e.g. 'Open amt') */
+  short?: string;
+  /** phone card ke title ke liye plain text (pehle column me) */
+  cardTitle?: (row: R) => string;
   render: (row: R) => React.ReactNode;
 };
 
@@ -216,6 +222,8 @@ function Table<R>({
   minWidth,
   onRowPress,
   selectedKey,
+  renderExpanded,
+  cardCols = 2,
   emptyText = 'No data for the selected filters.',
 }: {
   columns: Col<R>[];
@@ -226,9 +234,15 @@ function Table<R>({
   minWidth: number;
   onRowPress?: (row: R) => void;
   selectedKey?: string;
+  /** row selected (selectedKey) ho to uske theek niche ye block khulta hai */
+  renderExpanded?: (row: R) => React.ReactNode;
+  /** phone card me ek line me kitne numbers */
+  cardCols?: number;
   emptyText?: string;
 }) {
+  const { width: winW } = useWindowDimensions();
   const [width, setWidth] = useState(0);
+  const narrow = (width || winW) < 640; // web = grid, phone = cards
   const tableWidth = Math.max(width, minWidth);
 
   const renderRow = (row: R, index: number, isTotal = false) => {
@@ -265,19 +279,93 @@ function Table<R>({
 
     if (onRowPress && !isTotal) {
       return (
-        <TouchableOpacity
-          key={key}
-          activeOpacity={0.75}
-          onPress={() => onRowPress(row)}
-          accessibilityRole="button"
-          accessibilityState={{ selected }}
-        >
-          {body}
-        </TouchableOpacity>
+        <React.Fragment key={key}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => onRowPress(row)}
+            accessibilityRole="button"
+            accessibilityState={{ selected, expanded: selected && !!renderExpanded }}
+          >
+            {body}
+          </TouchableOpacity>
+          {selected && renderExpanded ? <View style={[st.expandWrap, width > 0 && { width }]}>{renderExpanded(row)}</View> : null}
+        </React.Fragment>
       );
     }
     return <React.Fragment key={key}>{body}</React.Fragment>;
   };
+
+  /* ------------------------------ phone: card per row ------------------------------ */
+  const renderCard = (row: R, isTotal = false) => {
+    const key = isTotal ? '__total' : rowKey(row);
+    const selected = !isTotal && selectedKey !== undefined && selectedKey === key;
+    const first = columns[0];
+    const metrics = columns.slice(1);
+    const title = first.cardTitle ? first.cardTitle(row) : first.render(row);
+    const tappable = !!onRowPress && !isTotal;
+    const head = (
+      <View style={st.mHead}>
+        <View style={st.mTop}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {typeof title === 'string' || typeof title === 'number' ? (
+              <Text style={[st.mTitle, isTotal && { color: T.nav }]} numberOfLines={2}>
+                {title}
+              </Text>
+            ) : (
+              title
+            )}
+          </View>
+          {tappable ? <Icon name={selected ? 'expand-less' : 'expand-more'} size={22} color={selected ? T.copper : T.muted} /> : null}
+        </View>
+        <View style={st.mGrid}>
+          {metrics.map((c) => {
+            const node = c.render(row);
+            return (
+              <View key={c.key} style={[st.mCell, { width: `${100 / cardCols}%` as any }]}>
+                <Text style={[st.mLbl, c.danger && { color: T.red }]} numberOfLines={1}>
+                  {c.short || c.label}
+                </Text>
+                {typeof node === 'string' || typeof node === 'number' ? (
+                  <Text style={[st.mVal, c.danger && { color: T.red }]} numberOfLines={1}>
+                    {node}
+                  </Text>
+                ) : (
+                  <View style={{ alignItems: 'flex-start', marginTop: 2 }}>{node}</View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+    return (
+      <View key={key} style={[st.mCard, selected && st.mCardOpen, isTotal && st.mCardTotal]}>
+        {tappable ? (
+          <TouchableOpacity activeOpacity={0.8} onPress={() => onRowPress!(row)} accessibilityRole="button" accessibilityState={{ selected, expanded: selected && !!renderExpanded }}>
+            {head}
+          </TouchableOpacity>
+        ) : (
+          head
+        )}
+        {selected && renderExpanded ? <View style={st.mExpand}>{renderExpanded(row)}</View> : null}
+      </View>
+    );
+  };
+
+  if (narrow) {
+    return (
+      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={st.mList}>
+        {rows.length === 0 ? (
+          <View style={st.tableEmpty}>
+            <Text style={st.tableEmptyText}>{emptyText}</Text>
+          </View>
+        ) : (
+          rows.map((row) => renderCard(row))
+        )}
+        {total && rows.length > 0 ? renderCard(total, true) : null}
+      </View>
+    );
+  }
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
@@ -395,8 +483,10 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
   const [error, setError] = useState<{ message: string; denied: boolean } | null>(null);
 
   const [contentWidth, setContentWidth] = useState(0);
-  // Executive Summary drill-down: tapped executive -> open sales orders -> sales order detail.
-  const [drill, setDrill] = useState<{ code: string; name: string } | null>(null);
+  // Executive Summary: tapped row expands in the grid (its sales orders); tapping a sales order opens its detail.
+  const [expandedExec, setExpandedExec] = useState<string | null>(null);
+  const [openOrder, setOpenOrder] = useState<{ order: TrackerOrder; name: string } | null>(null);
+  useHardwareBack(() => setOpenOrder(null), !!openOrder);
 
   const requestSeq = useRef(0);
   const isoDate = toIsoDate(date);
@@ -470,7 +560,7 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
     }
   }, [refreshTick, onRefresh]);
 
-  const kpiCols = contentWidth >= 1160 ? 7 : contentWidth >= 820 ? 4 : contentWidth >= 520 ? 3 : 2;
+  const kpiCols = contentWidth >= 1000 ? 7 : contentWidth >= 720 ? 4 : contentWidth >= 520 ? 3 : 2; // chhote cards: 7 ek line me
   const twoUp = contentWidth >= 820;
   const isPhone = contentWidth > 0 && contentWidth < 560;
 
@@ -521,13 +611,29 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
 
   const executiveCols = useMemo<Col<OwnerExecutiveRow>[]>(
     () => [
-      { key: 'name', label: 'Executive Name', flex: 2.2, render: (r) => r.name },
+      {
+        key: 'name',
+        label: 'Executive Name',
+        flex: 2.2,
+        cardTitle: (r) => r.name,
+        render: (r) =>
+          r.code === '__total' ? (
+            r.name
+          ) : (
+            <View style={st.execName}>
+              <Icon name={expandedExec === r.code ? 'expand-less' : 'expand-more'} size={18} color={expandedExec === r.code ? T.copper : T.muted} />
+              <Text style={[st.tdText, st.tdTextFirst, { flexShrink: 1 }]} numberOfLines={1}>
+                {r.name}
+              </Text>
+            </View>
+          ),
+      },
       { key: 'open', label: 'Open Order', flex: 0.9, align: 'right', render: (r) => count(r.open_order) },
-      { key: 'openamt', label: 'Amt', flex: 1.15, align: 'right', render: (r) => money(r.open_amount, mode) },
+      { key: 'openamt', label: 'Amt', short: 'Open amt', flex: 1.15, align: 'right', render: (r) => money(r.open_amount, mode) },
       { key: 'mto', label: 'Make to Order', flex: 0.9, align: 'right', render: (r) => count(r.mto_order) },
-      { key: 'mtoamt', label: 'Amt', flex: 1.15, align: 'right', render: (r) => money(r.mto_amount, mode) },
+      { key: 'mtoamt', label: 'Amt', short: 'MTO amt', flex: 1.15, align: 'right', render: (r) => money(r.mto_amount, mode) },
       { key: 'run', label: 'Running Orders', flex: 0.9, align: 'right', render: (r) => count(r.running_order) },
-      { key: 'runamt', label: 'Amt', flex: 1.15, align: 'right', render: (r) => money(r.running_amount, mode) },
+      { key: 'runamt', label: 'Amt', short: 'Running amt', flex: 1.15, align: 'right', render: (r) => money(r.running_amount, mode) },
       { key: 'out', label: 'Outstanding', flex: 1.25, align: 'right', render: (r) => money(r.outstanding, mode) },
       {
         key: 'due',
@@ -538,7 +644,7 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
         render: (r) => money(r.due_amount, mode),
       },
     ],
-    [mode],
+    [mode, expandedExec],
   );
 
   /* ------------------------------ render ----------------------------- */
@@ -819,7 +925,7 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
               {/* ---------------------------- executive table ------------------------ */}
               <Panel
                 title="Executive Summary"
-                meta={`${data.executive_rows.length} executive${data.executive_rows.length === 1 ? '' : 's'}  ·  tap a row to see its sales orders`}
+                meta={`${data.executive_rows.length} executive${data.executive_rows.length === 1 ? '' : 's'}  ·  tap a row to expand its sales orders`}
                 icon="badge"
                 accent={T.nav}
                 right={
@@ -839,8 +945,28 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
                   rowKey={(r) => r.code}
                   accent={T.nav}
                   minWidth={980}
-                  selectedKey={executive.code || undefined}
-                  onRowPress={(r) => setDrill({ code: r.code, name: r.name })}
+                  selectedKey={expandedExec ?? (executive.code || undefined)}
+                  onRowPress={(r) => setExpandedExec((cur) => (cur === r.code ? null : r.code))}
+                  renderExpanded={(r) => (
+                    <View style={st.execOpen}>
+                      <View style={st.execOpenHead}>
+                        <Icon name="receipt-long" size={15} color={T.muted} />
+                        <Text style={st.execOpenLbl}>SALES ORDERS OF</Text>
+                        <View style={st.execPill}>
+                          <Text style={st.execPillTx} numberOfLines={1}>
+                            {r.name}
+                          </Text>
+                        </View>
+                      </View>
+                      <ExecutiveOrders
+                        embedded
+                        session={{ API, token, prptype: prptype || 'S', date: isoDate }}
+                        executive={{ code: r.code, name: r.name, id: r.code }} // id -> sexeid
+                        onBack={() => setExpandedExec(null)}
+                        onOpenOrder={(o) => setOpenOrder({ order: o, name: r.name })}
+                      />
+                    </View>
+                  )}
                 />
                 {data.order_book && !data.order_book.mto_supported ? (
                   <Note tone="warn" text="Make to Order split is not available in this database (FAMSO.SOType missing) — all open orders are shown under Open Order." />
@@ -857,12 +983,13 @@ function SalesOrdersDashboard({ token, API, prptype = 'S', executive, onPickExec
         </View>
       </ScrollView>
 
-      {/* ------------- executive drill-down (sales orders -> sales order detail) ------------- */}
-      {drill ? (
-        <ExecutiveOrders
+      {/* ------------- sales order detail (opened from an expanded executive row) ------------- */}
+      {openOrder ? (
+        <SalesOrderDetail
           session={{ API, token, prptype: prptype || 'S', date: isoDate }}
-          executive={drill}
-          onBack={() => setDrill(null)}
+          order={openOrder.order}
+          executiveName={openOrder.name}
+          onBack={() => setOpenOrder(null)}
         />
       ) : null}
 
@@ -899,6 +1026,8 @@ export default function OwnerDashboardNEW(props: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
+  const [prodTick, setProdTick] = useState(0); // Order > Production orders tab dobara chunne par
+  const [salesTick, setSalesTick] = useState(0); // Order > Sales orders tab dobara chunne par
   const [width, setWidth] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const isPhone = width > 0 && width < 560;
@@ -959,6 +1088,13 @@ export default function OwnerDashboardNEW(props: Props) {
 
   // every time the person switches between Order and Setup, that screen calls its APIs again
   const [setupTick, setSetupTick] = useState(0);
+  // Order ke andar Sales orders <-> Production orders: har baar badalne par us tab ki API dobara lagti hai
+  const switchOrderTab = (k: typeof tab) => {
+    setTab(k);
+    if (k === 'production') setProdTick((n) => n + 1);
+    else setSalesTick((n) => n + 1);
+  };
+
   const openSection = (k: Section) => {
     setSection(k);
     if (k === 'setup') {
@@ -1100,7 +1236,7 @@ export default function OwnerDashboardNEW(props: Props) {
                 <TouchableOpacity
                   key={t.key}
                   activeOpacity={0.8}
-                  onPress={() => setTab(t.key)}
+                  onPress={() => switchOrderTab(t.key)}
                   style={[st.tabBtn, on && st.tabBtnOn]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: on }}
@@ -1124,7 +1260,7 @@ export default function OwnerDashboardNEW(props: Props) {
           API={props.API}
           prptype={props.prptype || 'S'}
           executiveCode={executive.code}
-          refreshTick={refreshTick}
+          refreshTick={refreshTick + prodTick}
           onBusyChange={setProdBusy}
           onDetailChange={setDetailOpen}
         />
@@ -1136,7 +1272,7 @@ export default function OwnerDashboardNEW(props: Props) {
           executive={executive}
           onPickExecutive={pickExecutive}
           mode={mode}
-          refreshTick={refreshTick}
+          refreshTick={refreshTick + salesTick}
           onBusyChange={setSalesBusy}
         />
       </View>
@@ -1289,17 +1425,17 @@ const st = StyleSheet.create({
   sectionMeta: { fontFamily: FONT, fontSize: 11.5, fontWeight: '600', color: T.muted, flexShrink: 1 },
 
   // tiles
-  grid: { flexDirection: 'row', flexWrap: 'wrap', margin: -4 },
-  gridCell: { padding: 4, flexGrow: 1, flexShrink: 0, minWidth: 0 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', margin: -3 },
+  gridCell: { padding: 3, flexGrow: 1, flexShrink: 0, minWidth: 0 },
   tile: {
     backgroundColor: T.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: T.border,
-    paddingHorizontal: 12,
-    paddingTop: 13,
-    paddingBottom: 11,
-    minHeight: 104,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    minHeight: 76,
     flexGrow: 1,
     overflow: 'hidden',
     ...S.card,
@@ -1308,7 +1444,7 @@ const st = StyleSheet.create({
   },
   tileDanger: { backgroundColor: '#FBF1EF', borderColor: `${T.red}45` },
   tileBar: { position: 'absolute', left: 0, right: 0, top: 0, height: 3 },
-  tileHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 28 },
+  tileHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: 22 },
   tileLabel: {
     flex: 1,
     fontFamily: FONT,
@@ -1319,9 +1455,9 @@ const st = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
-  tileIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  tileValue: { fontFamily: FONT, fontSize: 20, fontWeight: '900', color: T.ink, marginTop: 6 },
-  tileSub: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: T.muted, marginTop: 4 },
+  tileIcon: { width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  tileValue: { fontFamily: FONT, fontSize: 17, fontWeight: '900', color: T.ink, marginTop: 3 },
+  tileSub: { fontFamily: FONT, fontSize: 10.5, fontWeight: '600', color: T.muted, marginTop: 2 },
 
   // panels
   duo: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
@@ -1397,6 +1533,29 @@ const st = StyleSheet.create({
   tdRight: { alignItems: 'flex-end' },
   tdText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.ink },
   tdTextFirst: { fontWeight: '800', color: T.nav },
+
+  // phone cards (grid ki jagah)
+  mList: { padding: 10, gap: 8 },
+  mCard: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
+  mCardOpen: { borderColor: T.copper, borderWidth: 1.5 },
+  mCardTotal: { backgroundColor: `${T.nav}0D`, borderColor: `${T.nav}30` },
+  mHead: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
+  mTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mTitle: { fontFamily: FONT, fontSize: 14.5, fontWeight: '900', color: T.nav },
+  mGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
+  mCell: { paddingRight: 8, paddingVertical: 5 },
+  mLbl: { fontFamily: FONT, fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.3, textTransform: 'uppercase' },
+  mVal: { fontFamily: FONT, fontSize: 14, fontWeight: '900', color: T.ink, marginTop: 2 },
+  mExpand: { borderTopWidth: 1, borderTopColor: T.hair, backgroundColor: T.surface },
+
+  // executive row expand
+  execName: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
+  expandWrap: { backgroundColor: T.surface, borderLeftWidth: 3, borderLeftColor: T.copper, borderBottomWidth: 1, borderBottomColor: T.hair },
+  execOpen: { padding: 10, gap: 10 },
+  execOpenHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  execOpenLbl: { fontFamily: FONT, fontSize: 10.5, fontWeight: '800', color: T.muted, letterSpacing: 0.5 },
+  execPill: { maxWidth: 260, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, backgroundColor: T.nav },
+  execPillTx: { fontFamily: FONT, fontSize: 12, fontWeight: '800', color: '#fff' },
   tdTextTotal: { fontWeight: '900' },
   tableEmpty: { paddingVertical: 22, alignItems: 'center' },
   tableEmptyText: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.muted, textAlign: 'center', paddingVertical: 8 },

@@ -294,6 +294,27 @@ export const api = {
     }),
 
   /** Financial-year checked Production, using the same dashboard endpoint. */
+  getOwnerFyOutstanding: (params = {}) =>
+    fetchJSON(`/getOwnerDashboard`, { report_type: 'fy_outstanding', ...params }),
+
+  /** FY Outstanding drilldowns: explicitly forward required query parameters. */
+  getOwnerFyOutstandingDetail: (params: {
+    date: string;
+    prptype: string;
+    view?: string;
+    outstanding_detail: 'customers' | 'invoices';
+    outstanding_exec: string;
+    outstanding_party?: string;
+  }) => fetchJSON(`/getOwnerDashboard`, {
+    report_type: 'fy_outstanding',
+    date: params.date,
+    prptype: params.prptype,
+    view: params.view || 'owner',
+    outstanding_detail: params.outstanding_detail,
+    outstanding_exec: params.outstanding_exec,
+    ...(params.outstanding_party ? { outstanding_party: params.outstanding_party } : {}),
+  }),
+
   getOwnerFyProduction: (params = {}) =>
     fetchJSON(`/getOwnerDashboard`, {
       report_type: 'fy_production',

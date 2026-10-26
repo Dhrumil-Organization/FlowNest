@@ -60,9 +60,6 @@ const MAKE_COLS_DESKTOP: MCol[] = [
   { k: 'makeCode', label: 'Code', w: 82 },
   { k: 'makeName', label: 'Make name', w: 180 },
   { k: 'model', label: 'Model', w: 340 },
-  { k: 'shortName', label: 'Short name', w: 150 },
-  { k: 'roLevel', label: 'R.O. level', w: 105, right: true, dp: 'roLevel' },
-  { k: 'roQty', label: 'R.O. qty', w: 105, right: true, dp: 'roQty' },
   { k: 'opQty', label: 'Op. qty', w: 110, right: true, dp: 'opQty' },
   { k: 'opRate', label: 'Op. rate', w: 105, right: true, dp: 'opRate' },
   { k: 'rate1', label: 'Rate', w: 100, right: true },
@@ -70,9 +67,6 @@ const MAKE_COLS_DESKTOP: MCol[] = [
   { k: 'rate3', label: 'Rate 3', w: 100, right: true },
   { k: 'rate4', label: 'Rate 4', w: 100, right: true },
   { k: 'saleRate', label: 'Sale rate', w: 105, right: true, dp: 'saleRate' },
-  { k: 'location', label: 'Location', w: 150 },
-  { k: 'inwardExtraQtyPct', label: 'Inward Extra Qty (%)', w: 190, right: true },
-  { k: 'inwardExtraQty', label: 'Inward Extra Qty', w: 180, right: true },
   
   { k: 'status', label: 'Status', w: 100 },
 ];
@@ -80,8 +74,6 @@ const MAKE_COLS_TABLET: MCol[] = [
   { k: 'makeCode', label: 'Code', w: 64 },
   { k: 'makeName', label: 'Make', w: 120 },
   { k: 'model', label: 'Model', w: 220 },
-  { k: 'roLevel', label: 'R.O. level', w: 80, right: true, dp: 'roLevel' },
-  { k: 'roQty', label: 'R.O. qty', w: 80, right: true, dp: 'roQty' },
   { k: 'opQty', label: 'Op. qty', w: 84, right: true, dp: 'opQty' },
   { k: 'opRate', label: 'Op. rate', w: 84, right: true, dp: 'opRate' },
   { k: 'rate1', label: 'Rate', w: 78, right: true },
@@ -89,9 +81,6 @@ const MAKE_COLS_TABLET: MCol[] = [
   { k: 'rate3', label: 'Rate 3', w: 78, right: true },
   { k: 'rate4', label: 'Rate 4', w: 78, right: true },
   { k: 'saleRate', label: 'Sale rate', w: 84, right: true, dp: 'saleRate' },
-  { k: 'location', label: 'Location', w: 100 },
-  { k: 'inwardExtraQtyPct', label: 'Inward Extra Qty (%)', w: 130, right: true },
-  { k: 'inwardExtraQty', label: 'Inward Extra Qty', w: 120, right: true },
   { k: 'status', label: 'Status', w: 84 },
 ];
 
@@ -382,7 +371,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
 
   const onSave = async () => {
     if (!editing || busy || !lookups) return;
-    const e = validateItem(draft, mode);
+    const e = validateItem(draft, mode, lookups.subGroups);
     setErrors(e);
     if (Object.keys(e).length) {
       setFormError(`Fix ${Object.keys(e).length} ${Object.keys(e).length === 1 ? 'field' : 'fields'} before saving.`);
@@ -490,6 +479,12 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
     });
     setErrors((p) => ({ ...p, makes: undefined }));
     setMakeEdit(null);
+  };
+
+  /** The Make / Model master dialog changed the master -> keep the cached dropdown options in sync. */
+  const onMakeOptionsChange = (list: typeof makeOptions) => {
+    setMakeOptions(list);
+    setLookups((l) => (l ? { ...l, makes: list } : l));
   };
 
   const openMakeEditor = (make: ItemMake, isNew: boolean) => {
@@ -656,6 +651,8 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
             options={subGroupOptions}
             disabled={ro}
             allowClear
+            required={subGroupOptions.length > 0 && !!draft.groupId}
+            error={errors.subGroupId}
             placeholder={draft.groupId && subGroupOptions.length === 0 ? 'None for this group' : 'Select…'}
             onChange={(id) => set('subGroupId', id)}
           />,
@@ -788,8 +785,6 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
             {m.model ? <Text style={s.mCardModel}>{m.model}</Text> : null}
             <View style={s.mStats}>
               {[
-                ['R.O. level', fmt(m.roLevel, DP.roLevel)],
-                ['R.O. qty', fmt(m.roQty, DP.roQty)],
                 ['Op. qty', fmt(m.opQty, DP.opQty)],
                 ['Op. rate', fmt(m.opRate, DP.opRate)],
                 ['Rate', m.rate1 || '0'],
@@ -797,8 +792,6 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
                 ['Rate 3', m.rate3 || '0'],
                 ['Rate 4', m.rate4 || '0'],
                 ['Sale rate', fmt(m.saleRate, DP.saleRate)],
-                ['Inward Extra Qty (%)', m.inwardExtraQtyPct || '0'],
-                ['Inward Extra Qty', m.inwardExtraQty || '0'],
               ].map(([l, v]) => (
                 <View key={l} style={s.mStat}>
                   <Text style={s.mStatL}>{l}</Text>
@@ -966,7 +959,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
       <NoticeHost />
 
       {makeEdit ? (
-        <MakeSheet key={makeEdit.make.id} locations={lookups.locations} statuses={lookups.status} rateEditable={lookups.rateEditable} makeOptions={makeOptions} make={makeEdit.make} isNew={makeEdit.isNew} editable={editing} onClose={() => setMakeEdit(null)} onSave={saveMake} onRemove={removeMake} />
+        <MakeSheet key={makeEdit.make.id} API={API} token={token} scope={scope} onMakeOptionsChange={onMakeOptionsChange} locations={lookups.locations} statuses={lookups.status} rateEditable={lookups.rateEditable} makeOptions={makeOptions} make={makeEdit.make} isNew={makeEdit.isNew} editable={editing} onClose={() => setMakeEdit(null)} onSave={saveMake} onRemove={removeMake} />
       ) : null}
     </View>
   );

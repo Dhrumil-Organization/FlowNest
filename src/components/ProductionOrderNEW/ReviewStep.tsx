@@ -156,6 +156,11 @@ function InputRates({ f }: { f: Row }) {
       </TouchableOpacity>
       {open ? (
         <View style={{ marginTop: 8 }}>
+          <View style={{ backgroundColor: '#F5F7FA', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 9, marginBottom: 8 }}>
+            <Muted style={{ fontSize: 9.5 }}>
+              Master Design Costing is the starting basis. Changes here apply only to this Production Order and are frozen at authorization; the Design Costing master is never modified.
+            </Muted>
+          </View>
           <Text style={{ fontSize: 10, color: T.muted, fontWeight: '700', marginVertical: 2 }}>Yarn rates (₹/kg)</Text>
           {e.yarns.map((y: Row) => (
             <View key={y.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: T.alt }}>

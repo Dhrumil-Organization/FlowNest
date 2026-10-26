@@ -37,6 +37,7 @@ type Row = {
   unplanned: number;
   notMade: number;
   unplannedPct: number;
+  asPlannedPct: number;
   hasUnplanned: boolean;
   search: string;
 };
@@ -102,6 +103,7 @@ const toRow = (r: BeamPlanApiRow, view: ViewKey, i: number): Row => {
     unplanned: n(r.UnplannedQty),
     notMade: n(r.NotMadeQty),
     unplannedPct: n(r.UnplannedPercent),
+    asPlannedPct: n(r.AsPlannedPercent),
     hasUnplanned: n(r.HasUnplannedFlag) > 0 || n(r.UnplannedQty) > 0,
     search: [title, sub, design, ...plannedDesigns.map((c) => c.label), ...madeDesigns.map((c) => c.label), ...planned.map((c) => c.label), ...made.map((c) => c.label)]
       .filter((x) => x && x !== '0')
@@ -120,22 +122,24 @@ const toSummary = (x: BeamPlanSummaryApi): Summary => ({
   unplannedPct: n(x.TotalUnplannedPercent),
 });
 
+/** label bhi percent se: As planned % + Unplanned % = 100 */
 const verdict = (r: Row): { text: string; color: string } =>
-  r.madeQty <= 0
-    ? { text: r.plannedQty > 0 ? 'Not made yet' : '—', color: T.muted }
-    : r.unplanned > 0
-      ? { text: `${fmtPct(r.unplannedPct)} unplanned`, color: T.copper }
-      : { text: 'As planned', color: T.green };
+  r.unplannedPct > 0
+    ? { text: `${fmtPct(r.unplannedPct)} unplanned`, color: T.copper }
+    : r.asPlannedPct > 0
+      ? { text: 'As planned', color: T.green }
+      : { text: r.plannedQty > 0 ? 'Not made yet' : '—', color: T.muted };
 
 /* ------------------------------ small parts ------------------------------ */
 
+/** bar = As planned % (navy) + Unplanned % (copper); dono ka total 100 hota hai, isliye bar poori bharti hai */
 function PlanBar({ r, h = 8 }: { r: Row; h?: number }) {
-  const total = r.asPlanned + r.unplanned + r.notMade;
+  const ap = Math.max(0, r.asPlannedPct);
+  const up = Math.max(0, r.unplannedPct);
   return (
     <View style={[st.bar, { height: h, borderRadius: h / 2 }]}>
-      {total > 0 && r.asPlanned > 0 ? <View style={{ flex: r.asPlanned, backgroundColor: T.nav }} /> : null}
-      {total > 0 && r.unplanned > 0 ? <View style={{ flex: r.unplanned, backgroundColor: T.copper }} /> : null}
-      {total > 0 && r.notMade > 0 ? <View style={{ flex: r.notMade, backgroundColor: T.border }} /> : null}
+      {ap > 0 ? <View style={{ flex: ap, backgroundColor: T.nav }} /> : null}
+      {up > 0 ? <View style={{ flex: up, backgroundColor: T.copper }} /> : null}
     </View>
   );
 }
@@ -249,12 +253,11 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
   const [shown, setShown] = useState(PAGE);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const seq = useRef<Record<ViewKey, number>>({ beam: 0, po: 0 });
-  const started = useRef<Record<ViewKey, boolean>>({ beam: false, po: false }); // each view calls its API only once
+  const lastTick = useRef(-1);
 
   const load = useCallback(
     async (v: ViewKey, silent = false) => {
       const id = ++seq.current[v];
-      started.current[v] = true;
       setPending((p) => ({ ...p, [v]: true }));
       if (silent) setRefreshing(true);
       setError('');
@@ -273,7 +276,6 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
         setStore((cur) => ({ ...cur, [v]: { summary: toSummary(res.summary), rows: data.map((r, i) => toRow(r, v, i)) } }));
       } catch (e: any) {
         if (id === seq.current[v]) {
-          started.current[v] = false; // failed -> next time this view opens it tries again
           setError(e?.message || 'Unable to load beam plan.');
         }
       } finally {
@@ -286,12 +288,20 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
     [API, token],
   );
 
-  // Har view (By beam / By production order) ki API sirf EK baar lagti hai - pehli baar jab wo view khulta hai.
-  // Dobara view badalne ya Beam plan tab dobara kholne par purana data hi dikhta hai; naya data sirf refresh button / pull-to-refresh se.
+  // Beam plan tab jitni baar khulta hai (refreshTick badalta hai) - current view ki API dobara lagti hai.
   useEffect(() => {
-    if (!started.current[view]) void load(view);
+    if (lastTick.current === refreshTick) return;
+    lastTick.current = refreshTick;
+    void load(view, !!store[view]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [refreshTick]);
+
+  // By beam <-> By production order: har baar badalne par us view ki API dobara lagti hai
+  // (purana data tab tak dikhta hai jab tak naya aa nahi jata)
+  const switchView = (k: ViewKey) => {
+    setView(k);
+    void load(k, !!store[k]);
+  };
 
   useEffect(() => {
     onBusyChange?.(pending.beam || pending.po);
@@ -319,8 +329,6 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
   };
   const toggle = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
   const refresh = () => {
-    started.current[view === 'beam' ? 'po' : 'beam'] = false; // the other view's old data is dropped -> it loads again when opened
-    setStore((c) => ({ [view]: c[view] }) as Partial<Record<ViewKey, Bucket>>);
     void load(view, true);
   };
 
@@ -366,7 +374,21 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
       { key: 'pl', label: 'Planned', flex: 0.9, align: 'right', render: num((r) => r.plannedQty) },
       { key: 'ma', label: 'Made', flex: 0.9, align: 'right', render: num((r) => r.madeQty) },
       { key: 'un', label: 'Unplanned', flex: 0.9, align: 'right', render: (r) => <Text style={[st.numStrong, r.unplanned > 0 && { color: T.copper }]}>{fmtQty(r.unplanned)}</Text> },
-      { key: 'nm', label: 'Not made', flex: 0.9, align: 'right', render: num((r) => r.notMade) },
+      ...(view === 'po'
+        ? ([
+            {
+              key: 'nm',
+              label: 'Not made (plan)',
+              flex: 1.2,
+              align: 'right',
+              render: (r: Row) => (
+                <Text style={st.num}>
+                  {fmtQty(r.notMade)} <Text style={st.planBr}>({fmtQty(r.plannedQty)})</Text>
+                </Text>
+              ),
+            },
+          ] as Col<Row>[])
+        : []),
       {
         key: 'bar',
         label: 'Planned vs unplanned',
@@ -406,7 +428,7 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
         { key: 'po', label: 'By production order' },
       ]}
       value={view}
-      onChange={setView}
+      onChange={switchView}
       fill={phone}
     />
   );
@@ -464,10 +486,14 @@ export default function BeamPlan({ token, API, refreshTick = 0, onBusyChange }: 
             <Text style={[st.statNum, r.unplanned > 0 && { color: T.copper }]}>{fmtQty(r.unplanned)}</Text>
             <Text style={st.statLbl}>Unplanned</Text>
           </View>
-          <View style={st.stat}>
-            <Text style={st.statNum}>{fmtQty(r.notMade)}</Text>
-            <Text style={st.statLbl}>Not made</Text>
-          </View>
+          {view === 'po' ? (
+            <View style={st.stat}>
+              <Text style={st.statNum}>
+                {fmtQty(r.notMade)} <Text style={st.planBr}>({fmtQty(r.plannedQty)})</Text>
+              </Text>
+              <Text style={st.statLbl}>Not made (plan)</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={st.secBlock}>
@@ -663,6 +689,7 @@ const st = StyleSheet.create({
 
   num: { fontFamily: FONT, fontSize: 12.5, fontWeight: '600', color: T.ink, textAlign: 'right' },
   numStrong: { fontFamily: FONT, fontSize: 12.5, fontWeight: '900', color: T.ink, textAlign: 'right' },
+  planBr: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: T.muted },
   verdict: { fontFamily: FONT, fontSize: 12, fontWeight: '900' },
   poNo: { fontFamily: FONT, fontSize: 13, fontWeight: '900', color: T.ink },
   poSub: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: T.muted, marginTop: 1 },

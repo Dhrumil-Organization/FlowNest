@@ -612,6 +612,20 @@ registerPermissionArea({
             { key: 'delete', name: 'Delete' },
           ],
         },
+        {
+          key: 'sampling_hub',
+          name: 'Sampling Hub',
+          type: 'screen',
+          displayOrder: 163,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'New sample / split' },
+            { key: 'edit', name: 'Modify sample / movement' },
+            { key: 'delete', name: 'Delete sample / movement', dangerous: true },
+            { key: 'move', name: 'Record movement (scan & move)' },
+            { key: 'print', name: 'Print QR sticker' },
+          ],
+        },
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -1907,6 +1921,24 @@ registerUiNodes([
     permission: 'production.roll_cut_scanner',
     action: 'view',
     order: 166,
+  },
+  {
+    id: 'nav.sampling_hub',
+    kind: 'navigation',
+    title: 'Sampling Hub',
+    permission: 'production.sampling_hub',
+    action: 'view',
+    route: 'sampling-hub',
+    icon: 'qr-code-2',
+    order: 163,
+  },
+  {
+    id: 'screen.sampling_hub',
+    kind: 'screen',
+    title: 'Sampling Hub',
+    permission: 'production.sampling_hub',
+    action: 'view',
+    order: 163,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

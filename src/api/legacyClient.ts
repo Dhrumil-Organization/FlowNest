@@ -402,6 +402,9 @@ export const LEGACY_ROUTES = {
   beamShortageTakas: '/reports/beam_shortage/takas',
   yarnHubSummary: '/yarn_hub/summary',
   yarnHubItem: '/yarn_hub/item',
+  yarnRates: (action: string) => `/yarn_rates/${action}`,
+  realCostChain: (action: string) => `/real_cost_chain/${action}`,
+  samplingHub: (action: string) => `/sampling_hub/${action}`,
   greyScanInward: (action: string) => `/grey_scan_inward/${action}`,
 } as const;
 
@@ -758,6 +761,50 @@ export const YarnHubAPI = {
   // stock SP + every yarn of the year: allow longer than the 30 s default
   summary: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubSummary, body, { timeout: 180000 }),
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnHubItem, body, { timeout: 120000 }),
+};
+
+// Real Cost Chain (RealCostChainController) — Reports → Real Costing Chain: actual vs assumed cost per metre.
+// body { prptype, prpcode, yearno, month? 'YYYY-MM' } — group / property / year of the login.
+export const RealCostChainAPI = {
+  report: (body: Record<string, any>) => client.post(LEGACY_ROUTES.realCostChain('report'), body, { timeout: 600000 }),
+};
+
+// Sampling Hub (SamplingHubController) — samples with permanent IDs + QR, movement log (TMSMASTER SmpSample / SmpMove).
+// Every body carries { prptype, yearno } of the login. Rights: production.sampling_hub (checked by the API too).
+//   list       -> samples + movements of the group, rights, me, today
+//   masters    -> designs (Design module catalogue rule), categories, customers (Sales Order party rule)
+//   colourways -> { md_id } active colourways of a design
+//   photo      -> { id } garment photo (data URL)
+//   save       -> new sample(s) / { id } edit;  delete -> { id } HARD delete with its movements
+//   split      -> { id, n } items of a batch get their own IDs
+//   move_save  -> record / { id } modify a movement;  move_delete -> { id } HARD delete
+//   sticker    -> { ids } label rows for the Checking Scanner print path (PRINTSTICKER, PrintFormat 4)
+export const SamplingHubAPI = {
+  list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('list'), body, { timeout: 120000 }),
+  masters: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('masters'), body, { timeout: 120000 }),
+  colourways: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('colourways'), body),
+  photo: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('photo'), body),
+  save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('save'), body, { timeout: 60000 }),
+  remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('delete'), body, { timeout: 60000 }),
+  split: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('split'), body, { timeout: 60000 }),
+  moveSave: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_save'), body, { timeout: 60000 }),
+  moveRemove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_delete'), body, { timeout: 60000 }),
+  sticker: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('sticker'), body, { timeout: 60000 }),
+};
+
+// Yarn Rates (YarnRateController) — rate book per main yarn (TMSMASTER.dbo.FAMIYarnRate).
+// Every body carries { prptype, yearno } of the login — property GROUP wise, no prpcode. New table data only.
+//   list    -> main yarns of the group + every rate of the group's book
+//   item    { itmcode }                      -> that yarn's rates
+//   parties                                  -> supplier master: Dyeing party list (FAMAcc MHead 18 / SHead 117) + yarn suppliers of the group
+//   save    { itmcode, parcode, date, rate, remark, replace, orig? { itmcode, parcode, date } } -> 409 code 'exists' = ask to replace
+//   remove  { itmcode, parcode, date }      (hard delete)
+export const YarnRateAPI = {
+  list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('list'), body, { timeout: 120000 }),
+  item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('item'), body, { timeout: 120000 }),
+  parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('parties'), body),
+  save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('save'), body, { timeout: 60000 }),
+  remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('delete'), body, { timeout: 60000 }),
 };
 
 // Outward Scan Sticker (GreyScanInwardController) — grey store job inward by scanning the fusion sticker.

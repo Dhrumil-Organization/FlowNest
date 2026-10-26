@@ -44,9 +44,12 @@ export type HubLot = {
   status: LotStatus;
 };
 
-/** one aggregated line (design row / grand total / challan total) */
+/** one aggregated line (item row / design row / grand total / challan total) */
 export type HubAgg = {
+  /** label: item name on the item level, design name on the design level */
   design: string;
+  /** item level: number of designs under the item */
+  designs?: number;
   lots: number;
   outM: number;
   inM: number;
@@ -201,6 +204,26 @@ export const buildDesignRows = (lots: HubLot[]) => {
   const rows = [...by.entries()].map(([d, ls]) => aggOf(d, ls)).sort((a, b) => b.outM - a.outM || a.design.localeCompare(b.design));
   return { rows, G: aggOf('GRAND TOTAL', lots) };
 };
+
+/** item of a lot as shown (GRYOutD1 item → FAMItem.ItmName) */
+export const itemOf = (l: HubLot) => l.item || '(no item)';
+
+/** item-wise rows (parent level, most outward first) + grand total; HubAgg.design carries the item name */
+export const buildItemRows = (lots: HubLot[]) => {
+  const by = new Map<string, HubLot[]>();
+  lots.forEach((l) => {
+    const k = itemOf(l);
+    const list = by.get(k);
+    if (list) list.push(l); else by.set(k, [l]);
+  });
+  const rows = [...by.entries()]
+    .map(([k, ls]) => ({ ...aggOf(k, ls), designs: new Set(ls.map((l) => l.design)).size }))
+    .sort((a, b) => b.outM - a.outM || a.design.localeCompare(b.design));
+  return { rows, G: aggOf('GRAND TOTAL', lots) };
+};
+
+/** lots of one item */
+export const lotsOfItem = (lots: HubLot[], item: string) => lots.filter((l) => itemOf(l) === item);
 
 /** lots of one design, newest challan first */
 export const lotsOfDesign = (lots: HubLot[], design: string) =>

@@ -49,7 +49,7 @@ export default function RollCutScanner({ token, API }: Props) {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
   const [loaded, setLoaded] = useState(false);
-  const autoLoaded = useRef(false);
+  const [filtersOpen, setFiltersOpen] = useState(true); // open at start, closes after Show list, tap header to open again
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -78,29 +78,26 @@ export default function RollCutScanner({ token, API }: Props) {
 
   /* -------------------------------- list --------------------------------- */
   const loadList = useCallback(async () => {
-    if (!prpCode) return setListError('Select a property.');
-    if (!prptype) return setListError('Property group (prptype) not found for this login — please re-login.');
+    if (!prpCode) { setListError('Select a property.'); return 0; }
+    if (!prptype) { setListError('Property group (prptype) not found for this login — please re-login.'); return 0; }
     setListError('');
     setListLoading(true);
     try {
       const r = await api.list({ prptype, prpCode, beamNo: beamFilter, from: fromDate, to: toDate });
-      setRows(Array.isArray(r) ? r : []);
+      const list = Array.isArray(r) ? r : [];
+      setRows(list);
       setLoaded(true);
+      return list.length; // number of cards that will show
     } catch (e: any) {
       setRows([]);
       setListError(errMsg(e, 'Could not load the list.'));
+      return 0;
     } finally {
       setListLoading(false);
     }
   }, [api, prpCode, prptype, beamFilter, fromDate, toDate]);
 
-  // first time a property is known -> show today's scans without asking
-  useEffect(() => {
-    if (prpCode && prptype && !autoLoaded.current) {
-      autoLoaded.current = true;
-      void loadList();
-    }
-  }, [prpCode, prptype, loadList]);
+  // NOTE: the list API is called ONLY when the user taps 'Show list' (or pulls to refresh) — never automatically.
 
   const changeFrom = (d: Date) => {
     setFromDate(d);
@@ -143,6 +140,25 @@ export default function RollCutScanner({ token, API }: Props) {
     setVisible((v) => (v < filtered.length ? v + PAGE_SIZE : v));
   }, [filtered.length]);
 
+  /* ------------------------------- delete -------------------------------- */
+  const deleteRow = useCallback(
+    async (row: any) => {
+      try {
+        const r = await api.remove({ prpcode: prpCode, yearno: getCurrentFinancialYear(), row });
+        if (r && r.success === false) {
+          AppAlert.alert('Error', r?.message || 'Delete failed');
+          return false;
+        }
+        setRows((list) => list.filter((x) => x !== row));
+        return true;
+      } catch (e: any) {
+        AppAlert.alert('Error', errMsg(e, 'Delete failed'));
+        return false;
+      }
+    },
+    [api, prpCode],
+  );
+
   /* -------------------------------- scan --------------------------------- */
   const clearScan = () => {
     setRaw('');
@@ -175,7 +191,6 @@ export default function RollCutScanner({ token, API }: Props) {
         setFailMsg('');
         setLastSaved({ beam: qr.beamno, taka: qr.takano, at: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
         clearScan();
-        if (prpCode) void loadList();
       } else {
         setLastSaved(null);
         setFailMsg(r?.message || 'Save failed');
@@ -249,10 +264,27 @@ export default function RollCutScanner({ token, API }: Props) {
   const listHeader = (
     <View>
       <View style={st.card}>
-        <View style={st.filterHead}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[st.filterHead, !filtersOpen && { marginBottom: 0 }]}
+          onPress={() => setFiltersOpen((o) => !o)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: filtersOpen }}
+          accessibilityLabel="Toggle filters"
+        >
           <Icon name="tune" size={17} color={T.copper} />
           <Text style={st.filterTitle}>Filters</Text>
-        </View>
+          {!filtersOpen ? (
+            <Text style={st.filterSummary} numberOfLines={1}>
+              {fmtShowDate(fromDate)} – {fmtShowDate(toDate)}{beamFilter ? ` · Beam ${beamFilter}` : ''}
+            </Text>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          <Icon name={filtersOpen ? 'expand-less' : 'expand-more'} size={24} color={T.muted} />
+        </TouchableOpacity>
+        {filtersOpen ? (
+        <>
         <View style={st.grid}>
           <SelectField
             label="Property"
@@ -285,10 +317,12 @@ export default function RollCutScanner({ token, API }: Props) {
         </View>
         {c.prptypeMissing ? <Text style={st.err}>Property group (prptype) not found for this login — please re-login.</Text> : null}
         {listError ? <Text style={st.err}>{listError}</Text> : null}
-        <TouchableOpacity activeOpacity={0.85} style={[st.loadBtn, listLoading && { opacity: 0.8 }]} onPress={loadList} disabled={listLoading} accessibilityRole="button">
+        <TouchableOpacity activeOpacity={0.85} style={[st.loadBtn, listLoading && { opacity: 0.8 }]} onPress={() => { void loadList().then((n) => { if (n > 0) setFiltersOpen(false); }); }} disabled={listLoading} accessibilityRole="button">
           {listLoading ? <ActivityIndicator color="#fff" /> : <Icon name="search" size={18} color="#fff" />}
           <Text style={st.loadText}>{listLoading ? 'Loading…' : 'Show list'}</Text>
         </TouchableOpacity>
+        </>
+        ) : null}
       </View>
 
       {loaded ? (
@@ -335,7 +369,7 @@ export default function RollCutScanner({ token, API }: Props) {
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={listLoading && loaded} onRefresh={loadList} colors={[T.copper]} tintColor={T.copper} />}
       ListHeaderComponent={listHeader}
-      renderItem={({ item }) => <ScanRow item={item.r} no={item.no} />}
+      renderItem={({ item }) => <ScanRow item={item.r} no={item.no} onDelete={deleteRow} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.4}
       initialNumToRender={12}
@@ -431,7 +465,17 @@ function Info({ k, v }: { k: string; v: string }) {
   );
 }
 
-function ScanRow({ item, no }: { item: any; no: number }) {
+function ScanRow({ item, no, onDelete }: { item: any; no: number; onDelete: (row: any) => Promise<boolean> }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const doDelete = async () => {
+    setBusy(true);
+    const ok = await onDelete(item);
+    if (!ok) {
+      setBusy(false);
+      setConfirm(false);
+    }
+  };
   const date = str(item.ChkDate || item.ScanDate || item.EntryDate || item.CrtDate);
   const design = str(item.DsnName || item.OrdDsnName);
   const qty = str(item.Qty);
@@ -451,7 +495,29 @@ function ScanRow({ item, no }: { item: any; no: number }) {
             <Text style={st.datePillText}>{date}</Text>
           </View>
         ) : null}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={st.delBtn}
+          onPress={() => setConfirm(true)}
+          disabled={busy}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel="Delete scan"
+        >
+          <Icon name="delete-outline" size={19} color={T.red} />
+        </TouchableOpacity>
       </View>
+      {confirm ? (
+        <View style={st.confirmBar}>
+          <Text style={st.confirmText} numberOfLines={2}>Delete taka {str(item.TakaNo)}?</Text>
+          <TouchableOpacity activeOpacity={0.8} style={st.confirmNo} onPress={() => setConfirm(false)} disabled={busy}>
+            <Text style={st.confirmNoText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.85} style={st.confirmYes} onPress={doDelete} disabled={busy}>
+            {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={st.confirmYesText}>Delete</Text>}
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <View style={st.rowInfo}>
         <Info k="BEAM NO" v={str(item.BeamNo)} />
         {qty ? <Info k="METER" v={qty} /> : null}
@@ -505,12 +571,20 @@ const st = StyleSheet.create({
   searchInput: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: T.ink, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null) },
   footer: { alignItems: 'center', paddingVertical: 16, gap: 8 },
   footerText: { fontSize: 12, fontWeight: '700', color: T.muted },
+  delBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: `${T.red}12`, alignItems: 'center', justifyContent: 'center' },
+  confirmBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: `${T.red}0F`, borderWidth: 1, borderColor: `${T.red}33` },
+  confirmText: { flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '800', color: T.red },
+  confirmNo: { height: 32, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
+  confirmNoText: { fontSize: 12, fontWeight: '800', color: T.nav },
+  confirmYes: { minWidth: 64, height: 32, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: T.red },
+  confirmYesText: { fontSize: 12, fontWeight: '900', color: '#fff' },
   okBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.green}55`, backgroundColor: `${T.green}12` },
   okIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: T.green, alignItems: 'center', justifyContent: 'center' },
   okTitle: { fontSize: 13.5, fontWeight: '900', color: T.green },
   okSub: { fontSize: 12, fontWeight: '700', color: T.ink, marginTop: 1 },
 
   filterHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 12 },
+  filterSummary: { flex: 1, minWidth: 0, textAlign: 'right', fontSize: 12, fontWeight: '700', color: T.muted },
   filterTitle: { fontSize: 14, fontWeight: '900', color: T.nav },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 12 },
   err: { fontSize: 12.5, fontWeight: '700', color: T.red, marginTop: 12 },
@@ -520,14 +594,14 @@ const st = StyleSheet.create({
   countCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 16, backgroundColor: T.nav, marginBottom: 12 },
   countLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, color: '#ffffffAA' },
   countRange: { fontSize: 12.5, fontWeight: '700', color: '#fff', marginTop: 3 },
-  countValue: { fontSize: 34, fontWeight: '900', color: '#fff', fontFamily: MONO },
+  countValue: { fontSize: 22, fontWeight: '900', color: '#fff', fontFamily: MONO },
 
   row: { backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, borderLeftWidth: 4, borderLeftColor: T.copper, padding: 12, marginBottom: 10 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowNo: { minWidth: 30, height: 30, paddingHorizontal: 6, borderRadius: 15, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
-  rowNoText: { fontSize: 12, fontWeight: '900', color: T.copper },
+  rowNo: { minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
+  rowNoText: { fontSize: 11, fontWeight: '900', color: T.copper },
   rowLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.6, color: T.muted },
-  rowTaka: { fontSize: 16, fontWeight: '900', color: T.ink, fontFamily: MONO, marginTop: 1 },
+  rowTaka: { fontSize: 13.5, fontWeight: '900', color: T.ink, fontFamily: MONO, marginTop: 1 },
   datePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, height: 26, borderRadius: 13, backgroundColor: T.alt, borderWidth: 1, borderColor: T.border },
   datePillText: { fontSize: 11.5, fontWeight: '800', color: T.nav },
   rowInfo: { flexDirection: 'row', gap: 10, marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.hair },

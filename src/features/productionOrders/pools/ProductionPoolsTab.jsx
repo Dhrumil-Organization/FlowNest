@@ -81,7 +81,7 @@ function PoolDetail({pool,onBack,view}) {
       {pool.rate_parts?.length?<View>{pool.rate_parts.map((r,i)=><Row key={`${r.po}|${i}`} style={{justifyContent:'space-between',paddingVertical:4,borderBottomWidth:i===pool.rate_parts.length-1?0:1,borderBottomColor:T.alt}}><Txt style={styles.aux}>{r.po} · {fmt(r.qty)}</Txt><Txt mono style={{fontSize:11,fontWeight:'800'}}>{r.rate==null?'—':`₹${Number(r.rate).toFixed(4)}/pick`}</Txt></Row>)}</View>:<Empty>Approved PO rate breakdown is not available.</Empty>}
       <Txt style={[styles.aux,{marginTop:4}]}>Checking valuation · PPI × checked metres × pool pick rate.</Txt>
     </Section>
-    {rec?<View style={styles.reconcile}><Txt style={{color:rec.ok?T.green:T.red,fontWeight:'800',fontSize:11}}>Opening {fmt(rec.opening??pool.opening_stock)} + Produced {fmt(rec.produced??pool.produced)} − Out {fmt(rec.out)} = Closing {fmt(rec.closing??pool.closing_stock)} {rec.ok?'✓':'⚠'}</Txt>{rec.ok===false&&<Txt style={{color:T.red,fontSize:10,marginTop:5}}>Difference: {fmt(rec.difference)}</Txt>}</View>:<View style={styles.reconcile}><Txt style={[styles.aux,{color:T.muted}]}>Opening + Produced − Out = Closing · awaiting dated roll reconciliation</Txt></View>}
+    {rec?<View style={styles.reconcile}><Txt style={{color:rec.ok?T.green:T.red,fontWeight:'800',fontSize:11}}>Opening {fmt(rec.opening??pool.opening_stock)} + Produced {fmt(rec.produced??pool.produced)} − Out {fmt(rec.out)} = Closing {fmt(rec.closing??pool.closing_stock)} {rec.ok?'✓':'⚠'}</Txt>{rec.ok===false&&<Txt style={{color:T.red,fontSize:10,marginTop:5}}>Difference: {fmt(rec.difference)}{rec.bad_rolls?.length?` · Affected rolls: ${rec.bad_rolls.join(', ')}`:''}</Txt>}</View>:<View style={styles.reconcile}><Txt style={[styles.aux,{color:T.muted}]}>Opening + Produced − Out = Closing · awaiting dated roll reconciliation</Txt></View>}
     <Section label="Entry order · who is served first">
       {!entries.length&&<Empty>No eligible production order in this month.</Empty>}
       {entries.map((e,i)=>{
@@ -106,9 +106,11 @@ function PoolDetail({pool,onBack,view}) {
       <Txt style={styles.aux}>Rolls remain loose until a sale or job outward pulls them into an executive's PO.</Txt>
       {showRolls&&(pool.loose_rolls?.length?<Row style={{flexWrap:'wrap',gap:5,marginTop:8}}>{pool.loose_rolls.slice(0,60).map((r,i)=><View style={styles.rollChip} key={r.roll_id||i}><Txt mono style={styles.aux}>{r.roll_id||r.roll||r.id} · {fmt(r.greige_metres??r.qty??r.metres)}</Txt></View>)}{pool.loose_rolls.length>60&&<Txt style={styles.aux}>+{pool.loose_rolls.length-60} more</Txt>}</Row>:<Empty>As-of-month verified loose rolls are unavailable.</Empty>)}
     </Section>
-    <Section label={`Bind log · ${events.length}`}>
-      {!events.length&&<Empty>Verified append-only binds will appear here after transaction-save integration.</Empty>}
-      {events.map((e,i)=><View key={e.id||i} style={styles.entry}><Row style={{alignItems:'center',justifyContent:'space-between'}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date||e.date)} · {e.executive||e.exec} · {e.via||'—'}</Txt><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)} → {e.po_no||e.po||'NO PO'}</Txt></Row><Txt style={styles.aux}>{e.reference||e.ref||'—'} · {e.roll_ids?.length??e.rollIds?.length??0} rolls</Txt><Row style={{marginTop:4,gap:5,flexWrap:'wrap'}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres||0)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF</Pill>}</Row></View>)}
+    <Section label={`Bind log · ${pool.bind_status==='verified'?events.length:'—'}`}>
+      {!events.length&&<Empty>{pool.bind_status==='verified'?'No saved bindings in this period.':'Saved bind history is not fully certified for the selected month.'}</Empty>}
+      {events.map((e,i)=><View key={e.id||i} style={styles.entry}><Row style={{alignItems:'center',justifyContent:'space-between'}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date||e.date)} · {e.executive||e.exec} · {e.via||'—'}</Txt><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)} → {e.po_no||e.po||'NO PO'}</Txt></Row><Txt style={styles.aux}>{e.reference||e.ref||'—'} · {e.roll_ids?.length??e.rollIds?.length??0} rolls</Txt>
+        {(e.allocations||[]).map((a,j)=><Txt key={`po:${j}`} style={styles.aux}>PO {a.po_no||a.po_uid||'NO PO'} · {fmt(a.metres)}{Number(a.over_metres)>0?' · OVER '+fmt(a.over_metres):''}</Txt>)}
+        {(e.rolls||[]).length>0&&<Txt style={styles.aux}>{e.rolls.map(r=>`${r.roll_id} (${fmt(r.greige_metres)})`).join(' · ')}</Txt>}<Row style={{marginTop:4,gap:5,flexWrap:'wrap'}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres||0)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF</Pill>}</Row></View>)}
     </Section>
     {!!pool.issues?.length&&<View style={styles.issue}><Txt style={{fontWeight:'800',color:T.amber,fontSize:10,marginBottom:3}}>Data reconciliation pending</Txt>{pool.issues.map((e,i)=><Txt style={styles.aux} key={i}>• {e}</Txt>)}</View>}
   </View>;
@@ -126,15 +128,14 @@ function combinePoolPages(a,b) {
   const sumMy=key=>pools.every(p=>nonNull(p?.my_orders?.[key]))
     ? pools.reduce((total,p)=>total+Number(p.my_orders[key]||0),0) : null;
   const my=a?.view_scope==='my'||b?.view_scope==='my';
-  return {...a,...b,pools,
-    kpis:{
-      po_quantity:my?sumMy('my_po_quantity'):sumNullable('po_quantity'),
-      so_pending:my?sumMy('my_so_pending'):sumNullable('so_pending'),
-      loose_stock:sumNullable('loose_metres'), overdue_lines:sumNullable('overdue_count'),
-      marked_binds:sumNullable('marked_binds'), below_cost_pos:sumNullable('below_cost_count')
-    },
-    so_summary_status:pools.every(p=>nonNull(p.so_pending))?'reconstructed':'partial'
-  };
+  const loaded={po_quantity:my?sumMy('my_po_quantity'):sumNullable('po_quantity'),
+    so_pending:my?sumMy('my_so_pending'):sumNullable('so_pending'),
+    loose_stock:sumNullable('loose_metres'),overdue_lines:sumNullable('overdue_count'),
+    marked_binds:sumNullable('marked_binds'),below_cost_pos:sumNullable('below_cost_count')};
+  const more=Boolean(b?.pagination?.more_available);
+  return {...a,...b,pools,loaded_page_kpis:loaded,monthly_totals_complete:false,
+    kpis:Object.fromEntries(Object.keys(loaded).map(k=>[k,null])),
+    so_summary_status:pools.every(p=>nonNull(p.so_pending))?'reconstructed':'partial'};
 }
 function endpoint(apiBase,params){const qs=Object.entries(params).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');return `${apiBase.replace(/\/$/,'')}/getProductionOrderPools?${qs}`;}
 export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,property='',requestFn,view='owner'}) {
@@ -192,7 +193,13 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
     below:sorted.every(x=>nonNull(x.below_cost_count))?sorted.filter(x=>x.below_cost_count>0).length:null};
   const listed=sorted.filter(p=>filter==='all'||(filter==='overdue'&&p.overdue_count>0)||(filter==='marked'&&p.marked_binds>0)||(filter==='below'&&p.below_cost_count>0));
   const k=data?.kpis||{};
-  const totals=[['PO quantity',fmt(k.po_quantity)],['SO pending',fmt(k.so_pending)],['Loose stock',fmt(k.loose_stock)],['Overdue lines',integer(k.overdue_lines)],['Marked binds',integer(k.marked_binds)],['Below-cost POs',integer(k.below_cost_pos)]];
+  const kpisComplete=data?.monthly_totals_complete!==false;
+  // Never disguise a 100-card sum as a month-wide total. But hiding all
+  // values as dashes also conceals valid ERP quantities. Display the exact
+  // LOADED-PAGE subtotal while clearly marking it as partial until every
+  // eligible design (including PO/SO-only) has been reconciled.
+  const shown=kpisComplete?k:{...k,...(data?.loaded_page_kpis||{})};
+  const totals=[['PO quantity',fmt(shown.po_quantity)],['SO pending',fmt(shown.so_pending)],['Loose stock',fmt(shown.loose_stock)],['Overdue lines',integer(shown.overdue_lines)],['Marked binds',integer(shown.marked_binds)],['Below-cost POs',integer(shown.below_cost_pos)]];
   return <ScrollView style={styles.page} contentContainerStyle={styles.pageContent} refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>setRefresh(x=>x+1)} tintColor={T.copper}/> }>
     {selected? <>
       {detailLoading&&<View style={styles.loading}><ActivityIndicator size="small" color={T.copper}/><Txt style={styles.aux}>Loading {selected.design_name||selected.design_code} · {monthName(month)}…</Txt></View>}
@@ -201,12 +208,30 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
     </>:<>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingBottom:9}}>{months.map(m=><Chip month key={m} active={month===m} onPress={()=>{setMonth(m);setFilter('all');}}>{monthName(m)}</Chip>)}</ScrollView>
 
-      {view==='my'&&<Txt style={{fontWeight:'800',fontSize:12,marginBottom:8}}>My orders · design-pool production share</Txt>}
+      {view==='my'&&<View style={[styles.section,{marginBottom:12}]}>
+        <Txt style={{fontSize:18,fontWeight:'800',marginBottom:4}}>My orders</Txt>
+        <Txt style={[styles.aux,{marginBottom:8}]}>Your production and sales orders inside the design pools · production share follows each executive’s proportion of the pool</Txt>
+        <Row style={{gap:6,flexWrap:'wrap'}}>
+          <Mini name="My PO qty · loaded" value={pools.every(p=>nonNull(p.my_orders?.my_po_quantity))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_po_quantity||0),0)):'—'}/>
+          <Mini name="My SO pending · loaded" value={pools.every(p=>nonNull(p.my_orders?.my_so_pending))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_so_pending||0),0)):'—'}/>
+          <Mini name="Production share · loaded" value={pools.every(p=>nonNull(p.my_orders?.production_share_metres))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.production_share_metres||0),0)):'—'}/>
+        </Row>
+        {poolPagination?.more_available&&<Txt style={[styles.aux,{marginTop:5}]}>Showing loaded pools only · more designs available</Txt>}
+      </View>}
 
       <View style={styles.metrics}>{totals.map(([name,value],i)=><KPI key={name} label={name} value={value} hi={i===0} columns={columns}/>)}</View>
+      {!kpisComplete&&<Row style={{justifyContent:'space-between',alignItems:'center',marginTop:-7,marginBottom:10,gap:8,flexWrap:'wrap'}}><Txt style={[styles.aux,{color:T.copper,fontWeight:'800'}]}>Loaded-page quantities · NOT full-month totals</Txt><Txt style={styles.aux}>{pools.length} of {poolPagination?.total??'more'} shown · PO/SO-only designs may still be absent</Txt></Row>}
 
       <Row style={{gap:6,flexWrap:'wrap',marginBottom:10}}>{[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>setFilter(key)}>{name} · {cnt[key]===null?'—':`${cnt[key]}${poolPagination?.more_available?'+':''}`}</Chip>)}</Row>
-      {filter==='marked'&&<Section label={`Marked binds · ${monthName(month)}`}><Empty>{cnt.marked===null?'Persistent bind events are not yet certified.':cnt.marked===0?'No drew-ahead, over-quantity or no-PO binds this month.':'Select a marked pool below for its bind log.'}</Empty></Section>}
+      {filter==='marked'&&<Section label={`Marked binds · ${monthName(month)}`}>
+        {sorted.flatMap(p=>(p.bind_events||[]).filter(e=>e.no_po||Number(e.over_metres)>0||(e.ahead_of||[]).length).map(e=>({...e,pool:p})))
+          .sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date))).map((e,i)=><TouchableOpacity key={`${e.pool.key}:${e.id||i}`} onPress={()=>setSelected(e.pool)} style={styles.entry}>
+            <Row style={{alignItems:'center',gap:8}}><View style={styles.designTag}><Txt mono style={{fontSize:10,fontWeight:'800'}}>{e.pool.design_code}</Txt></View><View style={{flex:1}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date)} · {e.executive} · {e.via}</Txt><Txt style={styles.aux}>{e.reference||'—'}</Txt></View><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)}</Txt></Row>
+            <Row style={{gap:5,flexWrap:'wrap',marginTop:4}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF {e.ahead_of.map(x=>x.po_no||x.po_uid).join(', ')}</Pill>}</Row>
+          </TouchableOpacity>)}
+        {cnt.marked===null&&<Empty>Saved bind history is incomplete; displayed events are recorded, not a complete monthly count.</Empty>}
+        {cnt.marked===0&&<Empty>No drew-ahead, over-quantity or no-PO binds this month.</Empty>}
+      </Section>}
       {filter==='below'&&<Section label={`Approved below cost · ${monthName(month)}`}><Empty>{cnt.below===null?'Verified costing comparisons are not yet available.':cnt.below===0?'No below-cost POs in this month.':'Select a flagged pool to see the costing.'}</Empty></Section>}
       <Row style={{alignItems:'center',justifyContent:'space-between',marginBottom:9,gap:8}}>
         <TouchableOpacity accessibilityRole="button" onPress={()=>setShowStatus(s=>!s)} style={{paddingVertical:3}}><Txt style={{color:T.muted,fontSize:10,fontWeight:'700'}}>{showStatus?'▾':'▸'} Data status</Txt></TouchableOpacity>

@@ -417,6 +417,25 @@ export async function fetchBrowse(API: string, token: string, sc: Scope): Promis
   try { const res = await get(API, token, ENDPOINTS.browse, { ...scopePayload(sc, 'browse_data'), type: 'items', page: 1, per_page: 200 }); assertOk(res); const d = bodyData(res); const list = Array.isArray(d) ? d : (d?.items ?? d?.data ?? d?.main ?? d?.rows ?? []); return (Array.isArray(list) ? list : []).map(toBrowseRow); }
   catch (e) { throw new ApiError(messageOf(e, 'Could not load the item list.')); }
 }
+/** One page of the item list (lazy loading). `hasMore` comes from the server's paging meta when present,
+ *  otherwise from "page came back full". If the server ignores `page` the caller stops on a page with no new rows. */
+export async function fetchBrowsePage(API: string, token: string, sc: Scope, page: number, perPage: number, search = ''): Promise<{ rows: BrowseRow[]; hasMore: boolean; total?: number }> {
+  try {
+    const res = await get(API, token, ENDPOINTS.browse, { ...scopePayload(sc, 'browse_data'), type: 'items', search, page, per_page: perPage });
+    assertOk(res);
+    const d: any = bodyData(res);
+    const list = Array.isArray(d) ? d : (d?.items ?? d?.data ?? d?.main ?? d?.rows ?? []);
+    const arr: any[] = Array.isArray(list) ? list : [];
+    const meta = d?.pagination ?? d?.meta ?? (d && typeof d === 'object' ? d : {});
+    const total = Number(meta?.total ?? meta?.total_rows ?? meta?.totalRecords ?? d?.total) || undefined;
+    const last = Number(meta?.last_page ?? meta?.lastPage ?? meta?.total_pages) || undefined;
+    const base = (page - 1) * perPage;
+    const rows = arr.map((r, i) => toBrowseRow(r, base + i));
+    // server ignored per_page and sent everything -> that is the whole list, nothing more to fetch
+    const hasMore = arr.length > perPage ? false : last ? page < last : total ? base + arr.length < total : arr.length >= perPage;
+    return { rows, hasMore, total };
+  } catch (e) { throw new ApiError(messageOf(e, 'Could not load the item list.')); }
+}
 export async function fetchItem(API: string, token: string, sc: Scope, code: string): Promise<StoreItem> {
   try { const res = await get(API, token, ENDPOINTS.item, { ...scopePayload(sc, 'show_data'), MItmCode: Number(code) }); assertOk(res); const d0 = bodyData(res); const d = Array.isArray(d0) ? d0[0] : (d0?.item ?? d0); if (!d || !(d.ItmCode ?? d.MItmCode)) throw new ApiError(`Item ${code} was not found.`); return toItem(d, sc); }
   catch (e) { throw new ApiError(messageOf(e, 'Could not open the item.')); }

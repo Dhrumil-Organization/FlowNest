@@ -1,18 +1,18 @@
 // FILE: src/screens/samplingHub/SmpParts.tsx
 // Small building blocks of the Sampling Hub (same vocabulary as the artifact / Yarn Hub: segs, chips, stat cards,
-// rows, widgets) and the QR sticker preview + print card.
-import { QrCode } from '@/src/lib/qr/QrCode';
+// rows, widgets) and the QR sticker card (the print server's own preview, shown inline + print).
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { C } from '../yarnHub/yarnHubModel';
 import { colourLabel, dateShort, designLabel, Move, PURPOSE, Sample, SMP_TYPE, SmpState } from './samplingHubModel';
 import { SamplingHubAPI } from '@/src/api/legacyClient';
 import { useErpSession } from '@/src/core/session/erpSession';
 import { PrinterSheet } from '../checkingScannerNew/PrinterSheet';
 import { errText, unwrap } from './samplingHubModel';
-import { loadPrinters, MAX_COPIES, previewSticker, Printer, printErr, printSticker, rememberPrinter, stickerQrText, withCopies } from './samplingPrint';
+import { loadPrinters, MAX_COPIES, previewSticker, Printer, printErr, printSticker, rememberPrinter, withCopies } from './samplingPrint';
+import { SmpPdfInline } from './SmpPdfInline';
 import { SmpPdfPreview } from './SmpPdfPreview';
 
 export const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
@@ -87,6 +87,7 @@ export function SampleRow({ s, state, onPress, right }: { s: Sample; state: SmpS
 export function MoveRow({ m, sample, onPress, onEdit, onDelete }: { m: Move; sample?: Sample | null; onPress?: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const p = PURPOSE[m.purpose];
   const unit = sample ? SMP_TYPE[sample.type].unit : 'pc';
+  const isEv = !!p.event;
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={st.row} accessibilityLabel={`Movement ${m.no}`}>
       <View style={[st.pBadge, { backgroundColor: p.color }]}><Text style={st.pBadgeT}>{p.short.toUpperCase()}</Text></View>
@@ -95,9 +96,11 @@ export function MoveRow({ m, sample, onPress, onEdit, onDelete }: { m: Move; sam
           {sample ? <Text style={{ fontFamily: MF }}>{sample.id} </Text> : null}
           {sample ? sample.name : p.lbl}
           {m.party ? <Text style={{ color: C.mut, fontWeight: '600' }}> → {m.party}</Text> : null}
+          {isEv ? <Text style={{ color: p.color, fontWeight: '700' }}>{m.purpose === 'event_out' ? ' → ' : ' ← '}{m.event || m.event_id}</Text> : null}
         </Text>
         <Text style={st.rowSub} numberOfLines={2}>
-          {dateShort(m.date)} · {m.by}{(sample && !sample.tracked) || m.qty > 1 ? ` · ${m.qty} ${unit}${m.qty !== 1 ? 's' : ''}` : ''}{m.note ? ' · ' + m.note : ''}{m.edited_by ? ` · modified by ${m.edited_by}` : ''}
+          {dateShort(m.date)} · {isEv ? 'scanned by ' : ''}{m.by}{isEv && m.carrier ? (m.purpose === 'event_out' ? ' · carried by ' : ' · brought back by ') + m.carrier : ''}
+          {(sample && !sample.tracked) || m.qty > 1 ? ` · ${m.qty} ${unit}${m.qty !== 1 ? 's' : ''}` : ''}{m.note ? ' · ' + m.note : ''}{m.edited_by ? ` · modified by ${m.edited_by}` : ''}
         </Text>
         {onEdit || onDelete ? (
           <View style={{ flexDirection: 'row', gap: 14, marginTop: 4 }}>
@@ -115,8 +118,9 @@ export function MoveRow({ m, sample, onPress, onEdit, onDelete }: { m: Move; sam
 }
 
 /**
- * QR sticker: the app preview (the QR the label will carry + its lines) and the Checking Scanner print path —
- * printer list / last printer, "Preview from printer" (PDF the print server renders) and Print with copies.
+ * QR sticker: what the print server will print — "Preview from printer" (POST /api/taka-preview-label, the PDF Node
+ * renders) is called by itself when the card opens and again when the copies change, and the PDF is shown right
+ * here. Nothing is drawn by the app, so what you see is exactly the label. Print = /api/taka-print-label.
  */
 export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
   samples: Sample[]; ctx: { prptype: string; yearno: string; prpcode: string }; canPrint: boolean;
@@ -132,14 +136,17 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
   const [pErr, setPErr] = useState('');
   const [sheet, setSheet] = useState(false);
   const [pending, setPending] = useState(false);
-  const [busy, setBusy] = useState<'' | 'print' | 'preview'>('');
-  const [pv, setPv] = useState<{ open: boolean; loading: boolean; error: string; pdf: string }>({ open: false, loading: false, error: '', pdf: '' });
-  // the sticker rows from the API (Taka row shape + label from the New Design master) — shown here exactly as printed
-  const [apiRows, setApiRows] = useState<any[] | null>(null);
+  const [busy, setBusy] = useState<'' | 'print'>('');
+  const [full, setFull] = useState(false);
+  // preview from the print server: { key of what it shows, loading, error, pdf }
+  const [pv, setPv] = useState<{ key: string; loading: boolean; error: string; pdf: string }>({ key: '', loading: false, error: '', pdf: '' });
   const [apiNotes, setApiNotes] = useState<Record<string, string>>({});
-  const [rowsErr, setRowsErr] = useState('');
+  const rowsRef = useRef<{ key: string; rows: any[] } | null>(null);
+  const reqRef = useRef(0);
   const first = samples[0];
   const idsKey = samples.map((x) => x.id).join(',');
+  const n = Math.max(1, Math.min(MAX_COPIES, +copies || 1));
+  const total = samples.length * n;
 
   const reload = async () => {
     if (!API || !token) { setPErr('Login session not ready — reopen the screen.'); return; }
@@ -157,34 +164,41 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
   };
   useEffect(() => { if (canPrint && token) void reload(); }, [canPrint, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stickerData = async () => {
+  /** the sticker rows from the API (Taka row shape + label from the New Design master), read once per set of samples */
+  const rowsFromApi = async () => {
+    if (rowsRef.current && rowsRef.current.key === idsKey) return rowsRef.current.rows;
     const r = await SamplingHubAPI.sticker({ ...ctx, ids: samples.map((x) => x.id) });
     const d = unwrap(r);
     if (!Array.isArray(d?.rows) || !d.rows.length) throw new Error('The server returned no sticker rows.');
-    return { rows: d.rows as any[], notes: (d.notes && typeof d.notes === 'object' ? d.notes : {}) as Record<string, string> };
+    setApiNotes(d.notes && typeof d.notes === 'object' ? d.notes : {});
+    rowsRef.current = { key: idsKey, rows: d.rows };
+    return d.rows as any[];
   };
-  const rowsFromApi = async () => (await stickerData()).rows;
+
+  /** "Preview from printer" — automatic: on open, and again when the copies change */
+  const preview = async (force = false) => {
+    if (!canPrint || !first) return;
+    if (!API || !token) { setPv({ key: '', loading: false, error: 'Login session not ready — reopen the screen.', pdf: '' }); return; }
+    const key = idsKey + '×' + n;
+    if (!force && pv.key === key && (pv.pdf || pv.loading)) return;
+    const req = ++reqRef.current;
+    if (force) rowsRef.current = null;
+    setPv({ key, loading: true, error: '', pdf: '' });
+    try {
+      const rows = withCopies(await rowsFromApi(), n);
+      const pdf = await previewSticker(API, rows, token);
+      if (req === reqRef.current) setPv({ key, loading: false, error: '', pdf });
+    } catch (e: any) {
+      if (req === reqRef.current) setPv({ key, loading: false, error: e?.response ? printErr(e) : errText(e, 'Preview failed.'), pdf: '' });
+    }
+  };
   useEffect(() => {
-    let alive = true;
-    setApiRows(null); setRowsErr('');
-    stickerData().then((x) => { if (alive) { setApiRows(x.rows); setApiNotes(x.notes); } }).catch((e) => { if (alive) setRowsErr(errText(e, 'Sticker details could not be loaded.')); });
-    return () => { alive = false; };
-  }, [idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    const t = setTimeout(() => void preview(), pv.key ? 600 : 0);   // copies typed → wait until the typing stops
+    return () => clearTimeout(t);
+  }, [idsKey, n, canPrint, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!first) return null;
   const t = SMP_TYPE[first.type];
-  const row0 = apiRows ? apiRows.find((r) => r.printid === first.id) || apiRows[0] : null;
-  const lab = row0 || {};
-  const qrText = row0?.printjson || stickerQrText(first.prpcode, first.uid, first.id, String(ctx.yearno || ''));
-  const n = Math.max(1, Math.min(MAX_COPIES, +copies || 1));
-  const lines: [string, string][] = [
-    ['Design', lab.design ?? designLabel(first)],
-    ['Width', lab.width ?? ''],
-    ['GSM', lab.gsm ?? ''],
-    ['Blend', lab.blend ?? ''],
-    ['Name', lab.name ?? first.work_name],
-    ['Remarks', lab.remarks ?? first.note],
-  ];
   const doPrint = async () => {
     if (!printer) { setPending(true); setSheet(true); return; }
     setBusy('print');
@@ -199,37 +213,34 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
       setBusy('');
     }
   };
-  const doPreview = async () => {
-    setPv({ open: true, loading: true, error: '', pdf: '' });
-    try {
-      const rows = withCopies(await rowsFromApi(), n);
-      const pdf = await previewSticker(API, rows, token);
-      setPv({ open: true, loading: false, error: '', pdf });
-    } catch (e: any) {
-      setPv({ open: true, loading: false, error: e?.response ? printErr(e) : errText(e, 'Preview failed.'), pdf: '' });
-    }
-  };
+  const notes = samples.map((x) => (apiNotes[x.id] ? `${x.id}: ${apiNotes[x.id]}` : '')).filter(Boolean);
 
   return (
     <View style={[st.card, { gap: 10 }]} testID="sticker-card">
-      <Text style={st.head}>QR STICKER{samples.length > 1 ? ` · ${samples.length} SAMPLES` : ''} · {t.lbl.toUpperCase()}</Text>
-      <View style={st.label} accessibilityLabel={`Sticker preview ${first.id}`}>
-        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', gap: 2 }}>
-          {lines.map(([k, v]) => (
-            <Text key={k} style={st.lLine} numberOfLines={k === 'Design' || k === 'Blend' ? 2 : 1}>
-              <Text style={{ fontWeight: '800' }}>{k}: </Text>{v ? String(v) : <Text style={{ color: C.mut }}>{apiRows ? '—' : '…'}</Text>}
-            </Text>
-          ))}
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={st.lId} numberOfLines={1} testID="sticker-id">{row0?.printid || first.id}</Text>
-          <QrCode value={qrText} size={124} quiet={2} />
-        </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={[st.head, { flex: 1 }]}>QR STICKER{samples.length > 1 ? ` · ${samples.length} SAMPLES` : ` · ${first.id}`} · {t.lbl.toUpperCase()}{n > 1 ? ` · ${n} COPIES` : ''}</Text>
+        {canPrint && pv.pdf ? <Text onPress={() => setFull(true)} style={st.link} accessibilityRole="button" accessibilityLabel="Full screen preview">Full screen</Text> : null}
+        {canPrint ? <Text onPress={() => void preview(true)} style={st.link} accessibilityRole="button" accessibilityLabel="Refresh preview">↻ Refresh</Text> : null}
       </View>
-      {apiNotes[first.id] ? <Text style={[st.note, { color: T.red }]}>Width / GSM / Blend: {apiNotes[first.id]}</Text> : null}
-      {rowsErr ? <Text style={[st.note, { color: T.red }]}>{rowsErr}</Text> : null}
-      {samples.length > 1 ? <Text style={st.note}>Preview shows {first.id}; one sticker each for {samples.map((x) => x.id).join(', ')}.</Text> : null}
-      <Text style={st.note}>Design, Width, GSM and Blend come from the New Design master; Name and Remarks from this sample. The unique ID is printed above the QR, and scanning the QR here opens this sample. “Preview from printer” shows the label exactly as the print server draws it.</Text>
+      {canPrint ? (
+        <View style={st.pvBox} testID="sticker-preview">
+          {pv.loading ? (
+            <View style={st.pvCenter}><ActivityIndicator color={T.copper} /><Text style={st.note}>Getting the sticker from the print server…</Text></View>
+          ) : pv.error ? (
+            <View style={st.pvCenter}>
+              <Icon name="error-outline" size={28} color={T.red} />
+              <Text style={[st.note, { color: T.red, textAlign: 'center' }]}>{pv.error}</Text>
+              <Text onPress={() => void preview(true)} style={st.link} accessibilityRole="button">Try again</Text>
+            </View>
+          ) : pv.pdf ? (
+            <SmpPdfInline pdfBase64={pv.pdf} height={total > 1 ? 340 : 260} />
+          ) : <View style={st.pvCenter}><Text style={st.note}>No preview yet.</Text></View>}
+        </View>
+      ) : null}
+      {notes.length ? <Text style={[st.note, { color: T.red }]}>Width / GSM / Blend blank — {notes.join(' · ')}</Text> : null}
+      {canPrint ? (
+        <Text style={st.note}>This is the label exactly as the print server makes it ({total} sticker{total !== 1 ? 's' : ''}{samples.length > 1 ? ': ' + samples.map((x) => x.id).join(', ') : ''}). Design, Width, GSM and Blend come from the New Design master; Name and Remarks from this sample; the QR opens this sample when scanned.</Text>
+      ) : null}
       {canPrint ? (
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -242,21 +253,15 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
             <TextInput value={copies} onChangeText={(v) => setCopies(v.replace(/[^0-9]/g, '').slice(0, 2))} keyboardType="number-pad" style={st.copies} accessibilityLabel="Copies" />
           </View>
           {pErr ? <Text style={[st.note, { color: T.red }]}>{pErr}</Text> : null}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={doPreview} disabled={!!busy} style={[st.printBtn, { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: T.border }]} accessibilityRole="button" accessibilityLabel="Preview from printer">
-              <Icon name="picture-as-pdf" size={18} color={T.nav} />
-              <Text style={[st.printT, { color: T.nav }]}>Preview from printer</Text>
-            </Pressable>
-            <Pressable onPress={doPrint} disabled={!!busy} style={[st.printBtn, { flex: 1 }, busy === 'print' && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Print sticker">
-              <Icon name="print" size={18} color="#fff" />
-              <Text style={st.printT}>{busy === 'print' ? 'Printing…' : `Print ${samples.length * n > 1 ? samples.length * n + ' stickers' : 'sticker'}`}</Text>
-            </Pressable>
-          </View>
+          <Pressable onPress={doPrint} disabled={!!busy} style={[st.printBtn, busy === 'print' && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Print sticker">
+            <Icon name="print" size={18} color="#fff" />
+            <Text style={st.printT}>{busy === 'print' ? 'Printing…' : `Print ${total > 1 ? total + ' stickers' : 'sticker'}`}</Text>
+          </Pressable>
         </>
-      ) : <Text style={st.note}>Printing needs the “Print QR sticker” right.</Text>}
+      ) : <Text style={st.note}>The sticker preview and printing need the “Print QR sticker” right.</Text>}
       <PrinterSheet
         visible={sheet}
-        subtitle={pending ? `Print ${samples.length * n} sticker${samples.length * n !== 1 ? 's' : ''}` : 'Sticker printer'}
+        subtitle={pending ? `Print ${total} sticker${total !== 1 ? 's' : ''}` : 'Sticker printer'}
         printers={printers}
         printer={printer}
         loading={pLoading}
@@ -268,8 +273,8 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
         onClose={() => { setSheet(false); setPending(false); }}
         onPrint={doPrint}
       />
-      <SmpPdfPreview visible={pv.open} title={first.id + (samples.length > 1 ? ` + ${samples.length - 1}` : '')} printer={printer} loading={pv.loading} error={pv.error} pdfBase64={pv.pdf}
-        onRetry={doPreview} onClose={() => setPv((x) => ({ ...x, open: false }))} />
+      <SmpPdfPreview visible={full} title={first.id + (samples.length > 1 ? ` + ${samples.length - 1}` : '')} printer={printer} loading={pv.loading} error={pv.error} pdfBase64={pv.pdf}
+        onRetry={() => void preview(true)} onClose={() => setFull(false)} />
     </View>
   );
 }
@@ -302,16 +307,13 @@ export const st = StyleSheet.create({
   singlet: { fontFamily: MF, fontSize: 12, fontWeight: '800' },
   singletL: { fontSize: 8, color: C.mut, letterSpacing: 0.3 },
   link: { fontSize: 11.5, fontWeight: '800', color: T.nav },
-  label: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#999', borderStyle: 'dashed', borderRadius: 6, padding: 6, maxWidth: '100%' },
-  lId: { fontFamily: MF, fontWeight: '800', color: '#000', fontSize: 18 },
-  lName: { fontSize: 12, fontWeight: '700', color: '#000' },
-  lLine: { fontSize: 10, color: '#222' },
+  pvBox: { borderWidth: 1, borderColor: T.border, borderRadius: 10, padding: 6, backgroundColor: T.sub, minHeight: 160 },
+  pvCenter: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 10 },
   note: { fontSize: 10.5, color: C.mut },
   lbl: { fontSize: 9.5, fontWeight: '800', color: T.muted, letterSpacing: 0.4 },
   copies: { width: 54, height: 34, borderWidth: 1, borderColor: T.border, borderRadius: 8, textAlign: 'center', fontFamily: MF, fontSize: 14, color: T.ink, backgroundColor: '#fff' },
   printBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: T.nav, borderRadius: 10, paddingVertical: 11 },
   printT: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  qrTxt: { fontFamily: MF, fontSize: 9.5, color: '#555', marginTop: 3 },
   printerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: T.border, borderRadius: 9, paddingHorizontal: 10, height: 36, backgroundColor: '#fff', maxWidth: 260 },
   printerT: { fontSize: 12.5, fontWeight: '700', color: T.nav, flexShrink: 1 },
 });

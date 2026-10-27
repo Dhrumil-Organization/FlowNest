@@ -11,8 +11,12 @@
 // is listed under, and a "Results by item and city" table shows how many
 // parties each combination gave. An item name may
 // contain any characters — only a comma separates two items.
-// There is no free chat: these two values are the only thing sent
-// (POST /api/yarn-vendors-chat { item, city }, Bearer token — ./api.ts).
+// There is no free chat: these values are the only thing sent
+// (POST /api/yarn-vendors-chat { item, city, yarns?, prptype? }, Bearer token — ./api.ts).
+// Next to the typed item box, yarns can be SELECTED from the ERP yarn master (Designs → Yarns: blend → ply → item →
+// sub items, ./YarnPicker.tsx). Every detail of a selected yarn (Spun / Filament, blend with %, count + count type,
+// ply, type, lustre, denier, other) is shown here and the backend puts it in the AI question, read again from the
+// master — so the list is for exactly that yarn. Typed + selected together: max 5.
 // The backend builds the question for Claude with its strict rules, Claude
 // searches the web and returns a fixed list: party name, what the party calls
 // the item, rate, contact no, address, city, state, remarks, source page.
@@ -25,6 +29,8 @@
 // or runs a new search.
 // ─────────────────────────────────────────────────────────────
 import { AppAlert } from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { useBusinessContext } from '@/src/core/business';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { NavigationContext } from '@react-navigation/native';
@@ -43,7 +49,8 @@ import {
   View,
 } from 'react-native';
 import { previewStyle } from '../VisitorsReportNEW/xlsxLite';
-import { Coverage, SearchError, SearchResult, searchVendors, Vendor } from './api';
+import { Coverage, loadYarnMaster, SearchError, SearchResult, searchVendors, Vendor, Yarn, YarnMaster } from './api';
+import { YarnPicker, yarnStats } from './YarnPicker';
 import { ITEM_EXAMPLES, MAX_CITIES, MAX_CITY_BOX_CHARS, MAX_ITEM_BOX_CHARS, MAX_ITEMS, splitList } from './config';
 import { buildSheet, downloadExcel, excelFileName, HEADER_ROWS, NOTICE, searchedCities, searchedItems } from './excel';
 
@@ -85,6 +92,14 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
 
   const [item, setItem] = useState('');
   const [city, setCity] = useState('');
+  // yarns selected from the ERP yarn master (Designs → Yarns)
+  const { prpGroup } = useBusinessContext();
+  const [picked, setPicked] = useState<Yarn[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [master, setMaster] = useState<YarnMaster | null>(null);
+  const [masterLoading, setMasterLoading] = useState(false);
+  const [masterErr, setMasterErr] = useState('');
+  const prptypeRef = useRef('');
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -104,6 +119,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
   const signedIn = Boolean(token && API);
   // What the two boxes currently hold, split on commas (shown as chips).
   const itemList = useMemo(() => splitList(item), [item]);
+  const room = MAX_ITEMS - itemList.length - picked.length;   // typed + selected together
   const cityList = useMemo(() => splitList(city), [city]);
   const activeView: View2 = view || (phone ? 'cards' : 'excel');
 
@@ -120,8 +136,44 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     setCityError('');
     setItem('');
     setCity('');
+    setPicked([]);
+    setPickerOpen(false);
+    setMaster(null);   // read again next time (the login group / the master may have changed)
+    setMasterErr('');
     setView(null);
   }, []);
+
+  /** the login group, read the same way as Designs → Yarns (AsyncStorage user_prptype), else the header group */
+  const prptypeOf = useCallback(async () => {
+    let p = '';
+    try { p = String((await AsyncStorage.getItem('user_prptype')) || ''); } catch { p = ''; }
+    prptypeRef.current = p || String(prpGroup || '');
+    return prptypeRef.current;
+  }, [prpGroup]);
+
+  const loadMaster = useCallback(async () => {
+    setMasterLoading(true);
+    setMasterErr('');
+    try {
+      const m = await loadYarnMaster(API || '', token || '', await prptypeOf());
+      if (mountedRef.current) setMaster(m);
+    } catch (e: any) {
+      if (mountedRef.current) setMasterErr(e?.message || 'The yarn master could not be loaded.');
+    } finally {
+      if (mountedRef.current) setMasterLoading(false);
+    }
+  }, [API, token, prptypeOf]);
+
+  const openPicker = useCallback(() => {
+    setPickerOpen(true);
+    if (!master && !masterLoading) void loadMaster();
+  }, [master, masterLoading, loadMaster]);
+
+  const togglePick = useCallback((y: Yarn) => {
+    setItemError('');
+    setPicked((cur) => (cur.some((x) => x.itmcode === y.itmcode) ? cur.filter((x) => x.itmcode !== y.itmcode)
+      : MAX_ITEMS - splitList(item).length - cur.length > 0 ? [...cur, y] : cur));
+  }, [item]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -156,12 +208,13 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     const cityList = splitList(city);
     const it = itemList.join(', ');
     const ct = cityList.join(', ');
-    if (itemList.length === 0) {
-      setItemError('Enter a yarn item name.');
+    const sel = rawItem !== undefined ? [] : picked;   // an example chip searches only that example
+    if (itemList.length === 0 && sel.length === 0) {
+      setItemError('Enter a yarn item name or select a yarn from the yarn master.');
       return;
     }
-    if (itemList.length > MAX_ITEMS) {
-      setItemError(`Enter at most ${MAX_ITEMS} yarn items at a time.`);
+    if (itemList.length + sel.length > MAX_ITEMS) {
+      setItemError(`Enter / select at most ${MAX_ITEMS} yarn items at a time (typed + selected together).`);
       return;
     }
     if (cityList.length > MAX_CITIES) {
@@ -179,10 +232,12 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     const run = ++runRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    setSearching({ item: it, area: ct || 'All India' });
+    setSearching({ item: [it, ...sel.map((y) => y.label)].filter(Boolean).join(', '), area: ct || 'All India' });
     setLoading(true);
     try {
-      const r = await searchVendors(API || '', token || '', it, ct, controller.signal);
+      const prptype = sel.length ? prptypeRef.current || (await prptypeOf()) : '';
+      const r = await searchVendors(API || '', token || '', it, ct, controller.signal,
+        sel.length ? { yarns: sel.map((y) => y.itmcode), prptype } : undefined);
       if (!mountedRef.current || run !== runRef.current) return;
       setResult(r);
     } catch (e: any) {
@@ -200,7 +255,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
         setSearching(null);
       }
     }
-  }, [API, city, item, loading, token]);
+  }, [API, city, item, loading, token, picked, prptypeOf]);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
@@ -259,6 +314,16 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
             ? <Text style={s.fieldError}>{itemError}</Text>
             : <Text style={s.hint}>Any name or symbols are fine. A comma starts the next item (max {MAX_ITEMS}).</Text>}
           <ValueChips values={itemList} max={MAX_ITEMS} />
+          <TouchableOpacity
+            style={[s.pickBtn, (loading || !signedIn) && { opacity: 0.55 }]}
+            onPress={openPicker}
+            disabled={loading || !signedIn}
+            accessibilityRole="button"
+            accessibilityLabel="Select from yarn master"
+          >
+            <Icon name="playlist-add-check" size={18} color={T.copper} />
+            <Text style={s.pickBtnText}>Select from yarn master{picked.length ? ` · ${picked.length} selected` : ''}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={[s.field, !phone && { flex: 2 }]}>
@@ -305,9 +370,35 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
         </TouchableOpacity>
       </View>
 
-      {itemList.length * Math.max(1, cityList.length) > 1 && !loading ? (
+      {picked.length ? (
+        <View style={s.pickedWrap} testID="picked-yarns">
+          <Text style={s.examplesLabel}>SELECTED FROM THE YARN MASTER · every detail below goes to the AI</Text>
+          {picked.map((y) => (
+            <View key={y.itmcode} style={s.picked}>
+              <View style={s.pickedHead}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.pickedName} numberOfLines={2}>{y.name}</Text>
+                  <Text style={s.pickedCode}>#{y.itmcode} · {y.kind}{y.is_sub ? ' · sub item' : ''}</Text>
+                </View>
+                {!loading ? (
+                  <TouchableOpacity onPress={() => togglePick(y)} hitSlop={HIT} accessibilityLabel={`Remove ${y.name}`}>
+                    <Icon name="close" size={18} color={T.muted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={s.pickedStats}>
+                {yarnStats(y).map(([k, v]) => (
+                  <Text key={k} style={s.pickedStat}><Text style={s.pickedK}>{k}: </Text>{v}</Text>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {(itemList.length + picked.length) * Math.max(1, cityList.length) > 1 && !loading ? (
         <Text style={s.pairs}>
-          {itemList.length} {itemList.length === 1 ? 'item' : 'items'} x {cityList.length || 1} {cityList.length > 1 ? 'cities' : cityList.length === 1 ? 'city' : 'area (all India)'} = {itemList.length * Math.max(1, cityList.length)} combinations in one search. Fewer combinations give more parties for each.
+          {itemList.length + picked.length} {itemList.length + picked.length === 1 ? 'item' : 'items'} x {cityList.length || 1} {cityList.length > 1 ? 'cities' : cityList.length === 1 ? 'city' : 'area (all India)'} = {(itemList.length + picked.length) * Math.max(1, cityList.length)} combinations in one search. Fewer combinations give more parties for each.
         </Text>
       ) : null}
 
@@ -461,6 +552,17 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
           {intro}
         </View>
       </ScrollView>
+      <YarnPicker
+        visible={pickerOpen}
+        master={master}
+        loading={masterLoading}
+        error={masterErr}
+        onReload={() => void loadMaster()}
+        selected={picked}
+        room={room}
+        onToggle={togglePick}
+        onClose={() => setPickerOpen(false)}
+      />
     </View>
   );
 }
@@ -676,6 +778,16 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 const noOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null;
 
 const s = StyleSheet.create({
+  pickBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1, borderColor: T.copper, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff' },
+  pickBtnText: { color: T.copper, fontWeight: '800', fontSize: 12.5 },
+  pickedWrap: { marginTop: 12, gap: 8 },
+  picked: { borderWidth: 1, borderColor: T.border, borderLeftWidth: 3, borderLeftColor: T.copper, borderRadius: 10, padding: 10, backgroundColor: T.sub, gap: 6 },
+  pickedHead: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  pickedName: { fontSize: 13.5, fontWeight: '800', color: T.ink },
+  pickedCode: { fontSize: 11, color: T.muted, marginTop: 1 },
+  pickedStats: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 3 },
+  pickedStat: { fontSize: 12, color: T.ink },
+  pickedK: { color: T.muted, fontWeight: '700' },
   root: { flex: 1, backgroundColor: T.bg },
   content: { padding: 12, flexGrow: 1 },
   page: { width: '100%', maxWidth: 1200, alignSelf: 'center', gap: 10 },

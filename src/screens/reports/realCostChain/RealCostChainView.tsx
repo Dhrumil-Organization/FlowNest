@@ -36,6 +36,8 @@ import {
 const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
 const GREEN = '#2A6044';
 
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 export function RealCostChainView() {
   const { prpGroup, prpCode, yearNo } = useBusinessContext();
   const yearno = String(parseInt(String(yearNo), 10) || '');
@@ -43,7 +45,8 @@ export function RealCostChainView() {
 
   const [cw, setCw] = useState(0);
   const narrow = cw > 0 && cw < 560;
-  const [month, setMonth] = useState('');
+  // default: the CURRENT month ('current' → the server answers with that month, or the login year's last month)
+  const [month, setMonth] = useState('current');
   const [data, setData] = useState<ChainData | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,15 +57,17 @@ export function RealCostChainView() {
   const [showRates, setShowRates] = useState(false);
   const req = useRef(0);
 
+  /** pull / Refresh = fresh: built again now (else the server may answer from its 10-minute cache — much faster) */
   const load = useCallback(async (m: string, pull = false) => {
     if (!ready) return;
     const id = ++req.current;
     pull ? setRefreshing(true) : setLoading(true);
     setErr('');
     try {
-      const d = normalizeChain(unwrap(await RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: m })));
+      const d = normalizeChain(unwrap(await RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: m, ...(pull ? { fresh: 1 } : {}) })));
       if (id !== req.current) return;
       setData(d);
+      if (m === 'current') setMonth(d.month);   // the chip of the month the server used
     } catch (e) {
       if (id === req.current) setErr(errText(e, 'Unable to load the real cost chain.'));
     } finally {
@@ -78,7 +83,8 @@ export function RealCostChainView() {
       setData(null);
       setOpen(null);
       setSel({});
-      void load(month);
+      setMonth('current');
+      void load('current');
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prpGroup, prpCode, yearno]),
   );
@@ -250,6 +256,10 @@ export function RealCostChainView() {
             ))}
           </ScrollView>
 
+          <View style={st.refRow}>
+            <Text style={st.muted}>{data?.built_at ? `Figures as of ${data.built_at.slice(11, 16)}${data.built_at.slice(0, 10) !== todayIso() ? ' · ' + dateShort(data.built_at.slice(0, 10)) : ''} · Refresh builds them again now` : ''}</Text>
+            <Btn label={refreshing ? 'Refreshing…' : 'Refresh'} icon="refresh" kind="ghost" compact onPress={() => void load(month, true)} />
+          </View>
           {err ? (
             <View style={[st.card, { padding: 14, gap: 8 }]}>
               <Text style={{ color: T.red, fontWeight: '700' }}>{err}</Text>
@@ -259,7 +269,7 @@ export function RealCostChainView() {
           {loading && !refreshing ? (
             <View style={[st.card, st.loadingCard]}>
               <ActivityIndicator color={T.copper} />
-              <Text style={st.muted}>Gathering beams, conversion rates and mill returns{month ? ` for ${monthLbl(month)}` : ''}…</Text>
+              <Text style={st.muted}>Gathering beams, conversion rates and mill returns{month === 'current' ? ' for this month' : month ? ` for ${monthLbl(month)}` : ''}…</Text>
             </View>
           ) : null}
 
@@ -326,6 +336,7 @@ export function RealCostChainView() {
 }
 
 const st = StyleSheet.create({
+  refRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
   pad: { padding: 12, paddingBottom: 40 },
   wrap: { width: '100%', maxWidth: 900, alignSelf: 'center', gap: 10 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: T.bg },

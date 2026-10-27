@@ -32,7 +32,8 @@ export default function SelectField({ label, value, options, onChange, icon = 'a
     setOpen(false);
     setQ('');
   };
-  const text = selected?.label || (disabled && disabledHint ? disabledHint : placeholder || `Select ${label.toLowerCase()}`);
+  const text = disabled && disabledHint ? disabledHint : selected?.label || placeholder || `Select ${label.toLowerCase()}`;
+  const showAsPlaceholder = (disabled && !!disabledHint) || !selected;
 
   return (
     <View style={st.field}>
@@ -42,15 +43,15 @@ export default function SelectField({ label, value, options, onChange, icon = 'a
           {required ? <Text style={{ color: T.red }}> *</Text> : null}
         </Text>
         {onRefresh && !disabled ? (
-          <TouchableOpacity onPress={onRefresh} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel={`Reload ${label}`}>
-            <Icon name="refresh" size={15} color={T.muted} />
+          <TouchableOpacity style={st.refresh} onPress={onRefresh} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} accessibilityLabel={`Reload ${label}`}>
+            <Icon name="refresh" size={14} color={T.muted} />
           </TouchableOpacity>
         ) : null}
       </View>
 
       <TouchableOpacity activeOpacity={0.8} style={[st.box, disabled && st.boxOff]} onPress={() => setOpen(true)} disabled={disabled} accessibilityRole="button">
         <Icon name={icon as any} size={17} color={T.copper} />
-        <Text style={[st.boxText, !selected && { color: T.muted, fontWeight: '600' }]} numberOfLines={1}>
+        <Text style={[st.boxText, showAsPlaceholder && { color: T.muted, fontWeight: '600' }]} numberOfLines={1}>
           {text}
         </Text>
         {loading ? <ActivityIndicator size="small" color={T.copper} /> : <Icon name="keyboard-arrow-down" size={20} color={T.muted} />}
@@ -113,10 +114,11 @@ export default function SelectField({ label, value, options, onChange, icon = 'a
 
 const st = StyleSheet.create({
   field: { flexGrow: 1, flexBasis: 220, minWidth: 0 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  labelRow: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  refresh: { width: 22, height: 22, borderRadius: 11, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, color: T.muted, textTransform: 'uppercase' },
   box: { height: 46, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12 },
-  boxOff: { opacity: 0.55, backgroundColor: T.sub },
+  boxOff: { opacity: 0.6, backgroundColor: T.sub },
   boxText: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '800', color: T.ink },
   backdrop: { flex: 1, backgroundColor: 'rgba(8,16,28,0.55)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   card: { width: '100%', maxWidth: 540, maxHeight: '82%', backgroundColor: T.surface, borderRadius: 20, overflow: 'hidden' },

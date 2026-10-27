@@ -503,6 +503,27 @@ const ProductionOrderAuthorizationReviewModal: React.FC<Props> = ({
 
                             {model.isStockSell && model.snapshot ? (
                                 <>
+                                    {model.costingSource === 'NEW' && (
+                                        <View style={styles.section}>
+                                            <Text style={styles.sectionTitle}>COSTING USED BY THIS PO · NEW DESIGN COSTING</Text>
+                                            <Row label="Costing revision" value={String(model.costingItem.design_costing_id || model.snapshot?.design_costing_id || '—')} />
+                                            <TouchableOpacity
+                                                style={styles.costingReviewButton}
+                                                onPress={() => onViewCosting({
+                                                    ...model.costingItem,
+                                                    design_costing_source: 'NEW',
+                                                    design_costing_id: first(model.snapshot?.design_costing_id, model.costingItem.design_costing_id),
+                                                    required_greige_qty: model.greigeQty,
+                                                    po_costing_snapshot: model.snapshot,
+                                                })}
+                                                activeOpacity={0.78}
+                                            >
+                                                <Icon name="visibility" size={18} color="#17324A" />
+                                                <Text style={styles.costingReviewButtonText}>Review costing</Text>
+                                                <Icon name="chevron-right" size={19} color="#6B7280" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                     <View style={styles.section}>
                                         <Text style={styles.sectionTitle}>INPUT RATES · SAVED WITH THIS PO</Text>
                                         {model.yarns.length > 0 && (

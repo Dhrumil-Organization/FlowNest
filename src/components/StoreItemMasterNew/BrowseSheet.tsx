@@ -25,26 +25,27 @@ type ColKey = string;
 type Col = { key: ColKey; label: string; flex?: number; w?: number; right?: boolean; sort?: BrowseSortKey; filter?: keyof BrowseFilters };
 
 const DESKTOP_COLS: Col[] = [
-  { key: 'code', label: 'Code', w: 84, right: true, sort: 'code', filter: 'code' },
+  { key: 'code', label: 'Item Code', w: 84, right: true, sort: 'code', filter: 'code' },
   { key: 'name', label: 'Item name', flex: 2.6, sort: 'name', filter: 'name' },
-  { key: 'uom', label: 'UOM', w: 76, filter: 'uom' },
   { key: 'group', label: 'Item Group', flex: 1.3, sort: 'group', filter: 'group' },
-  { key: 'subGroup', label: 'Item Sub Group', flex: 1.3, filter: 'subGroup' },
   { key: 'rate', label: 'Rate', w: 100, right: true, sort: 'rate', filter: 'rate' },
-  { key: 'location', label: 'Location', flex: 1, filter: 'location' },
 ];
+/** UOM is always the LAST column. */
+const UOM_COL: Col = { key: 'uom', label: 'UOM', w: 76, filter: 'uom' };
 const TABLET_COLS: Col[] = [
-  { key: 'code', label: 'Code', w: 70, right: true, sort: 'code' },
+  { key: 'code', label: 'Item Code', w: 70, right: true, sort: 'code' },
   { key: 'name', label: 'Item name', flex: 2.4, sort: 'name' },
-  { key: 'uom', label: 'UOM', w: 64 },
   { key: 'group', label: 'Item Group', flex: 1.4, sort: 'group' },
   { key: 'rate', label: 'Rate', w: 92, right: true, sort: 'rate' },
+  { key: 'uom', label: 'UOM', w: 64 },
 ];
 
 const ROW_H = { desktop: 44, tablet: 56 };
 
 /** API keys already shown by the fixed columns. */
-const KNOWN_KEYS = ['ItmCode','MItmCode','itmcode','code','item_name','ItmName','itmname','name','uom','UOM','PUOM','group_name','GroupName','IGName','itmgrp','sub_group_name','SubGroupName','ISGName','ItmSGrp','rate','Rate','LastRate','last_rate','location','StrLoc','str_code','StrCode'];
+const KNOWN_KEYS = ['ItmCode','MItmCode','itmcode','code','item_name','ItmName','itmname','name','uom','UOM','PUOM','group_name','GroupName','IGName','itmgrp','sub_group_name','SubGroupName','ISGName','ItmSGrp','rate','Rate','LastRate','last_rate','location','StrLoc','str_code','StrCode',
+  // Not wanted in Browse: Item Sub Group, Location, Stop In, Lct Name
+  'StopIn','StopIss','stop_in','stop_issue','stop_inward','LctName','lct_name','location_name','sub_group','SubGroup','ItmSGrpName'];
 /** Extra API columns that only carry a code (ItmGrp, ItmSGrp, StrLoc, ...) are not shown — only the leading item Code column stays. */
 const isCodeKey = (k: string) => /code/i.test(k) || /^(itmgrp|itmsgrp|strloc|yearno|srno|maksrno|make_srno)$/i.test(k);
 const showApiKey = (k: string) => !KNOWN_KEYS.includes(k) && !isCodeKey(k);
@@ -114,7 +115,7 @@ export default function BrowseSheet({
     const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.apiData || {}))));
     return keys.filter(showApiKey).map((k) => ({ key: `api:${k}`, label: k, flex: 1.2 }));
   }, [rows]);
-  const cols = layout === 'desktop' ? [...DESKTOP_COLS, ...dynamicCols] : TABLET_COLS;
+  const cols = layout === 'desktop' ? [...DESKTOP_COLS, ...dynamicCols, UOM_COL] : TABLET_COLS;
 
   const load = useCallback(async () => {
     const id = ++seq.current;
@@ -257,11 +258,6 @@ export default function BrowseSheet({
               >
                 {v || '—'}
               </Text>
-              {layout === 'tablet' && c.key === 'group' && item.subGroup ? (
-                <Text numberOfLines={1} style={g.tdSub}>
-                  {item.subGroup}
-                </Text>
-              ) : null}
             </View>
           );
         })}
@@ -290,11 +286,9 @@ export default function BrowseSheet({
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={g.cardMeta} numberOfLines={1}>
               {item.group || 'No group'}
-              {item.subGroup ? `, ${item.subGroup}` : ''}
             </Text>
             <Text style={g.cardMeta} numberOfLines={1}>
               {item.uom}
-              {item.location ? `, ${item.location}` : ''}
             </Text>
           </View>
           <Text style={g.cardRate}>{fmtRate(item.rate)}</Text>
@@ -438,7 +432,7 @@ export default function BrowseSheet({
       <View style={{ flex: 1, minHeight: 0 }}>
         {/* search + group chips + (phone) sort chips */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
-          <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item, group or location" autoFocus={Platform.OS === 'web'} />
+          <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item or group" autoFocus={Platform.OS === 'web'} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
             <Text style={{ color: T.muted, fontSize: 12, fontWeight: '700' }}>Group by</Text>
             <Pressable onPress={() => { const fields = ['']; setGroupBy(fields[0]); }} style={g.toolBtn}><Text style={g.toolText}>None</Text></Pressable>
@@ -461,7 +455,7 @@ export default function BrowseSheet({
               {(['name', 'code', 'rate'] as BrowseSortKey[]).map((k) => (
                 <FilterChip
                   key={k}
-                  label={`${k === 'name' ? 'Name' : k === 'code' ? 'Code' : 'Rate'}${sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`}
+                  label={`${k === 'name' ? 'Name' : k === 'code' ? 'Item Code' : 'Rate'}${sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}`}
                   active={sortKey === k}
                   onPress={() => toggleSort(k)}
                 />

@@ -14,8 +14,6 @@
 import axios from 'axios';
 
 export const TXNTYPE = 'sales_challan_packing_slip';
-/** Web CartonDetail asks getcartondetail for rowsPerPage = 20 and matches scans only against those. */
-export const CARTON_LIMIT = 20;
 export const PARTY_PAGE = 20;
 
 export type Row = Record<string, any>;
@@ -197,13 +195,19 @@ export async function fetchCurrentStock(a: Api, c: Ctx, p: { d1: Row[]; prodtype
   return arr(resp(body, 'Stock could not be loaded.').d1);
 }
 
-/** Web CartonDetail.fetchCarton → POST getcartondetail. Rows: cartno, qty, chees, ProdType, LotNo, TranType, ZUId/ZSrNo/ZSubSr, qrcodestring, qrcodestring1. */
-export async function fetchCartons(a: Api, c: Ctx, row: Row) {
+/**
+ * Cartons in stock for one allocation line (ItmCode + MerCode + GrdCode + ShdCode) — the same call as the web carton
+ * help (CartonDetail/components/CartonSelect.fetchCarton): limit '' = ALL cartons, linked to the order line
+ * (planninguid / planningsrno) on the packing date. Rows: cartno, qty, chees, WarehouseLoction (sic), ProdType,
+ * GrdName, TranName / TranType, LotNo, lock, lockreason, ZUId / ZSrNo / ZSubSr, SpColor, qrcodestring, qrcodestring1.
+ */
+export async function fetchCartons(a: Api, c: Ctx, row: Row, p: { date: string; selected: Row[] }) {
   const body = await postParams(a, 'getcartondetail', {
     PrpCode: c.prpcode, YearNo: c.yearno, StrCode: c.strcode,
     MerCode: row.MerCode, ItmCode: row.ItmCode, GrdCode: row.GrdCode, ShdCode: row.ShdCode,
-    selectedcarton: [], page: 1, limit: CARTON_LIMIT, search: '', type: 'S',
-    ttype: ['8', '3', '30', '2', '34', '32', '83'],
+    selectedcarton: p.selected, page: 1, limit: '', type: 'S', search: '',
+    planninguid: row.SOUId, planningsrno: row.SOSrNo, txntype: TXNTYPE, TxnDate: p.date,
+    ttype: ['8', '3', '30', '2', '34', '32', '83', '994', '992'],
   });
   return arr(resp(body, 'Cartons could not be loaded.').data);
 }

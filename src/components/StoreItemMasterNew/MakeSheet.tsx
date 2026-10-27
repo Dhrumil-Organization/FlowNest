@@ -1,16 +1,11 @@
 // FILE: src/components/StoreItemMasterNew/MakeSheet.tsx
 // Add / edit one make-model line of an item (opens from "Add make" or a row tap).
-import { T } from '@/src/theme';
 import React, { useState } from 'react';
-import { Text, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import type { MakeModelOption } from './api';
 import MakeMasterSheet from './MakeMasterSheet';
 import { DP, ItemMake, MakeErrors, makeStatusLabel, NumKey, Opt, sanitizeDecimal, Scope, validateMake } from './model';
 import { Btn, Cell, CheckChip, Field, SelectField, Sheet, StatusPill } from './ui';
-
-const Section = ({ title }: { title: string }) => (
-  <Text style={{ fontSize: 12.5, fontWeight: '800', color: T.copper, marginTop: 6, marginBottom: 10, paddingHorizontal: 6 }}>{title}</Text>
-);
 
 export default function MakeSheet({
   make,
@@ -112,7 +107,6 @@ export default function MakeSheet({
   const num = (k: NumKey) => (v: string) => set(k, sanitizeDecimal(v, DP[k]) as any);
 
   // plain render function (NOT a component) so inputs keep focus while typing
-  const RATE_KEYS: NumKey[] = ['opRate', 'rate1', 'rate2', 'rate3', 'rate4', 'saleRate'];
   const numF = (k: NumKey, label: string) => (
     <Cell key={k} cols={cols}>
       <Field
@@ -148,7 +142,6 @@ export default function MakeSheet({
       }
     >
       <View style={{ marginHorizontal: -6 }}>
-        <Section title="Make" />
         <View style={g.grid}>
           <Cell cols={cols}>
             <Field
@@ -239,15 +232,8 @@ export default function MakeSheet({
           </Cell>
         </View>
 
-        <Section title="Stock levels" />
-        <View style={g.grid}>
+        <View style={[g.grid, { marginTop: 12 }]}>
           {numF('opQty', 'Opening qty')}
-          {numF('opRate', 'Opening rate')}
-          {numF('surplusLevel', 'Surplus level')}
-        </View>
-
-        <Section title="Rates" />
-        <View style={g.grid}>
           {numF('rate1', 'Rate 1')}
           {numF('rate2', 'Rate 2')}
           {numF('rate3', 'Rate 3')}
@@ -255,8 +241,7 @@ export default function MakeSheet({
           {numF('saleRate', 'Sale rate')}
         </View>
 
-        <Section title="Inward tolerance" />
-        <View style={g.grid}>
+        <View style={[g.grid, { marginTop: 12 }]}>
           <Cell cols={cols}>
             <SelectField
               label="Status"

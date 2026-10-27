@@ -1,16 +1,23 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import {
-    View, Text, ScrollView, TextInput, TouchableOpacity,
-    StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
+    ActivityIndicator, FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 // SafeAreaView import removed — no longer used, the tabs layout now owns
 // the top safe-area inset for every tab screen (see (tabs)/_layout.tsx).
+import { CostingAPI, DesignAPI, type ComputeResult, type CostInputs, type Design, type SubDesign, type YarnMaster } from '../../api/legacyClient';
 import { T } from '../../theme';
-import { CostingAPI, DesignAPI, type CostInputs, type ComputeResult, type Design, type SubDesign, type YarnMaster } from '../../api/legacyClient';
 
 // ── formatters ───────────────────────────────────────────────
 const r2 = (n: number) => `₹${n.toFixed(2)}`;
@@ -326,7 +333,7 @@ function CostSheetPreviewModal({
 
                     <View style={pm.actions}>
                         <TouchableOpacity style={pm.closeBtn} onPress={onClose}><Text style={pm.closeTxt}>Close</Text></TouchableOpacity>
-                        <TouchableOpacity style={pm.shareBtn} onPress={doShare}><Text style={pm.actionTxt}>WhatsApp</Text></TouchableOpacity>
+                        {/* <TouchableOpacity style={pm.shareBtn} onPress={doShare}><Text style={pm.actionTxt}>WhatsApp</Text></TouchableOpacity> */}
                         {!readOnly && (
                             <TouchableOpacity style={[pm.saveBtn, saving && { opacity: 0.55 }]} onPress={onSave} disabled={saving}>
                                 <Text style={pm.actionTxt}>{saving ? 'Saving…' : 'Save costing'}</Text>

@@ -67,7 +67,10 @@ export type StoreItem = {
   prpCode: string;
   yearNo: string;
   store: string;
+  /** ItmCode — the item code shown on the form and in Browse. */
   code: string;
+  /** MItmCode — the master item code used for show-data / delete and sent as MItmCode on save. */
+  mItmCode: string;
   name: string;
   groupId: string;
   subGroupId: string;
@@ -86,7 +89,10 @@ export type StoreItem = {
 export type BrowseRow = {
   key: string;
   store: string;
+  /** ItmCode — the only code shown in Browse. */
   code: string;
+  /** MItmCode of this row — sent as MItmCode in the show-data call when the row is opened. */
+  mItmCode: string;
   name: string;
   uom: string;
   group: string;
@@ -212,6 +218,7 @@ const blankItem = (sc: Scope): StoreItem => ({
   yearNo: sc.yearNo,
   store: sc.store,
   code: '',
+  mItmCode: '',
   name: '',
   groupId: '',
   subGroupId: '',
@@ -224,11 +231,12 @@ const blankItem = (sc: Scope): StoreItem => ({
   makes: [],
 });
 
-/** Purchase / Sales UOM default to NUMBER (NOS) when the lookup has it — like the legacy Add. */
+/** UOM defaults to NUMBER (NOS) when the lookup has it — like the legacy Add. */
 export const withDefaultUom = (item: StoreItem, uoms: Opt[]): StoreItem => {
   const nos = uoms.find((u) => u.id.toUpperCase() === 'NOS') || uoms.find((u) => /number/i.test(u.label));
   if (!nos) return item;
-  return { ...item, purchaseUom: item.purchaseUom || nos.id, salesUom: item.salesUom || nos.id };
+  // Purchase UOM is no longer on the screen; only the (single) UOM is defaulted.
+  return { ...item, salesUom: item.salesUom || nos.id };
 };
 
 /* ------------------------------------------------------------------ */
@@ -257,7 +265,7 @@ export const itemStatus = (item: Pick<StoreItem, 'stopInward' | 'stopIssue'>): {
 
 export type ItemErrors = Partial<Record<'prpCode' | 'yearNo' | 'store' | 'code' | 'name' | 'groupId' | 'subGroupId' | 'purchaseUom' | 'salesUom' | 'makes', string>>;
 
-export function validateItem(item: StoreItem, mode: Mode, subGroups: SubGroupOpt[] = []): ItemErrors {
+export function validateItem(item: StoreItem, mode: Mode): ItemErrors {
   const e: ItemErrors = {};
   if (!item.prpCode) e.prpCode = 'Select a property';
   if (!item.yearNo) e.yearNo = 'Select a year';
@@ -265,10 +273,8 @@ export function validateItem(item: StoreItem, mode: Mode, subGroups: SubGroupOpt
   if (mode === 'add' && item.code && !/^\d+$/.test(item.code)) e.code = 'Digits only';
   if (item.name.trim().length < 2) e.name = 'Enter the item name';
   if (!item.groupId) e.groupId = 'Select an item group';
-  // Sub groups are listed per item group: when the chosen group has any, one must be picked.
-  else if (!item.subGroupId && subGroups.some((s) => s.groupId === item.groupId)) e.subGroupId = 'Select an item sub group';
-  if (!item.purchaseUom) e.purchaseUom = 'Select a purchase UOM';
-  if (!item.salesUom) e.salesUom = 'Select a sales UOM';
+  // Item sub group / Purchase UOM are no longer on the screen, so they are not validated.
+  if (!item.salesUom) e.salesUom = 'Select a UOM';
 
   const seen = new Set<string>();
   for (const m of item.makes) {
@@ -317,7 +323,7 @@ export function filterBrowse(
   const out = rows.filter(
     (r) =>
       (!group || r.group === group) &&
-      (has(`${r.code} ${r.name} ${r.group} ${r.subGroup} ${r.location}`, q)) &&
+      (has(`${r.code} ${r.name} ${r.group} ${r.uom}`, q)) &&
       has(r.code, cols.code) &&
       has(r.name, cols.name) &&
       has(r.uom, cols.uom) &&

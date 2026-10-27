@@ -7,10 +7,10 @@
 //                type + status filters · newest first
 //   Scan & move  camera QR scan (phone + browser) or scanner gun / typed ID → the record opens with the movement
 //                form ready · recently handled · my movements
-//                Event modes: "Taken to event" / "Back from event" — event (Event module) + who carries it + singlet
+//                Event modes: "Taken to event" / "Back from event" — event (Event module api/getevent) + who carries it
 //                once, then scan sticker after sticker; each scan is recorded (SmpEvents.tsx)
 //   Events       per event: taken · back · still at the event (dashboard widget → event page)
-//   Sample page  status / where / last movement / singlet · QR sticker preview + print · record / modify / delete
+//   Sample page  status / where / last movement · QR sticker preview + print · record / modify / delete
 //                movements · modify / delete sample · split a batch into items · booklet contents
 //
 // Every sample has a permanent type-prefixed ID; the QR holds only that ID. Status is read off the movement log.
@@ -43,7 +43,7 @@ type Preset = 'today' | '7d' | 'month' | 'all';
 type Page =
   | { kind: 'sample'; id: string }
   | { kind: 'list'; type: 'all' | SmpTypeKey; st: 'all' | StCode; created?: boolean; cat?: string; md?: string }
-  | { kind: 'moves'; purpose: 'all' | PurposeKey; mine?: boolean; all?: boolean; singlet?: string; cat?: string; md?: string }
+  | { kind: 'moves'; purpose: 'all' | PurposeKey; mine?: boolean; all?: boolean; cat?: string; md?: string }
   | { kind: 'event'; id: string };
 
 export function SamplingHubView() {
@@ -86,25 +86,58 @@ export function SamplingHubView() {
   const curTab: Tab = tab || (salesOnly ? 'scan' : canAdd && !(canEdit && canDel) ? 'register' : 'dash');
 
 
-  const load = useCallback(async () => {
+  /* ------------------------------ data + refresh (everything connected stays in step) ------------------------------
+   * One list (samples + movements) feeds every part of the screen. Every save answers with the fresh list (applyAnswer),
+   * so dashboard, lists, sample page, events, forms and sticker all redraw from it at once.
+   *   seq      — a full read that started BEFORE a save never overwrites the newer answer of that save
+   *   rev      — bumped by "Refresh": events (api/getevent), designs / customers, photos and the sticker preview read again
+   *   silent   — on screen focus and every 60 s (no form open) the list is read again quietly: other users' changes appear
+   */
+  const seq = useRef(0);
+  const [rev, setRev] = useState(0);
+  const [syncedAt, setSyncedAt] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const stamp = () => { const d = new Date(); setSyncedAt(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`); };
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!ctx.prptype || !ctx.yearno) { setError('Select the property group and year in the header.'); return; }
-    setLoading(true); setError('');
+    const my = ++seq.current;
+    if (!opts?.silent) setLoading(true);
     try {
-      setData(normalizeList(unwrap(await SamplingHubAPI.list(ctx))));
+      const d = normalizeList(unwrap(await SamplingHubAPI.list(ctx)));
+      if (my === seq.current) { setData(d); setError(''); stamp(); }   // a newer answer (a save) came meanwhile → keep that
     } catch (e: any) {
-      setError(errText(e, 'Could not load the Sampling Hub.'));
+      if (!opts?.silent) setError(errText(e, 'Could not load the Sampling Hub.'));
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [ctx]);
-  const loadMasters = useCallback(async () => {
-    if (masters || !ctx.prptype) return;
-    try { setMasters(normalizeMasters(unwrap(await SamplingHubAPI.masters(ctx)))); } catch (e: any) { setFlash('⚠ ' + errText(e, 'Could not load designs / customers.')); }
+  const mastersAt = useRef(0);
+  const loadMasters = useCallback(async (force = false) => {
+    if (!ctx.prptype) return;
+    if (masters && !force && Date.now() - mastersAt.current < 5 * 60000) return;   // designs / customers: re-read after 5 min
+    try { setMasters(normalizeMasters(unwrap(await SamplingHubAPI.masters(ctx)))); mastersAt.current = Date.now(); } catch (e: any) { setFlash('⚠ ' + errText(e, 'Could not load designs / customers.')); }
   }, [ctx, masters]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
-  useEffect(() => { setMasters(null); }, [ctx]);
+  const formOpen = useRef(false);
+  formOpen.current = creating || !!editing || !!moveOpen;
+  useFocusEffect(useCallback(() => {
+    void load({ silent: !!data });
+    const t = setInterval(() => { if (!formOpen.current) void load({ silent: true }); }, 60000);
+    return () => clearInterval(t);
+  }, [load])); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setMasters(null); mastersAt.current = 0; }, [ctx]);
   // the masters (designs, customers) are needed for the forms
   useEffect(() => { if (creating || editing || moveOpen) void loadMasters(); }, [creating, editing, moveOpen, loadMasters]);
+  /** ↻ Refresh — everything: list, events, designs / customers, photos, sticker preview */
+  const refreshAll = async () => {
+    setRefreshing(true);
+    setPhotos({});
+    setRev((r) => r + 1);
+    try {
+      await Promise.all([load({ silent: !!data }), formOpen.current || masters ? loadMasters(true) : Promise.resolve()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const samples = data?.samples || [];
   const moves = data?.moves || [];
@@ -123,7 +156,10 @@ export function SamplingHubView() {
   const desCat = (id: string) => { for (const s of samples) { if (s.md_id === id) return s.category; for (const c of s.contents) if (c.md_id === id) return c.category; } return ''; };
 
   /** apply a server answer (every write returns the fresh list); anything else → read the latest list again */
-  const applyAnswer = (d: any) => { if (d && Array.isArray(d.samples)) setData(normalizeList(d)); else void load(); };
+  const applyAnswer = (d: any) => {
+    if (d && Array.isArray(d.samples)) { seq.current++; setData(normalizeList(d)); stamp(); }   // newest data wins over a read in flight
+    else void load();
+  };
   const openSample = (id: string, opts?: { move?: boolean }) => {
     setPage({ kind: 'sample', id }); setMoveOpen(opts?.move ? { edit: null } : null); setSticker(null); setEditing(null); setFlash('');
     scrollRef.current?.scrollTo?.({ y: 0, animated: false });
@@ -177,7 +213,7 @@ export function SamplingHubView() {
       AppAlert.alert('Only the latest movement', `${last.no} (${dateFull(last.date)}) is the latest movement of ${m.sample}. Delete step by step from the latest — not from the middle.`);
       return;
     }
-    confirmDelete(`Delete movement ${m.no}?`, `${PURPOSE[m.purpose].lbl}${m.party ? ' → ' + m.party : ''} · ${dateFull(m.date)} · singlet #${m.singlet || '—'}${s ? `\n${s.id} ${s.name}` : ''}\n\nThe latest movement is removed permanently; the sample's status goes back to the step before.`, async () => {
+    confirmDelete(`Delete movement ${m.no}?`, `${PURPOSE[m.purpose].lbl}${m.party ? ' → ' + m.party : ''} · ${dateFull(m.date)}${s ? `\n${s.id} ${s.name}` : ''}\n\nThe latest movement is removed permanently; the sample's status goes back to the step before.`, async () => {
       try {
         const r = await SamplingHubAPI.moveRemove({ ...ctx, id: m.id });
         applyAnswer(unwrap(r)); setFlash('✓ ' + (r?.data?.message || 'Deleted.'));
@@ -200,17 +236,15 @@ export function SamplingHubView() {
   /* ------------------------------ helpers ------------------------------ */
   const Tag = ({ s }: { s: Sample }) => <>{catsOf(s).map((c) => <Chip key={c} t={c} c={C.prod} />)}</>;
   const search = (
-    <TextInput value={q} onChangeText={setQ} placeholder="Search sample ID, name, design, colourway, category or singlet no.…" style={st.search} accessibilityLabel="Search samples" />
+    <TextInput value={q} onChangeText={setQ} placeholder="Search sample ID, name, design, colourway, or category…" style={st.search} accessibilityLabel="Search samples" />
   );
   const ql = q.trim().toLowerCase();
   const found = ql ? withSt.filter(({ s }) => matches(searchText(s), ql) || s.id.toLowerCase().includes(ql)) : [];
-  const foundMv = ql ? moves.filter((m) => m.singlet && (m.singlet.toLowerCase() === ql || (ql.length >= 3 && m.singlet.toLowerCase().includes(ql)))) : [];
   const results = ql ? (
     <View style={P.card}>
-      <Head t={`${plural(found.length, 'sample')}${foundMv.length ? ` · ${plural(foundMv.length, 'movement')} on singlet` : ''}`} />
+      <Head t={plural(found.length, 'sample')} />
       {found.slice(0, 20).map(({ s, st: x }) => <SampleRow key={s.id} s={s} state={x} onPress={() => openSample(s.id)} />)}
-      {foundMv.slice(0, 20).map((m) => <MoveRow key={m.id} m={m} sample={byId[m.sample]} onPress={byId[m.sample] ? () => openSample(m.sample) : undefined} />)}
-      {!found.length && !foundMv.length ? <Empty t="No sample or singlet number matches." /> : null}
+      {!found.length ? <Empty t="No sample matches." /> : null}
     </View>
   ) : null;
   /** item category → design drill (General → Specific), counts on each chip */
@@ -279,7 +313,7 @@ export function SamplingHubView() {
             <StatCard label="Where" value={x.where} />
             {s.tracked ? <StatCard label={x.code === 'sent' ? 'Dispatched' : 'Last movement'} value={x.last ? dateFull(x.last.date) : '—'} color={C.mut} />
               : <StatCard label="Balance" value={`${x.bal} / ${s.qty} ${t.unit}${s.qty !== 1 ? 's' : ''}`} color={C.prod} />}
-            <StatCard label={x.last ? 'Singlet · ' + x.last.by : 'Singlet'} value={x.last?.singlet ? '#' + x.last.singlet : '—'} color={T.copper} />
+            <StatCard label="Recorded by" value={x.last ? x.last.by : '—'} color={T.copper} />
           </View>
           {!s.tracked ? (
             <View style={{ marginTop: 8 }}>
@@ -303,7 +337,7 @@ export function SamplingHubView() {
           </View>
           {flash ? <Text style={st.flash}>{flash}</Text> : null}
         </View>
-        {sticker ? <StickerCard key={sticker.join(',')} samples={sticker.map((k) => byId[k]).filter(Boolean)} ctx={ctx} canPrint={canPrint} onDone={(m) => setFlash('✓ ' + m)} onError={(m) => AppAlert.alert('Print', m)} /> : null}
+        {sticker ? <StickerCard key={sticker.join(',')} samples={sticker.map((k) => byId[k]).filter(Boolean)} ctx={ctx} canPrint={canPrint} rev={rev} onDone={(m) => setFlash('✓ ' + m)} onError={(m) => AppAlert.alert('Print', m)} /> : null}
         {editing ? (
           <SampleForm key={'e' + s.id} ctx={ctx} masters={masters} edit={editing} savedPhoto={photos[s.id] || undefined} onOpen={(k) => openSample(k)}
             onDone={(d, m) => {
@@ -315,11 +349,11 @@ export function SamplingHubView() {
             }} />
         ) : null}
         {moveOpen ? (
-          <MoveForm key={'m' + s.id + (moveOpen.edit?.id || '')} ctx={ctx} sample={s} state={x} me={me} meId={data?.me.id} today={today} masters={masters} edit={moveOpen.edit}
+          <MoveForm key={'m' + s.id + (moveOpen.edit?.id || '')} ctx={ctx} sample={s} state={x} me={me} meId={data?.me.id} today={today} masters={masters} edit={moveOpen.edit} rev={rev}
             onDone={(d, m) => { setMoveOpen(null); if (d) { applyAnswer(d); setFlash('✓ ' + m); } }} />
         ) : null}
         <View style={P.card}>
-          <Head t={`MOVEMENT HISTORY · ${hist.length}`} right={<Text style={P.lbl}>SINGLET</Text>} />
+          <Head t={`MOVEMENT HISTORY · ${hist.length}`} />
           {hist.map((m, i) => (
             <MoveRow key={m.id} m={m}
               onEdit={canEdit && m.purpose !== 'split' ? () => { setMoveOpen({ edit: m }); setEditing(null); } : undefined}
@@ -352,17 +386,17 @@ export function SamplingHubView() {
     );
   };
   const movesPage = (f: Extract<Page, { kind: 'moves' }>) => {
-    const pool = moves.filter((m) => (f.purpose === 'all' || m.purpose === f.purpose) && (!f.mine || m.by_id === data?.me.id) && (f.all || f.singlet || inR(m.date)) && (!f.singlet || m.singlet === f.singlet))
+    const pool = moves.filter((m) => (f.purpose === 'all' || m.purpose === f.purpose) && (!f.mine || m.by_id === data?.me.id) && (f.all || inR(m.date)))
       .slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
     const rows = pool.filter((m) => { const s = byId[m.sample]; return s ? inCat(s, f.cat) && hasDes(s, f.md) : !f.cat && !f.md; });
-    const title = f.singlet ? 'Singlet #' + f.singlet : f.purpose === 'dispatch' ? 'Customer dispatches · ' + rangeLbl : f.mine ? 'My movements' : 'Movement history · ' + (f.all ? 'all time' : rangeLbl);
+    const title = f.purpose === 'dispatch' ? 'Customer dispatches · ' + rangeLbl : f.mine ? 'My movements' : 'Movement history · ' + (f.all ? 'all time' : rangeLbl);
     const items = pool.map((m) => ({ s: byId[m.sample] })).filter((x) => x.s) as { s: Sample }[];
     return (
       <>
         {crumbs([{ l: 'Sampling', fn: () => goPage(null) }, { l: title, fn: f.cat ? () => goPage({ ...f, cat: '', md: '' }) : undefined }, ...(f.cat ? [{ l: f.cat }] : [])])}
-        {!f.singlet ? catDrill(items, f.cat || '', f.md || '', (c) => goPage({ ...f, cat: c, md: '' }), (id) => goPage({ ...f, md: id })) : null}
+        {catDrill(items, f.cat || '', f.md || '', (c) => goPage({ ...f, cat: c, md: '' }), (id) => goPage({ ...f, md: id }))}
         <View style={P.card}>
-          <Head t={plural(rows.length, 'movement')} right={<Text style={P.lbl}>SINGLET</Text>} />
+          <Head t={plural(rows.length, 'movement')} />
           {rows.map((m) => <MoveRow key={m.id} m={m} sample={byId[m.sample]} onPress={byId[m.sample] ? () => openSample(m.sample) : undefined} />)}
           {!rows.length ? <Empty t="No movements." /> : null}
         </View>
@@ -396,7 +430,7 @@ export function SamplingHubView() {
       <Pressable key={g.k} onPress={onPress} style={P.row} accessibilityRole="button" accessibilityLabel={g.lbl}>
         <Icon name={g.icon as any} size={16} color={C.prod} />
         <View style={{ flex: 1, minWidth: 0 }}><Text style={st.gT}>{g.lbl} · {g.list.length}</Text><Text style={P.rowSub}>{sub}</Text></View>
-        <View style={{ alignItems: 'flex-end' }}><Text style={st.gN}>{right}</Text><Text style={P.singletL}>{rsub}</Text></View>
+        <View style={{ alignItems: 'flex-end' }}><Text style={st.gN}>{right}</Text><Text style={P.subL}>{rsub}</Text></View>
       </Pressable>
     );
     const designsIn = (l: { s: Sample }[], c?: string) => new Set(l.flatMap(({ s }) => designIds(s).filter((id) => !c || desCat(id) === c))).size;
@@ -430,7 +464,7 @@ export function SamplingHubView() {
             </Widget>
             <EventsWidget samples={samples} moves={moves} onEvent={(id) => goPage({ kind: 'event', id })} />
             <Widget icon="local-shipping" title={'Customer dispatches · ' + disp.length} accent="#652880" onTitle={() => goPage({ kind: 'moves', purpose: 'dispatch' })}>
-              <Text style={P.note}>{plural(new Set(disp.map((m) => m.party)).size, 'customer')} · {plural(new Set(disp.map((m) => m.singlet)).size, 'singlet')}</Text>
+              <Text style={P.note}>{plural(new Set(disp.map((m) => m.party)).size, 'customer')} · {plural(new Set(disp.map((m) => m.sample)).size, 'sample')}</Text>
               {disp.slice(0, 4).map((m) => <MoveRow key={m.id} m={m} sample={byId[m.sample]} onPress={byId[m.sample] ? () => openSample(m.sample) : undefined} />)}
               {!disp.length ? <Empty t="No dispatches in this period." /> : null}
             </Widget>
@@ -523,7 +557,7 @@ export function SamplingHubView() {
         {modeBar}
         <View style={P.card}>
           <Text style={st.h1}>Scan a sample</Text>
-          <Text style={[P.note, { marginBottom: 10 }]}>Scan the QR sticker with the camera, shoot it with the scanner gun, or type the Sample ID. The record opens with the movement form ready — purpose, party, singlet no., date.</Text>
+          <Text style={[P.note, { marginBottom: 10 }]}>Scan the QR sticker with the camera, shoot it with the scanner gun, or type the Sample ID. The record opens with the movement form ready — purpose, party, date.</Text>
           <Pressable onPress={() => setScanOpen(true)} style={st.camBtn} accessibilityRole="button" accessibilityLabel="Scan QR with camera">
             <Icon name="qr-code-scanner" size={22} color="#fff" /><Text style={st.newT}>Scan QR (camera)</Text>
           </Pressable>
@@ -559,9 +593,14 @@ export function SamplingHubView() {
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <ScrollView ref={scrollRef} contentContainerStyle={st.body} keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={loading && !!data} onRefresh={load} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} />}>
         <View style={[st.wrap, { alignItems: 'center', marginBottom: 10 }]}>
           {tabs.map(([k, l]) => <Seg key={k} on={curTab === k && !page} label={l} onPress={() => { setTab(k); goPage(null); setQ(''); setFlash(''); }} />)}
+          <Pressable onPress={() => void refreshAll()} disabled={refreshing} style={st.refresh} accessibilityRole="button" accessibilityLabel="Refresh everything">
+            {refreshing ? <ActivityIndicator size="small" color={C.prod} /> : <Icon name="refresh" size={16} color={C.prod} />}
+            <Text style={st.refreshT}>{refreshing ? 'Refreshing…' : 'Refresh'}</Text>
+            {syncedAt && !refreshing ? <Text style={st.syncT}>· {syncedAt}</Text> : null}
+          </Pressable>
           {curTab === 'dash' && !page ? (
             <>
               <View style={{ flexGrow: 1 }} />
@@ -580,7 +619,7 @@ export function SamplingHubView() {
           : curTab === 'dash' ? dashTab() : curTab === 'register' ? registerTab() : scanTab()) : null}
         {data && canMove && scanMode !== 'open' ? (
           <View style={!page && curTab === 'scan' ? undefined : { display: 'none' }}>
-            <EventScanPanel mode={scanMode} ctx={ctx} byId={byId} moves={moves} stOf={stOf} me={data.me || { id: '', name: me }} today={today}
+            <EventScanPanel mode={scanMode} ctx={ctx} byId={byId} moves={moves} stOf={stOf} rev={rev} onRefresh={refreshAll} me={data.me || { id: '', name: me }} today={today}
               onAnswer={applyAnswer} onOpen={(k) => openSample(k)} />
           </View>
         ) : null}
@@ -631,6 +670,9 @@ const st = StyleSheet.create({
   gun: { flex: 1, borderWidth: 1, borderColor: T.border, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: MF, color: T.ink, backgroundColor: '#fff' },
   openBtn: { paddingHorizontal: 18, borderRadius: 9, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center' },
   h1: { fontSize: 15, fontWeight: '800', color: C.ink },
+  refresh: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: C.bd, backgroundColor: '#fff' },
+  refreshT: { fontSize: 11, fontWeight: '800', color: C.prod },
+  syncT: { fontSize: 10.5, color: C.mut },
   logo: { width: 44, height: 44, borderRadius: 11, backgroundColor: C.prod + '18', alignItems: 'center', justifyContent: 'center' },
   gT: { fontWeight: '700', fontSize: 12.5, color: C.ink },
   gN: { fontFamily: MF, fontWeight: '800', fontSize: 13, color: C.ink },

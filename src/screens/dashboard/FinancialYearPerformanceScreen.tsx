@@ -807,6 +807,7 @@ export default function FinancialYearPerformanceScreen() {
   const metric = one(params.metric) || 'sales';
   const prptype = one(params.prptype) || 'S';
   const view = one(params.view) || 'owner';
+  const selectedExecutiveCode = view === 'my' ? one(params.executive_code).trim() : '';
   const anchorDate = one(params.date) || toYmd(new Date());
   const anchor = parseYmd(anchorDate);
   const anchorStartYear = fyStartYearOf(anchorDate);
@@ -862,8 +863,8 @@ export default function FinancialYearPerformanceScreen() {
   ): Promise<LoadedYear | null> => {
     const spec = specs[specIndex];
     if (!spec) return null;
-    if (metric !== 'sales' || view === 'my') {
-      setError(view === 'my' ? 'Financial-year Sales is not available in My View yet.' : 'This financial-year metric is not available yet.');
+    if (metric !== 'sales') {
+      setError('This financial-year metric is not available yet.');
       setLoading(false);
       setRefreshing(false);
       return null;
@@ -883,7 +884,8 @@ export default function FinancialYearPerformanceScreen() {
         to_date: spec.toDate,
         stage_to_date: spec.isCurrent ? spec.toDate : stageToDate,
         prptype,
-        view: 'owner',
+        view,
+        ...(selectedExecutiveCode ? {executive_code: selectedExecutiveCode} : {}),
         include_details: 0,
         // Initial/current FY gets only the tiny month-level summaries for the
         // two prior FYs. Historical hierarchy/transactions are NOT preloaded.
@@ -936,25 +938,25 @@ export default function FinancialYearPerformanceScreen() {
       setRefreshing(false);
       setLoadingYearId(null);
     }
-  }, [metric, prptype, specs, view, years.length, anchorDate, anchorStartYear]);
+  }, [metric, prptype, specs, view, selectedExecutiveCode, years.length, anchorDate, anchorStartYear]);
 
   useEffect(() => {
     // Initial entry intentionally loads ONLY the current FY. Historical FYs are
     // requested only when the user selects them and remain cached in this screen.
     // The key guard also prevents development/StrictMode effect replays from
     // issuing a duplicate request for the same FY context.
-    const key = `${metric}|${prptype}|${view}|${anchorDate}`;
+    const key = `${metric}|${prptype}|${view}|${selectedExecutiveCode}|${anchorDate}`;
     if (initialLoadKeyRef.current === key) return;
     initialLoadKeyRef.current = key;
     void loadYear(0);
     // Deliberately exclude cached years/loadYear identity: cache updates must not
     // turn into automatic API traffic.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metric, prptype, view, anchorDate]);
+  }, [metric, prptype, view, selectedExecutiveCode, anchorDate]);
 
   const loadExecutiveOverview = useCallback(async (specIndex: number) => {
     const spec = specs[specIndex];
-    if (!spec || metric !== 'sales' || view !== 'owner') return;
+    if (!spec || metric !== 'sales') return;
     if (executiveOverview[spec.id] || executiveRequestedRef.current.has(spec.id)) return;
 
     executiveRequestedRef.current.add(spec.id);
@@ -967,7 +969,8 @@ export default function FinancialYearPerformanceScreen() {
         to_date: spec.fullEndDate,
         stage_to_date: stageToDate,
         prptype,
-        view: 'owner',
+        view,
+        ...(selectedExecutiveCode ? {executive_code: selectedExecutiveCode} : {}),
         overview_executives: 1,
         include_comparisons: 1,
       });
@@ -989,7 +992,7 @@ export default function FinancialYearPerformanceScreen() {
     } finally {
       setExecutiveLoadingId(current => current === spec.id ? null : current);
     }
-  }, [specs, metric, view, executiveOverview, anchorDate, anchorStartYear, prptype]);
+  }, [specs, metric, view, selectedExecutiveCode, executiveOverview, anchorDate, anchorStartYear, prptype]);
 
   const selectedSpec = specs[selectedYear];
   const focus = selectedSpec ? years.find(year => year.id === selectedSpec.id) : undefined;
@@ -1135,7 +1138,7 @@ export default function FinancialYearPerformanceScreen() {
     const pathKey = detailPath.map(p => `${p.dim}:${p.code}`).join('|');
     // Month intentionally excluded: one progressive response contains all
     // month buckets for the current path/dimension.
-    return `${focus.id}|${activeDetailDim}|${pathKey}`;
+    return `${view}|${selectedExecutiveCode}|${focus.id}|${activeDetailDim}|${pathKey}`;
   }, [focus?.id, viewMode, activeDetailDim, detailPath]);
 
   const loadProgressiveDetail = useCallback(async () => {
@@ -1169,7 +1172,8 @@ export default function FinancialYearPerformanceScreen() {
         to_date: period.last,
         stage_to_date: period.last,
         prptype,
-        view: 'owner',
+        view,
+        ...(selectedExecutiveCode ? {executive_code: selectedExecutiveCode} : {}),
         drilldown: 1,
         dimension: activeDetailDim,
         include_previous: 0,
@@ -1199,7 +1203,8 @@ export default function FinancialYearPerformanceScreen() {
           to_date: previousLast,
           stage_to_date: previousLast,
           prptype,
-          view: 'owner',
+          view,
+          ...(selectedExecutiveCode ? {executive_code: selectedExecutiveCode} : {}),
           drilldown: 1,
           dimension: activeDetailDim,
           include_previous: 0,
@@ -1225,7 +1230,7 @@ export default function FinancialYearPerformanceScreen() {
         setDetailLoading(false);
       }
     }
-  }, [focus, viewMode, detailCacheKey, anchorDate, detailPath, prptype, activeDetailDim]);
+  }, [focus, viewMode, detailCacheKey, anchorDate, detailPath, prptype, view, selectedExecutiveCode, activeDetailDim]);
 
   useEffect(() => {
     if (viewMode !== 'detail' || !focus || !detailCacheKey) return;
@@ -1274,7 +1279,9 @@ export default function FinancialYearPerformanceScreen() {
       report_month: period.ym,
       expected_month: period.ym,
       prptype,
-      view: 'owner',
+      view,
+      fy_origin: '1',
+      ...(selectedExecutiveCode ? {executive_code: selectedExecutiveCode} : {}),
       level: 'documents',
     };
     detailPath.forEach(p => {

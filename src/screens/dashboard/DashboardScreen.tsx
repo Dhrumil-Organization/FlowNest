@@ -258,9 +258,14 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
       ?? 0,
   ) === 1;
   const isManagementUser = isSuperAdmin || isDirector;
+  // Production is a company/shed report. An authenticated user with the
+  // Production card grant must be able to open My View even without a Sales
+  // Executive mapping. The Production card still checks the same permission
+  // locally and again on the Laravel dashboard/report endpoints.
   const myViewAllowed = isManagementUser
     || !saleExecKnown
-    || (saleExecCode !== '' && saleExecCode !== '0');
+    || (saleExecCode !== '' && saleExecCode !== '0')
+    || canAccess('dashboard.production_detail');
 
   // Permissions arrive asynchronously after login, so the initial useState
   // value can be computed before they exist. Until the user picks a view

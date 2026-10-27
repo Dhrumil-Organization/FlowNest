@@ -915,8 +915,8 @@ export default function ProductionFinancialYearPerformanceScreen() {
   ): Promise<LoadedYear | null> => {
     const spec = specs[specIndex];
     if (!spec) return null;
-    if (metric !== 'production' || view === 'my') {
-      setError(view === 'my' ? 'Financial-year Production is not available in My View yet.' : 'This financial-year metric is not available yet.');
+    if (metric !== 'production') {
+      setError('This financial-year metric is not available yet.');
       setLoading(false);
       setRefreshing(false);
       return null;
@@ -936,7 +936,7 @@ export default function ProductionFinancialYearPerformanceScreen() {
         to_date: spec.toDate,
         stage_to_date: spec.isCurrent ? spec.toDate : stageToDate,
         prptype,
-        view: 'owner',
+        view,
         include_details: 0,
         // Initial/current FY gets only the tiny month-level summaries for the
         // two prior FYs. Historical hierarchy/transactions are NOT preloaded.
@@ -1158,7 +1158,7 @@ export default function ProductionFinancialYearPerformanceScreen() {
         to_date: period.last,
         stage_to_date: period.last,
         prptype,
-        view: 'owner',
+        view,
         drilldown: 1,
         dimension: activeDetailDim,
         include_previous: 0,
@@ -1188,7 +1188,7 @@ export default function ProductionFinancialYearPerformanceScreen() {
           to_date: previousLast,
           stage_to_date: previousLast,
           prptype,
-          view: 'owner',
+          view,
           drilldown: 1,
           dimension: activeDetailDim,
           include_previous: 0,

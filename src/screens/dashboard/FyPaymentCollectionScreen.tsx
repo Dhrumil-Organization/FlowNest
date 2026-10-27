@@ -3,10 +3,9 @@ import {ActivityIndicator,Platform,Pressable,ScrollView,StyleSheet,Text,TextInpu
 import Svg, {Polyline,Line,Circle} from 'react-native-svg';
 import {useLocalSearchParams,useRouter,usePathname} from 'expo-router';
 import {api} from '@/src/screens/dashboard/employ/api/api';
-import {DashboardAPI} from '@/src/api/dashboard';
 
 type Row={code:string;name:string;amount:number};
-type Month={label:string;date:string;amount:number|null;rows:Row[];receiptCount?:number|null;error?:string};
+type Month={label:string;date:string;amount:number|null;target?:number|null;targetSource?:string;targetError?:string;rows:Row[];receiptCount?:number|null;error?:string};
 type ReceiptItem={receipt_uid:string;receipt_srno:string;voucher_no?:string|null;payment_reference?:string|null;bank_name?:string|null;payment_mode?:string|null;amount:number;allocation_count:number};
 type ReceiptDay={date:string;label:string;amount:number;entries:number;receipts:ReceiptItem[]};
 const NAMES=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
@@ -16,9 +15,48 @@ const num=(v:any)=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v
 const fyOf=(d:string)=>Number(d.slice(0,4))-(Number(d.slice(5,7))<4?1:0);
 const fyName=(y:number)=>`FY ${String(y).slice(-2)}–${String(y+1).slice(-2)}`;
 const endOf=(y:number,i:number)=>{const yr=y+(i>=9?1:0),m=i<9?i+4:i-8;return `${yr}-${String(m).padStart(2,'0')}-${String(new Date(yr,m,0).getDate()).padStart(2,'0')}`;};
-const amount=(v:number|null)=>v===null?'—':'₹'+v.toLocaleString('en-IN',{maximumFractionDigits:2});
-const compact=(v:number|null)=>v===null?'—':v>=10000000?`₹${(v/10000000).toFixed(2)} Cr`:v>=100000?`₹${(v/100000).toFixed(2)} L`:amount(v);
+const amount=(v:number|null)=>v===null?'—':(v<0?'-':'')+'₹'+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const compact=(v:number|null)=>v===null?'—':Math.abs(v)>=10000000?`${v<0?'-':''}₹${(Math.abs(v)/10000000).toFixed(2)} Cr`:Math.abs(v)>=100000?`${v<0?'-':''}₹${(Math.abs(v)/100000).toFixed(2)} L`:amount(v);
 const normalize=(r:any):Row[]=>Array.isArray(r)?r.map((x:any)=>({code:String(x.code??''),name:String(x.name??'Unassigned'),amount:Number(x.amount??0)})).filter(x=>Number.isFinite(x.amount)):[];
+// Read the same Collection benchmark delivered alongside each month's actual.
+// An old due-outstanding snapshot is deliberately NOT a historical Collection target.
+const extractMonthTarget=(report:any):{target:number|null;targetSource:string;targetError?:string}=>{
+ const card=report?.collection_target;
+ const source=String(report?.target_source??card?.target_source??'');
+ const configured=report?.target_configured??card?.target_configured??false;
+ const target=num(report?.target??report?.total?.target??card?.target);
+ if(configured===true&&source==='AUTO_OPENING_OUTSTANDING_AS_ON'&&target!==null&&target>=0)
+   return {target,targetSource:source};
+ return {target:null,targetSource:source,targetError:configured===false?'Monthly opening target unavailable':source!=='AUTO_OPENING_OUTSTANDING_AS_ON'?'Opening outstanding source not confirmed':'Monthly target is missing or invalid'};
+};
+const sumRows=(list:Row[]):number=>Math.round(list.reduce((sum,row)=>sum+row.amount,0)*100)/100;
+const monthAchievement=(actual:number|null,target:number|null):number|null=>
+ actual!==null&&target!==null&&target>0?actual/target*100:null;
+const buildTargetSummary=(rows:Month[]|undefined,upto:number)=>{
+ const limit=Math.min(11,Math.max(0,upto));
+ const missing:string[]=[];
+ let collected=0,target=0,verified=0;
+ for(let i=0;i<=limit;i++){
+   const m=rows?.[i];
+   if(!m||m.amount===null||m.target===null||m.target===undefined){missing.push(NAMES[i]);continue;}
+   collected+=m.amount;target+=m.target;verified++;
+ }
+ const complete=missing.length===0;
+ return {collected:complete?Math.round(collected*100)/100:null,
+  target:complete?Math.round(target*100)/100:null,
+  achievement:complete?monthAchievement(collected,target):null,
+  verified,expected:limit+1,missing};
+};
+function AmountTotal({label,total,count,secondary,format}:{label:string;total:number;count:number;secondary?:string;format:(v:number|null)=>string}){
+ return <View style={{backgroundColor:'#F5F2EE',borderRadius:9,borderWidth:1,borderColor:BORDER,paddingHorizontal:12,paddingVertical:10,marginVertical:9}}>
+   <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+    <Text style={{fontSize:11,color:GREEN,fontWeight:'800',flexShrink:1}}>{label} · {count.toLocaleString('en-IN')}</Text>
+    <Text accessibilityLabel={`Total ${amount(total)}`} style={{fontSize:14,color:INK,fontWeight:'900'}}>{format(total)}</Text>
+   </View>
+   {secondary?<Text style={{fontSize:10,color:MUTED,marginTop:5}}>{secondary}</Text>:null}
+  </View>;
+}
+
 const merge=(lists:Row[][]):Row[]=>{const m=new Map<string,Row>();for(const list of lists)for(const r of (Array.isArray(list)?list:[])){const old=m.get(r.code);m.set(r.code,{code:r.code,name:r.name||old?.name||'Unassigned',amount:Math.round(((old?.amount||0)+r.amount)*100)/100});}return [...m.values()].sort((a,b)=>b.amount-a.amount);};
 export default function FyPaymentCollectionScreen(){
  const router=useRouter(),pathname=usePathname(),p=useLocalSearchParams(),{width}=useWindowDimensions();
@@ -26,71 +64,19 @@ export default function FyPaymentCollectionScreen(){
  const activeFY=fyOf(today),prptype=(str(p.prptype)||'S').toUpperCase(),view=(str(p.view)||'owner').toLowerCase();
  const requestEpoch=useRef(0);
  const [fy,setFy]=useState(activeFY),[months,setMonths]=useState<Month[]>([]),[busy,setBusy]=useState(true);
+ const [amountMode,setAmountMode]=useState<'compact'|'actual'>('compact');
+ const displayAmount=(value:number|null):string=>amountMode==='compact'?compact(value):amount(value);
+ const [targetBreakdownOpen,setTargetBreakdownOpen]=useState(false);
  const [month,setMonth]=useState<number|null>(null),[executive,setExecutive]=useState<Row|null>(null),[customers,setCustomers]=useState<Row[]>([]),[loadingDetail,setLoadingDetail]=useState(false);
- const [search,setSearch]=useState(''),[ascending,setAscending]=useState(false),[detailError,setDetailError]=useState(''),[selectedKpi,setSelectedKpi]=useState<string|null>(null);
+ const [search,setSearch]=useState(''),[ascending,setAscending]=useState(false),[detailError,setDetailError]=useState(''),[selectedKpi,setSelectedKpi]=useState<string|null>('target');
  const years=[activeFY,activeFY-1,activeFY-2];
  const [history,setHistory]=useState<Record<number,Month[]>>({});
  const [billedByFY,setBilledByFY]=useState<Record<number,(number|null)[]>>({});
  const [billingReady,setBillingReady]=useState(false);
- const [collectionTargets,setCollectionTargets]=useState<Record<number,(number|null)[]>>({});
- const [targetLoading,setTargetLoading]=useState(false);
- const [targetErrors,setTargetErrors]=useState<Record<number,string>>({});
- // Cache survives collapsing the tile, FY changes and normal re-renders.
- // null means the target was explicitly unconfigured, not zero.
- const targetCache=useRef<Record<string,number|null>>({});
- const targetInFlight=useRef<Record<string,Promise<number|null>>>({});
- const targetRequestId=useRef(0);
- // Due outstanding is a point-in-time balance, NOT an additive monthly target.
- // Historical FAMSali.BalAmt is not reconstructed as-of the selected FY date by target-card.
- // Consequently this FY screen only displays the current FY collection coverage.
- const targetComparableIndex=Math.min(11,Math.max(0,(Number(today.slice(0,4))-activeFY)*12+Number(today.slice(5,7))-4));
- const targetCacheKey=(y:number,i:number)=>`${prptype}:${view}:${y}:${i<9?i+4:i-8}`;
- const readMonthlyTarget=useCallback((y:number,i:number):Promise<number|null>=>{
-   const key=targetCacheKey(y,i);
-   if(Object.prototype.hasOwnProperty.call(targetCache.current,key))return Promise.resolve(targetCache.current[key]);
-   if(targetInFlight.current[key])return targetInFlight.current[key];
-   const monthno=i<9?i+4:i-8;
-   const job=(async()=>{
-     const result:any=await DashboardAPI.targetCard({prptype,yearno:y-1999,monthno,view:view==='my'?'my':'owner'});
-     if(result?.success===false||result?.response?.success===false)throw Error(result?.message||'Monthly Target request failed');
-     const response=result?.response;
-     // Never cache an API response against the wrong financial year/month.
-     if(Number(response?.period?.yearno)!==y-1999||Number(response?.period?.monthno)!==monthno)
-       throw Error(`Target period mismatch: requested ${y-1999}/${monthno}`);
-     const card=Array.isArray(response?.cards)?response.cards.find((c:any)=>String(c.key).toUpperCase()==='COLLECTION'):null;
-     if(!card||card.target_source!=='AUTO_DUE_OUTSTANDING')throw Error('Expected due-outstanding Collection benchmark is unavailable');
-     const target=Number(card.target);
-     const value=Number.isFinite(target)&&target>=0?target:null;
-     targetCache.current[key]=value;
-     return value;
-   })();
-   targetInFlight.current[key]=job;
-   void job.then(()=>{delete targetInFlight.current[key];},()=>{delete targetInFlight.current[key];});
-   return job;
- },[prptype,view]);
- useEffect(()=>{
-   if(selectedKpi!=='target')return;
-   const requestId=++targetRequestId.current;
-   let cancelled=false;
-   const load=async()=>{
-     setTargetLoading(true);
-     const errors:Record<number,string>={};
-     // A single snapshot is meaningful; summing monthly due balances is not.
-     try{
-       const snapshot=await readMonthlyTarget(activeFY,targetComparableIndex);
-       if(!cancelled&&requestId===targetRequestId.current){
-         const values:(number|null)[]=Array(12).fill(null);
-         values[targetComparableIndex]=snapshot;
-         setCollectionTargets(prev=>({...prev,[activeFY]:values}));
-       }
-     }catch(e:any){errors[activeFY]=String(e?.message||'Due outstanding unavailable');}
-     if(!cancelled&&requestId===targetRequestId.current){setTargetErrors(errors);setTargetLoading(false);}
-   };
-   void load();
-   return()=>{cancelled=true;targetRequestId.current+=1;setTargetLoading(false);};
- },[selectedKpi,activeFY,targetComparableIndex,readMonthlyTarget]);
-
+ // Opening Collection targets are bundled with the *same* monthly Collection
+ // actual requests below, for all three FYs. No second/competing target API.
  const [historyReady,setHistoryReady]=useState(false);
+ const [sparkPoint,setSparkPoint]=useState<number|null>(null);
  const [chartPoint,setChartPoint]=useState<number|null>(null);
  const [chartMonth,setChartMonth]=useState<number|null>(null);
  const [paymentMode,setPaymentMode]=useState<string|null>(null);
@@ -98,14 +84,14 @@ export default function FyPaymentCollectionScreen(){
  const fetchReport=useCallback(async(date:string,level:'executives'|'parties',executiveCode?:string)=>{
    const response:any=await api.getOwnerCardReport({date,prptype,view,report_type:'collection',level,...(executiveCode?{executive_code:executiveCode}:{})});
    if(!response?.success||!response?.data?.report)throw Error(response?.message||'Collection report unavailable');
-   const report=response.data.report;const history=Array.isArray(report.history)?report.history:null;const receiptCount=history?history.reduce((sum:number,d:any)=>sum+Math.max(0,Number(d.entry_count||0)),0):null;return {amount:num(report?.total?.amount),rows:normalize(report?.rows),receiptCount};
+   const report=response.data.report;const history=Array.isArray(report.history)?report.history:null;const receiptCount=history?history.reduce((sum:number,d:any)=>sum+Math.max(0,Number(d.entry_count||0)),0):null;return {amount:num(report?.total?.amount),...extractMonthTarget(report),rows:normalize(report?.rows),receiptCount};
  },[prptype,view]);
  useEffect(()=>{let cancelled=false;setBusy(true);setMonths([]);setCustomers([]);setReceiptDays([]);setDetailError('');setReceiptError('');
    (async()=>{const result:Month[]=[];for(let i=0;i<12;i++){
      const last=endOf(fy,i),start=i===0?`${fy}-04-01`:endOf(fy,i-1);
      if(last<start || last>today&&start>=today){result.push({label:NAMES[i],date:last,amount:null,rows:[]});continue;}
      const date=last>today?today:last;
-     try{const report=await fetchReport(date,'executives');result.push({label:NAMES[i],date,amount:report.amount,rows:report.rows,receiptCount:report.receiptCount,error:report.amount===null?'Missing total':undefined});}
+     try{const report=await fetchReport(date,'executives');result.push({label:NAMES[i],date,amount:report.amount,target:report.target,targetSource:report.targetSource,targetError:report.targetError,rows:report.rows,receiptCount:report.receiptCount,error:report.amount===null?'Missing total':undefined});}
      catch(e:any){result.push({label:NAMES[i],date,amount:null,rows:[],error:e?.message||'Unavailable'});}
      if(cancelled)return;
    }if(!cancelled){setMonths(result);setBusy(false);}})();return()=>{cancelled=true};
@@ -115,22 +101,22 @@ export default function FyPaymentCollectionScreen(){
      // Historical requests run in bounded batches instead of serially for 36 months.
      // Publish the comparison atomically; never reveal partially loaded FY values.
      const loaded:Record<number,Month[]>={};
-     const jobs=years.filter(y=>y!==activeFY).flatMap(y=>NAMES.map((label,i)=>({y,i,label,end:endOf(y,i)})));
+     const jobs=years.filter(y=>y!==fy).flatMap(y=>NAMES.map((label,i)=>({y,i,label,end:endOf(y,i)})));
      for(let offset=0;offset<jobs.length;offset+=6){
        const batch=jobs.slice(offset,offset+6);
        const results=await Promise.all(batch.map(async job=>{
          const monthStart=job.i===0?`${job.y}-04-01`:endOf(job.y,job.i-1);
          if(monthStart>=today)return {...job,date:job.end,amount:null,rows:[]} as Month & {y:number;i:number};
          const date=job.end>today?today:job.end;
-         try{const result=await fetchReport(date,'executives');return {...job,date,amount:result.amount,rows:result.rows,receiptCount:result.receiptCount} as Month & {y:number;i:number};}
+         try{const result=await fetchReport(date,'executives');return {...job,date,amount:result.amount,target:result.target,targetSource:result.targetSource,targetError:result.targetError,rows:result.rows,receiptCount:result.receiptCount} as Month & {y:number;i:number};}
          catch(e:any){return {...job,date,amount:null,rows:[],error:e?.message||'Unavailable'} as Month & {y:number;i:number};}
        }));
        if(cancelled)return;
-       for(const item of results){if(!loaded[item.y])loaded[item.y]=[];loaded[item.y][item.i]={label:item.label,date:item.date,amount:item.amount,rows:item.rows,receiptCount:item.receiptCount,error:item.error};}
+       for(const item of results){if(!loaded[item.y])loaded[item.y]=[];loaded[item.y][item.i]={label:item.label,date:item.date,amount:item.amount,target:item.target,targetSource:item.targetSource,targetError:item.targetError,rows:item.rows,receiptCount:item.receiptCount,error:item.error};}
      }
      if(!cancelled){setHistory(loaded);setHistoryReady(true);}
    })();return()=>{cancelled=true};
- },[activeFY,today,fetchReport]);
+ },[fy,activeFY,today,fetchReport]);
  // Each financial year has its own request queue. Historical FYs cannot be
  // starved by the current FY, and a failed month is never converted to zero.
  const [billingErrors,setBillingErrors]=useState<Record<number,string[]>>({});
@@ -286,6 +272,8 @@ export default function FyPaymentCollectionScreen(){
    if(next===fy)return;
    ++requestEpoch.current;
    lastLoadedFY.current=null;
+   // A selected historical month must not become a future-month drilldown.
+   if(next===activeFY&&month!==null&&endOf(next,month).slice(0,7)>today.slice(0,7))setMonth(null);
    setLoadingDetail(!!executive);setLoadingReceipts(!!customer);
    setReceiptDays([]);setExpandedReceipt(null);setDetailError('');setReceiptError('');
    setFy(next);
@@ -306,22 +294,38 @@ export default function FyPaymentCollectionScreen(){
  const previousAverage=previousAvailable.length?previousAvailable.reduce((a,m)=>a+(m.amount||0),0)/previousAvailable.length:null;
  const peakPrior=previousAvailable.length?Math.max(...previousAvailable.map(m=>m.amount||0)):null;
  const kpiCompare=(value:number|null,prior:number|null)=>value!==null&&prior!==null&&prior!==0?`${value>=prior?'▲':'▼'} ${Math.abs((value/prior-1)*100).toFixed(1)}% vs ${fyName(fy-1)}`:'Prior FY comparison unavailable';
- const targetMetric=(y:number):number|null=>{
-   // Do not present an invented historical achievement percentage: the API's
-   // BalAmt is not reconstructed as-of prior FY dates.
-   if(y!==activeFY)return null;
-   const due=collectionTargets[y]?.[targetComparableIndex];
-   const collectionMonths=y===fy?months:history[y];
-   if(due===null||due===undefined||!collectionMonths||collectionMonths.length<=targetComparableIndex)return null;
-   let collected=0;
-   for(let i=0;i<=targetComparableIndex;i++){
-     const actual=collectionMonths[i]?.amount;
-     if(actual===null||actual===undefined)return null;
-     collected+=actual;
-   }
-   // Coverage of collected plus still-due amounts; not a target-achievement %.
-   return collected+due>0?collected/(collected+due)*100:null;
+ // All FY achievement percentages use additive MONTHLY opening Collection
+ // targets. Only compare months with both verified Actual and verified Target.
+ // For the current FY exclude the future months completely.
+ const targetSummary=(y:number,compareAtStage=false)=>{
+   const source=y===fy?months:history[y];
+   const last=compareAtStage||y===activeFY?comparableIndex:11;
+   return buildTargetSummary(source,last);
  };
+ const targetMetric=(y:number,compareAtStage=false):number|null=>targetSummary(y,compareAtStage).achievement;
+ const selectedTargetSummary=targetSummary(fy,true);
+ const missingTargetLabel=(y:number,atStage=false):string=>{
+   const result=targetSummary(y,atStage);
+   if(!result.missing.length)return result.target===0?'No opening balance / zero target':'Target unavailable';
+   return `${result.verified}/${result.expected} months verified · missing ${result.missing.slice(0,3).join(', ')}${result.missing.length>3?` +${result.missing.length-3} more`:''}`;
+ };
+ const targetCurrentAchievement=targetMetric(fy,true);
+ const targetPreviousAchievement=targetMetric(fy-1,true);
+ const targetPreviousChange=targetCurrentAchievement!==null&&targetPreviousAchievement!==null&&targetPreviousAchievement>0
+   ?(targetCurrentAchievement/targetPreviousAchievement-1)*100:null;
+ const targetPreviousLabel=targetPreviousChange===null?'Previous FY achievement unavailable':
+   `${targetPreviousChange>=0?'▲':'▼'} ${Math.abs(targetPreviousChange).toFixed(1)}% vs ${fyName(fy-1)}`;
+ const selectedTotal=sumRows(selectedRows);
+ const visibleTotal=sumRows(visible);
+ const searchActive=search.trim().length>0;
+ const listKind=executive?'CUSTOMERS':'EXECUTIVES';
+ const selectedPeriod=month===null?'all available months':`${NAMES[month]} ${fy+(month>=9?1:0)}`;
+ const periodRowTotal=month===null?total:months[month]?.amount??null;
+ const executiveRowDifference=!executive&&!searchActive&&periodRowTotal!==null?Math.round((selectedTotal-periodRowTotal)*100)/100:0;
+ const customerRowDifference=executive&&!searchActive&&!loadingDetail?Math.round((selectedTotal-(rows.find(r=>r.code===executive.code)?.amount??executive.amount))*100)/100:0;
+ const listDifference=!executive?executiveRowDifference:customerRowDifference;
+ const listSecondary=searchActive?`Matching ${visible.length} of ${selectedRows.length} ${listKind.toLowerCase()} · overall ${displayAmount(selectedTotal)}`:
+  `${selectedPeriod} · ${selectedRows.length} ${listKind.toLowerCase()}${Math.abs(listDifference)>0.02?' · breakdown differs from the parent total by '+displayAmount(Math.abs(listDifference)):''}`;
 
  const tiles=[
   {key:'avg',label:'MONTHLY AVERAGE',value:avg,sub:kpiCompare(avg,previousAverage),info:'Collection divided by months with verified data.',series:available.map(m=>m.amount||0)},
@@ -329,7 +333,7 @@ export default function FyPaymentCollectionScreen(){
   {key:'receipts',label:'RECEIPTS',value:receiptCount,sub:receiptCount===null?'Receipt history unavailable':'Distinct receipt entries',info:'Counts distinct receipt UID + SrNo from the same monthly collection history; D2 allocations are not counted as separate receipts.',series:[]},
   {key:'receiptAvg',label:'AVG RECEIPT',value:averageReceipt,sub:averageReceipt===null?'Receipt count unavailable':'Collected ÷ distinct receipts',info:'Collection total divided by verified distinct receipt entries from the same available months.',series:[]},
   {key:'billed',label:'COLLECTED VS BILLED',value:billedMetric(fy),sub:billedMetric(fy)===null?(billingErrors[fy]?.length?`Sales unavailable: ${billingErrors[fy].slice(0,2).join('; ')}`:billingLoading[fy]?'Loading billed sales…':'Billing total unavailable'):'Collection ÷ billed sales',info:'Collection divided by billed sales from the Sales report for the same financial-year months and property.',series:[]},
-  {key:'target',label:'COLLECTION COVERAGE',value:targetMetric(fy),sub:targetLoading?'Loading due-outstanding snapshot…':fy!==activeFY?'Historical due balance not reconstructed':targetMetric(fy)===null?'Coverage unavailable':'Collected ÷ (collected + due outstanding)',info:'Current FY only: verified cumulative Collection divided by (cumulative Collection + latest due-outstanding snapshot). This is coverage, NOT achievement against an approved target. Historical snapshots are unavailable because target-card does not reconstruct historical BalAmt.',series:[]}
+  {key:'target',label:'ACHIEVEMENT VS TARGET',value:targetMetric(fy,true),sub:comparisonBusy?'Loading monthly Collection targets…':targetMetric(fy,true)===null?missingTargetLabel(fy,true):targetPreviousLabel,info:'FY achievement uses the same opening-outstanding Collection target shown in the Monthly Report for each month. Monthly actuals and monthly targets are summed independently; achievement = total collected ÷ total target × 100. No future or missing months are counted as zero.',series:[]}
  ];
  const max=Math.max(1,...months.map(x=>Math.max(0,x.amount||0)));
   // A fixed-position web overlay must never survive after the URL changes.
@@ -345,11 +349,17 @@ export default function FyPaymentCollectionScreen(){
     {executive&&<><Text style={s.crumbSeparator}>›</Text><Pressable accessibilityRole="button" accessibilityLabel={`Back to customers of ${executive.name}`} onPress={toExecutive} style={s.crumbPress}><Text style={customer?s.crumbLink:s.crumbCurrent} numberOfLines={1}>{executive.name}</Text></Pressable></>}
     {customer&&<><Text style={s.crumbSeparator}>›</Text><Pressable onPress={()=>setPaymentMode(null)} style={s.crumbPress}><Text style={paymentMode?s.crumbLink:s.crumbCurrent} numberOfLines={2}>{customer.name}</Text></Pressable></>}{paymentMode&&<><Text style={s.crumbSeparator}>›</Text><Text style={s.crumbCurrent}>{paymentMode}</Text></>}
    </View>}
+   <View style={{flexDirection:'row',justifyContent:'flex-end',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+     <Text style={s.eyebrow}>AMOUNT DISPLAY</Text>
+     <View accessibilityRole="radiogroup" accessibilityLabel="Amount display mode" style={{flexDirection:'row',padding:3,borderRadius:9,borderWidth:1,borderColor:BORDER,backgroundColor:'#FFFFFF',gap:3}}>
+       {(['compact','actual'] as const).map(opt=><Pressable key={opt} accessibilityRole="radio" accessibilityState={{checked:amountMode===opt}} accessibilityLabel={opt==='compact'?'Compact amounts in crore and lakh':'Actual amounts in rupees and paise'} onPress={()=>setAmountMode(opt)} style={{paddingVertical:7,paddingHorizontal:12,borderRadius:6,backgroundColor:amountMode===opt?DARK:'#FFFFFF'}}><Text style={{fontSize:11,fontWeight:'800',color:amountMode===opt?'#FFFFFF':INK}}>{opt==='compact'?'Compact':'Actual'}</Text></Pressable>)}
+     </View>
+   </View>
    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>{years.map((y,i)=><Pressable key={y} onPress={()=>changeFY(y)} style={[s.chip,fy===y&&s.chipActive]}><Text style={[s.chipLabel,fy===y&&s.white]}>{fyName(y)}{i===0?' · current':''}</Text></Pressable>)}</ScrollView>
    {comparisonBusy?<Text style={[s.note,{marginBottom:12}]}>Loading FY comparison…</Text>:null}
    {!busy&&months.length>0&&available.length===0?<View style={s.warning}><Text style={s.warningText}>Collection data is unavailable for {fyName(fy)}. No amounts have been estimated.</Text></View>:null}
    {comparisonBusy&&!executive?<OverviewSkeleton width={width}/>:!executive?<>
-    <View style={s.hero}><View style={{flex:1,minWidth:220}}><Text style={s.eyebrow}>COLLECTED · {fyName(fy)} · {fy===activeFY?'TO DATE':'FULL YEAR'}</Text><Text style={s.heroValue}>{busy?'Loading…':compact(fy===activeFY?yearCurrent:total)}</Text><Text style={[s.note,{color:yoy!==null&&yoy<0?'#B6402B':GREEN,fontWeight:'700'}]}>{yoy===null?'Comparable previous FY data unavailable':`${yoy>=0?'▲':'▼'} ${Math.abs(yoy).toFixed(1)}% vs ${fyName(fy-1)} at this stage`}</Text><Text style={s.note}>{fy===activeFY?`Actual receipts through ${today}`:'Completed FY total'} · Missing months are never treated as zero</Text></View><View style={[s.heroAside,{backgroundColor:'#F5F2EE',padding:12,borderRadius:10}]}><Text style={s.heroAsideText}>{yearCurrent!==null&&yearPrior!==null?`${yearCurrent>=yearPrior?'Ahead of':'Behind'} ${fyName(fy-1)} by ${compact(Math.abs(yearCurrent-yearPrior))} at the comparable stage`:'Previous FY comparison unavailable'}</Text><Text style={s.heroAsideText}>{requiredPace!==null?`${compact(requiredPace)} per remaining month needed to pass ${fyName(fy-1)} full-year collection`:'Required pace unavailable until the prior FY is fully loaded'}</Text><Text style={s.heroAsideText}>{topShare!==null?`${topExecutive?.name} accounts for ${topShare.toFixed(1)}% of available collections`:'Executive concentration unavailable'}</Text></View><View style={{width:'100%',flexDirection:'row',gap:6,flexWrap:'wrap'}}>{historyYears.map(y=><Pressable key={y} onPress={()=>changeFY(y)} style={[s.yearCard,fy===y&&s.yearCardActive]}><Text style={[s.eyebrow,fy===y&&s.white]}>{fyName(y)} {y===activeFY?'· to date':''}</Text><Text style={[s.tileValue,fy===y&&s.white]}>{busy&&y===fy?'Loading…':compact(fySum(y,comparableIndex))}</Text><Text style={[s.note,fy===y&&s.white]}>At comparable stage</Text></Pressable>)}</View></View>
+    <View style={s.hero}><View style={{flex:1,minWidth:220}}><Text style={s.eyebrow}>COLLECTED · {fyName(fy)} · {fy===activeFY?'TO DATE':'FULL YEAR'}</Text><Text style={[s.heroValue,amountMode==='actual'&&{fontSize:21}]}>{busy?'Loading…':displayAmount(fy===activeFY?yearCurrent:total)}</Text><Text style={[s.note,{color:yoy!==null&&yoy<0?'#B6402B':GREEN,fontWeight:'700'}]}>{yoy===null?'Comparable previous FY data unavailable':`${yoy>=0?'▲':'▼'} ${Math.abs(yoy).toFixed(1)}% vs ${fyName(fy-1)} at this stage`}</Text><Text style={s.note}>{fy===activeFY?`Actual receipts through ${today}`:'Completed FY total'} · Missing months are never treated as zero</Text></View><View style={[s.heroAside,{backgroundColor:'#F5F2EE',padding:12,borderRadius:10}]}><Text style={s.heroAsideText}>{yearCurrent!==null&&yearPrior!==null?`${yearCurrent>=yearPrior?'Ahead of':'Behind'} ${fyName(fy-1)} by ${displayAmount(Math.abs(yearCurrent-yearPrior))} at the comparable stage`:'Previous FY comparison unavailable'}</Text><Text style={s.heroAsideText}>{requiredPace!==null?`${displayAmount(requiredPace)} per remaining month needed to pass ${fyName(fy-1)} full-year collection`:'Required pace unavailable until the prior FY is fully loaded'}</Text><Text style={s.heroAsideText}>{topShare!==null?`${topExecutive?.name} accounts for ${topShare.toFixed(1)}% of available collections`:'Executive concentration unavailable'}</Text></View><View style={{width:'100%',flexDirection:'row',gap:6,flexWrap:'wrap'}}>{historyYears.map(y=><Pressable key={y} onPress={()=>changeFY(y)} style={[s.yearCard,fy===y&&s.yearCardActive]}><Text style={[s.eyebrow,fy===y&&s.white]}>{fyName(y)} {y===activeFY?'· to date':''}</Text><Text style={[s.tileValue,fy===y&&s.white]}>{busy&&y===fy?'Loading…':displayAmount(fySum(y,comparableIndex))}</Text><Text style={[s.note,fy===y&&s.white]}>At comparable stage</Text></Pressable>)}</View></View>
     <View style={[s.tiles,{flexDirection:'row',flexWrap:'wrap',alignItems:'flex-start'}]}>{tiles.map(t=>{
       const expanded=selectedKpi===t.key;
       const tileWidth=expanded?'100%':width>740?'19%':width>470?'32%':'48%';
@@ -370,22 +380,60 @@ export default function FyPaymentCollectionScreen(){
           return t.key==='receipts'?count:count>0?collected/count:null;
         }
         if(t.key==='billed')return billedMetric(y);
-        if(t.key==='target')return targetMetric(y);
+        if(t.key==='target')return targetMetric(y,true);
         return null;
       };
-      const metricDisplay=(value:number|null)=>t.key==='receipts'?(value===null?'—':Math.round(value).toLocaleString('en-IN')):t.key==='billed'||t.key==='target'?(value===null?'—':`${value.toFixed(1)}%`):compact(value);
+      const metricDisplay=(value:number|null)=>t.key==='receipts'?(value===null?'—':Math.round(value).toLocaleString('en-IN')):t.key==='billed'||t.key==='target'?(value===null?'—':`${value.toFixed(1)}%`):displayAmount(value);
       return <Pressable key={t.key} accessibilityRole="button" accessibilityLabel={`${t.label} ${expanded?'collapse':'expand'} breakdown`} onPress={()=>setSelectedKpi(expanded?null:t.key)} style={[s.tile,{width:tileWidth,minHeight:expanded?185:119,overflow:'hidden',borderColor:expanded?'#23658A':BORDER,borderWidth:expanded?1.5:1}]}>
         <View style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={[s.eyebrow,{flex:1}]}>{t.label}</Text><Text style={{fontSize:10,color:MUTED}}>{expanded?'⌃':'⌄'}</Text></View>
-        <Text style={s.tileValue}>{metricDisplay(t.value)}</Text>
-        <Text style={[s.note,{color:t.sub.startsWith('▼')?'#B6402B':MUTED}]}>{t.sub}</Text>
-        {t.series.length>1?<View style={{height:24,flexDirection:'row',alignItems:'flex-end',gap:3,marginTop:8}}>{t.series.map((v,i)=><View key={i} style={{flex:1,height:`${Math.max(5,v/Math.max(1,...t.series)*100)}%` as any,backgroundColor:'#9CBBCB'}}/>)}</View>:null}
-        {expanded?<View style={{marginTop:12,borderTopWidth:1,borderTopColor:BORDER,paddingTop:10}}>
-          <View style={{flexDirection:'row',justifyContent:'space-between',marginBottom:7}}><Text style={s.eyebrow}>YEAR</Text><Text style={s.eyebrow}>{t.label}</Text></View>
-          {historyYears.map(y=><View key={y} style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:5}}><Text style={[s.note,y===fy&&{color:'#23658A',fontWeight:'800'}]}>{fyName(y)} · {y===activeFY?'to date':'at comparable stage'}</Text><Text style={[s.note,{fontWeight:'800',color:INK}]}>{metricDisplay(metricFor(y))}{t.key==='billed'&&metricFor(y)===null?(billingLoading[y]?' · loading':billingErrors[y]?.length?' · sales error':' · incomplete'):''}{t.key==='target'&&metricFor(y)===null?(y!==activeFY?' · historical N/A':targetLoading?' · loading':' · unavailable'):''}</Text></View>)}
-          <Text style={[s.note,{marginTop:8}]}>{t.info}</Text>
-          {t.key==='peak'&&peak?<Text style={[s.note,{marginTop:5}]}>Best available month: {peak.label}. Select the month in the monthly breakdown below.</Text>:null}
-          {t.key==='target'?<Text style={[s.note,{marginTop:5}]}>{targetLoading?'Loading monthly Collection targets…':Object.values(targetErrors).length?`Target API errors: ${Object.values(targetErrors).join('; ')}`:'Current FY uses one AUTO_DUE_OUTSTANDING snapshot from the unchanged Monthly Target API. Historical coverage is withheld because past due balances cannot be reconstructed from that API. No monthly outstanding snapshots are added.'}</Text>:null}
-        </View>:null}
+        <Text style={[s.tileValue,amountMode==='actual'&&t.key!=='target'&&t.key!=='billed'&&t.key!=='receipts'&&{fontSize:13}]}>{metricDisplay(t.value)}</Text>
+        <Text style={[s.note,{color:t.sub.startsWith('▼')?'#B6402B':t.sub.startsWith('▲')?GREEN:MUTED}]}>{t.sub}</Text>
+         {t.key==='target'&&selectedTargetSummary.achievement!==null?<Text style={s.note}>Collected {displayAmount(selectedTargetSummary.collected)} / Target {displayAmount(selectedTargetSummary.target)}</Text>:null}
+        {t.series.length>1?<View style={{height:24,flexDirection:'row',alignItems:'flex-end',gap:3,marginTop:8}}>{t.series.map((v,i)=><Pressable key={i} accessibilityLabel={`${available[i]?.label||NAMES[i]}: ${displayAmount(v)}`} onHoverIn={()=>setSparkPoint(i)} onPress={(event)=>{event.stopPropagation();setSparkPoint(sparkPoint===i?null:i);}} style={{flex:1,height:'100%',justifyContent:'flex-end'}}><View style={{height:`${Math.max(5,v/Math.max(1,...t.series)*100)}%` as any,backgroundColor:sparkPoint===i?'#176F58':'#9CBBCB'}}/></Pressable>)}</View>:null}
+        {t.series.length>1&&sparkPoint!==null&&t.series[sparkPoint]!==undefined?<Text style={[s.note,{color:INK,fontWeight:'700'}]}>{available[sparkPoint]?.label||NAMES[sparkPoint]}: {displayAmount(t.series[sparkPoint])} · tap a bar to compare</Text>:null}
+         {expanded?<View style={{marginTop:12,borderTopWidth:1,borderTopColor:BORDER,paddingTop:10}}>
+           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:7}}>
+             <Text style={s.eyebrow}>YEAR</Text>
+             <View style={{flexDirection:'row',alignItems:'center',gap:18}}>
+               <Text style={s.eyebrow}>{t.label}</Text>
+               {t.key==='target'?<Text style={s.eyebrow}>VS PREVIOUS</Text>:null}
+             </View>
+           </View>
+           {historyYears.map((y,idx)=>{
+             const value=metricFor(y);
+             const previous=idx>0?metricFor(historyYears[idx-1]):null;
+             const yearChange=t.key==='target'&&value!==null&&previous!==null&&previous>0?(value/previous-1)*100:null;
+             return <View key={y} style={{paddingVertical:7,borderBottomWidth:1,borderBottomColor:BORDER}}>
+               <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                 <Text style={[s.note,{flex:1},y===fy&&{color:'#23658A',fontWeight:'800'}]}>{fyName(y)} · {y===activeFY?'to date':'at comparable stage'}</Text>
+                 <Text style={[s.note,{fontWeight:'900',color:INK,textAlign:'right',minWidth:56}]}>{metricDisplay(value)}</Text>
+                 {t.key==='target'?<Text style={[s.note,{fontWeight:'800',color:yearChange===null?MUTED:yearChange>=0?GREEN:'#B6402B',textAlign:'right',width:100}]}>{yearChange===null?'—':`${yearChange>=0?'▲':'▼'} ${Math.abs(yearChange).toFixed(1)}%`}</Text>:null}
+               </View>
+               {t.key==='target'&&value===null?<Text style={[s.note,{marginTop:3,color:'#9D5011'}]}>{comparisonBusy?'Loading…':missingTargetLabel(y,true)}</Text>:null}
+             </View>;
+           })}
+           <Text style={[s.note,{marginTop:8}]}>{t.info}</Text>
+           {t.key==='peak'&&peak?<Text style={[s.note,{marginTop:5}]}>Best available month: {peak.label}. Select the month in the monthly breakdown below.</Text>:null}
+           {t.key==='target'?<>
+             <Pressable accessibilityRole="button" accessibilityLabel={targetBreakdownOpen?'Hide monthly achievement breakdown':'Show full monthly achievement breakdown'} onPress={(event)=>{event.stopPropagation?.();setTargetBreakdownOpen(open=>!open);}} style={{alignSelf:'flex-start',paddingVertical:10,paddingRight:16,marginTop:2}}><Text style={s.link}>{targetBreakdownOpen?'Hide breakdown ⌃':'Full breakdown ›'}</Text></Pressable>
+             {targetBreakdownOpen?<View style={{marginTop:4}}>
+               <Text style={[s.eyebrow,{marginBottom:6}]}>MONTHLY BREAKDOWN · {fyName(fy)} · TARGET / COLLECTED / ACHIEVEMENT</Text>
+               {months.slice(0,comparableIndex+1).map((m,i)=>{
+                 const percent=monthAchievement(m?.amount??null,m?.target??null);
+                 return <View key={`${fy}-${i}`} style={{paddingVertical:7,borderBottomWidth:1,borderBottomColor:BORDER}}>
+                   <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',gap:6}}>
+                     <Text style={[s.rankName,{minWidth:34}]}>{NAMES[i]}</Text>
+                     <Text style={[s.note,{fontWeight:'700'}]}>Target {displayAmount(m?.target??null)}</Text>
+                     <Text style={[s.note,{fontWeight:'700'}]}>Collected {displayAmount(m?.amount??null)}</Text>
+                     <Text style={{fontSize:11,fontWeight:'800',color:percent===null?MUTED:percent>=100?GREEN:INK}}>{percent===null?'—':`${percent.toFixed(1)}%`}</Text>
+                   </View>
+                   {m?.targetError?<Text style={[s.note,{color:'#9D5011'}]}>{m.targetError}</Text>:null}
+                 </View>;
+               })}
+               {selectedTargetSummary.achievement!==null?<AmountTotal format={displayAmount} label="SUMMED MONTHLY TARGET" count={selectedTargetSummary.verified} total={selectedTargetSummary.target||0} secondary={`Collected: ${displayAmount(selectedTargetSummary.collected)} · Achievement: ${selectedTargetSummary.achievement.toFixed(2)}%`}/>:<Text style={[s.note,{marginTop:8,color:'#9D5011'}]}>{comparisonBusy?'Loading monthly reports…':missingTargetLabel(fy,true)}</Text>}
+             </View>:null}
+           </>:null}
+         </View>:null}
       </Pressable>;
     })}</View>
     <View style={s.sectionHeading}><Text style={s.sectionTitle}>CUMULATIVE · THE CHASE</Text><Text style={s.note}>Tap a point for FY values · dashed reference at current stage</Text></View>
@@ -394,19 +442,20 @@ export default function FyPaymentCollectionScreen(){
       {curves.map((c,i)=><Polyline key={c.y} points={points(c.values)} fill="none" stroke={['#B8B0A8','#77726E','#176F58'][i]} strokeWidth={i===2?3:2}/>) }
       {curves.map((c,i)=>c.values.map((v,j)=>v===null?null:<Circle key={`${c.y}-${j}`} cx={20+j*(plotW-40)/11} cy={plotH-18-(v/graphMax)*(plotH-36)} r={chartPoint===j?6:4} onPress={()=>setChartPoint(j)} fill={['#B8B0A8','#77726E','#176F58'][i]}/>))}
     </Svg></View><View style={{flexDirection:'row',justifyContent:'space-between'}}>{NAMES.map((n,i)=><Pressable key={n} onPress={()=>setChartPoint(i)} style={{paddingVertical:8,flex:1,alignItems:'center'}}><Text style={[s.note,chartPoint===i&&{fontWeight:'900',color:GREEN}]}>{n}</Text></Pressable>)}</View>
-    <View style={{flexDirection:'row',flexWrap:'wrap',gap:14,marginTop:7}}>{historyYears.map((y,i)=><Text key={y} style={{fontSize:11,color:['#B8B0A8','#77726E','#176F58'][i],fontWeight:'800'}}>{fyName(y)} · {compact(fySum(y,chartPoint??comparableIndex))}</Text>)}</View>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:14,marginTop:7}}>{historyYears.map((y,i)=><Text key={y} style={{fontSize:11,color:['#B8B0A8','#77726E','#176F58'][i],fontWeight:'800'}}>{fyName(y)} · {displayAmount(fySum(y,chartPoint??comparableIndex))}</Text>)}</View>
     {chartPoint!==null?<Text style={s.note}>{NAMES[chartPoint]} cumulative values · tap another month to compare</Text>:null}
     </View>
-    <View style={[s.panel,{marginTop:0}]}><Text style={s.eyebrow}>COLLECTION PACE · VERIFIED RECEIPTS</Text><Text style={s.note}>{requiredPace!==null?`To exceed ${fyName(fy-1)} full-year collection (${compact(priorFull)}), ${compact(requiredPace)} per remaining month is required over ${monthsRemaining} months. Current average: ${compact(avg)} per available month.`:'Pace comparison is shown only when complete previous-year receipt data is available.'}</Text><Text style={s.note}>Collection target achievement uses configured monthly Collection targets from the existing Monthly Target service.</Text></View>
+    <View style={[s.panel,{marginTop:0}]}><Text style={s.eyebrow}>COLLECTION PACE · VERIFIED RECEIPTS</Text><Text style={s.note}>{requiredPace!==null?`To exceed ${fyName(fy-1)} full-year collection (${displayAmount(priorFull)}), ${displayAmount(requiredPace)} per remaining month is required over ${monthsRemaining} months. Current average: ${displayAmount(avg)} per available month.`:'Pace comparison is shown only when complete previous-year receipt data is available.'}</Text><Text style={s.note}>Achievement vs Target sums verified opening-outstanding monthly Collection targets from the same Collection reports; percentages are withheld when a required month is unavailable.</Text></View>
     <View style={s.sectionHeading}><Text style={s.sectionTitle}>Month by Month · Three Years</Text><Text style={s.note}>Hover or tap a bar for all three FY amounts</Text></View>
     <View style={s.panel}>
      <View style={{flexDirection:'row',justifyContent:'flex-end',gap:14,flexWrap:'wrap',marginBottom:14}}>{historyYears.map((y,yi)=><View key={y} style={{flexDirection:'row',alignItems:'center',gap:5}}><View style={{height:9,width:9,backgroundColor:['#C6B7A5','#859DA8',GREEN][yi],borderRadius:2}}/><Text style={s.note}>{fyName(y)}</Text></View>)}</View>
-     <View style={{flexDirection:'row',alignItems:'flex-end',height:215,gap:3}}>{NAMES.map((name,i)=>{const values=historyYears.map(y=>(y===fy?months:history[y])?.[i]?.amount??null);const maxV=Math.max(1,...historyYears.flatMap(y=>(y===fy?months:history[y]||[]).map(m=>m?.amount||0)));return <Pressable key={name} onPress={()=>setChartMonth(chartMonth===i?null:i)} onHoverIn={()=>setChartMonth(i)} style={{flex:1,alignItems:'center',justifyContent:'flex-end',height:'100%'}} accessibilityLabel={`${name}: ${values.map((v,j)=>fyName(historyYears[j])+' '+amount(v)).join(', ')}`}><View style={{flex:1,width:'100%',flexDirection:'row',alignItems:'flex-end',justifyContent:'center',gap:2}}>{values.map((v,j)=><View key={j} style={{width:'29%',maxWidth:13,height:v===null?0:`${Math.max(2,v/maxV*100)}%` as any,backgroundColor:['#C6B7A5','#859DA8',GREEN][j],borderTopLeftRadius:2,borderTopRightRadius:2}}/>)}</View><Text style={{fontSize:10,color:INK,marginTop:8}}>{name}</Text></Pressable>;})}</View>
-     {chartMonth!==null?<View style={{backgroundColor:'#F5F2EE',padding:12,borderRadius:8,marginTop:12}}><Text style={s.rankName}>{NAMES[chartMonth]} · Three-FY comparison</Text>{historyYears.map(y=>{const m=(y===fy?months:history[y])?.[chartMonth];return <Text key={y} style={s.note}>{fyName(y)}: {m?.amount===null||m?.amount===undefined?"Not available":amount(m.amount)} · {m?.rows?.length??0} executive rows</Text>;})}<Pressable onPress={()=>chooseMonth(chartMonth)} style={{paddingVertical:9}}><Text style={s.link}>Open {NAMES[chartMonth]} collection ›</Text></Pressable></View>:null}
+     <View style={{flexDirection:'row',alignItems:'flex-end',height:215,gap:3}}>{NAMES.map((name,i)=>{const values=historyYears.map(y=>(y===fy?months:history[y])?.[i]?.amount??null);const maxV=Math.max(1,...historyYears.flatMap(y=>(y===fy?months:history[y]||[]).map(m=>m?.amount||0)));return <Pressable key={name} onPress={()=>setChartMonth(chartMonth===i?null:i)} onHoverIn={()=>setChartMonth(i)} style={{flex:1,alignItems:'center',justifyContent:'flex-end',height:'100%'}} accessibilityLabel={`${name}: ${values.map((v,j)=>fyName(historyYears[j])+' '+displayAmount(v)).join(', ')}`}><View style={{flex:1,width:'100%',flexDirection:'row',alignItems:'flex-end',justifyContent:'center',gap:2}}>{values.map((v,j)=><View key={j} style={{width:'29%',maxWidth:13,height:v===null?0:`${Math.max(2,v/maxV*100)}%` as any,backgroundColor:['#C6B7A5','#859DA8',GREEN][j],borderTopLeftRadius:2,borderTopRightRadius:2}}/>)}</View><Text style={{fontSize:10,color:INK,marginTop:8}}>{name}</Text></Pressable>;})}</View>
+     <View style={{marginTop:12,borderTopWidth:1,borderTopColor:BORDER,paddingTop:10,gap:5}}><Text style={s.eyebrow}>FINANCIAL-YEAR COLLECTION TOTALS</Text>{historyYears.map(y=>{const source=y===fy?months:history[y];const valid=source?.filter(m=>m.amount!==null)||[];return <View key={y} style={{flexDirection:'row',justifyContent:'space-between',gap:6}}><Text style={s.note}>{fyName(y)} · {valid.length} months</Text><Text style={[s.note,{fontWeight:'800',color:INK}]}>{valid.length>0?displayAmount(valid.reduce((sum,m)=>sum+(m.amount||0),0)): '—'}{valid.length<(y===activeFY?comparableIndex+1:12)?' · incomplete':''}</Text></View>;})}</View>
+     {chartMonth!==null?<View style={{backgroundColor:'#F5F2EE',padding:12,borderRadius:8,marginTop:12}}><Text style={s.rankName}>{NAMES[chartMonth]} · Three-FY comparison</Text>{historyYears.map(y=>{const m=(y===fy?months:history[y])?.[chartMonth];return <Text key={y} style={s.note}>{fyName(y)}: {m?.amount===null||m?.amount===undefined?"Not available":displayAmount(m.amount)} · {m?.rows?.length??0} executive rows</Text>;})}<Pressable onPress={()=>chooseMonth(chartMonth)} style={{paddingVertical:9}}><Text style={s.link}>Open {NAMES[chartMonth]} collection ›</Text></Pressable></View>:null}
     </View>
-    {month!==null?<View style={s.monthPanel}><Text style={s.sectionTitle}>{NAMES[month]} {fy+(month>=9?1:0)}</Text><Text style={s.tileValue}>{compact(months[month]?.amount??null)}</Text><Pressable onPress={()=>setMonth(null)}><Text style={s.link}>Show full FY ›</Text></Pressable></View>:null}
+    {month!==null?<View style={s.monthPanel}><Text style={s.sectionTitle}>{NAMES[month]} {fy+(month>=9?1:0)}</Text><Text style={s.tileValue}>{displayAmount(months[month]?.amount??null)}</Text><Text style={s.note}>Monthly Collection total · {displayAmount(months[month]?.amount??null)} · {months[month]?.rows?.length??0} executives</Text><Pressable onPress={()=>setMonth(null)}><Text style={s.link}>Show full FY ›</Text></Pressable></View>:null}
    </>:null}
-   {executive&&!customer?<View style={{marginTop:12,marginBottom:12}}><Text style={s.eyebrow}>PERIOD · {month===null?'ALL MONTHS':NAMES[month].toUpperCase()}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:8}}>{[{label:'All Months',i:null as number|null},...NAMES.map((label,i)=>({label,i}))].map(x=><Pressable key={x.label} onPress={()=>{if(month===x.i)return;setMonth(x.i);setPaymentMode(null);setReceiptDays([]);setCustomers([]);setExpandedReceipt(null);setSearch('');const currentExecutive=executive;const currentCustomer=customer;if(currentExecutive){const epoch=++requestEpoch.current;setLoadingDetail(true);setLoadingReceipts(!!currentCustomer);(async()=>{const source=x.i===null?months.filter(m=>m.amount!==null):(months[x.i]?[months[x.i]]:[]);const lists:Row[][]=[];const days=new Map<string,ReceiptDay>();let errors=0;for(const m of source){if(!m||m.amount===null)continue;try{const result=await fetchReport(m.date,'parties',currentExecutive.code);lists.push(result.rows);if(currentCustomer){const response:any=await api.getOwnerCardReport({date:m.date,prptype,view,report_type:'collection',level:'parties',executive_code:currentExecutive.code,party_code:currentCustomer.code});if(!response?.success)throw Error('Receipt details unavailable');for(const d of response?.data?.report?.history||[]){const key=String(d.date_ymd);const old=days.get(key);days.set(key,{date:key,label:String(d.date_label||key),amount:(old?.amount||0)+Number(d.amount||0),entries:(old?.entries||0)+Number(d.entry_count||0),receipts:[...(old?.receipts||[]),...((d.parties||[]).flatMap((party:any)=>party.receipts||[]) as ReceiptItem[])]});}}}catch{errors++;}}if(epoch!==requestEpoch.current)return;const next=merge(lists);setCustomers(next);setLoadingDetail(false);if(currentCustomer){setCustomer(next.find(r=>r.code===currentCustomer.code)||currentCustomer);setReceiptDays([...days.values()].sort((a,b)=>b.date.localeCompare(a.date)));setLoadingReceipts(false);}setDetailError(errors?`${errors} month(s) unavailable`:'' );})();}}} style={{paddingHorizontal:10,paddingVertical:8,borderRadius:7,backgroundColor:month===x.i?DARK:'#FFFFFF',borderWidth:1,borderColor:BORDER}}><Text style={{fontSize:11,fontWeight:'700',color:month===x.i?'#FFFFFF':INK}}>{x.label}</Text></Pressable>)}</View></View>:null}
+   {executive&&!customer?<View style={{marginTop:12,marginBottom:12}}><Text style={s.eyebrow}>PERIOD · {month===null?'ALL MONTHS':NAMES[month].toUpperCase()}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:8}}>{[{label:'All Months',i:null as number|null},...NAMES.map((label,i)=>({label,i}))].map(x=><Pressable key={x.label} onPress={()=>{if(month===x.i||(x.i!==null&&months[x.i]?.amount===null))return;setMonth(x.i);setPaymentMode(null);setReceiptDays([]);setCustomers([]);setExpandedReceipt(null);setSearch('');const currentExecutive=executive;const currentCustomer=customer;if(currentExecutive){const epoch=++requestEpoch.current;setLoadingDetail(true);setLoadingReceipts(!!currentCustomer);(async()=>{const source=x.i===null?months.filter(m=>m.amount!==null):(months[x.i]?[months[x.i]]:[]);const lists:Row[][]=[];const days=new Map<string,ReceiptDay>();let errors=0;for(const m of source){if(!m||m.amount===null)continue;try{const result=await fetchReport(m.date,'parties',currentExecutive.code);lists.push(result.rows);if(currentCustomer){const response:any=await api.getOwnerCardReport({date:m.date,prptype,view,report_type:'collection',level:'parties',executive_code:currentExecutive.code,party_code:currentCustomer.code});if(!response?.success)throw Error('Receipt details unavailable');for(const d of response?.data?.report?.history||[]){const key=String(d.date_ymd);const old=days.get(key);days.set(key,{date:key,label:String(d.date_label||key),amount:(old?.amount||0)+Number(d.amount||0),entries:(old?.entries||0)+Number(d.entry_count||0),receipts:[...(old?.receipts||[]),...((d.parties||[]).flatMap((party:any)=>party.receipts||[]) as ReceiptItem[])]});}}}catch{errors++;}}if(epoch!==requestEpoch.current)return;const next=merge(lists);setCustomers(next);setLoadingDetail(false);if(currentCustomer){setCustomer(next.find(r=>r.code===currentCustomer.code)||currentCustomer);setReceiptDays([...days.values()].sort((a,b)=>b.date.localeCompare(a.date)));setLoadingReceipts(false);}setDetailError(errors?`${errors} month(s) unavailable`:'' );})();}}} style={{paddingHorizontal:10,paddingVertical:8,borderRadius:7,backgroundColor:month===x.i?DARK:'#FFFFFF',borderWidth:1,borderColor:BORDER}}><Text style={{fontSize:11,fontWeight:'700',color:month===x.i?'#FFFFFF':INK}}>{x.label}</Text></Pressable>)}</View></View>:null}
    {customer?<View style={[s.panel,{padding:0,overflow:'hidden'}]}>
      <View style={{backgroundColor:'#205D7D',padding:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
        <View style={{flex:1,flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:5}} accessibilityRole="navigation">
@@ -417,31 +466,36 @@ export default function FyPaymentCollectionScreen(){
          {paymentMode?<Pressable accessibilityRole="button" accessibilityLabel={`Back to ${customer.name} payment modes`} onPress={()=>{setPaymentMode(null);setExpandedReceipt(null);}} style={{paddingVertical:6,paddingHorizontal:3}}><Text style={{fontSize:12,color:'#FFFFFF',fontWeight:'800',textDecorationLine:'underline'}}>{customer.name}</Text></Pressable>:<Text style={{fontSize:12,color:'#FFFFFF',fontWeight:'800'}}>{customer.name}</Text>}
          {paymentMode?<><Text style={{color:'#FFFFFF'}}>›</Text><Text style={{fontSize:12,color:'#FFFFFF',fontWeight:'800'}}>{paymentMode==='ALL_RECEIPTS'?'All Receipts':paymentMode}</Text></>:null}
        </View>
-       <Text style={{fontSize:13,color:'#FFFFFF',fontWeight:'800'}}>{compact(paymentMode?selectedReceiptAmount:customer.amount)} · {paymentMode?selectedReceipts.length:modeCount} receipts</Text>
+       <Text style={{fontSize:13,color:'#FFFFFF',fontWeight:'800'}}>{displayAmount(paymentMode?selectedReceiptAmount:customer.amount)} · {paymentMode?selectedReceipts.length:modeCount} receipts</Text>
      </View>
      <View style={{padding:12}}>
-   {customer?<View style={{marginTop:12,marginBottom:12}}><Text style={s.eyebrow}>PERIOD · {month===null?'ALL MONTHS':NAMES[month].toUpperCase()}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:8}}>{[{label:'All Months',i:null as number|null},...NAMES.map((label,i)=>({label,i}))].map(x=><Pressable key={x.label} onPress={()=>{if(month===x.i)return;setMonth(x.i);setPaymentMode(null);setReceiptDays([]);setCustomers([]);setExpandedReceipt(null);setSearch('');const currentExecutive=executive;const currentCustomer=customer;if(currentExecutive){const epoch=++requestEpoch.current;setLoadingDetail(true);setLoadingReceipts(!!currentCustomer);(async()=>{const source=x.i===null?months.filter(m=>m.amount!==null):(months[x.i]?[months[x.i]]:[]);const lists:Row[][]=[];const days=new Map<string,ReceiptDay>();let errors=0;for(const m of source){if(!m||m.amount===null)continue;try{const result=await fetchReport(m.date,'parties',currentExecutive.code);lists.push(result.rows);if(currentCustomer){const response:any=await api.getOwnerCardReport({date:m.date,prptype,view,report_type:'collection',level:'parties',executive_code:currentExecutive.code,party_code:currentCustomer.code});if(!response?.success)throw Error('Receipt details unavailable');for(const d of response?.data?.report?.history||[]){const key=String(d.date_ymd);const old=days.get(key);days.set(key,{date:key,label:String(d.date_label||key),amount:(old?.amount||0)+Number(d.amount||0),entries:(old?.entries||0)+Number(d.entry_count||0),receipts:[...(old?.receipts||[]),...((d.parties||[]).flatMap((party:any)=>party.receipts||[]) as ReceiptItem[])]});}}}catch{errors++;}}if(epoch!==requestEpoch.current)return;const next=merge(lists);setCustomers(next);setLoadingDetail(false);if(currentCustomer){setCustomer(next.find(r=>r.code===currentCustomer.code)||currentCustomer);setReceiptDays([...days.values()].sort((a,b)=>b.date.localeCompare(a.date)));setLoadingReceipts(false);}setDetailError(errors?`${errors} month(s) unavailable`:'' );})();}}} style={{paddingHorizontal:10,paddingVertical:8,borderRadius:7,backgroundColor:month===x.i?DARK:'#FFFFFF',borderWidth:1,borderColor:BORDER}}><Text style={{fontSize:11,fontWeight:'700',color:month===x.i?'#FFFFFF':INK}}>{x.label}</Text></Pressable>)}</View></View>:null}
+   {customer?<View style={{marginTop:12,marginBottom:12}}><Text style={s.eyebrow}>PERIOD · {month===null?'ALL MONTHS':NAMES[month].toUpperCase()}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:8}}>{[{label:'All Months',i:null as number|null},...NAMES.map((label,i)=>({label,i}))].map(x=><Pressable key={x.label} onPress={()=>{if(month===x.i||(x.i!==null&&months[x.i]?.amount===null))return;setMonth(x.i);setPaymentMode(null);setReceiptDays([]);setCustomers([]);setExpandedReceipt(null);setSearch('');const currentExecutive=executive;const currentCustomer=customer;if(currentExecutive){const epoch=++requestEpoch.current;setLoadingDetail(true);setLoadingReceipts(!!currentCustomer);(async()=>{const source=x.i===null?months.filter(m=>m.amount!==null):(months[x.i]?[months[x.i]]:[]);const lists:Row[][]=[];const days=new Map<string,ReceiptDay>();let errors=0;for(const m of source){if(!m||m.amount===null)continue;try{const result=await fetchReport(m.date,'parties',currentExecutive.code);lists.push(result.rows);if(currentCustomer){const response:any=await api.getOwnerCardReport({date:m.date,prptype,view,report_type:'collection',level:'parties',executive_code:currentExecutive.code,party_code:currentCustomer.code});if(!response?.success)throw Error('Receipt details unavailable');for(const d of response?.data?.report?.history||[]){const key=String(d.date_ymd);const old=days.get(key);days.set(key,{date:key,label:String(d.date_label||key),amount:(old?.amount||0)+Number(d.amount||0),entries:(old?.entries||0)+Number(d.entry_count||0),receipts:[...(old?.receipts||[]),...((d.parties||[]).flatMap((party:any)=>party.receipts||[]) as ReceiptItem[])]});}}}catch{errors++;}}if(epoch!==requestEpoch.current)return;const next=merge(lists);setCustomers(next);setLoadingDetail(false);if(currentCustomer){setCustomer(next.find(r=>r.code===currentCustomer.code)||currentCustomer);setReceiptDays([...days.values()].sort((a,b)=>b.date.localeCompare(a.date)));setLoadingReceipts(false);}setDetailError(errors?`${errors} month(s) unavailable`:'' );})();}}} style={{paddingHorizontal:10,paddingVertical:8,borderRadius:7,backgroundColor:month===x.i?DARK:'#FFFFFF',borderWidth:1,borderColor:BORDER}}><Text style={{fontSize:11,fontWeight:'700',color:month===x.i?'#FFFFFF':INK}}>{x.label}</Text></Pressable>)}</View></View>:null}
        {loadingReceipts?<SkeletonLines count={6}/>:null}
        {receiptError?<Text style={s.warningText}>{receiptError}</Text>:null}
-       {!loadingReceipts&&receiptDays.length>0&&Math.abs(modeTotal-customer.amount)>0.02?<Text style={s.warningText}>Receipt breakdown differs from customer summary by {amount(Math.abs(modeTotal-customer.amount))}. Check incomplete periods or source allocation.</Text>:null}
+       {!loadingReceipts&&receiptDays.length>0&&Math.abs(modeTotal-customer.amount)>0.02?<Text style={s.warningText}>Receipt breakdown differs from customer summary by {displayAmount(Math.abs(modeTotal-customer.amount))}. Check incomplete periods or source allocation.</Text>:null}
        {!paymentMode?<>
          <Text style={[s.note,{marginBottom:10}]}>BY PAYMENT MODE · {month===null?'All available months':`${NAMES[month]} ${fy+(month>=9?1:0)}`} · {modeCount} receipt entries</Text>
          <View style={{flexDirection:'row',justifyContent:'space-between',borderBottomWidth:1,borderColor:BORDER,paddingBottom:7}}><Text style={s.eyebrow}>MODE</Text><Text style={s.eyebrow}>RECEIPTS       COLLECTED</Text></View>
-         {modeGroups.map(g=><Pressable key={g.mode} onPress={()=>setPaymentMode(g.mode)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{g.mode}</Text><View style={[s.rankTrack,{marginRight:16}]}><View style={[s.rankFill,{width:`${modeTotal>0?Math.min(100,g.amount/modeTotal*100):0}%` as any}]}/></View></View><Text style={s.note}>{g.receipts.length}     </Text><Text style={s.rankAmount}>{compact(g.amount)} ›</Text></Pressable>)}
+         {modeGroups.map(g=><Pressable key={g.mode} onPress={()=>setPaymentMode(g.mode)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{g.mode}</Text><View style={[s.rankTrack,{marginRight:16}]}><View style={[s.rankFill,{width:`${modeTotal>0?Math.min(100,g.amount/modeTotal*100):0}%` as any}]}/></View></View><Text style={s.note}>{g.receipts.length}     </Text><Text style={s.rankAmount}>{displayAmount(g.amount)} ›</Text></Pressable>)}
+         {!loadingReceipts?<AmountTotal format={displayAmount} label="RECEIPTS ACROSS MODES" count={modeCount} total={modeTotal} secondary={`${modeGroups.length} modes · receipt-level amounts (distinct UID + SrNo)`}/>:null}
          {modeGroups.length>0?<Pressable onPress={()=>setPaymentMode('ALL_RECEIPTS')} style={{paddingVertical:12}}><Text style={s.link}>Show {modeCount} receipt entries ›</Text></Pressable>:null}
        </>:<>
          <Pressable onPress={()=>setPaymentMode(null)}><Text style={s.link}>‹ All payment modes</Text></Pressable>
          <View style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:8,borderBottomWidth:1,borderColor:BORDER}}><Text style={s.eyebrow}>RECEIPTS · {paymentMode==='ALL_RECEIPTS'?'ALL MODES':paymentMode}</Text><Text style={s.eyebrow}>COLLECTED</Text></View>
-         {selectedReceipts.map((r,i)=>{const key=`${r.date}:${r.receipt_uid}:${r.receipt_srno}`;return <View key={key+'-'+i}><Pressable onPress={()=>setExpandedReceipt(expandedReceipt===key?null:key)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{r.voucher_no||'Voucher not recorded'} · {paymentMode==='ALL_RECEIPTS'?(('groupMode' in r)?r.groupMode:'Unclassified'):paymentMode}</Text><Text style={s.note}>{r.dateLabel} · Ref {r.payment_reference||'—'}</Text></View><Text style={s.rankAmount}>{compact(r.amount)} {expandedReceipt===key?'⌃':'⌄'}</Text></Pressable>{expandedReceipt===key?<View style={{padding:10,backgroundColor:BG,borderRadius:7}}><Text style={s.note}>Voucher: {r.voucher_no||'—'} · Receipt UID: {r.receipt_uid} · SrNo: {r.receipt_srno}</Text><Text style={s.note}>Reference: {r.payment_reference||'—'} · Bank: {r.bank_name||'Not recorded'}</Text><Text style={s.note}>Allocations: {r.allocation_count} · Amount: {amount(r.amount)}</Text></View>:null}</View>;})}
+         {!loadingReceipts?<AmountTotal format={displayAmount} label="SELECTED RECEIPTS" count={selectedReceipts.length} total={selectedReceiptAmount} secondary={paymentMode==='ALL_RECEIPTS'?'All payment modes':'Payment mode '+String(paymentMode||'')}/>:null}
+         {selectedReceipts.map((r,i)=>{const key=`${r.date}:${r.receipt_uid}:${r.receipt_srno}`;return <View key={key+'-'+i}><Pressable onPress={()=>setExpandedReceipt(expandedReceipt===key?null:key)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{r.voucher_no||'Voucher not recorded'} · {paymentMode==='ALL_RECEIPTS'?(('groupMode' in r)?r.groupMode:'Unclassified'):paymentMode}</Text><Text style={s.note}>{r.dateLabel} · Ref {r.payment_reference||'—'}</Text></View><Text style={s.rankAmount}>{displayAmount(r.amount)} {expandedReceipt===key?'⌃':'⌄'}</Text></Pressable>{expandedReceipt===key?<View style={{padding:10,backgroundColor:BG,borderRadius:7}}><Text style={s.note}>Voucher: {r.voucher_no||'—'} · Receipt UID: {r.receipt_uid} · SrNo: {r.receipt_srno}</Text><Text style={s.note}>Reference: {r.payment_reference||'—'} · Bank: {r.bank_name||'Not recorded'}</Text><Text style={s.note}>Allocations: {r.allocation_count} · Amount: {displayAmount(r.amount)}</Text></View>:null}</View>;})}
+         {!loadingReceipts?<AmountTotal format={displayAmount} label="RECEIPTS TOTAL" count={selectedReceipts.length} total={selectedReceiptAmount}/>:null}
        </>}
        {!loadingReceipts&&!receiptDays.length?<Text style={s.note}>No receipt history returned for this customer in the selected period.</Text>:null}
      </View>
    </View>:<><View style={s.sectionHeading}><Text style={s.sectionTitle}>{executive?'Customer collections':month===null?'Top executives · '+fyName(fy):'Executives · '+NAMES[month]}</Text><Pressable onPress={()=>setAscending(x=>!x)}><Text style={s.link}>Amount {ascending?'↑':'↓'}</Text></Pressable></View>
    <View style={s.panel}><TextInput style={s.search} placeholder={executive?'Search customer':'Search executive'} value={search} onChangeText={setSearch}/>
+    {!busy&&!loadingDetail?<AmountTotal format={displayAmount} label={`${searchActive?'MATCHING ':'TOTAL '}${listKind}`} count={visible.length} total={visibleTotal} secondary={listSecondary}/>:null}
     {executive?<Pressable onPress={()=>{setExecutive(null);setCustomers([]);setSearch('')}}><Text style={s.link}>‹ All executives</Text></Pressable>:null}
     {loadingDetail?<SkeletonLines count={8}/>:null}{detailError?<Text style={s.warningText}>{detailError}</Text>:null}
-    {!loadingDetail&&visible.map((r,i)=><Pressable key={`${r.code}-${i}`} style={s.rankRow} onPress={()=>{if(!executive){void pickExecutive(r);}else{void pickCustomer(r);}}}><Text style={s.rank}>{i+1}</Text><View style={{flex:1}}><Text numberOfLines={1} style={s.rankName}>{r.name}</Text><View style={s.rankTrack}><View style={[s.rankFill,{width:`${Math.min(100,Math.max(0,r.amount)/(Math.max(1,...selectedRows.map(x=>x.amount)))*100)}%` as any}]}/></View></View><Text style={s.rankAmount}>{compact(r.amount)} ›</Text></Pressable>)}
+    {!loadingDetail&&visible.map((r,i)=><Pressable key={`${r.code}-${i}`} style={s.rankRow} onPress={()=>{if(!executive){void pickExecutive(r);}else{void pickCustomer(r);}}}><Text style={s.rank}>{i+1}</Text><View style={{flex:1}}><Text numberOfLines={1} style={s.rankName}>{r.name}</Text><View style={s.rankTrack}><View style={[s.rankFill,{width:`${Math.min(100,Math.max(0,r.amount)/(Math.max(1,...selectedRows.map(x=>x.amount)))*100)}%` as any}]}/></View></View><Text style={s.rankAmount}>{displayAmount(r.amount)} ›</Text></Pressable>)}
     {!busy&&!loadingDetail&&visible.length===0?<Text style={s.note}>No matching records.</Text>:null}
+    {!busy&&!loadingDetail&&visible.length>0?<AmountTotal format={displayAmount} label={`${searchActive?'FILTERED ':'LIST '}TOTAL · ${listKind}`} count={visible.length} total={visibleTotal} secondary={searchActive?`Overall ${selectedRows.length} records · ${displayAmount(selectedTotal)}`:Math.abs(listDifference)>0.02?`Parent total difference ${displayAmount(Math.abs(listDifference))} · check source allocation`:'Matches all displayed records'}/>:null}
     {executive?<Text style={s.note}>Select a customer to view receipt history within FY Payment Collection.</Text>:null}
    </View></>}
   </View></ScrollView>

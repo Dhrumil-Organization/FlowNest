@@ -151,17 +151,15 @@ export default function RollCutScanner({ token, API }: Props) {
     <View style={st.panelPad}>
       <View style={st.card}>
         <View style={st.scanTop}>
-          <TouchableOpacity activeOpacity={0.85} style={st.scanBtn} onPress={() => setCamOpen(true)} accessibilityRole="button" accessibilityLabel="Scan QR">
-            <Icon name="qr-code-scanner" size={44} color="#fff" />
+          <TouchableOpacity activeOpacity={0.85} style={[st.scanBtn, ready && st.scanBtnOk]} onPress={() => setCamOpen(true)} accessibilityRole="button" accessibilityLabel="Scan QR">
+            <Icon name={ready ? 'check' : 'qr-code-scanner'} size={44} color="#fff" />
           </TouchableOpacity>
           <Text style={st.scanTitle}>{ready ? 'QR scanned' : 'Scan taka QR'}</Text>
           <Text style={st.scanHint}>{ready ? 'Check the details below and press Save' : 'Tap the button and point the camera at the QR code'}</Text>
-          {ready ? (
-            <TouchableOpacity style={st.rescan} onPress={() => setCamOpen(true)}>
-              <Icon name="refresh" size={15} color={T.copper} />
-              <Text style={st.rescanText}>Scan again</Text>
-            </TouchableOpacity>
-          ) : null}
+          <TouchableOpacity style={st.rescan} onPress={() => setCamOpen(true)} accessibilityRole="button">
+            <Icon name={ready ? 'refresh' : 'photo-camera'} size={15} color={T.copper} />
+            <Text style={st.rescanText}>{ready ? 'Scan again' : 'Open camera'}</Text>
+          </TouchableOpacity>
         </View>
 
         <ReadBox label="Beam No" icon="view-column" value={qr?.beamno || ''} onClear={ready ? clearScan : undefined} />
@@ -169,14 +167,14 @@ export default function RollCutScanner({ token, API }: Props) {
 
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[st.saveBtn, (!ready || saving) && st.saveBtnOff]}
+          style={[st.saveBtn, !ready && !saving && st.saveBtnOff, saving && { opacity: 0.8 }]}
           onPress={onSave}
           disabled={!ready || saving}
           accessibilityRole="button"
           accessibilityLabel="Save"
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Icon name="check-circle" size={22} color="#fff" />}
-          <Text style={st.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
+          {saving ? <ActivityIndicator color="#fff" /> : <Icon name="check-circle" size={22} color={ready ? '#fff' : T.muted} />}
+          <Text style={[st.saveText, !ready && !saving && { color: T.muted }]}>{saving ? 'Saving…' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -274,21 +272,6 @@ export default function RollCutScanner({ token, API }: Props) {
 
   return (
     <View style={st.screen}>
-      {/* header */}
-      <View style={st.hero}>
-        <View style={st.heroIcon}><Icon name="content-cut" size={22} color="#fff" /></View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={st.heroTitle}>Roll Cut</Text>
-          <Text style={st.heroSub} numberOfLines={1}>Scan the taka QR and save in one tap</Text>
-        </View>
-        {loaded ? (
-          <View style={st.heroBadge}>
-            <Text style={st.heroBadgeNum}>{rows.length}</Text>
-            <Text style={st.heroBadgeText}>scans</Text>
-          </View>
-        ) : null}
-      </View>
-
       {wide ? (
         <View style={st.split}>
           <ScrollView style={st.left} keyboardShouldPersistTaps="handled">{scanPanel}</ScrollView>
@@ -389,15 +372,7 @@ function ScanRow({ item, no }: { item: any; no: number }) {
 const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: T.bg },
 
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: T.nav },
-  heroIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center' },
-  heroTitle: { fontSize: 18, fontWeight: '900', color: '#fff' },
-  heroSub: { fontSize: 12, fontWeight: '600', color: '#ffffffAA', marginTop: 1 },
-  heroBadge: { alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12, backgroundColor: '#ffffff1F' },
-  heroBadgeNum: { fontSize: 17, fontWeight: '900', color: '#fff' },
-  heroBadgeText: { fontSize: 10, fontWeight: '800', color: '#ffffffAA', letterSpacing: 0.5 },
-
-  tabs: { flexDirection: 'row', gap: 6, margin: 12, marginBottom: 0, padding: 4, borderRadius: 14, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
+  tabs: { flexDirection: 'row', gap: 6, margin: 16, marginBottom: 0, padding: 4, borderRadius: 14, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
   tab: { flex: 1, minHeight: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   tabOn: { backgroundColor: T.nav },
   tabText: { fontSize: 13, fontWeight: '900', color: T.nav },
@@ -405,17 +380,18 @@ const st = StyleSheet.create({
   tabBadgeText: { fontSize: 11, fontWeight: '900', color: T.copper },
 
   split: { flex: 1, flexDirection: 'row' },
-  left: { width: 400, flexGrow: 0, borderRightWidth: 1, borderRightColor: T.hair, backgroundColor: T.bg },
+  left: { width: 420, flexGrow: 0, borderRightWidth: 1, borderRightColor: T.hair, backgroundColor: T.bg },
   right: { flex: 1, minWidth: 0 },
-  panelPad: { padding: 12, width: '100%', maxWidth: 900, alignSelf: 'center' },
+  panelPad: { padding: 16, width: '100%', maxWidth: 900, alignSelf: 'center' },
 
   card: { backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 16, marginBottom: 12, ...S.card, shadowOpacity: 0.05, elevation: 1 },
 
   scanTop: { alignItems: 'center', paddingBottom: 16, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: T.hair },
   scanBtn: { width: 96, height: 96, borderRadius: 28, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', shadowColor: T.copper, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+  scanBtnOk: { backgroundColor: T.green, shadowColor: T.green },
   scanTitle: { fontSize: 17, fontWeight: '900', color: T.nav, marginTop: 12 },
   scanHint: { fontSize: 12.5, fontWeight: '600', color: T.muted, marginTop: 4, textAlign: 'center' },
-  rescan: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: T.alt, borderWidth: 1, borderColor: T.border },
+  rescan: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, height: 34, paddingHorizontal: 14, borderRadius: 16, backgroundColor: T.alt, borderWidth: 1, borderColor: T.border },
   rescanText: { fontSize: 12.5, fontWeight: '800', color: T.copper },
 
   fieldLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, color: T.muted, textTransform: 'uppercase', marginBottom: 6 },
@@ -424,7 +400,7 @@ const st = StyleSheet.create({
   readInput: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: '900', color: T.ink, fontFamily: MONO, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null) },
 
   saveBtn: { height: 56, borderRadius: 14, backgroundColor: T.green, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 6 },
-  saveBtnOff: { opacity: 0.4 },
+  saveBtnOff: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border },
   saveText: { color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: 0.3 },
 
   okBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.green}55`, backgroundColor: `${T.green}12` },

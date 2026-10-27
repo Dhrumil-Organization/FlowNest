@@ -583,7 +583,7 @@ registerPermissionArea({
           displayOrder: 164,
           actions: [{ key: 'view', name: 'View' }],
         },
-        {
+       {
           key: 'sales_challan_packing_slip',
           name: 'Sales Challan Packing Slip',
           type: 'screen',
@@ -1886,7 +1886,7 @@ registerUiNodes([
     action: 'view',
     order: 164,
   },
-  {
+   {
     id: 'nav.sales_challan_packing_slip',
     kind: 'navigation',
     title: 'Sales Challan Packing Slip',

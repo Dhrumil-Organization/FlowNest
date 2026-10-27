@@ -7,7 +7,7 @@
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import {
   BP_DESKTOP,
   BP_TABLET,
@@ -79,13 +79,14 @@ function ResizeHandle({ getWidth, onResize }: { getWidth: () => number; onResize
 export default function BrowseSheet({
   storeLabel,
   currentCode,
-  fetchRows,
+  fetchPage,
   onPick,
   onClose,
 }: {
   storeLabel: string;
   currentCode?: string;
-  fetchRows: () => Promise<BrowseRow[]>;
+  /** Lazy loading: one page at a time (search is sent to the server). */
+  fetchPage: (page: number, perPage: number, search: string) => Promise<{ rows: BrowseRow[]; hasMore: boolean; total?: number }>;
   onPick: (row: BrowseRow) => void;
   onClose: () => void;
 }) {
@@ -117,27 +118,78 @@ export default function BrowseSheet({
   }, [rows]);
   const cols = layout === 'desktop' ? [...DESKTOP_COLS, ...dynamicCols, UOM_COL] : TABLET_COLS;
 
-  const load = useCallback(async () => {
-    const id = ++seq.current;
+  /* ---------------- lazy loading: first page fast, the rest while scrolling ---------------- */
+  // Phone: small pages + manual "Show more" button (light on memory / data). Tablet & desktop: bigger pages + auto-load on scroll.
+  const manual = layout === 'phone';
+  const PER_PAGE = manual ? 20 : 50;
+  const rk = (r: BrowseRow) => `${r.code}|${r.mItmCode}`;
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [qServer, setQServer] = useState('');   // debounced search text that is sent to the server
+  const pageRef = useRef(1);
+  const rowsRef = useRef<BrowseRow[]>([]);
+  rowsRef.current = rows;
+  const mounted = useRef(false);
+
+  const fetchFirst = useCallback(async (search: string) => {
+    const id = ++seq.current; // also cancels any page still in flight
     setLoading(true);
+    setLoadingMore(false);
     setError('');
     try {
-      const data = await fetchRows();
-      if (id === seq.current) setRows(data);
+      const r = await fetchPage(1, PER_PAGE, search);
+      if (id !== seq.current) return;
+      const seen = new Set<string>();
+      setRows(r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true))));
+      pageRef.current = 1;
+      setHasMore(r.hasMore);
     } catch (e: any) {
-      if (id === seq.current) setError(e?.message || 'Could not load the item list.');
+      if (id === seq.current) { setError(e?.message || 'Could not load the item list.'); setHasMore(false); }
     } finally {
       if (id === seq.current) setLoading(false);
     }
-  }, [fetchRows]);
+  }, [fetchPage, PER_PAGE]);
+
+  const load = useCallback(() => fetchFirst(qServer), [fetchFirst, qServer]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || error) return;
+    const id = seq.current;
+    setLoadingMore(true);
+    try {
+      const next = pageRef.current + 1;
+      const r = await fetchPage(next, PER_PAGE, qServer);
+      if (id !== seq.current) return;
+      const seen = new Set(rowsRef.current.map(rk));
+      const add = r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true)));
+      pageRef.current = next;
+      if (add.length) setRows((prev) => [...prev, ...add]);
+      setHasMore(add.length > 0 && r.hasMore); // a page with nothing new = server has no more
+    } catch (e: any) {
+      if (id === seq.current) setHasMore(false);
+    } finally {
+      if (id === seq.current) setLoadingMore(false);
+    }
+  }, [loading, loadingMore, hasMore, error, fetchPage, qServer, PER_PAGE]);
 
   useEffect(() => {
-    void load();
+    void fetchFirst('');
+    mounted.current = true;
     return () => {
       seq.current++; // ignore late responses after close
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // typing in search -> wait 400 ms, then ask the server (so a huge list is never downloaded just to search it)
+  useEffect(() => {
+    const t = setTimeout(() => setQServer(q.trim()), 400);
+    return () => clearTimeout(t);
+  }, [q]);
+  useEffect(() => {
+    if (mounted.current) void fetchFirst(qServer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qServer]);
 
   const groups = useMemo(() => Array.from(new Set(rows.map((r) => r.group).filter(Boolean))).sort(), [rows]);
   const data = useMemo(() => {
@@ -152,6 +204,12 @@ export default function BrowseSheet({
     return [...filtered].sort((a, b) => value(a).localeCompare(value(b), undefined, { numeric: true }) || a.name.localeCompare(b.name));
   }, [rows, q, group, colF, dynamicColF, dynamicCols, sortKey, sortDir, groupBy]);
   const filtering = !!(q || group || Object.values(colF).some(Boolean) || Object.values(dynamicColF).some(Boolean));
+  // Not enough rows to fill the list (tall screen, or column / group filters hide most of the loaded rows)
+  // -> keep pulling pages so scrolling / filtering never dead-ends.
+  useEffect(() => {
+    if (manual) return; // phone: only when the user taps "Show more"
+    if (hasMore && !loading && !loadingMore && !error && data.length < (filtering ? 40 : 20)) void loadMore();
+  }, [manual, hasMore, loading, loadingMore, error, data.length, filtering, loadMore]);
   const exportRows = (format: 'csv' | 'pdf') => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const exportCols = cols.map((c) => ({ key: c.key, label: c.label }));
@@ -374,7 +432,7 @@ export default function BrowseSheet({
     <BrowseSkeleton layout={layout} />
   ) : error ? (
     <EmptyState icon="cloud-off" title="Could not load items" message={error} action={<Btn kind="primary" icon="refresh" label="Try again" onPress={load} />} />
-  ) : rows.length === 0 ? (
+  ) : rows.length === 0 && !qServer && !filtering ? (
     <EmptyState icon="inventory-2" title="No items in this store yet" message="Use Add on the main screen to create the first item." />
   ) : (
     <EmptyState
@@ -395,13 +453,28 @@ export default function BrowseSheet({
         renderItem={layout === 'phone' ? renderCard : renderGridRow}
         getItemLayout={layout === 'phone' ? undefined : (_, index) => ({ length: rowH, offset: rowH * index, index })}
         ListEmptyComponent={empty}
-        initialNumToRender={24}
-        windowSize={9}
-        maxToRenderPerBatch={24}
+        initialNumToRender={manual ? 10 : 24}
+        windowSize={manual ? 5 : 9}
+        maxToRenderPerBatch={manual ? 10 : 24}
+        removeClippedSubviews={manual}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={layout === 'phone' ? { padding: 16, paddingTop: 4, gap: 10 } : undefined}
         onScrollToIndexFailed={() => { }}
-        extraData={{ active, widths, wrapW }}
+        onEndReached={manual ? undefined : () => void loadMore()}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 }}>
+              <ActivityIndicator size="small" color={T.copper} />
+              <Text style={g.count}>Loading more…</Text>
+            </View>
+          ) : hasMore && !loading && data.length > 0 ? (
+            <View style={{ alignItems: 'stretch', paddingVertical: 12, paddingHorizontal: manual ? 0 : 16 }}>
+              <Btn icon="expand-more" label={manual ? `Show more (${PER_PAGE} more)` : 'Show more'} onPress={() => void loadMore()} />
+            </View>
+          ) : null
+        }
+        extraData={{ active, widths, wrapW, loadingMore, hasMore }}
       />
     </>
   );
@@ -420,7 +493,7 @@ export default function BrowseSheet({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={g.count} numberOfLines={1}>
-              {loading ? 'Loading…' : `Showing ${data.length} of ${rows.length} lines`}
+              {loading ? 'Loading…' : `Showing ${data.length} of ${rows.length}${hasMore ? '+' : ''} lines`}
             </Text>
             {layout === 'desktop' && !loading && data.length > 0 ? <Text style={g.hint}>Use ↑ ↓ to move, Enter to open, Esc to close</Text> : null}
           </View>
@@ -432,7 +505,7 @@ export default function BrowseSheet({
       <View style={{ flex: 1, minHeight: 0 }}>
         {/* search + group chips + (phone) sort chips */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
-          <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item or group" autoFocus={Platform.OS === 'web'} />
+          <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item or group" autoFocus={Platform.OS === 'web' && win >= 760} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
             <Text style={{ color: T.muted, fontSize: 12, fontWeight: '700' }}>Group by</Text>
             <Pressable onPress={() => { const fields = ['']; setGroupBy(fields[0]); }} style={g.toolBtn}><Text style={g.toolText}>None</Text></Pressable>

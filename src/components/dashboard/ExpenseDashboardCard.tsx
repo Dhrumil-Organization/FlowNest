@@ -155,6 +155,7 @@ type Props = {
   prpcodes?: string[] | string;
   isConnected?: boolean | null;
   onPress?: (data: ExpenseDashboardData) => void;
+  onOpenFY?: () => void;
 };
 
 const numberValue = (value: unknown): number => {
@@ -332,6 +333,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
   prpcodes,
   isConnected = true,
   onPress,
+  onOpenFY,
 }) => {
   const [data, setData] = useState<ExpenseDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -466,6 +468,28 @@ const ExpenseDashboardCard: React.FC<Props> = ({
           </Text>
         </View>
 
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {onOpenFY && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open Production Cost financial year report"
+              accessibilityHint="Compare production costs across financial years"
+              onPress={(event) => {
+                event.stopPropagation?.();
+                onOpenFY();
+              }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 3,
+                borderRadius: 12, borderWidth: 1, borderColor: '#C96E16',
+                backgroundColor: '#FFF', paddingHorizontal: 7, paddingVertical: 3,
+              }}
+            >
+              <Text style={{ color: '#BA6414', fontSize: 10, fontWeight: '800' }}>
+                FY {String(Math.max(0, Number(yearno) - 1)).padStart(2, '0')}–{String(yearno).padStart(2, '0')}
+              </Text>
+              <Icon name="chevron-right" size={13} color="#C96E16" />
+            </TouchableOpacity>
+          )}
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={onPress ? 'Open full production cost report' : 'Refresh'}
@@ -497,6 +521,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
             </>
           )}
         </TouchableOpacity>
+        </View>
       </View>
 
       <View style={sideBySide ? styles.wideBody : undefined}>

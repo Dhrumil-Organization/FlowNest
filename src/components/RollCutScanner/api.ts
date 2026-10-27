@@ -12,7 +12,9 @@ import axios from 'axios';
 export const TXN_ROLL_CUT = 'roll_cut_scanner';
 
 export const SAVE_ENDPOINT = '/api/add_roll_cut_detail';
-export const LIST_ENDPOINT = '/api/show_beam_checking';
+// !! confirm this with the backend: endpoint used by the delete icon on every scanned card
+export const DELETE_ENDPOINT = '/api/delete_roll_cut_detail';
+export const LIST_ENDPOINT = '/api/show_roll_cut';
 export const BEAM_HELP_ENDPOINT = '/api/get_auto_checking_help';
 
 /** query-string keys of the list API for the date range */
@@ -76,6 +78,21 @@ export function createRollCutApi(API: string, token: string) {
       return (await c.post(SAVE_ENDPOINT, body, xhr)).data;
     },
 
+    /** Delete one scanned taka — flat payload: txntype + prpcode + yearno + the row's own keys. */
+    remove: async (p: { prpcode: string; yearno: string; row: any }) => {
+      const r = p.row || {};
+      const body = {
+        txntype: TXN_ROLL_CUT,
+        prpcode: p.prpcode,
+        yearno: p.yearno,
+        uid: str(r.UId),
+        srno: str(r.SrNo),
+        beamno: str(r.BeamNo),
+        takano: str(r.TakaNo),
+      };
+      return (await c.post(DELETE_ENDPOINT, body, xhr)).data;
+    },
+
     /** Scanned list for property + date range (+ optional beam). */
     list: async (p: { prptype: string; prpCode: string; beamNo: string; from: Date; to: Date }): Promise<any[]> => {
       const params: Record<string, any> = {
@@ -84,9 +101,6 @@ export function createRollCutApi(API: string, token: string) {
         txntype: TXN_ROLL_CUT,
         PrpCode: p.prpCode,
         BeamNo: p.beamNo || '',
-        ShfCode: '',
-        ChkDate: '',
-        EMode: 'S',
         [LIST_FROM_KEY]: fmtApiDate(p.from),
         [LIST_TO_KEY]: fmtApiDate(p.to),
       };

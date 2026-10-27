@@ -1,10 +1,11 @@
 // FILE: src/components/StoreItemMasterNew/MakeSheet.tsx
 // Add / edit one make-model line of an item (opens from "Add make" or a row tap).
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import type { MakeModelOption } from './api';
 import MakeMasterSheet from './MakeMasterSheet';
 import { DP, ItemMake, MakeErrors, makeStatusLabel, NumKey, Opt, sanitizeDecimal, Scope, validateMake } from './model';
+import { T } from '@/src/theme';
 import { Btn, Cell, CheckChip, Field, SelectField, Sheet, StatusPill } from './ui';
 
 export default function MakeSheet({
@@ -41,7 +42,12 @@ export default function MakeSheet({
   onRemove: (id: string) => void;
 }) {
   const { width } = useWindowDimensions();
-  const cols = width >= 700 ? 3 : 2;
+  // Real width of the sheet (same rule as <Sheet>): phone = full width, tablet = width-32, desktop = max 640.
+  const sheetW = width >= 760 ? Math.min(640, width - 48) : width >= 560 ? Math.min(640, width - 32) : width;
+  const inner = sheetW - (width < 420 ? 24 : 32);
+  const roomy = inner >= 520;          // desktop / tablet: 3 columns
+  const cols = roomy ? 3 : 2;          // numeric fields: 3 per row (roomy) or 2 per row (phone)
+  const gut = width < 420 ? 10 : 12;
   const [m, setM] = useState<ItemMake>(make);
   const [errors, setErrors] = useState<MakeErrors>({});
   const [masterOpen, setMasterOpen] = useState(false);
@@ -108,7 +114,7 @@ export default function MakeSheet({
 
   // plain render function (NOT a component) so inputs keep focus while typing
   const numF = (k: NumKey, label: string) => (
-    <Cell key={k} cols={cols}>
+    <Cell key={k} cols={cols} gutter={gut}>
       <Field
         label={label}
         value={m[k]}
@@ -118,6 +124,13 @@ export default function MakeSheet({
         align="right"
         placeholder={(0).toFixed(DP[k])}
       />
+    </Cell>
+  );
+
+  // Make code: next to Make name on wide screens, next to Status (half row) on phones.
+  const codeCell = (
+    <Cell cols={cols} span={1} gutter={gut}>
+      <Field label="Make code" value={m.makeCode} readOnly />
     </Cell>
   );
 
@@ -141,17 +154,12 @@ export default function MakeSheet({
         </View>
       }
     >
-      <View style={{ marginHorizontal: -6 }}>
+      <View style={{ marginHorizontal: -(gut / 2) }}>
+        {/* Section: Make & model */}
+        <Text style={g.section}>MAKE & MODEL</Text>
         <View style={g.grid}>
-          <Cell cols={cols}>
-            <Field
-              label="Make code"
-              value={m.makeCode}
-              readOnly
-            />
-          </Cell>
-
-          <Cell cols={cols} span={cols - 1}>
+          {/* Make name (+ master button) - always a full row on phone so the dropdown has room */}
+          <Cell cols={cols} span={2} gutter={gut}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <SelectField
@@ -200,7 +208,9 @@ export default function MakeSheet({
             </View>
           </Cell>
 
-          <Cell cols={cols} span={cols}>
+          {roomy ? codeCell : null}
+
+          <Cell cols={cols} span={2} gutter={gut}>
             <SelectField
               label="Model"
               value={m.model}
@@ -230,19 +240,10 @@ export default function MakeSheet({
               }}
             />
           </Cell>
-        </View>
 
-        <View style={[g.grid, { marginTop: 12 }]}>
-          {numF('opQty', 'Opening qty')}
-          {numF('rate1', 'Rate 1')}
-          {numF('rate2', 'Rate 2')}
-          {numF('rate3', 'Rate 3')}
-          {numF('rate4', 'Rate 4')}
-          {numF('saleRate', 'Sale rate')}
-        </View>
+          {!roomy ? codeCell : null}
 
-        <View style={[g.grid, { marginTop: 12 }]}>
-          <Cell cols={cols}>
+          <Cell cols={cols} span={1} gutter={gut}>
             <SelectField
               label="Status"
               value={m.status === 'Active' ? 'A' : m.status === 'Passive' ? 'P' : (m.status || 'A')}
@@ -253,7 +254,17 @@ export default function MakeSheet({
           </Cell>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginTop: 4, flexWrap: 'wrap' }}>
+        <Text style={[g.section, { marginTop: 18 }]}>QUANTITY & RATES</Text>
+        <View style={g.grid}>
+          {numF('opQty', 'Opening qty')}
+          {numF('rate1', 'Rate 1')}
+          {numF('rate2', 'Rate 2')}
+          {numF('rate3', 'Rate 3')}
+          {numF('rate4', 'Rate 4')}
+          {numF('saleRate', 'Sale rate')}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: gut / 2, marginTop: 16, flexWrap: 'wrap' }}>
           <CheckChip label="Dead" value={m.dead} onChange={(v) => set('dead', v)} disabled={!editable} />
           {(() => {
             const st = makeStatusLabel(m.status, statuses);
@@ -281,4 +292,5 @@ export default function MakeSheet({
 
 const g = {
   grid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, rowGap: 12 },
+  section: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.6, color: T.copper, marginBottom: 10, paddingHorizontal: 0 },
 };

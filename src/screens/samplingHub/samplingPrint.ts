@@ -1,19 +1,20 @@
 // FILE: src/screens/samplingHub/samplingPrint.ts
-// QR sticker print for the Sampling Hub — EXACTLY the Checking Scanner print path:
+// QR sticker print for the Sampling Hub — the Taka label path (same API as the taka sticker print):
 //   printers  GET {API}/api/printers (x-api-key)  → createCheckingScannerApi(...).printers()  (same normalised list)
-//   preview   POST PRINTSTICKER { data:[rows], IskgQty:0, printype:'Preview', PrintFormat:4, printerName }
-//             → NodePrintController → Node → { success, mode:'Preview', pdfBase64 } (the label exactly as printed)
-//   print     POST PRINTSTICKER { …, printype:'Print' } → Node grey label on the chosen printer
+//   preview   POST {API}/api/taka-preview-label { printType: 6, rows }            → { success, pdfBase64 }
+//   print     POST {API}/api/taka-print-label   { printerName, printType: 6, rows } → Node prints on the chosen printer
 //   last printer remembered under the Checking Scanner key 'lastSelectedPrinter'.
-// The label rows come from the API (POST /sampling_hub/sticker): Checking Scanner row shape with PrpCode / UId /
-// SrNo 1 / TakaNo = Sample No., so the Node QR reads PRPCODE~UID~1~0~44~SAMPLENO and the Sampling Hub scanner
-// opens the sample from it.
-import * as Dyn from '@/common/API/dynamicAPI';
+// The rows come from the API (POST /sampling_hub/sticker), one per sample, in the Taka row shape:
+//   { uid, ref_uid, prptype, prpcode, beamuid, beamno, strcode, islasttaka, isfirsttaka, yearno, printid, printno,
+//     printjson, print_status, copy_no, kind, id, type, design, width, gsm, blend, name, remarks }
+//   printid / beamno = Sample ID (printed above the QR) · printjson = what the QR carries ({"takano":"GAR-0012",…})
+//   kind SAMPLE + the sticker text from the New Design master: design, width, gsm, blend, name, remarks
+//   COPIES n → n row objects per sample, copy_no 1..n
 import axios from 'axios';
 import { createCheckingScannerApi, LAST_PRINTER_KEY, Printer, storage } from '../checkingScannerNew/checkingScannerApi';
 
 export type { Printer };
-export const PRINT_FORMAT = 4;          // Checking Scanner sticker (60 × 60 mm)
+export const PRINT_TYPE = 6;          // Sampling Hub sample sticker
 export const MAX_COPIES = 20;
 
 const headers = (token: string) => ({
@@ -23,6 +24,7 @@ const headers = (token: string) => ({
   'X-Requested-With': 'XMLHttpRequest',
   'x-api-key': 'PRINT_SECRET_123',
 });
+const base = (API: string) => String(API || '').replace(/\/+$/, '');
 
 export async function loadPrinters(API: string, token: string): Promise<{ printers: Printer[]; selected: string }> {
   const printers = await createCheckingScannerApi(API, token).printers();
@@ -32,30 +34,58 @@ export async function loadPrinters(API: string, token: string): Promise<{ printe
 }
 export const rememberPrinter = (name: string) => storage.set(LAST_PRINTER_KEY, name);
 
-/** rows × copies, sample by sample (A A B B, so a sheet of copies stays together) */
+/** rows × copies, sample by sample (A A B B, so a sheet of copies stays together); copy_no 1..n per sample */
 export const withCopies = (rows: any[], copies: number) => {
   const n = Math.max(1, Math.min(MAX_COPIES, Math.round(copies) || 1));
-  return rows.flatMap((r) => Array.from({ length: n }, () => r));
+  return rows.flatMap((r) => Array.from({ length: n }, (_, i) => ({ ...r, copy_no: i + 1 })));
 };
 
-const sendSticker = async (rows: any[], printype: 'Preview' | 'Print', printerName: string, token: string) => {
-  const body = { data: rows, IskgQty: 0, printype, PrintFormat: PRINT_FORMAT, printerName: printerName || '', txntype: 'sampling_hub' };
-  const res = await axios.post(Dyn.PRINTSTICKER, body, { headers: headers(token), timeout: printype === 'Preview' ? 60000 : 30000 });
-  return res.data;
-};
+const str = (v: any) => (v == null ? '' : String(v));
+/** exactly the Taka label row (same keys, same order) + the sticker text keys; nothing else is sent */
+const clean = (r: any) => ({
+  uid: String(r.uid ?? ''),
+  ref_uid: String(r.ref_uid ?? r.uid ?? ''),
+  prptype: String(r.prptype ?? ''),
+  prpcode: String(r.prpcode ?? ''),
+  beamuid: String(r.beamuid ?? r.uid ?? ''),
+  beamno: String(r.beamno ?? ''),
+  strcode: String(r.strcode ?? ''),
+  islasttaka: Number(r.islasttaka) || 0,
+  isfirsttaka: Number(r.isfirsttaka) || 0,
+  yearno: String(r.yearno ?? ''),
+  printid: String(r.printid ?? ''),
+  printno: Number(r.printno) || 1,
+  printjson: String(r.printjson ?? ''),
+  print_status: str(r.print_status) || 'PENDING',
+  copy_no: Number(r.copy_no) || 1,
+  kind: str(r.kind) || 'SAMPLE',
+  id: str(r.id),
+  type: str(r.type),
+  design: str(r.design),
+  width: str(r.width),
+  gsm: str(r.gsm),
+  blend: str(r.blend),
+  name: str(r.name),
+  remarks: str(r.remarks),
+});
 
 /** the label as the printer server renders it (PDF, base64) */
-export async function previewSticker(rows: any[], printerName: string, token: string): Promise<string> {
-  const d = await sendSticker(rows.slice(0, 1), 'Preview', printerName, token);
+export async function previewSticker(API: string, rows: any[], token: string): Promise<string> {
+  // all rows × copies (copy_no 1..n) — the print server makes one combined PDF of them
+  const body = { printType: PRINT_TYPE, rows: rows.map(clean) };
+  const res = await axios.post(`${base(API)}/api/taka-preview-label`, body, { headers: headers(token), timeout: 60000 });
+  const d = res.data;
   const b64 = String(d?.pdfBase64 || d?.data?.pdfBase64 || '');
   if (!d?.success || !b64) throw new Error(d?.message || 'The print server did not return a preview.');
   return b64;
 }
 
-export async function printSticker(rows: any[], printerName: string, token: string): Promise<{ printed: number; message: string }> {
+export async function printSticker(API: string, rows: any[], printerName: string, token: string): Promise<{ printed: number; message: string }> {
   if (!printerName) throw new Error('Select the printer first.');
   if (!rows.length) throw new Error('Nothing to print.');
-  const d = await sendSticker(rows, 'Print', printerName, token);
+  const body = { printerName, printType: PRINT_TYPE, rows: rows.map(clean) };
+  const res = await axios.post(`${base(API)}/api/taka-print-label`, body, { headers: headers(token), timeout: 120000 });
+  const d = res.data;
   if (!d?.success) throw new Error(d?.message || 'The printer did not accept the stickers.');
   const printed = Number(d?.printed) || rows.length;
   return { printed, message: `${printed} sticker${printed !== 1 ? 's' : ''} sent to ${printerName}.` };
@@ -63,5 +93,6 @@ export async function printSticker(rows: any[], printerName: string, token: stri
 
 export const printErr = (e: any) => String(e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Print failed.');
 
-/** what the Node QR encodes for a sample (checking sticker format) — shown in the app preview */
-export const stickerQrText = (prpcode: string, uid: string, id: string) => `${prpcode}~${uid}~1~0~44~${id}`;
+/** what the QR on the sticker carries for a sample (same text the API puts in printjson) */
+export const stickerQrText = (prpcode: string, uid: string, id: string, yearno: string) =>
+  JSON.stringify({ prpcode, beamuid: uid, beamno: id, takano: id, yearno });

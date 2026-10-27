@@ -67,6 +67,7 @@ export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
     size: edit.size, metres: edit.metres, range: edit.range, nContents: edit.contents.length,
   }));
   const [note, setNote] = useState(edit?.note || '');
+  const [workName, setWorkName] = useState(edit?.work_name || '');   // name of this particular work — printed on the sticker
   const [photo, setPhoto] = useState<string | null>(null);     // null = unchanged (edit) / none (new)
   const [photoCleared, setPhotoCleared] = useState(false);
   const [similar, setSimilar] = useState<string[]>([]);
@@ -131,7 +132,7 @@ export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
     const body: Record<string, any> = {
       ...ctx, type, md_id: type === 'booklet' ? '' : md, sd_id: type === 'booklet' ? '' : sd, colour: sd ? '' : colour.trim(),
       garment, size, metres, range: range.trim(), contents: type === 'booklet' ? filled : [], qty: +qty, tracked: tracked ? 1 : 0,
-      name: nameNow.trim(), note: note.trim(), ack_similar: ackSimilar ? 1 : 0,
+      name: nameNow.trim(), work_name: workName.trim(), note: note.trim(), ack_similar: ackSimilar ? 1 : 0,
     };
     if (edit) body.id = edit.id;
     if (T0.photo && photo) body.photo = photo;
@@ -282,7 +283,9 @@ export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
       <L t="SAMPLE NAME · WRITTEN BY THE ERP, EDIT IF NEEDED" req />
       <TextInput value={nameNow} onChangeText={(v) => { setTouched(true); setName(v); }} style={[f.inp, { fontWeight: '700' }]} accessibilityLabel="Sample name" maxLength={150} />
       {touched ? <Text onPress={() => { setTouched(false); setName(''); }} style={[f.hint, { color: T.nav, fontWeight: '700' }]}>↺ use the automatic name</Text> : null}
-      <L t="NOTE" />
+      <L t="NAME · ON THE STICKER" />
+      <TextInput value={workName} onChangeText={setWorkName} placeholder="optional — name of this particular work" style={f.inp} accessibilityLabel="Name" maxLength={150} />
+      <L t="NOTE · REMARKS ON THE STICKER" />
       <TextInput value={note} onChangeText={setNote} placeholder="optional" style={f.inp} accessibilityLabel="Note" maxLength={200} />
 
       {similar.length ? (

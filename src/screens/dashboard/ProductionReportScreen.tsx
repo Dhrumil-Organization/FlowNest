@@ -48,6 +48,12 @@ export default function ProductionReportScreen() {
   const date = Array.isArray(params.date) ? params.date[0] : params.date;
   const prptype = Array.isArray(params.prptype) ? params.prptype[0] : params.prptype;
   const initial = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const initialShedKey = String(Array.isArray(params.shed_key) ? params.shed_key[0] : params.shed_key || '').trim();
+  const initialShedLabel = String(Array.isArray(params.shed_label) ? params.shed_label[0] : params.shed_label || '').trim();
+  const initialFromDate = String(Array.isArray(params.from_date) ? params.from_date[0] : params.from_date || '').trim();
+  const clearShed = useCallback(() => {
+    router.setParams({ shed_key: undefined, shed_label: undefined });
+  }, [router]);
   // Expo Router can retain an old serialized dashboard snapshot in the browser URL.
   // Strip it even when the user opens a bookmarked/stale URL directly.
   useEffect(() => {
@@ -57,8 +63,11 @@ export default function ProductionReportScreen() {
     if (typeof prptype === 'string' && prptype) clean.prptype = prptype;
     const tab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
     if (typeof tab === 'string' && tab) clean.tab = tab;
+    if (initialShedKey) clean.shed_key = initialShedKey;
+    if (initialShedLabel) clean.shed_label = initialShedLabel;
+    if (initialFromDate) clean.from_date = initialFromDate;
     router.replace({ pathname: '/new/(tabs)/reports/production', params: clean });
-  }, [params.production, params.tab, date, prptype, router]);
+  }, [params.production, params.tab, date, prptype, initialShedKey, initialShedLabel, initialFromDate, router]);
   const [tab, setTab] = useState<Tab>(tabs.some(t => t.id === initial) ? initial as Tab : 'prod');
   const activeTab = allowedTabs.some(t => t.id === tab) ? tab : allowedTabs[0]?.id;
   const chooseTab = (id: Tab) => { if (allowedTabs.some(t => t.id === id)) { setTab(id); router.setParams({ tab: id }); } };
@@ -148,7 +157,7 @@ export default function ProductionReportScreen() {
       {activeTab !== 'prod' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
         {allowedTabs.map(t => <TouchableOpacity key={t.id} onPress={() => chooseTab(t.id)} style={{ backgroundColor: activeTab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: activeTab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: activeTab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}
       </View>}
-      {!activeTab ? null : activeTab === 'prod' ? <WeavingDailyProduction date={date} prptype={prptype} initialBeam={beamTarget} onReturnToBeamStatus={() => { setBeamTarget(null); chooseTab('status'); }} refreshToken={refreshToken} onRefreshComplete={finishRefresh} onSelectedDateChange={selectedDate => router.setParams({date: selectedDate})} tabControls={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 3 }}>{allowedTabs.map(t => <TouchableOpacity key={t.id} onPress={() => chooseTab(t.id)} style={{ backgroundColor: activeTab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: activeTab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}><Text style={{ color: activeTab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}</View>} /> :
+      {!activeTab ? null : activeTab === 'prod' ? <WeavingDailyProduction date={date} prptype={prptype} initialFromDate={initialFromDate} initialShedKey={initialShedKey} initialShedLabel={initialShedLabel} onClearShed={clearShed} initialBeam={beamTarget} onReturnToBeamStatus={() => { setBeamTarget(null); chooseTab('status'); }} refreshToken={refreshToken} onRefreshComplete={finishRefresh} onSelectedDateChange={selectedDate => router.setParams({date: selectedDate})} tabControls={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 3 }}>{allowedTabs.map(t => <TouchableOpacity key={t.id} onPress={() => chooseTab(t.id)} style={{ backgroundColor: activeTab === t.id ? '#F3EAF4' : '#FFF', borderWidth: 1, borderColor: activeTab === t.id ? '#782C86' : '#E6E0DA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}><Text style={{ color: activeTab === t.id ? '#782C86' : navy, fontSize: 11, fontWeight: '800' }}>{t.title}</Text></TouchableOpacity>)}</View>} /> :
         activeTab === 'status' ? <BeamStatusPanel prptype={prptype} onOpenBeam={(beam: BeamStatusRow) => {
           setBeamTarget({prpcode: beam.prpcode, beam_uid: beam.beam_uid, beam_no: beam.beam_no,
             last_checking_date: beam.last_checking_date, nonce: Date.now()});

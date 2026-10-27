@@ -159,3 +159,19 @@ export async function fetchDesignDetail(a: Api, mdId: string): Promise<Row> {
   const r = await axios.get(`${a.API}/api/designs/${encodeURIComponent(mdId)}`, { headers: headers(a.token) });
   return ok(r?.data, 'Design could not be loaded.').data || {};
 }
+
+
+/**
+ * Pools uses the SAME authenticated property-aware API host and Bearer token
+ * as Orders. No independent endpoint, token store, or unauthenticated fetch.
+ * Path comes from ProductionPoolsTab and is restricted to the POOL GET route.
+ */
+export async function fetchProductionOrderPools(a: Api, path: string): Promise<any> {
+  if (!/^\/api\/getProductionOrderPools\?/.test(path)) {
+    throw new Error('Invalid Production Orders POOL request.');
+  }
+  const res = await axios.get(`${a.API.replace(/\/$/, '')}${path}`, {
+    headers: headers(a.token),
+  });
+  return res.data;
+}

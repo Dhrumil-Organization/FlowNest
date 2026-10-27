@@ -2,7 +2,7 @@
 // NEW ERP — Roll Cut Scanner: every HTTP call of the module in one place.
 // Host + Bearer token come from props (ErpSessionGate), same as the other NEW ERP modules.
 //
-//   SAVE   POST  SAVE_ENDPOINT       { txntype:'roll_cut_scanner', prpcode, yearno, scannedString }
+//   SAVE   POST  SAVE_ENDPOINT       { txntype:'roll_cut_scanner', prpcode, yearno, beamuid, beamno, takano, isfirsttaka, islasttaka } (flat)
 //   LIST   GET   LIST_ENDPOINT       { prptype, yearno, txntype, PrpCode, BeamNo, FromDate, ToDate, ... } -> data.main
 //   BEAMS  POST  BEAM_HELP_ENDPOINT  same call as the old Checking Scanner "Beam No help" -> response.data (unique BeamNo)
 //
@@ -18,10 +18,6 @@ export const BEAM_HELP_ENDPOINT = '/api/get_auto_checking_help';
 /** query-string keys of the list API for the date range */
 export const LIST_FROM_KEY = 'FromDate';
 export const LIST_TO_KEY = 'ToDate';
-
-/** true  -> scannedString is sent as the raw string that the scanner returned (as asked)
- *  false -> it is sent as the parsed JSON object (old Checking Scanner style) */
-export const SEND_SCANNED_AS_STRING = true;
 
 export type Opt = { label: string; value: string };
 export type QrData = { prpcode: string; beamno: string; takano: string; yearno?: string; [k: string]: any };
@@ -72,10 +68,11 @@ export function createRollCutApi(API: string, token: string) {
   const xhr = { headers: { 'X-Requested-With': 'XMLHttpRequest' } };
 
   return {
-    /** Save one scan — payload is only prpcode + yearno + scannedString (+ txntype). */
+    /** Save one scan — flat payload: txntype + all QR keys. */
     save: async (p: { prpcode: string; yearno: string; scannedString: string }) => {
-      const scannedString: any = SEND_SCANNED_AS_STRING ? p.scannedString : JSON.parse(p.scannedString);
-      const body = { txntype: TXN_ROLL_CUT, prpcode: p.prpcode, yearno: p.yearno, scannedString };
+      // flat payload: QR keys go straight into the body (no scannedString, no nested object/array)
+      const q = JSON.parse(p.scannedString);
+      const body = { txntype: TXN_ROLL_CUT, ...q, prpcode: p.prpcode, yearno: p.yearno };
       return (await c.post(SAVE_ENDPOINT, body, xhr)).data;
     },
 

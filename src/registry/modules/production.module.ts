@@ -79,6 +79,33 @@ registerPermissionArea({
             { key: 'edit', name: 'Edit' },
             { key: 'delete', name: 'Delete' },
           ],
+          // Existing Production Orders route is the container. All three tabs
+          // are independently authorised; parent view is NOT a tab permission.
+          children: [
+            {
+              key: 'orders', name: 'Orders', type: 'tab', displayOrder: 10,
+              actions: [
+                { key: 'view', name: 'View Orders' },
+                { key: 'add', name: 'New production order' },
+                { key: 'edit', name: 'Modify production order' },
+                { key: 'delete', name: 'Delete production order', dangerous: true },
+              ],
+            },
+            {
+              key: 'pools', name: 'Pools', type: 'tab', displayOrder: 20,
+              actions: [
+                { key: 'view', name: 'View Pools / My Orders' },
+                { key: 'view_all', name: 'View all executives pools' },
+              ],
+            },
+            {
+              key: 'job_work', name: 'Job work', type: 'tab', displayOrder: 30,
+              actions: [
+                { key: 'view', name: 'View Job work' },
+                { key: 'edit', name: 'Modify job work orders' },
+              ],
+            },
+          ],
         },
         {
           key: 'sudamo_production_order',

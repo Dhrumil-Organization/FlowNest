@@ -1,0 +1,110 @@
+{
+  "client_version": "sudamo-production-order-pools-real-integration-20261027",
+  "full_snapshot": false,
+  "areas": [
+    {
+      "key": "production",
+      "name": "Production",
+      "displayOrder": 30,
+      "resources": [
+        {
+          "key": "production",
+          "name": "Production",
+          "type": "screen",
+          "displayOrder": 30,
+          "actions": [
+            {
+              "key": "view",
+              "name": "View"
+            }
+          ],
+          "children": [
+            {
+              "key": "production_order_entry",
+              "name": "Production Orders",
+              "type": "screen",
+              "displayOrder": 45,
+              "actions": [
+                {
+                  "key": "view",
+                  "name": "View"
+                },
+                {
+                  "key": "add",
+                  "name": "Add"
+                },
+                {
+                  "key": "edit",
+                  "name": "Edit"
+                },
+                {
+                  "key": "delete",
+                  "name": "Delete"
+                }
+              ],
+              "children": [
+                {
+                  "key": "orders",
+                  "name": "Orders",
+                  "type": "tab",
+                  "displayOrder": 10,
+                  "actions": [
+                    {
+                      "key": "view",
+                      "name": "View Orders"
+                    },
+                    {
+                      "key": "add",
+                      "name": "New production order"
+                    },
+                    {
+                      "key": "edit",
+                      "name": "Modify production order"
+                    },
+                    {
+                      "key": "delete",
+                      "name": "Delete production order",
+                      "dangerous": true
+                    }
+                  ]
+                },
+                {
+                  "key": "pools",
+                  "name": "Pools",
+                  "type": "tab",
+                  "displayOrder": 20,
+                  "actions": [
+                    {
+                      "key": "view",
+                      "name": "View Pools / My Orders"
+                    },
+                    {
+                      "key": "view_all",
+                      "name": "View all executives pools"
+                    }
+                  ]
+                },
+                {
+                  "key": "job_work",
+                  "name": "Job work",
+                  "type": "tab",
+                  "displayOrder": 30,
+                  "actions": [
+                    {
+                      "key": "view",
+                      "name": "View Job work"
+                    },
+                    {
+                      "key": "edit",
+                      "name": "Modify job work orders"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

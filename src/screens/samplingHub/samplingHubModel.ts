@@ -29,7 +29,7 @@ export const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free'];
 
 export type Content = { md_id: string; design: string; category: string; sd_ids: string[]; colourways: string[] };
 export type Sample = {
-  id: string; uid: string; prpcode: string; type: SmpTypeKey; name: string; md_id: string; design: string; dsn_code: string; category: string; design_gone: boolean;
+  id: string; uid: string; prpcode: string; type: SmpTypeKey; name: string; work_name: string; md_id: string; design: string; dsn_code: string; category: string; design_gone: boolean;
   sd_id: string; colourway: string; colour: string; garment: string; size: string; metres: number; range: string;
   qty: number; tracked: boolean; parent: string; note: string; created: string; by: string; by_id: string;
   edited_by: string; edited_at: string; contents: Content[]; photo: boolean;
@@ -78,7 +78,7 @@ export function normalizeList(raw: any): ListData {
     me: { id: s(raw.me?.id), name: s(raw.me?.name) || 'User' },
     rights: { view: !!r.view, add: !!r.add, edit: !!r.edit, delete: !!r.delete, move: !!r.move, print: !!r.print },
     samples: arr(raw.samples).map((x: any): Sample => ({
-      id: s(x.id), uid: s(x.uid), prpcode: s(x.prpcode), type: (SMP_TYPE[s(x.type) as SmpTypeKey] ? s(x.type) : 'garment') as SmpTypeKey, name: s(x.name), md_id: s(x.md_id),
+      id: s(x.id), uid: s(x.uid), prpcode: s(x.prpcode), type: (SMP_TYPE[s(x.type) as SmpTypeKey] ? s(x.type) : 'garment') as SmpTypeKey, name: s(x.name), work_name: s(x.work_name), md_id: s(x.md_id),
       design: s(x.design), dsn_code: s(x.dsn_code), category: s(x.category), design_gone: !!x.design_gone, sd_id: s(x.sd_id),
       colourway: s(x.colourway), colour: s(x.colour), garment: s(x.garment), size: s(x.size), metres: n(x.metres), range: s(x.range),
       qty: Math.max(1, Math.round(n(x.qty)) || 1), tracked: !!x.tracked, parent: s(x.parent), note: s(x.note), created: s(x.created),
@@ -187,11 +187,20 @@ export const searchText = (sm: Sample) =>
   [sm.id, sm.id.replace('-', ''), sm.name, designLabel(sm), sm.dsn_code, colourLabel(sm), sm.range, ...catsOf(sm), ...sm.contents.flatMap((c) => c.colourways)].join(' ');
 
 /**
- * what a scan / typed code means: a Sample No. (GAR-0001 · gar0001 · " HNG-12 "), or the printed sticker QR
- * (Checking Scanner label: PRPCODE~UID~1~0~44~GAR-0001 — the Sample No. part is used). Else null.
+ * what a scan / typed code means: a Sample No. (GAR-0001 · gar0001 · " HNG-12 "), the printed sticker QR
+ * ({"prpcode":..,"beamno":"GAR-0001","takano":"GAR-0001",..} — takano is used) or an older sticker
+ * (PRPCODE~UID~1~0~44~GAR-0001 — the Sample No. part is used). Else null.
  */
 export function parseSampleId(raw: string): string | null {
   let t = String(raw || '');
+  if (t.trim().startsWith('{')) {
+    try {
+      const j = JSON.parse(t.trim());
+      t = String(j?.takano || j?.beamno || j?.printid || '');
+    } catch {
+      return null;
+    }
+  }
   if (t.includes('~')) {
     const hit = t.split('~').map((x) => x.trim().toUpperCase()).find((x) => /^(GAR|HNG|BKL|FAB|SWC)-\d{1,8}$/.test(x));
     if (!hit) return null;

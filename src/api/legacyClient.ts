@@ -778,7 +778,7 @@ export const RealCostChainAPI = {
 //   save       -> new sample(s) / { id } edit;  delete -> { id } HARD delete with its movements
 //   split      -> { id, n } items of a batch get their own IDs
 //   move_save  -> record / { id } modify a movement;  move_delete -> { id } HARD delete
-//   sticker    -> { ids } label rows for the Checking Scanner print path (PRINTSTICKER, PrintFormat 4)
+//   sticker    -> { ids } sticker rows in the Taka label shape (POST /api/taka-preview-label · /api/taka-print-label)
 export const SamplingHubAPI = {
   list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('list'), body, { timeout: 120000 }),
   masters: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('masters'), body, { timeout: 120000 }),

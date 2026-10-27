@@ -521,6 +521,18 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                           params: { view },
                         } as any)
                       }
+                      onOpenFY={() => {
+                        const today = new Date();
+                        router.push({
+                          pathname: '/new/(tabs)/reports/financial-year',
+                          params: {
+                            metric: 'prodcost',
+                            prptype: getToken?.getUserPrptype || 'S',
+                            view: 'owner',
+                            date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+                          },
+                        } as any);
+                      }}
                     />
                   ) : null,
                 'dashboard.monthly_report': () => (

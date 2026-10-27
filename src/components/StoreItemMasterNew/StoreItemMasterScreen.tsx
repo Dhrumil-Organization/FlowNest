@@ -14,7 +14,7 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { deleteItem, fetchBrowse, fetchItem, fetchLookups, fetchNextCode, fetchStores, fetchYears, saveItem } from './api';
+import { deleteItem, fetchBrowsePage, fetchItem, fetchLookups, fetchNextCode, fetchStores, fetchYears, saveItem } from './api';
 import BrowseSheet from './BrowseSheet';
 import MakeSheet from './MakeSheet';
 import {
@@ -509,7 +509,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
     },
     [openItem, store],
   );
-  const fetchRows = useCallback(() => fetchBrowse(API, token, scope), [API, token, scope]);
+  const fetchPage = useCallback((page: number, perPage: number, search: string) => fetchBrowsePage(API, token, scope, page, perPage, search), [API, token, scope]);
 
   const onRefreshItem = () => {
     if (hasItem && !editing && !busy) void openItem(scopeOf(draft).store, draft.mItmCode || draft.code);
@@ -838,10 +838,11 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
     <Card
       title="Makes & models"
       subtitle={draft.makes.length ? `${liveMakes} active${draft.makes.length - liveMakes ? `, ${draft.makes.length - liveMakes} dead` : ''}` : undefined}
+      stack={bp === 'phone'}
       right={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, ...(bp === 'phone' ? { width: '100%' } : { flexWrap: 'wrap' }) } as any}>
           <CheckChip label="Show dead" value={showDead} onChange={setShowDead} />
-          <Btn kind="primary" icon="add" label="Add make" disabled={!editing} onPress={() => void openMakeEditor(emptyMake(), true)} />
+          <Btn kind="primary" icon="add" label="Add make" flex={bp === 'phone'} disabled={!editing} onPress={() => void openMakeEditor(emptyMake(), true)} />
         </View>
       }
     >
@@ -957,7 +958,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
       </Sheet>
 
       {browseOpen ? (
-        <BrowseSheet storeLabel={storeLabel} currentCode={hasItem ? draft.code : undefined} fetchRows={fetchRows} onPick={onPickRow} onClose={() => setBrowseOpen(false)} />
+        <BrowseSheet storeLabel={storeLabel} currentCode={hasItem ? draft.code : undefined} fetchPage={fetchPage} onPick={onPickRow} onClose={() => setBrowseOpen(false)} />
       ) : null}
 
       <NoticeHost />

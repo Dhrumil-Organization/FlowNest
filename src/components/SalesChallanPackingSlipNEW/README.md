@@ -76,12 +76,17 @@ The screen never checks `view` itself, because the route guard already did. It r
 
 ## Still to confirm
 
-- **`getcartondetail` limit.** It stays at 20 like the web (`CARTON_LIMIT` in `api.ts`). The scanner only matches against those 20 cartons.
 - **Store name** is read from `getstore` as `StrName` / `SName` / `StrDesc`. Only the code shows if none of these exist.
 
 ## Scanner devices (same as WarehouseNEW)
 
-In scan mode, every line has two buttons: **Hardware scanner** and **Mobile camera**. Inside the scanner you can switch between them with the toggle. "Type a label" is there for a damaged sticker.
+In scan mode, every line has two buttons: **Hardware scanner** and **Mobile camera**. The one you tap is the scanner type for that line's carton screen.
+
+The carton screen has two parts:
+
+- **Summary** (no scanner on it, so the Carton list is in view): Summary card, scanner type with **Change**, Carton list. **Scan QR** (top right) scans any carton. **Scan** on a row asks for that carton, and another label is reported as *Wrong carton*.
+- **Scanner screen** (opens on Scan QR / Scan): uses the chosen type. A good scan selects the carton and goes straight back to the summary, with a green "C-… selected" strip. A bad scan (not found, locked, already scanned, wrong carton) stays on the scanner with the reason, so you just scan again. **Type a label** is there for a damaged sticker.
+- **Remove:** a carton scanned by mistake is removed with ✕ on its row (asks first). Cartons already saved on a saved line (`D1Flag = 1`) stay, as on the web.
 
 | Device | Behaviour (copied from WarehouseNEW HardwareScanStep / CameraScanStep) |
 |---|---|
@@ -89,3 +94,34 @@ In scan mode, every line has two buttons: **Hardware scanner** and **Mobile came
 | Mobile camera | expo-camera with the back camera, a torch, and qr / ean13 / code128. On refusal it shows "Camera Permission Required", and OK switches back to the hardware scanner. A 350 ms lock applies, and the same QR is ignored until it has been out of frame for 700 ms. |
 
 The Urovo engine and the camera only run while their tab is open.
+
+### In the browser (web build in Chrome on the handheld)
+
+There is no Urovo native module in Chrome, so:
+
+- **Hardware tab:** shows the pill *"BROWSER: keyboard scanner mode"*. `webWedge.ts` listens on the page and fills a hidden `<input inputmode="none">` inside the scanner. It catches characters sent as key presses and text committed by the scanner's keyboard app. A scan ends on Enter or Tab, or after 150 ms with no suffix. A bare Enter or Tab never "clicks" a focused button.
+- **Camera tab:** `WebCameraScanner.web.tsx` uses Chrome's built-in `BarcodeDetector` (QR, Code 128, EAN-13, Data Matrix). Browsers without it fall back to expo-camera, which on web reads only QR, using jsQR fetched from cdn.jsdelivr.net. The camera needs **HTTPS**.
+
+**Urovo setting for Chrome:** Scanner Settings → Output mode = **Keyboard / input method** (not Broadcast / Intent), with the **Enter** suffix on. The orange laser trigger button only works in the Android app build.
+
+## Carton selection (scan screen)
+
+`getcartondetail` is now called the same way as the web carton help (`CartonDetail/components/CartonSelect.fetchCarton`):
+
+- `limit: ''` loads **all** cartons of the ItmCode + MerCode + GrdCode + ShdCode combination.
+- `planninguid` / `planningsrno` link it to the order line.
+- `TxnDate` (packing date), `txntype`, ttype `… '994', '992'`, and `selectedcarton` (this line's cartons) are sent too.
+
+Each carton row returns `cartno`, `qty`, `chees`, **`WarehouseLoction`** (sic), `ProdType`, `GrdName`, `TranName`, `LotNo`, `lock`, `lockreason` and the QR strings.
+
+The screen has these parts:
+
+- **Summary:** cartons selected, net weight against the balance qty, location (the aisle, or "B-03 +1"), production type, then item, merge, shade and grade.
+- **Carton list:** sorted by location so the picker walks the aisle. It has a search box (carton no., location or lot) and filters for All, Selected, To scan and Locked.
+- **Selecting a carton** only happens by scanning its label:
+  - The hardware scanner listens the whole time, in a slim bar above the list.
+  - **Scan QR** in the app bar opens the scanner panel, where you can switch to the mobile camera or type a label.
+  - **Scan / Scan QR** on a row asks for *that* carton. Any other label is reported as "Wrong carton" and not added.
+- **Locked cartons** (`lock = 1`) are greyed out with their `lockreason`, and scanning one shows "Locked carton".
+- **Saved cartons:** cartons already saved on this line stay in the list even if the stock call no longer returns them.
+- **Footer:** "View selected (n)" and "Done · n". Done is still blocked when the selected qty is more than the balance qty, or when a carton is listed twice.

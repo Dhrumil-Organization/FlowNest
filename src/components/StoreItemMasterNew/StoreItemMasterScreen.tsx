@@ -12,9 +12,9 @@ import { AppAlert } from '@/common/utils/appAlert';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { deleteItem, fetchBrowse, fetchItem, fetchLookups, fetchNextCode, fetchScopeBase, fetchStores, fetchYears, saveItem } from './api';
+import { deleteItem, fetchBrowse, fetchItem, fetchLookups, fetchNextCode, fetchStores, fetchYears, saveItem } from './api';
 import BrowseSheet from './BrowseSheet';
 import MakeSheet from './MakeSheet';
 import {
@@ -46,7 +46,7 @@ import {
 } from './model';
 import { NoticeHost, notifyError as showError, notifySuccess as showSuccess } from './Notice';
 import { FormSkeleton, ScreenSkeleton, SkeletonField } from './Skeleton';
-import { Banner, Btn, Card, Cell, CheckChip, EmptyState, Field, FieldLabel, SelectField, Sheet, StatusPill, useContainerWidth, useWebKeys } from './ui';
+import { Banner, Btn, Card, Cell, CheckChip, EmptyState, Field, SelectField, Sheet, StatusPill, useContainerWidth, useWebKeys } from './ui';
 
 type Props = { token: string; API: string; username?: string; defaultPrpType?: string; defaultPrpCode?: string; defaultYear?: string };
 
@@ -55,13 +55,12 @@ const LAST_SCOPE_KEY = 'sim_last_scope_v2'; // Property / Year / Store (v2: drop
 const GUT = 14;
 
 /* make-grid column definitions (desktop shows all, tablet a subset) */
-type MCol = { k: keyof ItemMake | 'status'; label: string; w?: number; flex?: number; right?: boolean; dp?: keyof typeof DP };
+type MCol = { k: keyof ItemMake | 'status'; label: string; w?: number; flex?: number; minW?: number; right?: boolean; dp?: keyof typeof DP };
 const MAKE_COLS_DESKTOP: MCol[] = [
-  { k: 'makeCode', label: 'Code', w: 82 },
+  { k: 'makeCode', label: 'Make Code', w: 82 },
   { k: 'makeName', label: 'Make name', w: 180 },
-  { k: 'model', label: 'Model', w: 340 },
+  { k: 'model', label: 'Model', flex: 1, minW: 340 },
   { k: 'opQty', label: 'Op. qty', w: 110, right: true, dp: 'opQty' },
-  { k: 'opRate', label: 'Op. rate', w: 105, right: true, dp: 'opRate' },
   { k: 'rate1', label: 'Rate', w: 100, right: true },
   { k: 'rate2', label: 'Rate 2', w: 100, right: true },
   { k: 'rate3', label: 'Rate 3', w: 100, right: true },
@@ -71,11 +70,10 @@ const MAKE_COLS_DESKTOP: MCol[] = [
   { k: 'status', label: 'Status', w: 100 },
 ];
 const MAKE_COLS_TABLET: MCol[] = [
-  { k: 'makeCode', label: 'Code', w: 64 },
+  { k: 'makeCode', label: 'Make Code', w: 64 },
   { k: 'makeName', label: 'Make', w: 120 },
-  { k: 'model', label: 'Model', w: 220 },
+  { k: 'model', label: 'Model', flex: 1, minW: 220 },
   { k: 'opQty', label: 'Op. qty', w: 84, right: true, dp: 'opQty' },
-  { k: 'opRate', label: 'Op. rate', w: 84, right: true, dp: 'opRate' },
   { k: 'rate1', label: 'Rate', w: 78, right: true },
   { k: 'rate2', label: 'Rate 2', w: 78, right: true },
   { k: 'rate3', label: 'Rate 3', w: 78, right: true },
@@ -84,7 +82,7 @@ const MAKE_COLS_TABLET: MCol[] = [
   { k: 'status', label: 'Status', w: 84 },
 ];
 
-export default function StoreItemMasterScreen({ token, API, defaultPrpType, defaultPrpCode, defaultYear }: Props) {
+export default function StoreItemMasterScreen({ token, API, defaultPrpType, defaultYear }: Props) {
   const { bp, onLayout } = useContainerWidth();
   const cols = formColumns(bp);
 
@@ -158,6 +156,52 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
     }
   };
 
+  /** Read YearNo from the login response persisted by the app. */
+  const readLoginYearNo = async () => {
+    const findYearNo = (value: any, depth = 0): string => {
+      if (value == null || depth > 6) return '';
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          const found = findYearNo(entry, depth + 1);
+          if (found) return found;
+        }
+        return '';
+      }
+      if (typeof value !== 'object') return '';
+      // Prefer the active login year object (the login response contains `year: { YearNo: ... }`).
+      const directYear = value.YearNo ?? value.yearNo ?? value.yearno;
+      if (directYear !== undefined && directYear !== null && String(directYear).trim()) {
+        return String(directYear);
+      }
+      for (const [key, child] of Object.entries(value)) {
+        if (key.toLowerCase() === 'year' || key.toLowerCase().includes('login') || typeof child === 'object') {
+          const found = findYearNo(child, depth + 1);
+          if (found) return found;
+        }
+      }
+      return '';
+    };
+
+    // A few app versions use different storage keys for the login/session response.
+    // Scan persisted values instead of relying on one guessed key name.
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      for (const key of keys) {
+        try {
+          const raw = await AsyncStorage.getItem(key);
+          if (!raw) continue;
+          let value: any = raw;
+          try { value = JSON.parse(raw); } catch { /* non-JSON storage value */ }
+          const found = findYearNo(value);
+          if (found) return found;
+        } catch { /* continue with remaining stored values */ }
+      }
+    } catch { /* getAllKeys may not be supported by a storage adapter */ }
+
+    // Keep compatibility with a parent screen that explicitly supplies the login year.
+    return defaultYear ? String(defaultYear) : '';
+  };
+
   const runLookups = useCallback(async () => {
     setLookupError('');
     try {
@@ -169,18 +213,20 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
         // storage unavailable — fall back to the first option of each list
       }
       const prpType = saved.prpType || defaultPrpType || (await readLoginPrpType());
-      // 1) property type -> properties + years (one call each)   2) stores   3) item lookups
-      const base = await fetchScopeBase(API, token, { prpType, prpCode: saved.prpCode || defaultPrpCode, yearNo: saved.yearNo || defaultYear });
-      const storeList = await fetchStores(API, token, base.prpCode, base.yearNo);
+      // Property is fixed to MT. Year comes from the login response, not a screen dropdown.
+      const loginYearNo = await readLoginYearNo();
+      const yearNo = loginYearNo;
+      if (!yearNo) throw new Error('Login year (YearNo) was not found. Please log in again.');
+      const storeList = await fetchStores(API, token, 'MT', yearNo);
       const first = storeList.find((x) => x.id === saved.store)?.id || storeList[0]?.id || '';
-      const next: Scope = { prpType: base.prpType, prpCode: base.prpCode, yearNo: base.yearNo, store: first };
+      const next: Scope = { prpType, prpCode: 'MT', yearNo, store: first };
       const l = await fetchLookups(API, token, next);
       if (!alive.current) return;
       // Make/Model options come from the same lookups response as Location.
       // Do not call the separate type=makes API.
       setMakeOptions(l.makes);
-      setProperties(base.properties);
-      setYears(base.years);
+      setProperties([]);
+      setYears([]);
       setStores(storeList);
       setLookups(l);
       setScope(next);
@@ -189,7 +235,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
       if (alive.current) setLookupError(e?.message || 'Could not load the item lists.');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API, token, defaultPrpType, defaultPrpCode, defaultYear]);
+  }, [API, token, defaultPrpType, defaultYear]);
 
   /** Never run two loads at once (double mount / re-render must not repeat the APIs). */
   const loadLookups = useCallback(() => {
@@ -371,7 +417,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
 
   const onSave = async () => {
     if (!editing || busy || !lookups) return;
-    const e = validateItem(draft, mode, lookups.subGroups);
+    const e = validateItem(draft, mode);
     setErrors(e);
     if (Object.keys(e).length) {
       setFormError(`Fix ${Object.keys(e).length} ${Object.keys(e).length === 1 ? 'field' : 'fields'} before saving.`);
@@ -413,7 +459,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
       async () => {
         setBusy('delete');
         try {
-          const message = await deleteItem(API, token, scopeOf(draft), draft.code);
+          const message = await deleteItem(API, token, scopeOf(draft), draft.mItmCode || draft.code);
           if (!alive.current) return;
           showSuccess(message || `Item ${draft.code} deleted successfully.`, { title: 'Item deleted' });
           resetToBlank(scopeOf(draft));
@@ -459,14 +505,14 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
   const onPickRow = useCallback(
     (row: BrowseRow) => {
       setBrowseOpen(false);
-      void openItem(row.store || store, row.code);
+      void openItem(row.store || store, row.mItmCode || row.code);
     },
     [openItem, store],
   );
   const fetchRows = useCallback(() => fetchBrowse(API, token, scope), [API, token, scope]);
 
   const onRefreshItem = () => {
-    if (hasItem && !editing && !busy) void openItem(scopeOf(draft).store, draft.code);
+    if (hasItem && !editing && !busy) void openItem(scopeOf(draft).store, draft.mItmCode || draft.code);
   };
 
   /* makes */
@@ -514,11 +560,6 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
   );
 
   /* ------------------------------ derived UI ------------------------------ */
-  const subGroupOptions = useMemo(
-    () => (lookups ? lookups.subGroups.filter((s) => !draft.groupId || s.groupId === draft.groupId) : []),
-    [lookups, draft.groupId],
-  );
-
   /* ------------------------------ early states ----------------------------- */
   if (!lookups) {
     if (lookupError) {
@@ -584,30 +625,15 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
       required
       error={errors.groupId}
       onChange={(id) => {
-        setDraft((p) => ({
-          ...p,
-          groupId: id,
-          subGroupId: lookups.subGroups.find((x) => x.id === p.subGroupId)?.groupId === id ? p.subGroupId : '',
-        }));
-        setErrors((p) => ({ ...p, groupId: undefined }));
+        set('groupId', id);
       }}
     />
   );
   const scopeLocked = mode === 'modify' || busy !== '';
 
   const details = (
-    <Card title="Details" subtitle={mode === 'add' ? 'Pick Property, Year and Store — the item code is assigned automatically.' : undefined}>
+    <Card title="Details" subtitle={mode === 'add' ? 'Select Store — the item code is assigned automatically.' : undefined}>
       <View style={[s.grid, { marginHorizontal: -GUT / 2 }]}>
-        {flowCell(
-          <SelectField label="Property" value={scope.prpCode} options={properties} onChange={onPropertyChange} disabled={scopeLocked} required error={errors.prpCode} />,
-        )}
-        {flowCell(
-          yearLoading ? (
-            <SkeletonField labelWidth={40} />
-          ) : (
-            <SelectField label="Year" value={scope.yearNo} options={years} onChange={onYearChange} disabled={scopeLocked || !scope.prpCode} required error={errors.yearNo} />
-          ),
-        )}
         {flowCell(
           storeLoading ? (
             <SkeletonField labelWidth={50} />
@@ -623,7 +649,9 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
               error={errors.store}
             />
           ),
+          1,
         )}
+        {cols > 1 && flowCell(<View />, cols - 1)}
         {flowCell(
           codeLoading ? (
             <SkeletonField labelWidth={66} />
@@ -641,43 +669,20 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
         )}
         {flowCell(
           <Field label="Item name" value={draft.name} readOnly={ro} required error={errors.name} autoCapitalize="characters" onChangeText={(v) => set('name', v.toUpperCase())} />,
-          cols === 3 ? 2 : cols,
+          Math.max(1, cols - 1),
         )}
         {flowCell(groupSelect)}
-        {flowCell(
-          <SelectField
-            label="Item sub group"
-            value={draft.subGroupId}
-            options={subGroupOptions}
-            disabled={ro}
-            allowClear
-            required={subGroupOptions.length > 0 && !!draft.groupId}
-            error={errors.subGroupId}
-            placeholder={draft.groupId && subGroupOptions.length === 0 ? 'None for this group' : 'Select…'}
-            onChange={(id) => set('subGroupId', id)}
-          />,
-        )}
-        {flowCell(<SelectField label="Purchase UOM" value={draft.purchaseUom} options={lookups.uoms} disabled={ro} required error={errors.purchaseUom} onChange={(id) => set('purchaseUom', id)} />)}
-        {flowCell(<SelectField label="Sales UOM" value={draft.salesUom} options={lookups.uoms} disabled={ro} required error={errors.salesUom} onChange={(id) => set('salesUom', id)} />)}
-        {flowCell(<SelectField label="HSN code" value={draft.hsn} options={lookups.hsn} disabled={ro} allowClear onChange={(id) => set('hsn', id)} />)}
-        {flowCell(<SelectField label="GST group" value={draft.gst} options={lookups.gst} disabled={ro} allowClear onChange={(id) => set('gst', id)} />)}
-        {flowCell(
-          <View>
-            <FieldLabel label="Stop transactions" />
-            <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-              <CheckChip label="Stop inward" value={draft.stopInward} onChange={(v) => set('stopInward', v)} disabled={ro} />
-              <CheckChip label="Stop issue" value={draft.stopIssue} onChange={(v) => set('stopIssue', v)} disabled={ro} />
-            </View>
-          </View>,
-          cols === 3 ? 1 : cols,
-        )}
+        {flowCell(<SelectField label="UOM" value={draft.salesUom} options={lookups.uoms} disabled={ro} required error={errors.salesUom} onChange={(id) => set('salesUom', id)} />)}
       </View>
     </Card>
   );
 
   /* make grid (desktop / tablet) */
   const mcols = bp === 'desktop' ? MAKE_COLS_DESKTOP : MAKE_COLS_TABLET;
-  const mcell = (c: MCol) => (c.w ? { width: c.w } : { flex: c.flex ?? 1, minWidth: 0 });
+  const mcell = (c: MCol) => (c.w ? { width: c.w } : { flex: c.flex ?? 1, minWidth: c.minW ?? 0 });
+  // Table is only as wide as its columns (+ row padding, edit icon, delete button); the Model column
+  // takes any spare width, so the edit / delete icons sit together at the right edge (no big gap).
+  const mTableMinW = mcols.reduce((n, c) => n + (c.w ?? c.minW ?? 0) + 10, 0) + 20 + 28 + 42;
   const mval = (m: ItemMake, c: MCol) => {
     if (c.k === 'status') return m.dead ? 'Dead' : makeStatusLabel(m.status, lookups.status);
     if (c.k === 'location') return labelOf(lookups.locations, m.location);
@@ -688,7 +693,7 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
 
   const makesTable = (
     <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: '100%' }}>
-      <View style={{ flex: 1, minWidth: bp === 'desktop' ? 2200 : 1450 }}>
+      <View style={{ flex: 1, minWidth: mTableMinW }}>
         <View style={s.mHead}>
           {mcols.map((c) => (
             <View key={String(c.k)} style={[mcell(c), { paddingRight: 10 }]}>
@@ -786,7 +791,6 @@ export default function StoreItemMasterScreen({ token, API, defaultPrpType, defa
             <View style={s.mStats}>
               {[
                 ['Op. qty', fmt(m.opQty, DP.opQty)],
-                ['Op. rate', fmt(m.opRate, DP.opRate)],
                 ['Rate', m.rate1 || '0'],
                 ['Rate 2', m.rate2 || '0'],
                 ['Rate 3', m.rate3 || '0'],

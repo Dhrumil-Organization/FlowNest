@@ -1201,7 +1201,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         <Metric label="Qty" value={showVal(d1Item.Qty)} style={styles.itemBox} />
                         <Metric label="Rate" value={showMoney(d1Item.UnitRate)} style={styles.itemBox} />
                         <Metric label="Amount" value={showMoney(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
-                        <Metric label="Last Rate" value={showVal(d1Item.LatestUnitRate)} style={styles.itemBox} />
+                        <Metric label="Last Date" value={showVal(d1Item.LatestRateDate)} color={T.pd} style={styles.itemBox} />
+                        <Metric label="Last Rate" value={showMoney(d1Item.LatestUnitRate)} style={styles.itemBox} />
                     </View>
                 </View>
             ))}
@@ -1713,7 +1714,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     <Metric label="Rate" value={showVal(d1Item.UnitRate)} style={styles.itemBox} />
                                     <Metric label="Amount" value={showVal(d1Item.Amount)} color={T.pd} style={styles.itemBox} />
                                     <Metric label="Disc. %" value={showVal(d1Item.DisPer)} style={styles.itemBox} />
-                                    
+
                                     {activeTab1YPO === 'requests' && (
                                         <>
                                             <Metric label="Current Stock" value={showVal(d1Item.CurrentStock)} style={styles.itemBox} />
@@ -1868,10 +1869,26 @@ const num0 = (v: any) => {
 };
 const fmtINR = (v: any) => num0(v).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const showVal = (v: any) => (v === undefined || v === null || String(v).trim() === '' ? '-' : String(v));
-const showMoney = (v: any) => {
+// const showMoney = (v: any) => {
+//     if (v === undefined || v === null || String(v).trim() === '') return '-';
+//     const x = parseFloat(String(v).replace(/,/g, ''));
+//     return Number.isFinite(x) ? `₹ ${x.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : String(v);
+// };
+
+const showMoney = (v: any, isAmount = false) => {
     if (v === undefined || v === null || String(v).trim() === '') return '-';
-    const x = parseFloat(String(v).replace(/,/g, ''));
-    return Number.isFinite(x) ? `₹ ${x.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : String(v);
+
+    if (isAmount) {
+        const x = parseFloat(String(v).replace(/,/g, ''));
+        return Number.isFinite(x)
+            ? `₹ ${x.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })}`
+            : String(v);
+    }
+
+    return `₹ ${v}`;
 };
 
 function StatusTag({ label, color, icon, solid }: { label: string; color: string; icon?: string; solid?: boolean }) {

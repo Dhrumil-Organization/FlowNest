@@ -3,6 +3,7 @@
 //
 //   SCAN   : [Scan QR] -> Beam No + Taka No text boxes fill from the QR -> [Save] -> POST { prpcode, yearno, scannedString }
 //   LIST   : filters Property · From date · To date · Beam No  -> how many scans were done + the scanned takas
+//            + search box (taka / beam / design / grade ...) and lazy loading (rows are shown PAGE_SIZE at a time while scrolling)
 //
 // Phone : two tabs (Scan / Scanned List).   Web / tablet (>= 980 px) : both side by side.
 // `token` and `API` come from ErpSessionGate (same as every other NEW ERP module).
@@ -18,6 +19,7 @@ import ScanCamera from './ScanCamera';
 import SelectField from './SelectField';
 
 type Props = { token: string; API: string };
+const PAGE_SIZE = 30; // rows rendered per lazy-load step
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
@@ -48,6 +50,9 @@ export default function RollCutScanner({ token, API }: Props) {
   const [listError, setListError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const autoLoaded = useRef(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   const c = useRollCutCriteria({ token, API, onAutoProperty: (code) => setPrpCode((p) => p || code) });
   const prptype = c.prptype;
@@ -105,6 +110,38 @@ export default function RollCutScanner({ token, API }: Props) {
     setToDate(d);
     if (d < fromDate) setFromDate(d);
   };
+
+  /* ---------------------- search + lazy loading (client side) ---------------------- */
+  // debounce typing so 20k+ rows are not re-filtered on every key
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // keep the original serial number (newest = highest) even when the list is filtered
+  const numbered = useMemo(() => rows.map((r, i) => ({ r, no: rows.length - i })), [rows]);
+
+  const filtered = useMemo(() => {
+    if (!search) return numbered;
+    const words = search.split(/\s+/).filter(Boolean);
+    return numbered.filter(({ r }) => {
+      const hay = [r?.TakaNo, r?.BeamNo, r?.DsnName, r?.OrdDsnName, r?.GrdName, r?.Qty, r?.Wt, r?.ChkDate, r?.ScanDate, r?.EntryDate, r?.CrtDate]
+        .map((v) => str(v).toLowerCase())
+        .join(' ');
+      return words.every((w) => hay.includes(w));
+    });
+  }, [numbered, search]);
+
+  // new data / new search -> start again from the first page
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [rows, search]);
+
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
+  const hasMore = visible < filtered.length;
+  const loadMore = useCallback(() => {
+    setVisible((v) => (v < filtered.length ? v + PAGE_SIZE : v));
+  }, [filtered.length]);
 
   /* -------------------------------- scan --------------------------------- */
   const clearScan = () => {
@@ -255,14 +292,36 @@ export default function RollCutScanner({ token, API }: Props) {
       </View>
 
       {loaded ? (
+        <View style={st.searchBox}>
+          <Icon name="search" size={19} color={searchInput ? T.copper : T.muted} />
+          <TextInput
+            value={searchInput}
+            onChangeText={setSearchInput}
+            placeholder="Search taka no, beam no, design, grade…"
+            placeholderTextColor={T.muted}
+            style={st.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Search scanned list"
+          />
+          {searchInput ? (
+            <TouchableOpacity onPress={() => setSearchInput('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Clear search">
+              <Icon name="cancel" size={18} color={T.muted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+
+      {loaded ? (
         <View style={st.countCard}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={st.countLabel}>TOTAL SCANS</Text>
+            <Text style={st.countLabel}>{search ? 'MATCHING SCANS' : 'TOTAL SCANS'}</Text>
             <Text style={st.countRange} numberOfLines={1}>
               {fmtShowDate(fromDate)} – {fmtShowDate(toDate)}{beamFilter ? ` · Beam ${beamFilter}` : ''}
             </Text>
           </View>
-          <Text style={st.countValue}>{rows.length}</Text>
+          <Text style={st.countValue}>{search ? filtered.length : rows.length}</Text>
         </View>
       ) : null}
     </View>
@@ -270,19 +329,35 @@ export default function RollCutScanner({ token, API }: Props) {
 
   const listPanel = (
     <FlatList
-      data={rows}
-      keyExtractor={(r, i) => `${str(r?.UId)}_${str(r?.SrNo)}_${str(r?.TakaNo)}_${i}`}
+      data={shown}
+      keyExtractor={({ r, no }) => `${str(r?.UId)}_${str(r?.SrNo)}_${str(r?.TakaNo)}_${no}`}
       contentContainerStyle={[st.panelPad, { paddingBottom: 40 }]}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={listLoading && loaded} onRefresh={loadList} colors={[T.copper]} tintColor={T.copper} />}
       ListHeaderComponent={listHeader}
-      renderItem={({ item, index }) => <ScanRow item={item} no={rows.length - index} />}
+      renderItem={({ item }) => <ScanRow item={item.r} no={item.no} />}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.4}
+      initialNumToRender={12}
+      maxToRenderPerBatch={12}
+      windowSize={7}
+      removeClippedSubviews={Platform.OS !== 'web'}
+      ListFooterComponent={
+        loaded && filtered.length > 0 ? (
+          <View style={st.footer}>
+            {hasMore ? <ActivityIndicator color={T.copper} /> : null}
+            <Text style={st.footerText}>
+              {hasMore ? `Showing ${shown.length} of ${filtered.length} · scroll for more` : `Showing all ${filtered.length}`}
+            </Text>
+          </View>
+        ) : null
+      }
       ListEmptyComponent={
         listLoading ? null : (
           <View style={st.empty}>
             <View style={st.emptyIcon}><Icon name="qr-code-2" size={30} color={T.copper} /></View>
-            <Text style={st.emptyTitle}>{loaded ? 'No scans found' : 'No data yet'}</Text>
-            <Text style={st.emptyText}>{loaded ? 'Nothing was scanned for these filters.' : 'Select a property and tap Show list.'}</Text>
+            <Text style={st.emptyTitle}>{loaded ? (search ? 'No match found' : 'No scans found') : 'No data yet'}</Text>
+            <Text style={st.emptyText}>{loaded ? (search ? `Nothing matches "${searchInput.trim()}".` : 'Nothing was scanned for these filters.') : 'Select a property and tap Show list.'}</Text>
           </View>
         )
       }
@@ -426,6 +501,10 @@ const st = StyleSheet.create({
   failBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.red}55`, backgroundColor: `${T.red}12` },
   failIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: T.red, alignItems: 'center', justifyContent: 'center' },
   failTitle: { fontSize: 13.5, fontWeight: '900', color: T.red },
+  searchBox: { height: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12, marginBottom: 12 },
+  searchInput: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: T.ink, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null) },
+  footer: { alignItems: 'center', paddingVertical: 16, gap: 8 },
+  footerText: { fontSize: 12, fontWeight: '700', color: T.muted },
   okBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.green}55`, backgroundColor: `${T.green}12` },
   okIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: T.green, alignItems: 'center', justifyContent: 'center' },
   okTitle: { fontSize: 13.5, fontWeight: '900', color: T.green },

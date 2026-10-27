@@ -315,8 +315,8 @@ export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
 /* ====================================================================== */
 /*  movement (record / modify)                                             */
 /* ====================================================================== */
-export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, onDone }: {
-  ctx: Ctx; sample: Sample; state: SmpState; me: string; meId?: string; today: string; masters: Masters | null; edit: Move | null;
+export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, onDone, rev = 0 }: {
+  ctx: Ctx; sample: Sample; state: SmpState; me: string; meId?: string; today: string; masters: Masters | null; edit: Move | null; rev?: number;
   onDone: (data: any | null, msg: string) => void;
 }) {
   const allowed = useMemo(() => {
@@ -329,7 +329,6 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
   const [par, setPar] = useState(edit ? edit.parcode : '');
   const [other, setOther] = useState(edit ? !!edit.party && !edit.parcode : false);
   const [party, setParty] = useState(edit && !edit.parcode ? edit.party : '');
-  const [singlet, setSinglet] = useState(edit?.singlet || '');
   const [date, setDate] = useState(edit?.date || today);
   const [qty, setQty] = useState(String(edit?.qty || 1));
   const [note, setNote] = useState(edit?.note || '');
@@ -338,7 +337,11 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
   const P = PURPOSE[purpose];
   // events: the Event module's events + who carries it (loaded only when an event purpose can be chosen)
   const evOk = allowed.some((k) => PURPOSE[k]?.event);
-  const ev = useSmpEvents(ctx, evOk);
+  const ev = useSmpEvents(ctx, evOk, rev);
+  // the sample changed meanwhile (another user / a refresh): keep the purpose only if it is still possible
+  useEffect(() => {
+    if (!edit && allowed.length && !allowed.includes(purpose)) setPurpose(defaultPurpose(sample, state));
+  }, [allowed]); // eslint-disable-line react-hooks/exhaustive-deps
   const atIds = Object.keys(state.atEvents);
   const [eventId, setEventId] = useState(edit ? edit.event_id : '');
   const [carrier, setCarrier] = useState<Carrier>(edit ? { code: edit.carrier_id, name: edit.carrier } : { code: '', name: '' });
@@ -357,7 +360,7 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
   const partyOk = P.party !== 'required' || (other ? !!party.trim() : !!par);
   const qtyOk = sample.tracked || (+qty > 0 && +qty <= maxQ);
   const eventOk = !P.event || !!edit || (purpose === 'event_out' ? !!eventId && !!carrier.name.trim() : sample.tracked ? !!state.event_id : !!eventId);
-  const ok = !!singlet.trim() && partyOk && qtyOk && eventOk && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today;
+  const ok = partyOk && qtyOk && eventOk && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today;
   const custOpts: Opt[] = custs.map((c) => ({ value: c.code, label: c.name, searchText: `${c.name} ${c.city} ${c.code}` }));
   if (par && !custs.some((c) => c.code === par) && edit?.parcode === par) custOpts.unshift({ value: par, label: edit.party || par });
 
@@ -365,13 +368,13 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
 
   const save = async () => {
     if (!ok) {
-      setErr(!singlet.trim() ? 'Enter the singlet number — every movement needs it.' : !partyOk ? 'Select the customer / party.'
+      setErr(!partyOk ? 'Select the customer / party.'
         : !eventOk ? (purpose === 'event_out' && eventId ? 'Select who carries the sample.' : 'Select the event.') : !qtyOk ? `Quantity must be 1 to ${maxQ}.` : 'Check the date.');
       return;
     }
     setBusy(true); setErr('');
     const body: Record<string, any> = {
-      ...ctx, sample: sample.id, date, purpose, singlet: singlet.trim(), qty: sample.tracked ? 1 : +qty, note: note.trim(),
+      ...ctx, sample: sample.id, date, purpose, qty: sample.tracked ? 1 : +qty, note: note.trim(),
       parcode: P.party === 'none' || other ? '' : par, party: P.party === 'none' ? '' : other ? party.trim() : '',
     };
     if (P.event) {
@@ -427,10 +430,6 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
         </>
       ) : null}
       <View style={[f.wrap, { alignItems: 'flex-end' }]}>
-        <View style={{ flexGrow: 1, flexBasis: 140 }}>
-          <Text style={[f.lbl, { color: T.copper }]}>SINGLET NO. <Text style={{ color: T.red }}>*</Text></Text>
-          <TextInput value={singlet} onChangeText={(v) => setSinglet(v.slice(0, 20))} placeholder="from the singlet book" style={[f.inp, { fontFamily: MF, borderColor: singlet.trim() ? T.border : T.copper }]} accessibilityLabel="Singlet number" />
-        </View>
         <View style={{ flexGrow: 1, flexBasis: 150 }}>
           <Text style={f.lbl}>DATE</Text>
           <PoyDateField value={isoToDate(date)} onChange={(d) => setDate(dateToIso(d))} />
@@ -443,7 +442,6 @@ export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, o
         ) : null}
       </View>
       <TextInput value={note} onChangeText={setNote} placeholder="Note (optional) — purpose, courier, meeting…" style={[f.inp, { marginTop: 8 }]} accessibilityLabel="Movement note" maxLength={200} />
-      {!singlet.trim() ? <Text style={[f.hint, { color: T.copper }]}>Every movement needs the singlet number, whatever its purpose or destination.</Text> : null}
       {err ? <Text style={f.err}>{err}</Text> : null}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
         <Pressable onPress={() => onDone(null, '')} style={[f.btn, f.btnGhost]}><Text style={[f.btnT, { color: T.muted }]}>Cancel</Text></Pressable>

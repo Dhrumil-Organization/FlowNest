@@ -109,10 +109,6 @@ export function MoveRow({ m, sample, onPress, onEdit, onDelete }: { m: Move; sam
           </View>
         ) : null}
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={[st.singlet, { color: m.singlet ? T.copper : C.mut }]}>{m.singlet ? '#' + m.singlet : '—'}</Text>
-        <Text style={st.singletL}>singlet</Text>
-      </View>
     </Pressable>
   );
 }
@@ -122,9 +118,11 @@ export function MoveRow({ m, sample, onPress, onEdit, onDelete }: { m: Move; sam
  * renders) is called by itself when the card opens and again when the copies change, and the PDF is shown right
  * here. Nothing is drawn by the app, so what you see is exactly the label. Print = /api/taka-print-label.
  */
-export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
+export function StickerCard({ samples, ctx, canPrint, onDone, onError, rev = 0 }: {
   samples: Sample[]; ctx: { prptype: string; yearno: string; prpcode: string }; canPrint: boolean;
   onDone: (msg: string) => void; onError: (msg: string) => void;
+  /** bumped by the screen's Refresh: rows + preview are read again */
+  rev?: number;
 }) {
   const { session } = useErpSession();
   const token = session?.token || '';
@@ -144,7 +142,10 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
   const rowsRef = useRef<{ key: string; rows: any[] } | null>(null);
   const reqRef = useRef(0);
   const first = samples[0];
-  const idsKey = samples.map((x) => x.id).join(',');
+  // what the label is made of: when a sample is modified (name, remarks, design, colour…) the rows and the preview are
+  // read again by themselves — the card never shows an old label
+  const idsKey = samples.map((x) => [x.id, x.name, x.work_name, x.note, x.md_id, x.sd_id, x.colour, x.garment, x.size, x.metres, x.range,
+    x.contents.map((c) => c.md_id + ':' + c.sd_ids.join('+')).join(';'), x.edited_at].join('|')).join(',') + '#' + rev;
   const n = Math.max(1, Math.min(MAX_COPIES, +copies || 1));
   const total = samples.length * n;
 
@@ -167,11 +168,12 @@ export function StickerCard({ samples, ctx, canPrint, onDone, onError }: {
   /** the sticker rows from the API (Taka row shape + label from the New Design master), read once per set of samples */
   const rowsFromApi = async () => {
     if (rowsRef.current && rowsRef.current.key === idsKey) return rowsRef.current.rows;
+    const key = idsKey;
     const r = await SamplingHubAPI.sticker({ ...ctx, ids: samples.map((x) => x.id) });
     const d = unwrap(r);
     if (!Array.isArray(d?.rows) || !d.rows.length) throw new Error('The server returned no sticker rows.');
     setApiNotes(d.notes && typeof d.notes === 'object' ? d.notes : {});
-    rowsRef.current = { key: idsKey, rows: d.rows };
+    rowsRef.current = { key, rows: d.rows };
     return d.rows as any[];
   };
 
@@ -304,8 +306,7 @@ export const st = StyleSheet.create({
   pBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   pBadgeT: { color: '#fff', fontSize: 8.5, fontWeight: '800' },
   mvTitle: { fontWeight: '700', fontSize: 12.5, color: C.ink },
-  singlet: { fontFamily: MF, fontSize: 12, fontWeight: '800' },
-  singletL: { fontSize: 8, color: C.mut, letterSpacing: 0.3 },
+  subL: { fontSize: 8, color: C.mut, letterSpacing: 0.3 },
   link: { fontSize: 11.5, fontWeight: '800', color: T.nav },
   pvBox: { borderWidth: 1, borderColor: T.border, borderRadius: 10, padding: 6, backgroundColor: T.sub, minHeight: 160 },
   pvCenter: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 10 },

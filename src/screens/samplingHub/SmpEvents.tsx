@@ -1,8 +1,8 @@
 // FILE: src/screens/samplingHub/SmpEvents.tsx
-// Event movements of the Sampling Hub — samples taken to an event of the Event module (EventVisits, the same Event
-// list as the Event & property screen) and brought back from it.
+// Event movements of the Sampling Hub — samples taken to the event of the Event module (GET api/getevent, the same call
+// the Event & property screen makes, so both always show the same event) and brought back from it.
 //
-//   Taken to event (OUT)   pick the event + who carries the samples + the singlet once, then scan sticker after
+//   Taken to event (OUT)   pick the event + who carries the samples once, then scan sticker after
 //                          sticker (camera stays open / scanner gun) — each scan is recorded at once.
 //                          The login user is saved as the one who scanned it.
 //   Back from event (IN)   pick the event they come back from (or "the event it is at"), scan again — the API finds
@@ -10,6 +10,8 @@
 //                          that event is refused, so OUT and IN always stay matched.
 //   Reconciliation         per event: taken · back · still at the event (with who carries what).
 import { SamplingHubAPI } from '@/src/api/legacyClient';
+import { useErpSession } from '@/src/core/session/erpSession';
+import axios from 'axios';
 import QrScanSheet from '@/src/components/StockVerificationNEW/QrScanSheet';
 import { Opt, SelectField } from '@/src/components/StockVerificationNEW/ui';
 import { T } from '@/src/theme';
@@ -26,26 +28,48 @@ import { Empty, Head, MF, SampleRow, Seg, StatCard, st as P, Widget } from './Sm
 type Ctx = { prptype: string; yearno: string; prpcode?: string };
 
 /* ------------------------------ events + people (one load per group) ------------------------------ */
-const cache: Record<string, EventsData> = {};
-export function useSmpEvents(ctx: Ctx, enabled = true) {
+/** the event EXACTLY as the Event module reads it: GET {API}/api/getevent?prptype=<group>&yearno=<year> */
+export async function fetchModuleEvents(API: string, token: string, ctx: Ctx) {
+  const res = await axios.get(`${String(API || '').replace(/\/+$/, '')}/api/getevent`, {
+    params: { prptype: ctx.prptype, yearno: ctx.yearno },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    timeout: 60000,
+  });
+  const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
+  return rows
+    .map((r: any) => ({ id: String(r?.EventId ?? '').trim(), name: String(r?.EventName ?? '').trim(), status: 'Active', active: true, created: '' }))
+    .filter((e: any) => e.id)
+    .map((e: any) => ({ ...e, name: e.name || 'Event ' + e.id }));
+}
+const cache: Record<string, EventsData & { at: number }> = {};
+const EVENT_TTL = 2 * 60000;   // the Event module may switch its event: read api/getevent again after 2 minutes
+/** rev: bumped by the screen's Refresh → read again now */
+export function useSmpEvents(ctx: Ctx, enabled = true, rev = 0) {
+  const { session } = useErpSession();
+  const API = session?.API || '';
+  const token = session?.token || '';
   const key = ctx.prptype + '|' + ctx.yearno;
   const [data, setData] = useState<EventsData | null>(cache[key] || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const load = useCallback(async (force = false) => {
     if (!ctx.prptype) return;
-    if (cache[key] && !force) { setData(cache[key]); return; }
+    if (cache[key] && !force && Date.now() - cache[key].at < EVENT_TTL) { setData(cache[key]); return; }
     setLoading(true); setError('');
     try {
-      const d = normalizeEvents(unwrap(await SamplingHubAPI.events(ctx)));
-      cache[key] = d; setData(d);
+      // event: the Event module's own api/getevent · people (who carries it) + setup state: sampling_hub/events
+      const [events, rest] = await Promise.all([fetchModuleEvents(API, token, ctx), SamplingHubAPI.events(ctx).then(unwrap)]);
+      const d = normalizeEvents({ ...rest, events, default: events[0]?.id || '' });
+      cache[key] = { ...d, at: Date.now() }; setData(d);
     } catch (e: any) {
       setError(errText(e, 'Could not load the events.'));
     } finally {
       setLoading(false);
     }
-  }, [ctx, key]);
-  useEffect(() => { if (enabled) void load(); }, [enabled, load]);
+  }, [ctx, key, API, token]);
+  useEffect(() => { if (enabled && API && token) void load(); }, [enabled, load, API, token]);
+  const firstRev = useRef(rev);
+  useEffect(() => { if (rev !== firstRev.current && enabled && API && token) void load(true); }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
   return { data, loading, error, reload: () => load(true) };
 }
 
@@ -81,17 +105,20 @@ export const meCarrier = (d: EventsData | null, me: { id: string; name: string }
 
 /* ------------------------------ scan panel ------------------------------ */
 type LogRow = { k: number; id: string; ok: boolean; msg: string; at: string };
-export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnswer, onOpen }: {
+export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnswer, onOpen, rev = 0, onRefresh }: {
   mode: 'event_out' | 'event_in'; ctx: Ctx; byId: Record<string, Sample>; moves: Move[]; stOf: (s: Sample) => SmpState;
   me: { id: string; name: string }; today: string; onAnswer: (d: any) => void; onOpen: (id: string) => void;
+  rev?: number; onRefresh?: () => void;
 }) {
-  const ev = useSmpEvents(ctx);
+  const ev = useSmpEvents(ctx, true, rev);
+  // every scan is checked against the LATEST data (the answer of the previous scan), not the data of when it was shot
+  const live = useRef({ byId, stOf });
+  live.current = { byId, stOf };
   const out = mode === 'event_out';
   const [eventId, setEventId] = useState('');
   const [inEvent, setInEvent] = useState('');            // IN: '' = the event the sample is at
   const [carrier, setCarrier] = useState<Carrier>({ code: '', name: '' });
   const [back, setBack] = useState<Carrier>({ code: '', name: '' });
-  const [singlet, setSinglet] = useState('');
   const [qty, setQty] = useState('1');
   const [txt, setTxt] = useState('');
   const [log, setLog] = useState<LogRow[]>([]);
@@ -105,11 +132,12 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
   // defaults once the events are in: newest active event (the Event module's default), carrier = me
   useEffect(() => {
     if (!ev.data) return;
-    setEventId((cur) => cur || ev.data!.default);
+    // the Event module's event changed → follow it (a sample already out stays linked to its own event)
+    setEventId((cur) => (cur && ev.data!.events.some((x) => x.id === cur) ? cur : ev.data!.default));
     setCarrier((cur) => (cur.name ? cur : meCarrier(ev.data, me)));
     setBack((cur) => (cur.name ? cur : meCarrier(ev.data, me)));
   }, [ev.data]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setSinglet(''); setLog([]); setTxt(''); }, [mode]);
+  useEffect(() => { setLog([]); setTxt(''); }, [mode]);
   useEffect(() => { if (Platform.OS === 'web') { const t = setTimeout(() => gun.current?.focus?.(), 150); return () => clearTimeout(t); } }, [mode]);
 
   const events = ev.data?.events || [];
@@ -124,8 +152,8 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
   }, [summaries, events]); // eslint-disable-line react-hooks/exhaustive-deps
   const selEvent = out ? eventId : inEvent;
   const who = out ? carrier : back;
-  const ready = !!ev.data?.ready && !!singlet.trim() && (out ? !!eventId && !!carrier.name.trim() : true) && +qty >= 1;
-  const missing = !ev.data ? 'Loading the events…' : !ev.data.ready ? ev.data.setup : out && !eventId ? 'Select the event.' : out && !carrier.name.trim() ? 'Select who carries the samples.' : !singlet.trim() ? 'Enter the singlet number first — every movement needs it.' : '';
+  const ready = !!ev.data?.ready && (out ? !!eventId && !!carrier.name.trim() : true) && +qty >= 1;
+  const missing = !ev.data ? 'Loading the events…' : !ev.data.ready ? ev.data.setup : out && !eventId ? 'Select the event.' : out && !carrier.name.trim() ? 'Select who carries the samples.' : '';
 
   const add = (r: Omit<LogRow, 'k' | 'at'>) => {
     const d = new Date();
@@ -140,10 +168,10 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
     chain.current = chain.current.then(async () => {
       const id = parseSampleId(t);
       if (!id) { add({ id: t.slice(0, 20), ok: false, msg: `“${t.slice(0, 30)}” is not a sample sticker.` }); return; }
-      const sm = byId[id];
+      const sm = live.current.byId[id];
       if (!sm) { add({ id, ok: false, msg: `No sample ${id} in your group.` }); return; }
       if (!ready) { add({ id, ok: false, msg: missing || 'Fill the details above first.' }); return; }
-      const st = stOf(sm);
+      const st = live.current.stOf(sm);
       const allowed = allowedPurposes(sm, st);
       if (!allowed.includes(mode)) {
         const why = out
@@ -159,7 +187,7 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
       setBusy(true);
       try {
         const r = await SamplingHubAPI.moveSave({
-          ...ctx, sample: id, purpose: mode, date: today, singlet: singlet.trim(), qty: q, note: '',
+          ...ctx, sample: id, purpose: mode, date: today, qty: q, note: '',
           event_id: out ? eventId : inEvent, carrier_code: who.code, carrier: who.code ? '' : who.name.trim(),
         });
         const d = unwrap(r);
@@ -180,17 +208,20 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
   return (
     <>
       <View style={[P.card, { borderTopWidth: 3, borderTopColor: out ? '#0E7C86' : '#3B7A3A' }]} testID="event-scan">
-        <Text style={e.h1}>{out ? 'Taken to event' : 'Back from event'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[e.h1, { flex: 1 }]}>{out ? 'Taken to event' : 'Back from event'}</Text>
+          <Text onPress={() => (onRefresh ? onRefresh() : void ev.reload())} style={P.link} accessibilityRole="button" accessibilityLabel="Refresh event and samples">{ev.loading ? 'Refreshing…' : '↻ Refresh'}</Text>
+        </View>
         <Text style={[P.note, { marginBottom: 6 }]}>
           {out
-            ? 'Pick the event and who carries the samples, enter the singlet once — then scan every sticker. Each scan is recorded at once; you are saved as the one who scanned it.'
+            ? 'Pick the event and who carries the samples — then scan every sticker. Each scan is recorded at once; you are saved as the one who scanned it.'
             : 'Scan the same stickers on the way back. The ERP finds each sample’s “Taken to event” and closes it — a sample that was not taken to this event is refused.'}
         </Text>
         {ev.error ? <Text style={e.err}>{ev.error} <Text onPress={ev.reload} style={P.link}>Try again</Text></Text> : null}
         {ev.data && !ev.data.ready ? <Text style={e.err}>{ev.data.setup}</Text> : null}
         {out ? (
           <SelectField label="Event" required value={eventId} options={outOpts} loading={ev.loading && !ev.data} onRefresh={ev.reload}
-            placeholder={ev.data && !outOpts.length ? 'No active event in the Event module' : 'Select event'} onChange={setEventId} />
+            placeholder={ev.data && !outOpts.length ? 'No active event in the Event module (api/getevent)' : 'Select event'} onChange={setEventId} />
         ) : (
           <SelectField label="Coming back from" value={inEvent} options={inOpts} loading={ev.loading && !ev.data} clearable onRefresh={ev.reload}
             placeholder="The event each sample is at" onChange={setInEvent} />
@@ -198,10 +229,6 @@ export function EventScanPanel({ mode, ctx, byId, moves, stOf, me, today, onAnsw
         <CarrierField label={out ? 'Carried by' : 'Brought back by'} required={out} people={ev.data?.people || []} value={who} loading={ev.loading && !ev.data}
           onChange={out ? setCarrier : setBack} />
         <View style={[e.wrap, { alignItems: 'flex-end' }]}>
-          <View style={{ flexGrow: 1, flexBasis: 140 }}>
-            <Text style={[e.lbl, { color: T.copper }]}>SINGLET NO. <Text style={{ color: T.red }}>*</Text></Text>
-            <TextInput value={singlet} onChangeText={(v) => setSinglet(v.slice(0, 20))} placeholder="from the singlet book" style={[e.inp, { fontFamily: MF, borderColor: singlet.trim() ? T.border : T.copper }]} accessibilityLabel="Singlet number" />
-          </View>
           <View style={{ flexBasis: 110 }}>
             <Text style={e.lbl}>QTY · BATCH QR</Text>
             <TextInput value={qty} onChangeText={(v) => setQty(v.replace(/[^0-9]/g, '').slice(0, 5))} keyboardType="number-pad" style={[e.inp, { fontFamily: MF }]} accessibilityLabel="Quantity for a batch sticker" />
@@ -280,7 +307,7 @@ export function EventCard({ ev, onOpen, full }: { ev: EventSummary; onOpen: (id:
       {!still ? <Empty t="No sample of this event is outstanding." /> : null}
       {full ? (
         <>
-          <Head t={`MOVEMENTS · ${ev.moves.length}`} right={<Text style={P.lbl}>SINGLET</Text>} />
+          <Head t={`MOVEMENTS · ${ev.moves.length}`} />
           {ev.moves.map((m) => (
             <Pressable key={m.id} onPress={() => onOpen(m.sample)} style={P.row}>
               <View style={[P.pBadge, { backgroundColor: m.purpose === 'event_out' ? '#0E7C86' : '#3B7A3A' }]}><Text style={P.pBadgeT}>{m.purpose === 'event_out' ? 'OUT' : 'IN'}</Text></View>
@@ -288,7 +315,6 @@ export function EventCard({ ev, onOpen, full }: { ev: EventSummary; onOpen: (id:
                 <Text style={P.mvTitle} numberOfLines={1}><Text style={{ fontFamily: MF }}>{m.sample}</Text>{m.qty > 1 ? ` · ${m.qty}` : ''}</Text>
                 <Text style={P.rowSub} numberOfLines={2}>{dateShort(m.date)} · scanned by {m.by}{m.carrier ? (m.purpose === 'event_out' ? ' · carried by ' : ' · brought back by ') + m.carrier : ''}</Text>
               </View>
-              <Text style={[P.singlet, { color: T.copper }]}>{m.singlet ? '#' + m.singlet : '—'}</Text>
             </Pressable>
           ))}
         </>
@@ -314,7 +340,7 @@ export function EventsWidget({ samples, moves, onEvent }: { samples: Sample[]; m
               <Text style={e.gT} numberOfLines={1}>{x.name}</Text>
               <Text style={P.rowSub} numberOfLines={1}>{x.out} taken · {x.back} back{x.carriers.length ? ' · ' + x.carriers.join(', ') : ''}</Text>
             </View>
-            <View style={{ alignItems: 'flex-end' }}><Text style={[e.gN, { color: still ? T.copper : C.mut }]}>{still}</Text><Text style={P.singletL}>still out</Text></View>
+            <View style={{ alignItems: 'flex-end' }}><Text style={[e.gN, { color: still ? T.copper : C.mut }]}>{still}</Text><Text style={P.subL}>still out</Text></View>
           </Pressable>
         );
       })}

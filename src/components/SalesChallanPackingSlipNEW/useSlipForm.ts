@@ -207,7 +207,12 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
 
   /* ------------------------------ cartons ------------------------------ */
 
-  const loadCartons = useCallback((row: Row) => A.fetchCartons(api, ctx, row), [api, ctx]);
+  /** All cartons in stock for the line (web carton help), on the packing date, with this line's cartons as selected. */
+  const loadCartons = useCallback((row: Row) => {
+    const x = fRef.current;
+    const selected = (x.d2 || []).filter((c: Row) => String(c.SrNo) === String(row.SrNo));
+    return A.fetchCartons(api, ctx, row, { date: str(x.ChalDate), selected });
+  }, [api, ctx]);
 
   const applyCartons = useCallback((srNo: any, cartons: Row[]) => {
     setF((x) => ({

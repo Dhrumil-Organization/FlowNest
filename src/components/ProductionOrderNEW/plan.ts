@@ -190,8 +190,8 @@ export function validatePlan(st: Row, p: Row): string {
     ownerLoading, poOwnerCode, costingLoading, shrinkage, isAdd, voucher, greigeRate } = st;
   if (readOnly) return (lock && lock.reason) || 'This record is view-only.';
   if (sourceMode === 'sales' && selectedOrders.length === 0) return stockType === 'P' ? 'Select a Design and at least one Job Order.' : 'Select a Design and at least one Sales Order.';
-  // web saveReason: a picked Stock & Sell design must carry an item code
-  if (sourceMode === 'self' && selfDesign.dsncode && !selfDesign.itmcode) return 'The selected design must provide an item code.';
+  // Stock & Sell may select a new design before an item code is available in the picker.
+  // Do not block costing review here; server-side design/item validation remains authoritative.
   if (sourceMode === 'self' && p.baseQty <= 0) return p.fabricType === 'Finish' ? 'Enter Finished qty.' : 'Enter Greige qty.';
   if (sourceMode === 'self' && !selfDesign.dsncode && p.fabricType === 'Finish' && Number(selfFinishedCost || 0) <= 0) return 'Enter Finished costing.';
   if (sourceMode === 'self' && !selfDesign.dsncode && p.fabricType === 'Greige' && Number(selfGreigeCost || 0) <= 0) return 'Enter Greige costing.';

@@ -179,7 +179,21 @@ export const normQr = (v: any) => (v ? String(v).replace(/(^,)|(,$)/g, '') : '')
 const cleanQr = (v: any) => (v ? String(v).trim().replace(/\r?\n|\r/g, '') : '');
 const dec3 = (s: string, sep: string) => s.split(sep).map((v) => (v === '' || isNaN(v as any) ? v : Number(v).toFixed(3))).join(sep);
 
-export type ScanResult = { status: 'added' | 'duplicate' | 'notfound'; carton?: Row; message: string };
+export type ScanResult = { status: 'added' | 'duplicate' | 'notfound' | 'locked' | 'mismatch'; carton?: Row; source?: Row; message: string };
+
+/** One stock carton (getcartondetail row) as the list shows it. */
+export const cartonView = (r: Row) => ({
+  no: str(r.cartno),
+  qty: n3(r.qty),
+  chees: str(r.chees),
+  location: str(r.WarehouseLoction ?? r.WarehouseLocation ?? r.Location),
+  prodType: str(r.ProdType),
+  grade: str(r.GrdName),
+  tran: str(r.TranName),
+  lot: str(r.LotNo),
+  locked: String(r.lock ?? '0').trim() === '1',
+  lockReason: str(r.lockreason),
+});
 
 /**
  * fetchQrScanData. Two label formats:
@@ -209,6 +223,9 @@ export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; other
     found = p.list.find((el) => el.qrcodestring && cleanQr(dec3(String(el.qrcodestring).split('~').slice(0, -4).join('~'), '~')) === target);
   }
   if (!found) return { status: 'notfound', message: 'This label is not in stock for this item, merge, grade and shade.' };
+  if (String(found.lock ?? '0').trim() === '1') {
+    return { status: 'locked', source: found, message: `Carton ${found.cartno} is locked${found.lockreason ? `: ${found.lockreason}` : ''}.` };
+  }
 
   const carton: Row = {
     Amount: null, BalMtr: null, CartNo: found.cartno, Chees: found.chees, DispNo: null, DispSubSr: null,
@@ -217,7 +234,7 @@ export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; other
     SpColor: found.SpColor, SpName: '', SRetMtr: '0', SrNo: p.srNo, Status: null, SubSr: maxSr(p.scanned, 'SubSr') + 1,
     TakaBalMtr: found.qty, TakaMtr: found.qty, UId: p.uid, Wt: found.qty,
   };
-  return { status: 'added', carton, message: `${carton.CartNo} · ${qty(carton.QtyWt)}` };
+  return { status: 'added', carton, source: found, message: `${carton.CartNo} · ${qty(carton.QtyWt)}${cartonView(found).location ? ` · ${cartonView(found).location}` : ''}` };
 }
 
 /** handleItemOk — total ≤ balance qty and no carton twice (ProSrNo|ProSubSr|ProUId|CartNo|EntType). */

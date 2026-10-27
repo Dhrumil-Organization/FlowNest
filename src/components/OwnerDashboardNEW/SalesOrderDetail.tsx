@@ -220,7 +220,6 @@ export default function SalesOrderDetail({
             <Fact label="Sales order" value={`SO ${order.so_no}`} />
             <Fact label="Date" value={ymd(order.so_date_ymd) || ''} />
             <Fact label="Party" value={order.party} />
-            <Fact label="Design" value={`${order.design || '—'}${order.more_designs > 0 ? `  +${order.more_designs}` : ''}`} />
             <Fact label="Qty" value={qty(order.qty)} />
             <Fact label="Sold" value={`${qty(order.sold_qty)} (${pct(order.sold_pct)})`} />
             <Fact label="Delivery">
@@ -229,6 +228,24 @@ export default function SalesOrderDetail({
                 {order.due_ymd ? <Pill text={dueText(order.days_to_due)} color={past ? T.red : T.green} strong={past} /> : null}
               </View>
             </Fact>
+          </View>
+
+          {/* every design and item of the sales order (SalesDesignName / SalesItemName) */}
+          <View style={st.listBox}>
+            <Text style={st.pickLabel}>{`Designs (${(order.designs || []).length})`}</Text>
+            <View style={st.chipRow}>
+              {(order.designs || []).length ? (
+                (order.designs || []).map((d, i) => (
+                  <View key={`${d}-${i}`} style={st.tag}>
+                    <Text style={st.tagText}>{d}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={st.factValue}>—</Text>
+              )}
+            </View>
+            <Text style={[st.pickLabel, { marginTop: 4 }]}>{`Item${(order.items || []).length > 1 ? 's' : ''}`}</Text>
+            <Text style={st.factValue}>{order.item || '—'}</Text>
           </View>
 
           {pos.length === 0 ? (
@@ -318,6 +335,17 @@ const st = StyleSheet.create({
   },
   stateText: { marginTop: 8, fontFamily: FONT, fontSize: 13, fontWeight: '700', color: T.muted, textAlign: 'center' },
   pickLabel: { fontFamily: FONT, fontSize: 11, fontWeight: '800', color: T.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  listBox: {
+    backgroundColor: T.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  tag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: T.border, backgroundColor: T.alt },
+  tagText: { fontFamily: FONT, fontSize: 12, fontWeight: '700', color: T.ink },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     height: 32,

@@ -38,7 +38,7 @@ export default function DateField({ label, value, onChange }: Props) {
 
   return (
     <View style={st.field}>
-      <Text style={st.label}>{label}</Text>
+      <View style={st.labelRow}><Text style={st.label}>{label}</Text></View>
       <TouchableOpacity activeOpacity={0.8} style={st.box} onPress={openIt} accessibilityRole="button" accessibilityLabel={`${label}: ${fmtShowDate(value)}`}>
         <Icon name="event" size={17} color={T.copper} />
         <Text style={st.boxText} numberOfLines={1}>{fmtShowDate(value)}</Text>
@@ -100,7 +100,8 @@ export default function DateField({ label, value, onChange }: Props) {
 
 const st = StyleSheet.create({
   field: { flexGrow: 1, flexBasis: 160, minWidth: 0 },
-  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, color: T.muted, textTransform: 'uppercase', marginBottom: 6 },
+  labelRow: { height: 22, flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, color: T.muted, textTransform: 'uppercase' },
   box: { height: 46, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12 },
   boxText: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '800', color: T.ink },
   backdrop: { flex: 1, backgroundColor: 'rgba(8,16,28,0.55)', alignItems: 'center', justifyContent: 'center', padding: 16 },

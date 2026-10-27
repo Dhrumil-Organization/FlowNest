@@ -23,7 +23,7 @@ export const TXN_TYPE = 'store_item_master';
  * If your backend reads only one style, delete the other here — this is the single place.
  */
 export const scopePayload = (sc: Scope, action?: string) => ({
-  prptype: sc.prpType, PrpCode: sc.prpCode, YearNo: sc.yearNo, StrCode: sc.store,
+  prptype: sc.prpType, PrpCode: 'MT', YearNo: sc.yearNo, StrCode: sc.store,
   // prp_type: sc.prpType, prp_code: sc.prpCode, year_no: sc.yearNo, str_code: sc.store,
   txntype: TXN_TYPE,
   ...(action ? { action } : {}),
@@ -171,14 +171,16 @@ const toItem = (r: any, sc: Scope): StoreItem => ({
   prpType: s(r.prp_type ?? r.prptype ?? r.PrpType) || sc.prpType,
   prpCode: s(r.prp_code ?? r.PrpCode) || sc.prpCode,
   yearNo: s(r.year_no ?? r.YearNo) || sc.yearNo,
-  store: s(r.str_code ?? r.StrCode) || sc.store, code: s(r.ItmCode ?? r.MItmCode), name: s(r.item_name ?? r.ItmName),
+  store: s(r.str_code ?? r.StrCode) || sc.store, code: s(r.ItmCode ?? r.MItmCode), mItmCode: s(r.MItmCode ?? r.ItmCode), name: s(r.item_name ?? r.ItmName),
   groupId: s(r.group_code ?? r.ItmGrp), subGroupId: s(r.sub_group_code ?? r.ItmSGrp), purchaseUom: s(r.purchase_uom ?? r.PUOM), salesUom: s(r.sales_uom ?? r.UOM),
   hsn: s(r.hsn_code ?? r.HsnCode), gst: s(r.gst_group_code ?? r.GSTGrpCode), stopInward: truthy(r.stop_inward ?? r.StopIn), stopIssue: truthy(r.stop_issue ?? r.StopIss),
   makes: (r.makes ?? r.Makes ?? []).map(toMake),
 });
 const toBrowseRow = (r: any, i: number): BrowseRow => ({
-  key: `${s(r.ItmCode ?? r.MItmCode ?? r.itmcode ?? r.code)}-${i}`,
-  store: s(r.str_code ?? r.StrCode), code: s(r.ItmCode ?? r.MItmCode ?? r.itmcode ?? r.code),
+  key: `${s(r.ItmCode ?? r.itmcode ?? r.code ?? r.MItmCode)}-${s(r.MItmCode)}-${i}`,
+  // Browse shows ItmCode; MItmCode is kept separately for the show-data call.
+  store: s(r.str_code ?? r.StrCode), code: s(r.ItmCode ?? r.itmcode ?? r.code ?? r.MItmCode),
+  mItmCode: s(r.MItmCode ?? r.mitmcode ?? r.ItmCode ?? r.itmcode ?? r.code),
   name: s(r.item_name ?? r.ItmName ?? r.itmname ?? r.name),
   uom: s(r.uom ?? r.UOM ?? r.PUOM), group: s(r.group_name ?? r.GroupName ?? r.IGName ?? r.itmgrp),
   subGroup: s(r.sub_group_name ?? r.SubGroupName ?? r.ISGName),
@@ -190,6 +192,22 @@ const safeDefaultForApiValue = (value: any) => {
   if (typeof value === 'string') return '';
   if (typeof value === 'boolean') return false;
   return '';
+};
+
+/**
+ * Value sent for a field that is no longer shown on the screen: the data type of the
+ * loaded show-data value decides it — string -> '' (blank), number -> 0.
+ * When the record has no such key yet (Add), `fallback` (blank '' or 0) is used.
+ */
+const blankByType = (src: Record<string, any> | undefined, keys: string[], fallback: any) => {
+  for (const k of keys) {
+    const v = src?.[k];
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'number') return 0;
+    if (typeof v === 'string') return '';
+    if (typeof v === 'boolean') return false;
+  }
+  return fallback;
 };
 
 const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
@@ -204,33 +222,40 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
     // PascalCase keys returned by show-data.
     PrpCode: it.prpCode,
     StrCode: it.store,
-    MItmCode: Number(it.code) || 0,
+    MItmCode: Number(it.mItmCode) || Number(it.code) || 0,
     Category: it.apiFields?.Category == null ? '' : it.apiFields.Category,
-    GSTGrpCode: it.gst === '' ? 0 : Number(it.gst) || 0,
+    // Removed from the screen -> blank / 0 by data type.
+    GSTGrpCode: 0, // GST group is no longer on the screen: always 0
     ItmName: it.name.trim().toUpperCase(),
-    PUOM: it.purchaseUom,
+    PUOM: blankByType(it.apiFields, ['PUOM', 'purchase_uom'], ''),
     UOM: it.salesUom,
     ItmGrp: it.groupId,
-    ItmSGrp: it.subGroupId,
-    HsnCode: it.hsn,
+    ItmSGrp: blankByType(it.apiFields, ['ItmSGrp', 'sub_group_code'], ''),
+    HsnCode: blankByType(it.apiFields, ['HsnCode', 'hsn_code'], ''),
     RawMat: it.apiFields?.RawMat === true || it.apiFields?.RawMat === 1 ? 1 : 0,
     ABCAnal: it.apiFields?.ABCAnal === true || it.apiFields?.ABCAnal === 1 ? 1 : 0,
     FSNAnal: it.apiFields?.FSNAnal === true || it.apiFields?.FSNAnal === 1 ? 1 : 0,
-    StopIn: it.stopInward ? 1 : 0,
-    StopIss: it.stopIssue ? 1 : 0,
+    StopIn: blankByType(it.apiFields, ['StopIn', 'stop_inward'], 0),
+    StopIss: blankByType(it.apiFields, ['StopIss', 'stop_issue'], 0),
 
     // Existing Laravel add-data contract.
     ...scopePayload(scopeOf(it)),
-    ItmCode: Number(it.code) || 0,
+    // ItmCode is the detail/make item code; MItmCode is the parent master code.
+    // Keep the parent master code separate instead of duplicating it into ItmCode.
+    ItmCode: Number(
+      [...(it.makes ?? [])]
+        .map((m: any) => Number(m.apiFields?.ItmCode) || 0)
+        .find((code: number) => code > 0) || 0
+    ),
     item_name: it.name.trim().toUpperCase(),
     group_code: it.groupId,
-    sub_group_code: it.subGroupId,
-    purchase_uom: it.purchaseUom,
+    sub_group_code: blankByType(it.apiFields, ['sub_group_code', 'ItmSGrp'], ''),
+    purchase_uom: blankByType(it.apiFields, ['purchase_uom', 'PUOM'], ''),
     sales_uom: it.salesUom,
-    hsn_code: it.hsn,
-    gst_group_code: it.gst === '' ? null : Number(it.gst),
-    stop_inward: it.stopInward,
-    stop_issue: it.stopIssue,
+    hsn_code: blankByType(it.apiFields, ['hsn_code', 'HsnCode'], ''),
+    gst_group_code: 0, // always 0 (same field as GSTGrpCode)
+    stop_inward: blankByType(it.apiFields, ['stop_inward', 'StopIn'], 0),
+    stop_issue: blankByType(it.apiFields, ['stop_issue', 'StopIss'], 0),
     raw_material: !!it.apiFields?.RawMat,
     abc_analysis: !!it.apiFields?.ABCAnal,
     fsn_analysis: !!it.apiFields?.FSNAnal,
@@ -241,7 +266,7 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
         ...defaults,
         ItmCode: /^new-/.test(m.id) ? 0 : Number(m.apiFields?.ItmCode ?? m.id) || 0,
         // MItmCode belongs to the parent Store Item Master record and must be sent on every make row.
-        MItmCode: Number(it.code) || Number(m.apiFields?.MItmCode) || 0,
+        MItmCode: Number(it.mItmCode) || Number(it.code) || Number(m.apiFields?.MItmCode) || 0,
         MakCode: Number(m.makeCode) || 0,
         MakName: m.makeName || '',
         Model: m.model || '',
@@ -256,11 +281,13 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
         IsDead: m.dead ? 1 : 0,
         // R.O. level / R.O. qty are no longer captured: 0 goes to the backend.
         ROLevel: 0, ROQty: 0,
-        OpQty: Number(m.opQty) || 0, OpRate: Number(m.opRate) || 0,
+        // Opening rate is no longer captured: blank / 0 by data type.
+        OpQty: Number(m.opQty) || 0, OpRate: blankByType(m.apiFields, ['OpRate', 'op_rate'], 0),
         // Inward extra qty (%) / qty are no longer captured: 0 goes to the backend.
         OLPerc: 0, OLQty: 0,
         Shift: m.shift || '', shift: m.shift || '',
-        SurplusLevel: Number(m.surplusLevel) || 0,
+        // Surplus level is no longer captured: blank / 0 by data type.
+        SurplusLevel: blankByType(m.apiFields, ['SurplusLevel', 'surplus_level'], 0),
         LastRate: Number(m.rate1) || 0, PRate1: Number(m.rate2) || 0,
         PRate2: Number(m.rate3) || 0, PRate3: Number(m.rate4) || 0,
         SLRate: Number(m.saleRate) || 0,
@@ -268,12 +295,12 @@ const toPayload = (it: StoreItem, deletedMakes: string[] = []) => {
         make_srno: Number(m.apiFields?.MakSrNo ?? m.apiFields?.make_srno ?? m.apiFields?.SrNo) || 0,
         short_name: '', ro_level: 0,
         ro_qty: 0, op_qty: Number(m.opQty) || 0,
-        op_rate: Number(m.opRate) || 0, rate1: Number(m.rate1) || 0,
+        op_rate: blankByType(m.apiFields, ['op_rate', 'OpRate'], 0), rate1: Number(m.rate1) || 0,
         rate2: Number(m.rate2) || 0, rate3: Number(m.rate3) || 0,
         rate4: Number(m.rate4) || 0, sale_rate: Number(m.saleRate) || 0,
         store_loc: '', inward_extra_perc: 0,
         inward_extra_qty: 0, is_dead: m.dead ? 1 : 0,
-        surplus_level: Number(m.surplusLevel) || 0,
+        surplus_level: blankByType(m.apiFields, ['surplus_level', 'SurplusLevel'], 0),
         status: (m.status === 'Active' ? 'A' : m.status === 'Passive' ? 'P' : m.status) || 'A',
         contra: Number(m.apiFields?.Contra) || 0,
       };

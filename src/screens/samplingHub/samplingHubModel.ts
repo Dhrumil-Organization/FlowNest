@@ -3,7 +3,7 @@
 // and the ERP Designing artifact). Status / location / balance are NEVER stored — always read off the log.
 
 export type SmpTypeKey = 'garment' | 'hanger' | 'booklet' | 'fabric' | 'swatch';
-export type PurposeKey = 'dispatch' | 'show' | 'return' | 'internal' | 'consume' | 'split';
+export type PurposeKey = 'dispatch' | 'show' | 'return' | 'internal' | 'consume' | 'split' | 'event_out' | 'event_in';
 
 export const SMP_TYPES: { k: SmpTypeKey; lbl: string; pfx: string; icon: string; color: string; unit: string; photo: boolean; tracked: boolean | null }[] = [
   { k: 'garment', lbl: 'Garment', pfx: 'GAR', icon: 'checkroom', color: '#652880', unit: 'pc', photo: true, tracked: true },
@@ -14,13 +14,16 @@ export const SMP_TYPES: { k: SmpTypeKey; lbl: string; pfx: string; icon: string;
 ];
 export const SMP_TYPE = Object.fromEntries(SMP_TYPES.map((t) => [t.k, t])) as Record<SmpTypeKey, (typeof SMP_TYPES)[number]>;
 
-export const PURPOSES: { k: PurposeKey; lbl: string; short: string; color: string; out: boolean; party: 'required' | 'optional' | 'none' }[] = [
+export const PURPOSES: { k: PurposeKey; lbl: string; short: string; color: string; out: boolean; party: 'required' | 'optional' | 'none'; event?: boolean }[] = [
   { k: 'dispatch', lbl: 'Sent to customer', short: 'Dispatch', color: '#652880', out: true, party: 'required' },
   { k: 'show', lbl: 'Taken for showing', short: 'Showing', color: '#C87533', out: true, party: 'optional' },
   { k: 'return', lbl: 'Returned to inventory', short: 'Return', color: '#2A6044', out: false, party: 'none' },
   { k: 'internal', lbl: 'Internal use', short: 'Internal', color: '#3A568A', out: true, party: 'none' },
   { k: 'consume', lbl: 'Consumed / given away', short: 'Consumed', color: '#B23A2A', out: true, party: 'optional' },
   { k: 'split', lbl: 'Split into individual items', short: 'Split', color: '#9A9590', out: true, party: 'none' },
+  // events of the Event module (EventVisits): scan → event + who carries it; scan again on the way back
+  { k: 'event_out', lbl: 'Taken to event', short: 'Event out', color: '#0E7C86', out: true, party: 'none', event: true },
+  { k: 'event_in', lbl: 'Back from event', short: 'Event in', color: '#3B7A3A', out: false, party: 'none', event: true },
 ];
 export const PURPOSE = Object.fromEntries(PURPOSES.map((p) => [p.k, p])) as Record<PurposeKey, (typeof PURPOSES)[number]>;
 
@@ -37,7 +40,12 @@ export type Sample = {
 export type Move = {
   id: number; no: string; sample: string; date: string; ts: string; purpose: PurposeKey; parcode: string; party: string;
   singlet: string; qty: number; note: string; by: string; by_id: string; edited_by: string;
+  /** event movements: the event (EventVisits), who carries it, and (event_in) the event_out it closes; by = who scanned it */
+  event_id: string; event: string; carrier_id: string; carrier: string; ref_move: number;
 };
+export type SmpEvent = { id: string; name: string; status: string; active: boolean; created: string };
+export type Person = { id: string; name: string; exec: boolean };
+export type EventsData = { ready: boolean; setup: string; events: SmpEvent[]; default: string; people: Person[]; me: { id: string; name: string } };
 export type Rights = { view: boolean; add: boolean; edit: boolean; delete: boolean; move: boolean; print: boolean };
 export type ListData = { prptype: string; today: string; me: { id: string; name: string }; rights: Rights; samples: Sample[]; moves: Move[] };
 export type Design = { id: string; code: string; dsn_code: string; category: string; type: string; cw_count: number };
@@ -89,6 +97,7 @@ export function normalizeList(raw: any): ListData {
       id: Math.round(n(m.id)), no: s(m.no), sample: s(m.sample), date: s(m.date), ts: s(m.ts),
       purpose: (PURPOSE[s(m.purpose) as PurposeKey] ? s(m.purpose) : 'show') as PurposeKey, parcode: s(m.parcode), party: s(m.party),
       singlet: s(m.singlet), qty: Math.max(1, Math.round(n(m.qty)) || 1), note: s(m.note), by: s(m.by), by_id: s(m.by_id), edited_by: s(m.edited_by),
+      event_id: s(m.event_id), event: s(m.event), carrier_id: s(m.carrier_id), carrier: s(m.carrier), ref_move: Math.round(n(m.ref_move)),
     })),
   };
 }
@@ -101,12 +110,24 @@ export function normalizeMasters(raw: any): Masters {
     sizes: arr(raw?.sizes).map(s).filter(Boolean).length ? arr(raw.sizes).map(s) : SIZES,
   };
 }
+export function normalizeEvents(raw: any): EventsData {
+  const ev = arr(raw?.events).map((e: any): SmpEvent => ({ id: s(e.id), name: s(e.name) || 'Event ' + s(e.id), status: s(e.status), active: !!e.active, created: s(e.created) })).filter((e) => e.id);
+  return {
+    ready: !!raw?.ready, setup: s(raw?.setup), events: ev, default: s(raw?.default) || ev.find((e) => e.active)?.id || '',
+    people: arr(raw?.people).map((p: any): Person => ({ id: s(p.id), name: s(p.name), exec: !!p.exec })).filter((p) => p.id && p.name),
+    me: { id: s(raw?.me?.id), name: s(raw?.me?.name) },
+  };
+}
 export const normalizeColourways = (raw: any): Colourway[] =>
   arr(raw?.colourways).map((c: any) => ({ id: s(c.id), code: s(c.code), commercial: s(c.commercial), shade_code: s(c.shade_code), colours: arr(c.colours).map(s).filter(Boolean) })).filter((c) => c.id);
 
 /* ------------------------------ movement log → status ------------------------------ */
-export type StCode = 'in' | 'out' | 'use' | 'sent' | 'gone';
-export type SmpState = { code: StCode; label: string; where: string; last: Move | null; color: string; bal: number; out: number; sent: number };
+export type StCode = 'in' | 'out' | 'use' | 'sent' | 'event' | 'gone';
+export type SmpState = {
+  code: StCode; label: string; where: string; last: Move | null; color: string; bal: number; out: number; sent: number;
+  /** tracked item at an event: that event + its event_out; batch: quantity still at each event */
+  event_id: string; event: string; atEvents: Record<string, number>; eventNames: Record<string, string>;
+};
 
 export const movesOf = (moves: Move[], id: string) =>
   moves.filter((m) => m.sample === id).slice().sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
@@ -114,16 +135,31 @@ export const movesOf = (moves: Move[], id: string) =>
 export function smpState(sm: Sample, moves: Move[]): SmpState {
   const ms = movesOf(moves, sm.id);
   const last = ms[ms.length - 1] || null;
+  const names: Record<string, string> = {};
+  ms.forEach((m) => { if (m.purpose === 'event_out' && m.event_id) names[m.event_id] = m.event || m.event_id; });
   if (!sm.tracked) {
     let bal = sm.qty, outQ = 0, sent = 0;
+    const at: Record<string, number> = {};
     ms.forEach((m) => {
-      if (m.purpose === 'return') { bal += m.qty; outQ -= m.qty; } else { bal -= m.qty; outQ += m.qty; }
+      if (m.purpose === 'return' || m.purpose === 'event_in') { bal += m.qty; outQ -= m.qty; } else { bal -= m.qty; outQ += m.qty; }
       if (m.purpose === 'dispatch') sent += m.qty;
+      if (m.purpose === 'event_out' && m.event_id) at[m.event_id] = (at[m.event_id] || 0) + m.qty;
+      if (m.purpose === 'event_in' && m.event_id) { at[m.event_id] = (at[m.event_id] || 0) - m.qty; if (at[m.event_id] <= 0) delete at[m.event_id]; }
     });
     bal = Math.max(0, bal);
-    return { code: bal > 0 ? 'in' : 'gone', label: bal > 0 ? 'In inventory' : 'Fully issued', where: 'Sampling store', bal, out: Math.max(0, outQ), sent, last, color: bal > 0 ? '#2A6044' : '#9A9590' };
+    const evN = Object.values(at).reduce((t, x) => t + x, 0);
+    return {
+      code: bal > 0 ? 'in' : 'gone', label: bal > 0 ? 'In inventory' : 'Fully issued',
+      where: 'Sampling store' + (evN ? ` · ${evN} at event${Object.keys(at).length > 1 ? 's' : ''}` : ''), bal, out: Math.max(0, outQ), sent, last,
+      color: bal > 0 ? '#2A6044' : '#9A9590', event_id: '', event: '', atEvents: at, eventNames: names,
+    };
   }
-  const base = { last, out: 0, sent: 0 };
+  const base = { last, out: 0, sent: 0, event_id: '', event: '', atEvents: {} as Record<string, number>, eventNames: names };
+  if (last && last.purpose === 'event_in') return { ...base, code: 'in', label: 'In inventory', where: 'Sampling store · back from ' + (last.event || 'event'), color: '#2A6044', bal: 1 };
+  if (last && last.purpose === 'event_out') {
+    return { ...base, code: 'event', label: 'At event · ' + (last.event || last.event_id), where: (last.event || 'event') + (last.carrier ? ' · with ' + last.carrier : ''),
+      color: '#0E7C86', bal: 0, event_id: last.event_id, event: last.event || last.event_id, atEvents: { [last.event_id]: 1 } };
+  }
   if (!last || last.purpose === 'return') return { ...base, code: 'in', label: 'In inventory', where: 'Sampling store', color: '#2A6044', bal: 1 };
   if (last.purpose === 'dispatch') return { ...base, code: 'sent', label: 'Sent to ' + (last.party || 'customer'), where: last.party || 'customer', color: '#652880', bal: 0 };
   if (last.purpose === 'show') return { ...base, code: 'out', label: 'Out with ' + last.by, where: last.by + (last.party ? ' · ' + last.party : ''), color: '#C87533', bal: 0 };
@@ -133,17 +169,58 @@ export function smpState(sm: Sample, moves: Move[]): SmpState {
 }
 
 /** purposes the movement form offers for the sample's current state (artifact rule; the API checks the whole log) */
+export const atEventQty = (st: SmpState) => Object.values(st.atEvents).reduce((t, x) => t + x, 0);
 export function allowedPurposes(sm: Sample, st: SmpState): PurposeKey[] {
-  const all: PurposeKey[] = ['dispatch', 'show', 'return', 'internal', 'consume'];
-  if (!sm.tracked) return all.filter((p) => (p === 'return' ? st.out > 0 : st.bal > 0));
+  const all: PurposeKey[] = ['dispatch', 'show', 'return', 'internal', 'consume', 'event_out', 'event_in'];
+  if (!sm.tracked) {
+    const atEv = atEventQty(st);
+    return all.filter((p) => (p === 'return' ? st.out - atEv > 0 : p === 'event_in' ? atEv > 0 : st.bal > 0));
+  }
   if (st.code === 'gone') return [];
-  if (st.code === 'in') return all.filter((p) => p !== 'return');
+  if (st.code === 'in') return all.filter((p) => p !== 'return' && p !== 'event_in');
+  // at an event: only "Back from event" (or given to a customer there) — never a plain return
+  if (st.code === 'event') return ['event_in', 'dispatch', 'consume'];
   return ['return', 'dispatch', 'consume'];
 }
 export function defaultPurpose(sm: Sample, st: SmpState): PurposeKey {
   const a = allowedPurposes(sm, st);
+  if (st.code === 'event' && a.includes('event_in')) return 'event_in';
   if ((st.code === 'out' || st.code === 'use') && a.includes('return')) return 'return';
   return a[0] || 'dispatch';
+}
+
+/* ------------------------------ events ------------------------------ */
+export type EventSummary = {
+  id: string; name: string; out: number; back: number; given: number; pending: { s: Sample; qty: number; carrier: string; since: string }[];
+  moves: Move[]; carriers: string[]; last: string;
+};
+/** per event: what was taken, what came back, what is still there (status read off the log, same as the API) */
+export function eventSummaries(samples: Sample[], moves: Move[]): EventSummary[] {
+  const map: Record<string, EventSummary> = {};
+  const get = (id: string, name: string) => (map[id] = map[id] || { id, name: name || id, out: 0, back: 0, given: 0, pending: [], moves: [], carriers: [], last: '' });
+  moves.forEach((m) => {
+    if (m.purpose !== 'event_out' && m.purpose !== 'event_in') return;
+    const e = get(m.event_id, m.event);
+    if (m.event && (e.name === e.id || !e.name)) e.name = m.event;
+    e.moves.push(m);
+    if (m.purpose === 'event_out') e.out += m.qty; else e.back += m.qty;
+    if (m.carrier && !e.carriers.includes(m.carrier)) e.carriers.push(m.carrier);
+    if (m.date > e.last) e.last = m.date;
+  });
+  samples.forEach((sm) => {
+    const st = smpState(sm, moves);
+    Object.entries(st.atEvents).forEach(([id, q]) => {
+      if (!map[id] || q <= 0) return;
+      const lastOut = movesOf(moves, sm.id).filter((m) => m.purpose === 'event_out' && m.event_id === id).slice(-1)[0];
+      map[id].pending.push({ s: sm, qty: q, carrier: lastOut?.carrier || '', since: lastOut?.date || '' });
+    });
+  });
+  Object.values(map).forEach((e) => {
+    e.given = Math.max(0, e.out - e.back - e.pending.reduce((t, p) => t + p.qty, 0));   // dispatched / consumed at the event
+    e.moves.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+    e.pending.sort((a, b) => a.s.id.localeCompare(b.s.id));
+  });
+  return Object.values(map).sort((a, b) => b.last.localeCompare(a.last) || a.name.localeCompare(b.name));
 }
 
 /* ------------------------------ names / categories ------------------------------ */

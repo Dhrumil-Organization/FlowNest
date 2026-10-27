@@ -62,6 +62,7 @@ export default function FyPaymentCollectionScreen(){
  const router=useRouter(),pathname=usePathname(),p=useLocalSearchParams(),{width}=useWindowDimensions();
  const raw=str(p.date),today=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw:new Date().toLocaleDateString('en-CA');
  const activeFY=fyOf(today),prptype=(str(p.prptype)||'S').toUpperCase(),view=(str(p.view)||'owner').toLowerCase();
+ const selectedExecutiveCode=view==='my'?str(p.executive_code).trim():'';
  const requestEpoch=useRef(0);
  const [fy,setFy]=useState(activeFY),[months,setMonths]=useState<Month[]>([]),[busy,setBusy]=useState(true);
  const [amountMode,setAmountMode]=useState<'compact'|'actual'>('compact');
@@ -82,10 +83,10 @@ export default function FyPaymentCollectionScreen(){
  const [paymentMode,setPaymentMode]=useState<string|null>(null);
  const [customer,setCustomer]=useState<Row|null>(null),[receiptDays,setReceiptDays]=useState<ReceiptDay[]>([]),[loadingReceipts,setLoadingReceipts]=useState(false),[receiptError,setReceiptError]=useState(''),[expandedReceipt,setExpandedReceipt]=useState<string|null>(null);
  const fetchReport=useCallback(async(date:string,level:'executives'|'parties',executiveCode?:string)=>{
-   const response:any=await api.getOwnerCardReport({date,prptype,view,report_type:'collection',level,...(executiveCode?{executive_code:executiveCode}:{})});
+   const response:any=await api.getOwnerCardReport({date,prptype,view,report_type:'collection',level,...((executiveCode||selectedExecutiveCode)?{executive_code:executiveCode||selectedExecutiveCode}:{})});
    if(!response?.success||!response?.data?.report)throw Error(response?.message||'Collection report unavailable');
    const report=response.data.report;const history=Array.isArray(report.history)?report.history:null;const receiptCount=history?history.reduce((sum:number,d:any)=>sum+Math.max(0,Number(d.entry_count||0)),0):null;return {amount:num(report?.total?.amount),...extractMonthTarget(report),rows:normalize(report?.rows),receiptCount};
- },[prptype,view]);
+ },[prptype,view,selectedExecutiveCode]);
  useEffect(()=>{let cancelled=false;setBusy(true);setMonths([]);setCustomers([]);setReceiptDays([]);setDetailError('');setReceiptError('');
    (async()=>{const result:Month[]=[];for(let i=0;i<12;i++){
      const last=endOf(fy,i),start=i===0?`${fy}-04-01`:endOf(fy,i-1);
@@ -131,7 +132,7 @@ export default function FyPaymentCollectionScreen(){
      const finalMonth=y===activeFY?today:endOf(y,11);
      try{
        const response:any=await api.getOwnerCardReport({
-         date:finalMonth,prptype,view,report_type:'sales',level:'fy_monthly_totals'
+         date:finalMonth,prptype,view,report_type:'sales',level:'fy_monthly_totals',...(selectedExecutiveCode?{executive_code:selectedExecutiveCode}:{})
        });
        const report=response?.data?.report;
        if(!response?.success||report?.type!=='sales'||report?.level!=='fy_monthly_totals'||Number(report?.fy_start)!==y||!report?.months||typeof report.months!=='object'){
@@ -161,7 +162,7 @@ export default function FyPaymentCollectionScreen(){
    };
    void Promise.all(years.map(fetchYear)).then(()=>{if(!cancelled)setBillingReady(true);});
    return()=>{cancelled=true;};
- },[activeFY,prptype,view,today]);
+ },[activeFY,prptype,view,selectedExecutiveCode,today]);
  const billedMetric=(y:number)=>{
    const source=y===fy?months:history[y],billing=billedByFY[y];
    if(!source?.length||!billing?.length)return null;

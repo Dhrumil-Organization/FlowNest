@@ -395,6 +395,7 @@ export default function SalesFlowScreen() {
         const response = await api.getOwnerCardReport({
           date: selectedChip.requestDate,
           prptype,
+          ...(one(params.fy_origin) === '1' ? {view: analyticsView, fy_origin: 1} : {}),
           report_type: 'sales',
           level,
           ...routeContext,
@@ -415,7 +416,7 @@ export default function SalesFlowScreen() {
         setLoading(false);
         setRefreshing(false);
       }
-    }, [analyticsMetric, analyticsView, expectedAmount, expectedGeneratedAt, expectedMonth, expectedQty, isMonthlyReport, level, prptype, routeContext, selectedChip],
+    }, [analyticsMetric, analyticsView, expectedAmount, expectedGeneratedAt, expectedMonth, expectedQty, isMonthlyReport, level, prptype, routeContext, selectedChip, params.fy_origin],
   );
 
   useEffect(() => {
@@ -493,6 +494,7 @@ export default function SalesFlowScreen() {
       expected_month: selectedChip.ym,
       prptype,
       view: one(params.view) || 'owner',
+      fy_origin: one(params.fy_origin),
       source: isMonthlyReport ? 'monthly_report' : '',
       api_view: isMonthlyReport ? analyticsView : '',
       metric: isMonthlyReport ? analyticsMetric : '',

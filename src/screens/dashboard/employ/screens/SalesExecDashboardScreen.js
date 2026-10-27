@@ -686,12 +686,13 @@ import TourOverlay from "../components/TourOverlay";
 import { SALES_EXEC_DASHBOARD_TOUR } from "./DashboardTours";
 import { DashboardGrid, DashboardInsetContext, DASH_GAP, Slot } from "@/src/components/dashboard/DashboardGrid";
 import { REPORT_MAX_WIDTH, ReportContainer, useReportLayout } from "@/src/components/dashboard/ResponsiveReport";
+import MyViewProductionCard from "../components/MyViewProductionCard";
 
 // ERP-dashboard columns for My View (UI only). 'lead' = Monthly Target +
 // Monthly Report from DashboardScreen; 'top' = executive chips / profile.
 const MY_VIEW_LAYOUT = {
-  2: [["lead", "top", "sales"], ["collection", "outstanding"]],
-  3: [["lead", "top", "sales"], ["collection"], ["outstanding"]],
+  2: [["lead", "top", "sales"], ["collection", "outstanding", "production"]],
+  3: [["lead", "top", "sales"], ["collection"], ["outstanding", "production"]],
 };
 
 // Standalone (Owner -> executive drill-down) columns, UI only: the profile
@@ -827,8 +828,25 @@ export default function SalesExecDashboardScreen({
   const displayAmount = value => formatAmount(value, amountMode);
   const [showTour, setShowTour] = useState(false);
 
+  const fiscalStart = Number(date.slice(0, 4)) - (Number(date.slice(5, 7)) < 4 ? 1 : 0);
+  const fyLabel = String(fiscalStart).slice(-2) + '-' + String(fiscalStart + 1).slice(-2);
+  const openMyFy = metric => {
+    router.push({
+      pathname: '/new/(tabs)/reports/financial-year',
+      params: {
+        metric,
+        prptype: getUserPrptype,
+        view: isMyView ? 'my' : 'owner',
+        date,
+        ...(metric !== 'production' && isMyView && myInspectExecId ? { executive_code: myInspectExecId } : {}),
+      },
+    });
+  };
+
+
   const [outstandingSort, setOutstandingSort] = useState("desc");
   const [myInspectExecId, setMyInspectExecId] = useState("");
+  const [productionRefreshKey, setProductionRefreshKey] = useState(0);
   // Standalone screen only: measure content width for the responsive grid.
   const pageLayout = useReportLayout();
   const standaloneWide = !embedded && !pageLayout.compact;
@@ -940,6 +958,7 @@ export default function SalesExecDashboardScreen({
   const onRefresh = useCallback(() => {
     if (!getUserPrptype || refreshing) return;
     setRefreshing(true);
+    setProductionRefreshKey(key => key + 1);
     load(getUserPrptype);
   }, [getUserPrptype, load, refreshing]);
 
@@ -1010,19 +1029,27 @@ export default function SalesExecDashboardScreen({
 
   if (error) {
     return (
-      <>{leadNodes}<ErrorView
-        message={error}
-        onRetry={() => load(getUserPrptype, { initial: true })}
-      /></>
+      <>{leadNodes}
+        {isMyView && visibleSections.production === true && (
+          <MyViewProductionCard permitted date={date} prptype={getUserPrptype} />
+        )}
+        {(visibleSections.sales || visibleSections.collection || visibleSections.outstanding || !isMyView) && (
+          <ErrorView message={error} onRetry={() => load(getUserPrptype, { initial: true })} />
+        )}
+      </>
     );
   }
 
   if (!data) {
     return (
-      <>{leadNodes}<ErrorView
-        message="Executive dashboard data is unavailable."
-        onRetry={() => load(getUserPrptype, { initial: true })}
-      /></>
+      <>{leadNodes}
+        {isMyView && visibleSections.production === true && (
+          <MyViewProductionCard permitted date={date} prptype={getUserPrptype} />
+        )}
+        {(visibleSections.sales || visibleSections.collection || visibleSections.outstanding || !isMyView) && (
+          <ErrorView message="Executive dashboard data is unavailable." onRetry={() => load(getUserPrptype, { initial: true })} />
+        )}
+      </>
     );
   }
 
@@ -1058,6 +1085,9 @@ export default function SalesExecDashboardScreen({
               })}
             </View>
           </SectionCard>
+          {visibleSections.production === true && (
+            <MyViewProductionCard permitted date={date} prptype={getUserPrptype} />
+          )}
         </ScrollView>
       </SafeAreaView></>
     );
@@ -1264,7 +1294,7 @@ export default function SalesExecDashboardScreen({
           {!embedded && topNode}
           <DashboardGrid
             columns={embedded ? (columns || 1) : pageLayout.cols}
-            layout={embedded ? MY_VIEW_LAYOUT : STANDALONE_LAYOUT}
+            layout={isMyView || embedded ? MY_VIEW_LAYOUT : STANDALONE_LAYOUT}
           >
           <Slot name="lead">{leadNodes}</Slot>
           {embedded && <Slot name="top">{topNode}</Slot>}
@@ -1276,6 +1306,8 @@ export default function SalesExecDashboardScreen({
                 icon="📊"
                 title="SALES"
                 bgColor={COLORS.salesBg}
+                badgeAction={`FY ${fyLabel}`}
+                onBadgeAction={() => openMyFy('sales')}
                 action="Full report"
                 onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
               />
@@ -1334,6 +1366,8 @@ export default function SalesExecDashboardScreen({
                 icon="💰"
                 title="PAYMENT COLLECTION"
                 bgColor={COLORS.collBg}
+                badgeAction={`FY ${fyLabel}`}
+                onBadgeAction={() => openMyFy('collections')}
                 action="Full report"
                 onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
               />
@@ -1418,6 +1452,8 @@ export default function SalesExecDashboardScreen({
                 icon="⚠️"
                 title="OUTSTANDING"
                 bgColor={COLORS.outsBg}
+                badgeAction={`FY ${fyLabel}`}
+                onBadgeAction={() => openMyFy('outstanding')}
               />
               <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
               {/* <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" /> */}
@@ -1467,6 +1503,16 @@ export default function SalesExecDashboardScreen({
               </TableWrapper>
             </SectionCard>
           )}
+          </Slot>
+          <Slot name="production">
+            {isMyView && visibleSections.production === true ? (
+              <MyViewProductionCard
+                permitted={visibleSections.production === true}
+                date={date}
+                prptype={getUserPrptype}
+                refreshKey={productionRefreshKey}
+              />
+            ) : null}
           </Slot>
           </DashboardGrid>
           </StandaloneFrame>

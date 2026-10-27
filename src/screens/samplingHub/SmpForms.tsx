@@ -12,10 +12,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { C } from '../yarnHub/yarnHubModel';
 import {
-  allowedPurposes, autoName, Colourway, defaultPurpose, errCode, errText, GARMENTS, Masters, Move, normalizeColourways,
+  allowedPurposes, atEventQty, autoName, Colourway, defaultPurpose, errCode, errText, GARMENTS, Masters, Move, normalizeColourways,
   PURPOSE, PurposeKey, Sample, SIZES, SMP_TYPE, SMP_TYPES, SmpState, SmpTypeKey, unwrap,
 } from './samplingHubModel';
 import { takeSamplePhoto } from './samplingPhoto';
+import { Carrier, CarrierField, meCarrier, useSmpEvents } from './SmpEvents';
 import { MF, Seg } from './SmpParts';
 
 type Ctx = { prptype: string; yearno: string };
@@ -314,12 +315,13 @@ export function SampleForm({ ctx, masters, edit, savedPhoto, onDone, onOpen }: {
 /* ====================================================================== */
 /*  movement (record / modify)                                             */
 /* ====================================================================== */
-export function MoveForm({ ctx, sample, state, me, today, masters, edit, onDone }: {
-  ctx: Ctx; sample: Sample; state: SmpState; me: string; today: string; masters: Masters | null; edit: Move | null;
+export function MoveForm({ ctx, sample, state, me, meId, today, masters, edit, onDone }: {
+  ctx: Ctx; sample: Sample; state: SmpState; me: string; meId?: string; today: string; masters: Masters | null; edit: Move | null;
   onDone: (data: any | null, msg: string) => void;
 }) {
   const allowed = useMemo(() => {
-    if (edit) return (['dispatch', 'show', 'return', 'internal', 'consume'] as PurposeKey[]); // API checks the whole log
+    // modify: an event movement stays the same event movement (its OUT / IN link); others as before — the API checks the whole log
+    if (edit) return PURPOSE[edit.purpose]?.event ? [edit.purpose] : (['dispatch', 'show', 'return', 'internal', 'consume'] as PurposeKey[]);
     return allowedPurposes(sample, state);
   }, [edit, sample, state]);
   const [purpose, setPurpose] = useState<PurposeKey>(edit ? edit.purpose : defaultPurpose(sample, state));
@@ -334,10 +336,28 @@ export function MoveForm({ ctx, sample, state, me, today, masters, edit, onDone 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const P = PURPOSE[purpose];
-  const maxQ = sample.tracked ? 1 : edit ? sample.qty : purpose === 'return' ? state.out : state.bal;
+  // events: the Event module's events + who carries it (loaded only when an event purpose can be chosen)
+  const evOk = allowed.some((k) => PURPOSE[k]?.event);
+  const ev = useSmpEvents(ctx, evOk);
+  const atIds = Object.keys(state.atEvents);
+  const [eventId, setEventId] = useState(edit ? edit.event_id : '');
+  const [carrier, setCarrier] = useState<Carrier>(edit ? { code: edit.carrier_id, name: edit.carrier } : { code: '', name: '' });
+  useEffect(() => {
+    if (edit || !ev.data) return;
+    if (purpose === 'event_out') setEventId((c) => (c && ev.data!.events.some((x) => x.id === c && x.active) ? c : ev.data!.default));
+    if (purpose === 'event_in') setEventId(sample.tracked ? state.event_id : atIds.length === 1 ? atIds[0] : '');
+    setCarrier((c) => (c.name ? c : meCarrier(ev.data, { id: meId || '', name: me })));
+  }, [purpose, ev.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const evName = (id: string) => ev.data?.events.find((x) => x.id === id)?.name || state.eventNames[id] || id;
+  const evOpts: Opt[] = purpose === 'event_in'
+    ? atIds.map((id) => ({ value: id, label: `${evName(id)} · ${state.atEvents[id]} there` }))
+    : (ev.data?.events || []).filter((x) => x.active || x.id === eventId).map((x) => ({ value: x.id, label: x.name + (x.active ? '' : ' (closed)'), searchText: x.name }));
+  const maxQ = sample.tracked ? 1 : edit ? sample.qty
+    : purpose === 'return' ? state.out - atEventQty(state) : purpose === 'event_in' ? state.atEvents[eventId] || 0 : state.bal;
   const partyOk = P.party !== 'required' || (other ? !!party.trim() : !!par);
   const qtyOk = sample.tracked || (+qty > 0 && +qty <= maxQ);
-  const ok = !!singlet.trim() && partyOk && qtyOk && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today;
+  const eventOk = !P.event || !!edit || (purpose === 'event_out' ? !!eventId && !!carrier.name.trim() : sample.tracked ? !!state.event_id : !!eventId);
+  const ok = !!singlet.trim() && partyOk && qtyOk && eventOk && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today;
   const custOpts: Opt[] = custs.map((c) => ({ value: c.code, label: c.name, searchText: `${c.name} ${c.city} ${c.code}` }));
   if (par && !custs.some((c) => c.code === par) && edit?.parcode === par) custOpts.unshift({ value: par, label: edit.party || par });
 
@@ -345,7 +365,8 @@ export function MoveForm({ ctx, sample, state, me, today, masters, edit, onDone 
 
   const save = async () => {
     if (!ok) {
-      setErr(!singlet.trim() ? 'Enter the singlet number — every movement needs it.' : !partyOk ? 'Select the customer / party.' : !qtyOk ? `Quantity must be 1 to ${maxQ}.` : 'Check the date.');
+      setErr(!singlet.trim() ? 'Enter the singlet number — every movement needs it.' : !partyOk ? 'Select the customer / party.'
+        : !eventOk ? (purpose === 'event_out' && eventId ? 'Select who carries the sample.' : 'Select the event.') : !qtyOk ? `Quantity must be 1 to ${maxQ}.` : 'Check the date.');
       return;
     }
     setBusy(true); setErr('');
@@ -353,6 +374,11 @@ export function MoveForm({ ctx, sample, state, me, today, masters, edit, onDone 
       ...ctx, sample: sample.id, date, purpose, singlet: singlet.trim(), qty: sample.tracked ? 1 : +qty, note: note.trim(),
       parcode: P.party === 'none' || other ? '' : par, party: P.party === 'none' ? '' : other ? party.trim() : '',
     };
+    if (P.event) {
+      body.event_id = eventId;
+      body.carrier_code = carrier.code;
+      body.carrier = carrier.code ? '' : carrier.name.trim();
+    }
     if (edit) body.id = edit.id;
     try {
       const r = await SamplingHubAPI.moveSave(body);
@@ -381,6 +407,23 @@ export function MoveForm({ ctx, sample, state, me, today, masters, edit, onDone 
               <Text onPress={() => { setOther(true); setPar(''); }} style={[f.hint, { color: T.nav, fontWeight: '700' }]}>Other party / new prospect…</Text>
             </>
           )}
+        </>
+      ) : null}
+      {P.event ? (
+        <>
+          {ev.data && !ev.data.ready ? <Text style={f.err}>{ev.data.setup}</Text> : null}
+          {ev.error ? <Text style={f.err}>{ev.error}</Text> : null}
+          {edit ? (
+            <Text style={f.hint}>Event: <Text style={{ fontWeight: '800', color: T.ink }}>{edit.event || edit.event_id}</Text> — the event of a recorded movement stays (delete and record again to change it).</Text>
+          ) : purpose === 'event_in' && sample.tracked ? (
+            <Text style={[f.hint, { color: T.ink }]}>Coming back from <Text style={{ fontWeight: '800' }}>{state.event}</Text>{state.last?.carrier ? ' · carried by ' + state.last.carrier : ''} — closes its “Taken to event”.</Text>
+          ) : (
+            <SelectField label={purpose === 'event_in' ? 'Coming back from' : 'Event'} required value={eventId} options={evOpts} loading={ev.loading && !ev.data}
+              placeholder={purpose === 'event_out' && ev.data && !evOpts.length ? 'No active event in the Event module' : 'Select event'} onChange={setEventId} onRefresh={ev.reload} />
+          )}
+          <CarrierField label={purpose === 'event_out' ? 'Carried by' : 'Brought back by'} required={purpose === 'event_out'} people={ev.data?.people || []}
+            value={carrier} onChange={setCarrier} loading={ev.loading && !ev.data} />
+          <Text style={f.hint}>Scanned / recorded by {edit ? edit.by : me}.</Text>
         </>
       ) : null}
       <View style={[f.wrap, { alignItems: 'flex-end' }]}>

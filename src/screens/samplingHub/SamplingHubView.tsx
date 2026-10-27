@@ -7,6 +7,9 @@
 //                type + status filters · newest first
 //   Scan & move  camera QR scan (phone + browser) or scanner gun / typed ID → the record opens with the movement
 //                form ready · recently handled · my movements
+//                Event modes: "Taken to event" / "Back from event" — event (Event module) + who carries it + singlet
+//                once, then scan sticker after sticker; each scan is recorded (SmpEvents.tsx)
+//   Events       per event: taken · back · still at the event (dashboard widget → event page)
 //   Sample page  status / where / last movement / singlet · QR sticker preview + print · record / modify / delete
 //                movements · modify / delete sample · split a batch into items · booklet contents
 //
@@ -28,8 +31,9 @@ import { C } from '../yarnHub/yarnHubModel';
 import {
   addDays, allowedPurposes, catsOf, colourLabel, dateFull, designIds, designLabel, errText, isoToday, ListData, Masters,
   matches, Move, movesOf, normalizeList, normalizeMasters, parseSampleId, plural, PURPOSE, PURPOSES, PurposeKey, Sample,
-  searchText, SMP_TYPE, SMP_TYPES, smpState, SmpState, SmpTypeKey, StCode, unwrap,
+  searchText, SMP_TYPE, SMP_TYPES, smpState, SmpState, SmpTypeKey, StCode, unwrap, eventSummaries,
 } from './samplingHubModel';
+import { EventCard, EventScanPanel, EventsWidget } from './SmpEvents';
 import { confirmDelete, MoveForm, SampleForm } from './SmpForms';
 import { Chip, Empty, Head, MF, MoveRow, SampleRow, Seg, StatCard, StBadge, StickerCard, st as P, TypeIcon, Widget } from './SmpParts';
 
@@ -39,7 +43,8 @@ type Preset = 'today' | '7d' | 'month' | 'all';
 type Page =
   | { kind: 'sample'; id: string }
   | { kind: 'list'; type: 'all' | SmpTypeKey; st: 'all' | StCode; created?: boolean; cat?: string; md?: string }
-  | { kind: 'moves'; purpose: 'all' | PurposeKey; mine?: boolean; all?: boolean; singlet?: string; cat?: string; md?: string };
+  | { kind: 'moves'; purpose: 'all' | PurposeKey; mine?: boolean; all?: boolean; singlet?: string; cat?: string; md?: string }
+  | { kind: 'event'; id: string };
 
 export function SamplingHubView() {
   const { prpGroup, yearNo, prpCode } = useBusinessContext();
@@ -67,6 +72,7 @@ export function SamplingHubView() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scanTxt, setScanTxt] = useState('');
   const [scanMsg, setScanMsg] = useState('');
+  const [scanMode, setScanMode] = useState<'open' | 'event_out' | 'event_in'>('open');
   const [photos, setPhotos] = useState<Record<string, string>>({});
   const gunRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -309,7 +315,7 @@ export function SamplingHubView() {
             }} />
         ) : null}
         {moveOpen ? (
-          <MoveForm key={'m' + s.id + (moveOpen.edit?.id || '')} ctx={ctx} sample={s} state={x} me={me} today={today} masters={masters} edit={moveOpen.edit}
+          <MoveForm key={'m' + s.id + (moveOpen.edit?.id || '')} ctx={ctx} sample={s} state={x} me={me} meId={data?.me.id} today={today} masters={masters} edit={moveOpen.edit}
             onDone={(d, m) => { setMoveOpen(null); if (d) { applyAnswer(d); setFlash('✓ ' + m); } }} />
         ) : null}
         <View style={P.card}>
@@ -364,12 +370,23 @@ export function SamplingHubView() {
     );
   };
 
+  const eventPage = (id: string) => {
+    const ev = eventSummaries(samples, moves).find((x) => x.id === id);
+    return (
+      <>
+        {crumbs([{ l: 'Sampling', fn: () => goPage(null) }, { l: 'Events' }, { l: ev?.name || id }])}
+        {ev ? <EventCard ev={ev} full onOpen={(k) => openSample(k)} /> : <View style={P.card}><Empty t="No movements for this event." /></View>}
+      </>
+    );
+  };
+
   /* ================================ dashboard ================================ */
   const dashTab = () => {
     const created = withSt.filter(({ s }) => inR(s.created));
     const disp = moves.filter((m) => m.purpose === 'dispatch' && inR(m.date)).slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
     const recent = moves.filter((m) => inR(m.date)).slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
     const inv = withSt.filter(({ st: x }) => x.code === 'in'), out = withSt.filter(({ st: x }) => x.code === 'out' || x.code === 'use'), sent = withSt.filter(({ st: x }) => x.code === 'sent');
+    const atEv = withSt.filter(({ st: x }) => x.code === 'event' || Object.keys(x.atEvents).length > 0);
     const units = (a: { s: Sample }[]) => a.reduce((t, { s }) => t + (s.tracked ? 1 : s.qty), 0);
     const byCat = dashBy === 'cat';
     const groups = (a: { s: Sample; st: SmpState }[]) => byCat
@@ -395,6 +412,7 @@ export function SamplingHubView() {
             <StatCard label="Dispatches" value={String(disp.length)} color="#652880" />
             <StatCard label="In inventory" value={String(inv.length)} color={T.green} />
             <StatCard label="Out with executives" value={String(out.length)} color={T.copper} />
+            <StatCard label="At events" value={String(atEv.length)} color="#0E7C86" />
           </View>
           <View style={{ marginTop: 12 }}>{search}</View>
         </View>
@@ -410,6 +428,7 @@ export function SamplingHubView() {
               {groups(created).map((g) => gRow(g, byCat ? `${plural(designsIn(g.list, g.k), 'design')}` : `${g.list.filter(({ s }) => s.tracked).length} individual · ${g.list.filter(({ s }) => !s.tracked).length} batch`, String(g.list.length), plural(units(g.list), 'unit'), () => goPage({ kind: 'list', type: 'all', st: 'all', created: true, ...g.nav })))}
               {!created.length ? <Empty t="No samples created in this period." /> : null}
             </Widget>
+            <EventsWidget samples={samples} moves={moves} onEvent={(id) => goPage({ kind: 'event', id })} />
             <Widget icon="local-shipping" title={'Customer dispatches · ' + disp.length} accent="#652880" onTitle={() => goPage({ kind: 'moves', purpose: 'dispatch' })}>
               <Text style={P.note}>{plural(new Set(disp.map((m) => m.party)).size, 'customer')} · {plural(new Set(disp.map((m) => m.singlet)).size, 'singlet')}</Text>
               {disp.slice(0, 4).map((m) => <MoveRow key={m.id} m={m} sample={byId[m.sample]} onPress={byId[m.sample] ? () => openSample(m.sample) : undefined} />)}
@@ -468,7 +487,7 @@ export function SamplingHubView() {
               {SMP_TYPES.map((t) => <Seg key={t.k} on={typeF === t.k} label={t.lbl} icon={t.icon} color={t.color} onPress={() => setTypeF(t.k)} />)}
             </View>
             <View style={[st.wrap, { marginBottom: 10 }]}>
-              {([['all', 'Any status'], ['in', 'In inventory'], ['out', 'Out with executives'], ['sent', 'With customers'], ['gone', 'Consumed / issued']] as ['all' | StCode, string][]).map(([k, l]) => <Seg key={k} on={stF === k} label={l} onPress={() => setStF(k)} />)}
+              {([['all', 'Any status'], ['in', 'In inventory'], ['out', 'Out with executives'], ['event', 'At events'], ['sent', 'With customers'], ['gone', 'Consumed / issued']] as ['all' | StCode, string][]).map(([k, l]) => <Seg key={k} on={stF === k} label={l} onPress={() => setStF(k)} />)}
             </View>
             <View style={P.card}>
               <Head t={`${plural(rows.length, 'sample')}${catF ? ' · ' + catF : ''}${desF ? ' · ' + desName(desF) : ''} · newest first`} right={<Text style={P.lbl}>STATUS</Text>} />
@@ -487,8 +506,21 @@ export function SamplingHubView() {
     const latest = moves.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
     const recentIds = [...new Set(latest.map((m) => m.sample))].filter((k) => byId[k]).slice(0, 6);
     const list = salesOnly ? mine : latest;
+    const modes: [typeof scanMode, string, string, string][] = [
+      ['open', 'Open a sample', 'qr-code-scanner', C.prod],
+      ['event_out', 'Taken to event', 'event', '#0E7C86'],
+      ['event_in', 'Back from event', 'assignment-return', '#3B7A3A'],
+    ];
+    const modeBar = canMove ? (
+      <View style={[st.wrap, { marginBottom: 10 }]}>
+        {modes.map(([k, l, i, c]) => <Seg key={k} on={scanMode === k} label={l} icon={i} color={c} onPress={() => setScanMode(k)} testID={'scan-mode-' + k} />)}
+      </View>
+    ) : null;
+    // event modes: the panel itself is rendered below the page (kept mounted while a sample is opened from it)
+    if (canMove && scanMode !== 'open') return modeBar;
     return (
       <>
+        {modeBar}
         <View style={P.card}>
           <Text style={st.h1}>Scan a sample</Text>
           <Text style={[P.note, { marginBottom: 10 }]}>Scan the QR sticker with the camera, shoot it with the scanner gun, or type the Sample ID. The record opens with the movement form ready — purpose, party, singlet no., date.</Text>
@@ -544,8 +576,14 @@ export function SamplingHubView() {
           </View>
         ) : null}
         {!data && loading ? <ActivityIndicator style={{ marginTop: 40 }} color={T.nav} /> : null}
-        {data ? (page ? (page.kind === 'sample' ? samplePage(page.id) : page.kind === 'list' ? listPage(page) : movesPage(page))
+        {data ? (page ? (page.kind === 'sample' ? samplePage(page.id) : page.kind === 'list' ? listPage(page) : page.kind === 'event' ? eventPage(page.id) : movesPage(page))
           : curTab === 'dash' ? dashTab() : curTab === 'register' ? registerTab() : scanTab()) : null}
+        {data && canMove && scanMode !== 'open' ? (
+          <View style={!page && curTab === 'scan' ? undefined : { display: 'none' }}>
+            <EventScanPanel mode={scanMode} ctx={ctx} byId={byId} moves={moves} stOf={stOf} me={data.me || { id: '', name: me }} today={today}
+              onAnswer={applyAnswer} onOpen={(k) => openSample(k)} />
+          </View>
+        ) : null}
       </ScrollView>
       <QrScanSheet
         visible={scanOpen}

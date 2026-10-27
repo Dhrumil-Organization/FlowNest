@@ -3,7 +3,7 @@ import { ProductionOrderEntryScreen } from '@/src/screens/production/ProductionO
 
 export default function ProductionOrdersRoute() {
   return (
-    <PermissionRouteGuard resource="production.production_order_entry" action="view">
+    <PermissionRouteGuard resource="production.production_order_entry">
       <ProductionOrderEntryScreen />
     </PermissionRouteGuard>
   );

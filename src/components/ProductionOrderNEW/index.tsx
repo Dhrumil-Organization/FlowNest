@@ -26,17 +26,26 @@ import { usePermission } from '@/src/core/permissions';
 import { T } from '@/src/theme';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { Btn, SelectField, Sheet, useYearStore } from '../StockVerificationNEW/ui';
 import { fetchProperties } from '../StockVerificationNEW/verificationApi';
-import { Api, Ctx } from './api';
+import { fetchProductionOrderPools } from './api';
+import type { Api, Ctx } from './api';
 import type { Row } from './format';
 import OrderForm from './OrderForm';
 import OrdersList from './OrdersList';
 import { CONTENT_W, Switch2 } from './ui';
+import { useAppSessionStore } from '../../stores/AppSessionStore';
+import ProductionOrdersPoolsSlot from '../../features/productionOrders/pools/ProductionOrdersPoolsSlot';
+import {
+  PRODUCTION_ORDER_TABS,
+  PRODUCTION_ORDERS_CONTAINER,
+  permittedProductionOrderTabs,
+  tabRegistered,
+} from '../../features/productionOrders/pools/productionOrderTabPermissions';
 
-export const PO_RESOURCE = 'production.production_order_entry';
+export const PO_RESOURCE = PRODUCTION_ORDERS_CONTAINER;
 const CTX_KEY = 'po_entry_ctx_v2'; // v2: drops saved login-store values
 
 type Props = { token: string; API: string; username?: string; isConnected?: boolean };
@@ -71,13 +80,25 @@ function ContextBar({ ctx, onChange, api, prptype }: { ctx: Ctx; onChange: (c: C
 
 export default function ProductionOrderNEW({ token, API }: Props) {
   const biz = useBusinessContext();
-  const { canDo } = usePermission();
+  const { canDo, canAccess } = usePermission();
+  const appSession = useAppSessionStore((s) => s.appSession);
   const api = useMemo<Api>(() => ({ API, token }), [API, token]);
   // strcode = GREIGE store (012 default) — the login store (e.g. 002) is a sales store and filters out the SO lines.
   const [ctx, setCtx] = useState<Ctx>({ prpcode: biz.prpCode || '', yearno: biz.yearNo || '', strcode: '012' });
   const [ready, setReady] = useState(false);
   const [route, setRoute] = useState<Route>({ name: 'list' });
   const [section, setSection] = useState('orders');
+  // Child grants are independent. The old parent grant is a container only.
+  // Legacy Orders/Job work remain visible until the NEW tabs are registered.
+  const visibleTabs = permittedProductionOrderTabs(appSession, canAccess);
+  const currentTab = visibleTabs.some((t) => t.key === section) ? section : (visibleTabs[0]?.key ?? '');
+  const tabPath = (key: string) => PRODUCTION_ORDER_TABS.find((t) => t.key === key)?.resource || '';
+  const childRegistered = PRODUCTION_ORDER_TABS.some((t) => tabRegistered(appSession, t.resource));
+  const canTabAction = (key: string, action: string) => {
+    if (!visibleTabs.some((t) => t.key === key)) return false;
+    return childRegistered ? canDo(tabPath(key), action) : canDo(PRODUCTION_ORDERS_CONTAINER, action);
+  };
+  const poolRequest = useCallback((path: string) => fetchProductionOrderPools(api, path), [api]);
 
   // Last choice made on this screen wins over the login default for the same property.
   useEffect(() => {
@@ -97,10 +118,20 @@ export default function ProductionOrderNEW({ token, API }: Props) {
     return () => sub.remove();
   }, [route.name]);
 
-  const rights = { add: canDo(PO_RESOURCE, 'add'), edit: canDo(PO_RESOURCE, 'edit'), del: canDo(PO_RESOURCE, 'delete') };
+  const rights = { add: canTabAction('orders','add'), edit: canTabAction('orders','edit'), del: canTabAction('orders','delete') };
+  const jobRights = { add: false, edit: canTabAction('jobwork','edit'), del: false };
+
   if (!ready) return null;
 
+  if (!visibleTabs.length) {
+    return <View style={{flex:1,alignItems:'center',justifyContent:'center',padding:28,backgroundColor:T.bg}}><Text style={{color:T.muted,fontSize:13}}>Production Orders access is not assigned to your user or role.</Text></View>;
+  }
+
   if (route.name === 'form') {
+    if (!visibleTabs.some((t) => t.key === 'orders' || t.key === 'jobwork')) {
+      return <View style={{flex:1,justifyContent:'center',padding:28}}><Text>Order form access is not available.</Text></View>;
+    }
+
     return (
       <OrderForm key={`${route.mode}-${route.uid}-${route.nonce}`} api={api} ctx={ctx} mode={route.mode} uid={route.uid}
         onBack={() => setRoute({ name: 'list' })}
@@ -113,15 +144,22 @@ export default function ProductionOrderNEW({ token, API }: Props) {
       <View style={{ paddingHorizontal: 14, paddingTop: 12, alignItems: 'center' }}>
         <View style={{ width: '100%', maxWidth: CONTENT_W }}>
           <ContextBar ctx={ctx} onChange={changeCtx} api={api} prptype={biz.prpGroup} />
-          <Switch2 options={[['orders', 'Orders'], ['jobwork', 'Job work']]} value={section} onChange={setSection} style={{ marginBottom: 0, marginTop: 6 }} />
+          <Switch2 options={visibleTabs.map((t) => [t.key, t.label] as [string, string])} value={currentTab} onChange={setSection} style={{ marginBottom: 0, marginTop: 6 }} />
         </View>
       </View>
-      {section === 'orders' ? (
+      {currentTab === 'orders' ? (
         <OrdersList api={api} ctx={ctx} rights={rights}
           onNew={() => setRoute({ name: 'form', mode: 'add', uid: 0, nonce: Date.now() })}
           onOpen={(r, mode) => setRoute({ name: 'form', mode, uid: r.uid, nonce: Date.now() })} />
+      ) : currentTab === 'pools' ? (
+        <ProductionOrdersPoolsSlot
+          prptype={String(biz.prpGroup || '')}
+          yearno={ctx.yearno} property={ctx.prpcode}
+          requestFn={poolRequest}
+          canViewAll={canDo(tabPath('pools'),'view_all')}
+        />
       ) : (
-        <OrdersList api={api} ctx={ctx} rights={{ add: false, edit: rights.edit, del: false }} jobWorkOnly
+        <OrdersList api={api} ctx={ctx} rights={jobRights} jobWorkOnly
           onNew={() => undefined}
           onOpen={(r, mode) => setRoute({ name: 'form', mode, uid: r.uid, nonce: Date.now() })} />
       )}

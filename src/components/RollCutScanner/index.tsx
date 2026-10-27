@@ -33,6 +33,7 @@ export default function RollCutScanner({ token, API }: Props) {
   const [raw, setRaw] = useState('');
   const [qr, setQr] = useState<QrData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [failMsg, setFailMsg] = useState('');
   const [lastSaved, setLastSaved] = useState<{ beam: string; taka: string; at: string } | null>(null);
 
   /* ----------------------------- list state ------------------------------ */
@@ -109,6 +110,7 @@ export default function RollCutScanner({ token, API }: Props) {
   const clearScan = () => {
     setRaw('');
     setQr(null);
+    setFailMsg('');
   };
 
   const onScan = (value: string) => {
@@ -121,23 +123,30 @@ export default function RollCutScanner({ token, API }: Props) {
     }
     setRaw(value);
     setQr(parsed);
+    setFailMsg('');
   };
 
   const onSave = async () => {
     if (saving) return;
     if (!qr || !raw) return AppAlert.alert('Scan required', 'Please scan the taka QR first.');
     setSaving(true);
+    setFailMsg('');
     try {
       const r = await api.save({ prpcode: qr.prpcode, yearno: qr.yearno || getCurrentFinancialYear(), scannedString: raw });
       if (r?.success === true) {
         const now = new Date();
+        setFailMsg('');
         setLastSaved({ beam: qr.beamno, taka: qr.takano, at: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
         clearScan();
         if (prpCode) void loadList();
       } else {
+        setLastSaved(null);
+        setFailMsg(r?.message || 'Save failed');
         AppAlert.alert('Error', r?.message || 'Save failed');
       }
     } catch (e: any) {
+      setLastSaved(null);
+      setFailMsg(errMsg(e, 'Save failed'));
       AppAlert.alert('Error', errMsg(e, 'Save failed'));
     } finally {
       setSaving(false);
@@ -151,11 +160,11 @@ export default function RollCutScanner({ token, API }: Props) {
     <View style={st.panelPad}>
       <View style={st.card}>
         <View style={st.scanTop}>
-          <TouchableOpacity activeOpacity={0.85} style={[st.scanBtn, ready && st.scanBtnOk]} onPress={() => setCamOpen(true)} accessibilityRole="button" accessibilityLabel="Scan QR">
-            <Icon name={ready ? 'check' : 'qr-code-scanner'} size={44} color="#fff" />
+          <TouchableOpacity activeOpacity={0.85} style={[st.scanBtn, ready && st.scanBtnOk, !!failMsg && st.scanBtnFail]} onPress={() => setCamOpen(true)} accessibilityRole="button" accessibilityLabel="Scan QR">
+            <Icon name={failMsg ? 'close' : ready ? 'check' : 'qr-code-scanner'} size={44} color="#fff" />
           </TouchableOpacity>
-          <Text style={st.scanTitle}>{ready ? 'QR scanned' : 'Scan taka QR'}</Text>
-          <Text style={st.scanHint}>{ready ? 'Check the details below and press Save' : 'Tap the button and point the camera at the QR code'}</Text>
+          <Text style={st.scanTitle}>{failMsg ? 'Save failed' : ready ? 'QR scanned' : 'Scan taka QR'}</Text>
+          <Text style={st.scanHint}>{failMsg ? failMsg : ready ? 'Check the details below and press Save' : 'Tap the button and point the camera at the QR code'}</Text>
           <TouchableOpacity style={st.rescan} onPress={() => setCamOpen(true)} accessibilityRole="button">
             <Icon name={ready ? 'refresh' : 'photo-camera'} size={15} color={T.copper} />
             <Text style={st.rescanText}>{ready ? 'Scan again' : 'Open camera'}</Text>
@@ -173,10 +182,20 @@ export default function RollCutScanner({ token, API }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Save"
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Icon name="check-circle" size={22} color={ready ? '#fff' : T.muted} />}
+          {saving ? <ActivityIndicator color="#fff" /> : <Icon name={failMsg ? 'cancel' : 'check-circle'} size={22} color={ready ? '#fff' : T.muted} />}
           <Text style={[st.saveText, !ready && !saving && { color: T.muted }]}>{saving ? 'Saving…' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
+
+      {failMsg ? (
+        <View style={st.failBox}>
+          <View style={st.failIcon}><Icon name="close" size={18} color="#fff" /></View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.failTitle}>Not saved</Text>
+            <Text style={st.okSub} numberOfLines={2}>{failMsg}</Text>
+          </View>
+        </View>
+      ) : null}
 
       {lastSaved ? (
         <View style={st.okBox}>
@@ -403,6 +422,10 @@ const st = StyleSheet.create({
   saveBtnOff: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border },
   saveText: { color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: 0.3 },
 
+  scanBtnFail: { backgroundColor: T.red, shadowColor: T.red },
+  failBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.red}55`, backgroundColor: `${T.red}12` },
+  failIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: T.red, alignItems: 'center', justifyContent: 'center' },
+  failTitle: { fontSize: 13.5, fontWeight: '900', color: T.red },
   okBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: `${T.green}55`, backgroundColor: `${T.green}12` },
   okIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: T.green, alignItems: 'center', justifyContent: 'center' },
   okTitle: { fontSize: 13.5, fontWeight: '900', color: T.green },

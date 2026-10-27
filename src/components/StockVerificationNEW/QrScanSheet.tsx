@@ -31,15 +31,19 @@ type Props = {
   onScanned: (value: string) => void;
   /** web build only: use the browser camera scanner (getUserMedia + QR decode) instead of expo-camera. Native is unchanged. */
   webCamera?: boolean;
+  /** optional: change this number to read the NEXT code without closing the sheet (continuous scanning). Not set = unchanged. */
+  rearm?: number;
 };
 
-export default function QrScanSheet({ visible, title, subtitle, footer, manualPlaceholder, onClose, onScanned, webCamera }: Props) {
+export default function QrScanSheet({ visible, title, subtitle, footer, manualPlaceholder, onClose, onScanned, webCamera, rearm }: Props) {
   const webCam = !!webCamera && Platform.OS === 'web';
   const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
   const [camKey, setCamKey] = useState(0);
   const [typed, setTyped] = useState('');
   const lock = useRef(false);
+  const last = useRef({ v: '', t: 0 });   // continuous scanning: the same sticker still in front of the camera is not read twice
+  const repeat = (v: string) => rearm !== undefined && v === last.current.v && Date.now() - last.current.t < 3000;
 
   useEffect(() => {
     lock.current = false;
@@ -47,6 +51,15 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
     setTyped('');
     if (visible) setCamKey((v) => v + 1);
   }, [visible]);
+
+  // continuous scanning: the parent re-arms the scanner after it has handled a code (sheet stays open)
+  useEffect(() => {
+    if (rearm === undefined || !visible) return;
+    lock.current = false;
+    setTyped('');
+    if (webCam) setCamKey((v) => v + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rearm]);
 
   const ensurePermission = async () => {
     try {
@@ -66,8 +79,9 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
   const handleScan = (res: BarcodeScanningResult) => {
     if (lock.current) return;
     const v = String(res?.data || '').trim();
-    if (!v) return;
+    if (!v || repeat(v)) return;
     lock.current = true;
+    last.current = { v, t: Date.now() };
     onScanned(v);
   };
 
@@ -93,7 +107,7 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
           <View style={{ flex: 1, paddingHorizontal: 12 }}>
             <Text style={st.eyebrow}>SCAN</Text>
             <Text style={st.title} numberOfLines={1}>{title}</Text>
-            <Text style={st.sub} numberOfLines={1}>{subtitle}</Text>
+            <Text style={st.sub} numberOfLines={rearm === undefined ? 1 : 2}>{subtitle}</Text>
           </View>
           <TouchableOpacity onPress={restart} style={st.iconBtn} accessibilityLabel="Restart camera">
             <Icon name="refresh" size={22} color="#fff" />
@@ -102,7 +116,7 @@ export default function QrScanSheet({ visible, title, subtitle, footer, manualPl
 
         <View style={st.camArea}>
           {webCam ? (
-            <WebQrCamera key={camKey} active={visible} onScanned={(v) => { if (lock.current) return; lock.current = true; onScanned(v); }} />
+            <WebQrCamera key={camKey} active={visible} onScanned={(v) => { if (lock.current || repeat(String(v || '').trim())) return; lock.current = true; last.current = { v: String(v || '').trim(), t: Date.now() }; onScanned(v); }} />
           ) : permission?.granted ? (
             <CameraView
               key={camKey}

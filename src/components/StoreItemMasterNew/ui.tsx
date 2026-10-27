@@ -63,20 +63,23 @@ export function Card({
   title,
   subtitle,
   right,
+  stack,
   children,
   style,
 }: {
   title?: string;
   subtitle?: string;
   right?: React.ReactNode;
+  /** Phone: title on its own line, `right` (actions) on a full-width line below it. */
+  stack?: boolean;
   children: React.ReactNode;
   style?: any;
 }) {
   return (
     <View style={[u.card, S.card, style]}>
       {title ? (
-        <View style={u.cardHead}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={[u.cardHead, stack && { flexDirection: 'column', alignItems: 'stretch', flexWrap: 'nowrap', gap: 12 }]}>
+          <View style={stack ? { minWidth: 0 } : { flex: 1, minWidth: 0 }}>
             <Text style={u.cardTitle} accessibilityRole="header">
               {title}
             </Text>
@@ -406,12 +409,22 @@ export function Sheet({
     visible,
   );
 
+  const pad = width < 420 ? 12 : 16;
+  // `fill` sheets have a fixed height -> body takes all of it (flex:1).
+  // Auto-height sheets -> body only shrinks when the sheet hits its max height (never collapses to 0).
+  const bodyFlex: any = fill ? { flex: 1, minHeight: 0 } : { flexGrow: 0, flexShrink: 1, minHeight: 0 };
   const body = scroll ? (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 12 }}>
+    <ScrollView
+      style={bodyFlex}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+      showsVerticalScrollIndicator
+      contentContainerStyle={{ padding: pad, paddingBottom: 12 }}
+    >
       {children}
     </ScrollView>
   ) : (
-    <View style={{ flex: 1, minHeight: 0 }}>{children}</View>
+    <View style={bodyFlex}>{children}</View>
   );
 
   return (
@@ -430,12 +443,12 @@ export function Sheet({
               S.sheet,
               {
                 width: wide ? Math.min(boxW, width - 48) : tablet ? Math.min(boxW, width - 32) : '100%',
-                maxHeight: wide ? height - 48 : height * 0.94,
+                maxHeight: wide ? height - 48 : Math.round(height * 0.92),
                 borderRadius: wide || tablet ? 18 : 0,
                 borderTopLeftRadius: 18,
                 borderTopRightRadius: 18,
               },
-              fill && { height: wide ? Math.min(height - 48, 760) : height * 0.94 },
+              fill && { height: wide ? Math.min(height - 48, 760) : Math.round(height * 0.92) },
             ]}
           >
             {!wide ? <View style={u.grabber} /> : null}
@@ -450,7 +463,7 @@ export function Sheet({
               <Btn icon="close" iconOnly kind="quiet" compact onPress={onClose} accessibilityLabel="Close" />
             </View>
             {body}
-            {footer ? <View style={u.sheetFoot}>{footer}</View> : null}
+            {footer ? <View style={[u.sheetFoot, !wide && !tablet && { paddingBottom: Platform.OS === 'ios' ? 24 : 14 }]}>{footer}</View> : null}
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -485,6 +498,12 @@ export function SelectField({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const { width: winW, height: winH } = useWindowDimensions();
+  const desktop = winW >= 760;
+  const searchable = options.length > 7;
+  // Sheet chrome (grabber + title + paddings + search box) takes ~150-210px; the list gets whatever is left,
+  // so the LAST option is always reachable by scrolling - nothing is clipped by the sheet.
+  const listMax = Math.max(150, Math.min(desktop ? 380 : 420, Math.round(winH * 0.92) - (searchable ? 200 : 140)));
   const current = options.find((o) => o.id === value);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -524,17 +543,22 @@ export function SelectField({
       <FieldError text={error} />
 
       <Sheet visible={open} title={label} onClose={() => setOpen(false)} size="sm" scroll={false}>
-        <View style={{ padding: 16, paddingBottom: 8, flexShrink: 1, minHeight: 0 }}>
-          {options.length > 7 ? (
+        <View style={{ padding: winW < 420 ? 12 : 16, paddingBottom: 8, flexShrink: 1, minHeight: 0 }}>
+          {searchable ? (
             <View style={{ marginBottom: 10 }}>
-              <SearchBox value={q} onChangeText={setQ} placeholder={`Search ${label.toLowerCase()}`} autoFocus={Platform.OS === 'web'} />
+              {/* autofocus only on desktop - on phones it pops the keyboard and hides half of the list */}
+              <SearchBox value={q} onChangeText={setQ} placeholder={`Search ${label.toLowerCase()}`} autoFocus={Platform.OS === 'web' && desktop} />
             </View>
           ) : null}
           <FlatList
             data={list}
             keyExtractor={(i) => i.id}
             keyboardShouldPersistTaps="handled"
-            style={{ flexGrow: 0, maxHeight: 360 }}
+            style={{ flexGrow: 0, flexShrink: 1, maxHeight: listMax }}
+            contentContainerStyle={{ paddingBottom: 6 }}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            ItemSeparatorComponent={() => <View style={{ height: 2 }} />}
             ListHeaderComponent={
               allowClear && value ? (
                 <Pressable onPress={() => pick('')} style={u.opt} accessibilityRole="button">
@@ -612,7 +636,7 @@ export const u = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(13,27,42,0.55)' },
   sheet: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, overflow: 'hidden' },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: T.border, marginTop: 8 },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: T.hair },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: T.hair },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: T.ink },
   sheetFoot: { borderTopWidth: 1, borderTopColor: T.hair, padding: 12, backgroundColor: T.sub },
   opt: { minHeight: 48, paddingHorizontal: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -1,4 +1,5 @@
 import { api } from '@/src/screens/dashboard/employ/api/api';
+import FyProductionCostScreen from '@/src/screens/dashboard/FyProductionCostScreen';
 import { useDashboardAmountMode, formatDashboardAmount } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -792,7 +793,7 @@ function FinancialYearLoadingSkeleton({ specs, selected, anchorDate, onBack, onC
   );
 }
 
-export default function FinancialYearPerformanceScreen() {
+function SalesFinancialYearPerformanceScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useLocalSearchParams();
@@ -1913,3 +1914,25 @@ const styles = StyleSheet.create({
   recordsBtnText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   detailHint: { marginTop: 10, fontSize: 10.5, color: C.faint },
 });
+
+
+/**
+ * Backward-compatible FY metric dispatch.
+ *
+ * Older deployed Expo Router financial-year.tsx versions send every unknown
+ * metric to FinancialYearPerformanceScreen (Sales).  Handle Production Cost
+ * here as well as in the current route so existing deployments do not show
+ * the Sales header / "financial-year metric not available" placeholder.
+ *
+ * Mount the Sales tree only for other metrics: separate child components
+ * preserve stable React hook order and existing Sales / My View behavior.
+ */
+export default function FinancialYearPerformanceScreen() {
+  const params = useLocalSearchParams();
+  const raw = Array.isArray(params.metric) ? params.metric[0] : params.metric;
+  const requestedMetric = String(raw ?? 'sales').trim().toLowerCase();
+  if (requestedMetric === 'prodcost' || requestedMetric === 'production_cost') {
+    return <FyProductionCostScreen />;
+  }
+  return <SalesFinancialYearPerformanceScreen />;
+}

@@ -779,6 +779,8 @@ export const RealCostChainAPI = {
 //   split      -> { id, n } items of a batch get their own IDs
 //   move_save  -> record / { id } modify a movement;  move_delete -> { id } HARD delete
 //   sticker    -> { ids } sticker rows in the Taka label shape (POST /api/taka-preview-label · /api/taka-print-label)
+//   events     -> active events (Event module, EventVisits) + people who carry samples; move_save event_out / event_in
+//                 { event_id, carrier_code | carrier } — the login user is who scanned it
 export const SamplingHubAPI = {
   list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('list'), body, { timeout: 120000 }),
   masters: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('masters'), body, { timeout: 120000 }),
@@ -790,6 +792,8 @@ export const SamplingHubAPI = {
   moveSave: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_save'), body, { timeout: 60000 }),
   moveRemove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('move_delete'), body, { timeout: 60000 }),
   sticker: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('sticker'), body, { timeout: 60000 }),
+  // events of the Event module (EventVisits) + the people of the group who can carry samples
+  events: (body: Record<string, any>) => client.post(LEGACY_ROUTES.samplingHub('events'), body, { timeout: 60000 }),
 };
 
 // Yarn Rates (YarnRateController) — rate book per main yarn (TMSMASTER.dbo.FAMIYarnRate).

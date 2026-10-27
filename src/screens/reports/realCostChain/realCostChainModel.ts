@@ -33,6 +33,8 @@ export type ChainData = {
   fent_default: number;
   designs: DesignChain[];
   rates: RateUsed[];
+  /** server time the numbers were built ("YYYY-MM-DD HH:mm:ss") — the answer may come from the 10-minute cache */
+  built_at: string;
 };
 
 const s = (v: any) => (v == null ? '' : String(v)).trim();
@@ -70,6 +72,7 @@ export function normalizeChain(raw: any): ChainData {
     fy: { yearno: s(fy.yearno), name: s(fy.name) || 'FY ' + s(fy.yearno), from: s(fy.from), to: s(fy.to) },
     month: s(raw.month),
     months: arr(raw.months).map(s).filter(Boolean),
+    built_at: s(raw.built_at),
     period: { from: s(raw.period?.from), to: s(raw.period?.to) },
     fent_default: n(raw.fent_default) || 3,
     designs: arr(raw.designs).map((d: any): DesignChain => {

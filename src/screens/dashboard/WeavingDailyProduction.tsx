@@ -78,7 +78,7 @@ function CalendarDateField({ label, value, onChange, compact = false }: { label:
 }
 
 
-export default function WeavingDailyProduction({ date, prptype, tabControls, refreshToken = 0, onRefreshComplete, onSelectedDateChange, initialBeam, onReturnToBeamStatus }: { date?: string; prptype?: string; tabControls?: React.ReactNode; refreshToken?: number; onRefreshComplete?: () => void; onSelectedDateChange?: (date: string) => void; initialBeam?: {prpcode: string; beam_uid: string; beam_no: string; last_checking_date?: number | null; nonce: number} | null; onReturnToBeamStatus?: () => void }) {
+export default function WeavingDailyProduction({ date, prptype, tabControls, refreshToken = 0, onRefreshComplete, onSelectedDateChange, initialFromDate, initialShedKey, initialShedLabel, onClearShed, initialBeam, onReturnToBeamStatus }: { date?: string; prptype?: string; tabControls?: React.ReactNode; refreshToken?: number; onRefreshComplete?: () => void; onSelectedDateChange?: (date: string) => void; initialFromDate?: string; initialShedKey?: string; initialShedLabel?: string; onClearShed?: () => void; initialBeam?: {prpcode: string; beam_uid: string; beam_no: string; last_checking_date?: number | null; nonce: number} | null; onReturnToBeamStatus?: () => void }) {
   const { width: windowWidth } = useWindowDimensions();
   const [availableWidth, setAvailableWidth] = useState(0);
   const width = availableWidth || windowWidth;
@@ -86,12 +86,16 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
   const compact = width >= 900;
   const today = iso(new Date());
   const initial = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? (date as string) : today;
+  const requestedFrom = /^\d{4}-\d{2}-\d{2}$/.test(initialFromDate || '')
+    && String(initialFromDate) <= initial ? String(initialFromDate) : initial;
+  const initialShedStep = (): Step[] => initialShedKey
+    ? [{field: 'shed', value: initialShedKey, label: initialShedLabel || initialShedKey}] : [];
   const yesterday = shiftIso(today, -1);
-  const [preset, setPreset] = useState<Preset>(initial === today ? 'today' : initial === yesterday ? 'yday' : 'custom');
-  const [from, setFrom] = useState(initial);
+  const [preset, setPreset] = useState<Preset>(requestedFrom !== initial ? 'custom' : initial === today ? 'today' : initial === yesterday ? 'yday' : 'custom');
+  const [from, setFrom] = useState(requestedFrom);
   const [to, setTo] = useState(initial);
   const [mode, setMode] = useState<Mode>('shed');
-  const [path, setPath] = useState<Step[]>([]);
+  const [path, setPath] = useState<Step[]>(initialShedStep);
   const [pendingBeamJump, setPendingBeamJump] = useState<typeof initialBeam>(null);
   const lastBeamJumpNonce = useRef<number | null>(null);
   // A Design Mix selection inside a shed retains its physical-shed scope.
@@ -123,7 +127,7 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
     pendingOwnUrlDate.current = null;
     setPreset(date === iso(new Date()) ? 'today' : date === shiftIso(iso(new Date()), -1) ? 'yday' : 'custom');
     setFrom(date!); setTo(date!);
-    setPath([]); setFocusShed(null); setReturnTo(null);
+    setPath(initialShedStep()); setFocusShed(null); setReturnTo(null);
     setRolls([]); setRecordsOpen(false);
   }, [date]);
   // Claude Beam Status row click: this-month + View by Shed + exact physical
@@ -148,6 +152,14 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
   const [rollPartial, setRollPartial] = useState(false);
   const [showUnmapped, setShowUnmapped] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
+  const lastIncomingShed = useRef(initialShedKey || '');
+  useEffect(() => {
+    const key = initialShedKey || '';
+    if (lastIncomingShed.current === key) return;
+    lastIncomingShed.current = key;
+    setMode('shed'); setPath(key ? [{field:'shed',value:key,label:initialShedLabel || key}] : []);
+    setFocusShed(null); setReturnTo(null); setRecordsOpen(false);
+  }, [initialShedKey, initialShedLabel]);
   const dayCount = Math.floor((fromIso(to).getTime()-fromIso(from).getTime())/86400000) + 1;
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
     && Number.isFinite(dayCount) && dayCount >= 1 && dayCount <= 63;
@@ -162,6 +174,7 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
       syncUrlDate(end);
     }
     setPath([]); setFocusShed(null); setReturnTo(null); setRolls([]); setRecordsOpen(false);
+    if (initialShedKey) onClearShed?.();
   };
   useEffect(() => {
     if (!valid || !prptype) {
@@ -179,7 +192,7 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
     setBusy(true);
     setError('');
     if (queryChanged) {
-      setResponse(null); setPath([]); setFocusShed(null); setReturnTo(null);
+      setResponse(null); setPath(initialShedStep()); setFocusShed(null); setReturnTo(null);
       setRolls([]); setRecordsOpen(false); setShowUnmapped(false);
     }
     api.getOwnerCardReport({ report_type: 'production_full', date: to, from_date: digits(from), to_date: digits(to), prptype })
@@ -211,6 +224,13 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
   }, [pendingBeamJump, busy, rows]);
 
   const catalog = response?.shed_catalog || [];
+  useEffect(() => {
+    if (!initialShedKey || !catalog.length) return;
+    const authoritativeLabel = catalog.find(s => s.key === initialShedKey)?.label;
+    if (!authoritativeLabel) return;
+    setPath(previous => previous.map((step,i) => i === 0 && step.field === 'shed' && step.value === initialShedKey && step.label !== authoritativeLabel
+      ? {...step,label:authoritativeLabel} : step));
+  }, [initialShedKey, catalog]);
   const levels = useMemo(() => levelsFor(mode,from !== to), [mode,from,to]);
   const scoped = useMemo(() => withinPath(rows,focusShed?[focusShed,...path]:path), [rows,path,focusShed]);
   const stage = levels[path.length];
@@ -282,7 +302,7 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
     return ()=>{live=false;};
   },[currentBeamStep?.value,beamProcessRefs,dayCount,response,from,to,prptype]);
   const open = (bucket: Bucket) => { if (stage) {setRecordsOpen(false);setPath(p=>[...p,{field:stage,value:bucket.key,label:bucket.label}]);} };
-  const changeMode = (next:Mode) => { setMode(next); setPath([]); setFocusShed(null); setReturnTo(null); setRolls([]); setRecordsOpen(false); };
+  const changeMode = (next:Mode) => { setMode(next); setPath([]); setFocusShed(null); setReturnTo(null); setRolls([]); setRecordsOpen(false); if (initialShedKey && next !== 'shed') onClearShed?.(); };
   const navigation: DrillNavigation = {mode,path,focusShed,recordsOpen};
   const crumbs = breadcrumbsFor(navigation);
   const parentLabel = parentLabelFor(navigation,returnTo);
@@ -293,8 +313,10 @@ export default function WeavingDailyProduction({ date, prptype, tabControls, ref
   const goBackOneLevel = () => {
     const next = backNavigation(navigation,returnTo);
     if (next) { applyNavigation(next.navigation); setReturnTo(next.returnTo); }
+    if (initialShedKey && path.length === 1) onClearShed?.();
   };
   const goToBreadcrumb = (crumb: Breadcrumb) => {
+    if (initialShedKey && crumb.target === 'root') onClearShed?.();
     const next = navigateBreadcrumb(navigation,crumb,returnTo);
     if (next) { applyNavigation(next.navigation); setReturnTo(next.returnTo); }
   };

@@ -2686,6 +2686,7 @@
 // screens/OwnerDashboardScreen.js
 import { AmountDisplayModeControl, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
+import { buildProductionShedSummary } from '@/src/screens/dashboard/ProductionShedSummary';
 import { usePermission } from '@/src/core/permissions';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -2752,6 +2753,12 @@ const coverageSubtitle = period => {
   return period.freshness_label || period.display_label || '';
 };
 
+const formatShedMetres = amount => {
+  const n = Number(amount) || 0;
+  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1)}K m`;
+  return `${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })} m`;
+};
+
 const financialYearShortLabel = value => {
   const raw = String(value || '');
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2802,6 +2809,9 @@ export default function OwnerDashboardScreen({
   const { canAccess } = usePermission();
   const { user } = route.params || {};
   const [data, setData] = useState(null);
+  const [productionSheds, setProductionSheds] = useState(null);
+  const [productionShedsLoading, setProductionShedsLoading] = useState(false);
+  const [productionShedsError, setProductionShedsError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -2854,6 +2864,53 @@ export default function OwnerDashboardScreen({
     if (!getUserPrptype) return;
     load(getUserPrptype);
   }, [load, getUserPrptype]);
+
+  // Physical-shed summary shares the EXACT Laravel classification behind
+  // Daily Production. The ordinary dashboard card gives only 3 coarse
+  // PrpCode + MacGrp rows, which cannot split 190 cm and 230 cm Rapier sheds.
+  const productionSnapshot = data?.production;
+  const selectedProductionThrough = (() => {
+    const ymd = String(productionSnapshot?.period?.actual_to_ymd ?? '').trim();
+    return /^\d{8}$/.test(ymd)
+      ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`
+      : dateString;
+  })();
+  useEffect(() => {
+    if (!visibleSections.production || !productionSnapshot?.total || !getUserPrptype) {
+      setProductionSheds(null);
+      setProductionShedsLoading(false);
+      setProductionShedsError(false);
+      return undefined;
+    }
+    let active = true;
+    const through = selectedProductionThrough;
+    const start = `${through.slice(0, 7)}-01`;
+    setProductionSheds(null);
+    setProductionShedsLoading(true);
+    setProductionShedsError(false);
+    api.getOwnerCardReport({
+      report_type: 'production_full',
+      date: through,
+      from_date: start.replace(/-/g, ''),
+      to_date: through.replace(/-/g, ''),
+      prptype: getUserPrptype,
+    }).then(response => {
+      if (!active) return;
+      const report = response?.data?.report;
+      if (!response?.success || !Array.isArray(report?.rows) || !Array.isArray(report?.shed_catalog)) {
+        throw new Error('Production shed data unavailable');
+      }
+      setProductionSheds(buildProductionShedSummary(
+        report.rows, report.shed_catalog, through.replace(/-/g, ''),
+      ));
+    }).catch(() => {
+      if (!active) return;
+      setProductionShedsError(true);
+    }).finally(() => {
+      if (active) setProductionShedsLoading(false);
+    });
+    return () => { active = false; };
+  }, [productionSnapshot, selectedProductionThrough, getUserPrptype, visibleSections.production]);
 
   /*
    * Card drill-downs are live. When the user comes back after viewing a
@@ -2960,11 +3017,7 @@ export default function OwnerDashboardScreen({
   const openProductionReport = () => {
     router.push({
       pathname: '/new/(tabs)/reports/production',
-      params: {
-        date: dateString,
-        production: JSON.stringify(production),
-        prptype: getUserPrptype,
-      },
+      params: { date: selectedProductionThrough, tab: 'prod', prptype: getUserPrptype },
     });
   };
 
@@ -2980,21 +3033,18 @@ export default function OwnerDashboardScreen({
     });
   };
 
-  const openProductionMachineReport = (machine, index) => {
-    const mtd = Number(machine?.today || machine?.mtd_meters || 0);
-    const totalMtd = Number(production?.total?.mtd_meters || 0);
-    const share = totalMtd > 0 ? (mtd / totalMtd) * 100 : 0;
-
+  const openProductionShedReport = shed => {
+    // The report opens its existing physical-shed → machine → design → beam
+    // hierarchy. The month range matches the dashboard MTD column.
     router.push({
-      pathname: '/new/(tabs)/reports/production-machine',
+      pathname: '/new/(tabs)/reports/production',
       params: {
-        date: dateString,
-        machine: JSON.stringify({
-          ...machine,
-          rank: index + 1,
-          share,
-          total_machine_count: production?.by_machine?.length || 0,
-        }),
+        date: selectedProductionThrough,
+        from_date: `${selectedProductionThrough.slice(0, 7)}-01`,
+        tab: 'prod',
+        prptype: getUserPrptype,
+        shed_key: shed.key,
+        shed_label: shed.label,
       },
     });
   };
@@ -3189,22 +3239,33 @@ export default function OwnerDashboardScreen({
                     />
                   </View>
 
-                  <ColHeader label1="MACHINE" label2="YESTERDAY" label3="MTD" />
-                  <TableWrapper rowCount={production.by_machine.length}>
-                    {production.by_machine.map((m, i) => (
-                      <RankRow
-                        key={`${m.prpcode || ''}-${m.macgrp || ''}-${i}`}
-                        rank={i + 1}
-                        name={m.machine}
-                        leftVal={`${(Number(m.target || m.today_meters || 0) / 1000).toFixed(0)}K m`}
-                        rightVal={`${(Number(m.today || m.mtd_meters || 0) / 1000).toFixed(1)}K m`}
-                        rawLeftVal={Number(m.target || m.today_meters || 0)}
-                        rawRightVal={Number(m.today || m.mtd_meters || 0)}
-                        trendUp={m.achievement === 'up'}
-                        onPress={() => openProductionMachineReport(m, i)}
-                      />
-                    ))}
-                  </TableWrapper>
+                  <ColHeader label1="SHED" label2="YESTERDAY" label3="MTD" />
+                  {productionShedsLoading && !productionSheds && (
+                    <Text style={{ paddingHorizontal: 12, paddingVertical: 12, color: COLORS.muted || '#747780', fontSize: 12 }}>Loading shed-wise production…</Text>
+                  )}
+                  {productionShedsError && !productionSheds && (
+                    <Text style={{ paddingHorizontal: 12, paddingVertical: 12, color: COLORS.muted || '#747780', fontSize: 12 }}>Shed totals are unavailable. Open Full report to view Daily Production.</Text>
+                  )}
+                  {productionSheds && (
+                    <TableWrapper rowCount={productionSheds.sheds.length}>
+                      {productionSheds.sheds.map((shed, i) => (
+                        <RankRow
+                          key={shed.key}
+                          rank={i + 1}
+                          name={shed.label}
+                          leftVal={formatShedMetres(shed.yesterdayMetres)}
+                          rightVal={formatShedMetres(shed.mtdMetres)}
+                          rawLeftVal={shed.yesterdayMetres}
+                          rawRightVal={shed.mtdMetres}
+                          trendUp={shed.yesterdayMetres > 0}
+                          onPress={() => openProductionShedReport(shed)}
+                        />
+                      ))}
+                    </TableWrapper>
+                  )}
+                  {productionSheds && Math.abs(productionSheds.totalMtd - Number(production.total.mtd_meters || 0)) > 1 && (
+                    <Text style={{ fontSize: 10, color: '#9A5B16', paddingHorizontal: 12, paddingBottom: 8 }}>Shed totals differ from the summary. Open Full report for the detailed figures.</Text>
+                  )}
                 </SectionCard>
               )}
 

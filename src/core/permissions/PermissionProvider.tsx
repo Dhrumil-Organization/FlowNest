@@ -128,6 +128,20 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       // (no grant row yet), while allowing SuperAdmin to explicitly deny a
       // module/screen/tab after registry sync.
       const exact = runtimeGrants.get(`resource:${path}`);
+
+      // Production Orders is a TAB CONTAINER, not another independent tab.
+      // When the three child resources exist, any one allowed child opens the
+      // sidebar entry and route, even if its former parent is denied.
+      // Before the first registry sync, keep the old parent grant working so
+      // existing Orders / Job work remain reachable during rollout.
+      if (path === 'production.production_order_entry') {
+        const childKeys = ['orders', 'pools', 'job_work'].map(
+          (key) => `resource:${path}.${key}`,
+        );
+        if (childKeys.some((key) => runtimeGrants.has(key))) {
+          return childKeys.some((key) => runtimeGrants.get(key) === true);
+        }
+      }
       if (exact !== undefined) return exact;
 
       // SuperAdmin fallback applies only when there is no explicit decision for

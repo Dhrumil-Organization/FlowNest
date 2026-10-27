@@ -21,7 +21,7 @@ export const PURPOSES: { k: PurposeKey; lbl: string; short: string; color: strin
   { k: 'internal', lbl: 'Internal use', short: 'Internal', color: '#3A568A', out: true, party: 'none' },
   { k: 'consume', lbl: 'Consumed / given away', short: 'Consumed', color: '#B23A2A', out: true, party: 'optional' },
   { k: 'split', lbl: 'Split into individual items', short: 'Split', color: '#9A9590', out: true, party: 'none' },
-  // events of the Event module (EventVisits): scan → event + who carries it; scan again on the way back
+  // events of the Event module (api/getevent): scan → event + who carries it; scan again on the way back
   { k: 'event_out', lbl: 'Taken to event', short: 'Event out', color: '#0E7C86', out: true, party: 'none', event: true },
   { k: 'event_in', lbl: 'Back from event', short: 'Event in', color: '#3B7A3A', out: false, party: 'none', event: true },
 ];
@@ -39,8 +39,8 @@ export type Sample = {
 };
 export type Move = {
   id: number; no: string; sample: string; date: string; ts: string; purpose: PurposeKey; parcode: string; party: string;
-  singlet: string; qty: number; note: string; by: string; by_id: string; edited_by: string;
-  /** event movements: the event (EventVisits), who carries it, and (event_in) the event_out it closes; by = who scanned it */
+  qty: number; note: string; by: string; by_id: string; edited_by: string;
+  /** event movements: the event (Event module, api/getevent), who carries it, and (event_in) the event_out it closes; by = who scanned it */
   event_id: string; event: string; carrier_id: string; carrier: string; ref_move: number;
 };
 export type SmpEvent = { id: string; name: string; status: string; active: boolean; created: string };
@@ -96,7 +96,7 @@ export function normalizeList(raw: any): ListData {
     moves: arr(raw.moves).map((m: any): Move => ({
       id: Math.round(n(m.id)), no: s(m.no), sample: s(m.sample), date: s(m.date), ts: s(m.ts),
       purpose: (PURPOSE[s(m.purpose) as PurposeKey] ? s(m.purpose) : 'show') as PurposeKey, parcode: s(m.parcode), party: s(m.party),
-      singlet: s(m.singlet), qty: Math.max(1, Math.round(n(m.qty)) || 1), note: s(m.note), by: s(m.by), by_id: s(m.by_id), edited_by: s(m.edited_by),
+      qty: Math.max(1, Math.round(n(m.qty)) || 1), note: s(m.note), by: s(m.by), by_id: s(m.by_id), edited_by: s(m.edited_by),
       event_id: s(m.event_id), event: s(m.event), carrier_id: s(m.carrier_id), carrier: s(m.carrier), ref_move: Math.round(n(m.ref_move)),
     })),
   };

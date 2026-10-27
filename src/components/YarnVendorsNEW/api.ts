@@ -7,9 +7,13 @@
 //   POST {API}/api/yarn-vendors-chat
 //   headers  Authorization: Bearer <token>, Content-Type: application/json,
 //            Accept: application/json
-//   body     { item: string, city: string }
-//            item: one or more yarn items, comma separated
+//   body     { item: string, city: string, yarns?: string[], prptype?: string }
+//            item: one or more yarn items, comma separated (typed)
 //            city: one or more INDIAN cities, comma separated — '' = all India
+//            yarns: item codes SELECTED from the ERP yarn master (Designs → Yarns, main or sub item); the backend reads
+//                   their full details from the master and puts them in the AI question. prptype: login group.
+//
+//   GET  {API}/api/yarn-vendors-yarns?prptype=   → { success, response: { spun: [Yarn], filament: [Yarn] } }  (the selection)
 //
 //   reply    { success: true, response: { status, item, city, area, items, cities,
 //              skipped_items, skipped_cities, failed_items, coverage, count, searched_at, note,
@@ -49,6 +53,52 @@ export type Coverage = {
   status: 'ok' | 'no_results' | 'invalid_city' | 'not_yarn_item' | 'failed';
   count: number;
 };
+
+/** One yarn of the ERP yarn master (main item, or a sub item in `subs`) — same fields as the Designs → Yarns card. */
+export type Yarn = {
+  itmcode: string; mitmcode: string; is_sub: boolean; name: string; kind: 'Spun' | 'Filament';
+  blend: { name: string; per: number }[]; blend_label: string; count: string; count_type: string; ply: string;
+  denier: string; filament_type: string; lustre: string; other: string;
+  /** what the vendor search calls it */
+  label: string;
+  /** every detail in one line (exactly what the AI gets) */
+  spec: string;
+  subs: Yarn[];
+};
+export type YarnMaster = { spun: Yarn[]; filament: Yarn[] };
+
+const toYarn = (r: any): Yarn => ({
+  itmcode: str(r?.itmcode), mitmcode: str(r?.mitmcode), is_sub: !!r?.is_sub, name: str(r?.name), kind: r?.kind === 'Filament' ? 'Filament' : 'Spun',
+  blend: Array.isArray(r?.blend) ? r.blend.map((b: any) => ({ name: str(b?.name), per: Number(b?.per) || 0 })).filter((b: any) => b.name) : [],
+  blend_label: str(r?.blend_label), count: str(r?.count), count_type: str(r?.count_type), ply: str(r?.ply), denier: str(r?.denier),
+  filament_type: str(r?.filament_type), lustre: str(r?.lustre), other: str(r?.other), label: str(r?.label) || str(r?.name), spec: str(r?.spec),
+  subs: Array.isArray(r?.subs) ? r.subs.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
+});
+
+/** The ERP yarn master for the selection (Designs → Yarns: main items with their sub items). */
+export async function loadYarnMaster(API: string, token: string, prptype: string): Promise<YarnMaster> {
+  if (!API || !token) throw new SearchError('auth', 'Your login session was not found. Please sign in again.');
+  let res: any;
+  let data: any = null;
+  try {
+    res = await fetch(`${API}/api/yarn-vendors-yarns?prptype=${encodeURIComponent(prptype || '')}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    data = JSON.parse((await res.text()) || 'null');
+  } catch {
+    throw new SearchError('network', 'Could not load the yarn master. Check your internet connection and try again.');
+  }
+  if (res.status === 401 || data?.response?.isauth === '_AUTHFAILED') throw new SearchError('auth', 'Your login session has expired. Please sign in again.');
+  if (!data || data.success !== true) {
+    throw new SearchError('server', str(data?.message) || (res.status === 404 ? 'The yarn master API was not found on this server (/api/yarn-vendors-yarns).' : 'The yarn master could not be loaded.'));
+  }
+  const r = data.response || {};
+  return {
+    spun: Array.isArray(r.spun) ? r.spun.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
+    filament: Array.isArray(r.filament) ? r.filament.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
+  };
+}
 
 export type SearchStatus = 'ok' | 'no_results' | 'not_yarn_item' | 'invalid_city';
 
@@ -116,7 +166,8 @@ const toVendor = (row: any): Vendor => ({
 });
 
 /** Ask the backend for the parties selling `item` in `city` (both may be comma lists; city '' = all India). */
-export async function searchVendors(API: string, token: string, item: string, city: string, signal?: AbortSignal): Promise<SearchResult> {
+export async function searchVendors(API: string, token: string, item: string, city: string, signal?: AbortSignal,
+  sel?: { yarns: string[]; prptype: string }): Promise<SearchResult> {
   if (!API || !token) {
     throw new SearchError('auth', 'Your login session was not found. Please sign in again.');
   }
@@ -144,7 +195,7 @@ export async function searchVendors(API: string, token: string, item: string, ci
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ item, city }),
+      body: JSON.stringify(sel && sel.yarns.length ? { item, city, yarns: sel.yarns, prptype: sel.prptype } : { item, city }),
       signal: controller.signal,
     });
     text = await res.text();

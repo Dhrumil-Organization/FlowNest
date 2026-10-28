@@ -81,7 +81,7 @@ function PoolDetail({pool,onBack,view}) {
       {pool.rate_parts?.length?<View>{pool.rate_parts.map((r,i)=><Row key={`${r.po}|${i}`} style={{justifyContent:'space-between',paddingVertical:4,borderBottomWidth:i===pool.rate_parts.length-1?0:1,borderBottomColor:T.alt}}><Txt style={styles.aux}>{r.po} · {fmt(r.qty)}</Txt><Txt mono style={{fontSize:11,fontWeight:'800'}}>{r.rate==null?'—':`₹${Number(r.rate).toFixed(4)}/pick`}</Txt></Row>)}</View>:<Empty>Approved PO rate breakdown is not available.</Empty>}
       <Txt style={[styles.aux,{marginTop:4}]}>Checking valuation · PPI × checked metres × pool pick rate.</Txt>
     </Section>
-    {rec?<View style={styles.reconcile}><Txt style={{color:rec.ok?T.green:T.red,fontWeight:'800',fontSize:11}}>Opening {fmt(rec.opening??pool.opening_stock)} + Produced {fmt(rec.produced??pool.produced)} − Out {fmt(rec.out)} = Closing {fmt(rec.closing??pool.closing_stock)} {rec.ok?'✓':'⚠'}</Txt>{rec.ok===false&&<Txt style={{color:T.red,fontSize:10,marginTop:5}}>Difference: {fmt(rec.difference)}{rec.bad_rolls?.length?` · Affected rolls: ${rec.bad_rolls.slice(0,20).join(', ')}`:''}</Txt>}{pool.stock?.out&&<Txt style={[styles.aux,{marginTop:4}]}>Out · sold {fmt(pool.stock.out.sold)} · job outward (net) {fmt(pool.stock.out.job_out_net)} · cut/fent/other {fmt(pool.stock.out.cut_fent_other_net)} · stock-take {fmt(pool.stock.out.stocktake_adjustment)}</Txt>}</View>:<View style={styles.reconcile}><Txt style={[styles.aux,{color:T.muted}]}>Opening + Produced − Out = Closing · awaiting dated roll reconciliation</Txt></View>}
+    {rec?<View style={styles.reconcile}><Txt style={{color:rec.ok?T.green:T.red,fontWeight:'800',fontSize:11}}>Opening {fmt(rec.opening??pool.opening_stock)} + Produced {fmt(rec.produced??pool.produced)} − Out {fmt(rec.out)} = Closing {fmt(rec.closing??pool.closing_stock)} {rec.ok?'✓':'⚠'}</Txt>{rec.ok===false&&<Txt style={{color:T.red,fontSize:10,marginTop:5}}>Difference: {fmt(rec.difference)}{rec.bad_rolls?.length?` · Affected rolls: ${rec.bad_rolls.slice(0,20).join(', ')}`:''}</Txt>}</View>:<View style={styles.reconcile}><Txt style={[styles.aux,{color:T.muted}]}>Opening + Produced − Out = Closing · awaiting dated roll reconciliation</Txt></View>}
     <Section label="Entry order · who is served first">
       {!entries.length&&<Empty>No eligible production order in this month.</Empty>}
       {entries.map((e,i)=>{
@@ -137,10 +137,13 @@ function combinePoolPages(a,b) {
     so_pending:my?sumMy('my_so_pending'):sumNullable('so_pending'),
     loose_stock:sumNullable('loose_metres'),overdue_lines:sumNullable('overdue_count'),
     marked_binds:sumNullable('marked_binds'),below_cost_pos:sumNullable('below_cost_count')};
-  // Even after reading all conversion-source records, Prompt 1's eligible
-  // PO/SO-only design universe is not yet certified by the current source.
-  return {...a,...b,pools,loaded_page_kpis:loaded,monthly_totals_complete:false,
-    kpis:Object.fromEntries(Object.keys(loaded).map(k=>[k,null])),
+  // Month-wide only when the server says these pages hold every live pool of the
+  // month (bind ledger complete), the last page is in and every pool's figure is known.
+  const lastIn=!b?.pagination?.more_available;
+  const universe=Boolean(b?.pagination?.source_universe_complete);
+  const complete=universe&&lastIn&&Object.values(loaded).every(nonNull);
+  return {...a,...b,pools,loaded_page_kpis:loaded,monthly_totals_complete:complete,
+    kpis:complete?loaded:Object.fromEntries(Object.keys(loaded).map(k=>[k,null])),
     so_summary_status:pools.every(p=>nonNull(p.so_pending))?'reconstructed':'partial'};
 }
 function endpoint(apiBase,params){
@@ -157,7 +160,9 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
   const [data,setData]=useState(null),[overview,setOverview]=useState(null),[detail,setDetail]=useState(null);
   const [loading,setLoading]=useState(false),[detailLoading,setDetailLoading]=useState(false),[error,setError]=useState(null),[detailError,setDetailError]=useState(null);
   const [refresh,setRefresh]=useState(0),[loadingMore,setLoadingMore]=useState(false),[loadMoreError,setLoadMoreError]=useState(null);
-  const months=useMemo(()=>Array.from({length:6},(_,i)=>shift(ymNow(),-i)),[]);
+  // Artifact: a chip for every month that can hold a pool (server list); 6 months until it arrives.
+  const [serverMonths,setServerMonths]=useState(null);
+  const months=useMemo(()=>serverMonths?.length?serverMonths:Array.from({length:6},(_,i)=>shift(ymNow(),-i)),[serverMonths]);
   const fy=fyOf(month);
   const isReady=Boolean(prptype&&property&&yearno&&typeof requestFn==='function');
   const requestKey=`${prptype}|${property}|${fy}|${month}|${view}|${search}`;
@@ -178,7 +183,8 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
       const raw=await requestFn(url),json=raw?.data??raw;
       if(!json?.success||!json?.response?.pool_view)throw new Error('Unable to read the monthly Pools response.');
       const next={...json.response.pool_view,__key:requestKey};
-      if(live){setData(next);if(!search)setOverview(next);}
+      if(live){setData(next);if(!search)setOverview(next);
+        if(Array.isArray(next.available_months)&&next.available_months.length)setServerMonths(next.available_months);}
     }catch(e){if(live){setError(e?.response?.data?.message||e?.message||'Unable to load Pools');setData(null);}}
     finally{if(live)setLoading(false);}})();
     return ()=>{live=false};
@@ -257,7 +263,11 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
       </View>}
       <View style={styles.metrics}>{totals.map(([name,value],i)=><KPI key={name} label={name} value={value} hi={i===0} columns={columns}/>)}</View>
       {!kpiComplete&&<Txt style={[styles.aux,{color:T.copper,marginBottom:7}]}>
-        {search?'Month KPIs are not changed by search. ':''}{kpiSource?'Displayed subtotals are from retrieved designs; complete monthly reconciliation is pending.':'Complete monthly KPI source not available.'}
+        {search?'Month KPIs are not changed by search. ':''}{!kpiSource?'Complete monthly KPI source not available.'
+          :!kpiSource?.pagination?.source_universe_complete?'Subtotals of the pools loaded so far: this month is before the bind history is complete.'
+          :kpiSource?.pagination?.more_available?'Subtotals so far: scroll to load the remaining pools for the month totals.'
+          :kpiSource?.board_stock?.pending>0?`Stock still being calculated for ${kpiSource.board_stock.pending} pool(s); Loose stock shows — until then.`
+          :'Some pools are missing a figure, so that KPI shows —.'}
       </Txt>}
       <Row style={{gap:6,flexWrap:'wrap',marginBottom:9}}>
         {[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>{setFilter(key);listRef.current?.scrollToOffset?.({offset:0,animated:false});}}>{name} · {cnt[key]===null?'—':`${cnt[key]}${countSuffix}`}</Chip>)}
@@ -282,7 +292,10 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
         <TouchableOpacity accessibilityRole="button" onPress={()=>setShowStatus(x=>!x)}><Txt style={styles.aux}>{showStatus?'▾':'▸'} Data status</Txt></TouchableOpacity>
       </Row>
       {showStatus&&<View style={[styles.section,{marginBottom:8}]}><Txt style={[styles.aux,{lineHeight:17}]}>
-        The list searches all designs available to the existing ERP pool source and automatically loads more while scrolling. Month-wide KPIs are not yet independently certified; PO/SO-only designs not present in the conversion source may still be absent. Stock and binds are shown only when supported by dated, verified records. FY {fyLabel(month)}.
+        {data?.universe?.live_only
+          ?`One pool per design with a PO or SO open this month (POs fully drawn earlier are left out${data?.universe?.dropped_po_count?`: ${data.universe.dropped_po_count}`:''}). `
+          :'This month is before the bind history is complete, so pools with fully drawn POs may still be listed. '}
+        More pools load while scrolling. Stock is read roll by roll from your database and shown with its reconciliation line. FY {fyLabel(month)}.
       </Txt></View>}
       {filter==='marked'&&<Section label={`Marked binds · ${monthName(month)}`}>
         {sorted.flatMap(p=>(p.bind_events||[]).filter(e=>e.no_po||Number(e.over_metres)>0||(e.ahead_of||[]).length).map(e=>({...e,pool:p})))

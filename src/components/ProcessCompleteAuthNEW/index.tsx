@@ -47,6 +47,8 @@ const num = (x: any) => {
 };
 const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
+type TabKey = 'request' | 'all';
+
 type Props = { token: string; API: string; username?: string };
 
 export default function ProcessCompleteAuthNEW({ token, API }: Props) {
@@ -67,6 +69,9 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
   const [getModalOpen, setModalOpen] = useState(false);
   const [getPrpType, setPrpType] = useState<string | null>('');
   const [loadedOnce, setLoadedOnce] = useState(false);
+
+  // ---- tabs: 'request' (baad me) | 'all' (current screen) ----
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
 
   // ---- PCAcard paging state ----
   const [page, setPage] = useState(1);
@@ -159,8 +164,15 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
   }, [token, API]);
 
   // ---- legacy PCAcard search (string values, excluded uid keys) ----
+  const tabData = useMemo(
+    () => activeTab === 'request'
+      ? (getAllData || []).filter((item) => String(item?.ProcessCompleteRequest ?? '').trim() === '1')
+      : (getAllData || []),
+    [getAllData, activeTab],
+  );
+
   const filteredData = useMemo(() => {
-    const src = getAllData || [];
+    const src = tabData;
     const q = searchQuery.trim().toLowerCase();
     if (!q) return src;
     return src.filter((item) =>
@@ -168,9 +180,9 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
         ([key, value]) => !EXCLUDED_SEARCH_KEYS.includes(key) && typeof value === 'string' && value.toLowerCase().includes(q),
       ),
     );
-  }, [getAllData, searchQuery]);
+  }, [tabData, searchQuery]);
 
-  useEffect(() => { setPage(1); }, [getAllData, searchQuery]);
+  useEffect(() => { setPage(1); }, [getAllData, searchQuery, activeTab]);
 
   const visible = useMemo(() => filteredData.slice(0, page * PAGE), [filteredData, page]);
 
@@ -190,14 +202,14 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
   }, []);
 
   const stats = useMemo(() => ({
-    total: getAllData.length,
-    dyeQty: getAllData.reduce((a, r) => a + num(r?.NetWt), 0),
-    packQty: getAllData.reduce((a, r) => a + num(r?.PQty), 0),
-  }), [getAllData]);
+    total: tabData.length,
+    dyeQty: tabData.reduce((a, r) => a + num(r?.NetWt), 0),
+    packQty: tabData.reduce((a, r) => a + num(r?.PQty), 0),
+  }), [tabData]);
 
   // ------------------------------- UI ----------------------------------
-  const header = (
-    <View style={{ gap: 12, marginBottom: 12 }}>
+  const summary = (
+    <View style={s.summary}>
       <View style={s.kpiWrap}>
         <Kpi label="Records" value={String(stats.total)} color="#fff" />
         <Kpi label="Dyeing qty" value={fmt(stats.dyeQty)} color={T.copper} />
@@ -206,31 +218,18 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
       <View style={s.toolbar}>
         <View style={s.search}>
           <Icon name="search" size={18} color={T.muted} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+          <TextInput value={searchQuery} onChangeText={setSearchQuery}
             placeholder="Search party, quality, batch, packing no…"
-            placeholderTextColor={T.muted}
-            style={s.searchInput}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+            placeholderTextColor={T.muted} style={s.searchInput}
+            autoCorrect={false} autoCapitalize="none" />
           {searchQuery ? (
             <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Clear search">
               <Icon name="close" size={18} color={T.muted} />
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity style={s.iconBtn} onPress={() => setCriteriaFormOpen(true)} accessibilityLabel="Criteria">
-          <Icon name="tune" size={20} color={T.nav} />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.iconBtn} onPress={() => handleConfirmAction(getPrpType)} disabled={isLoading} accessibilityLabel="Refresh">
-          <Icon name="refresh" size={20} color={T.nav} />
-        </TouchableOpacity>
       </View>
-      {getAllData.length ? (
-        <Text style={s.listInfo}>{filteredData.length} of {getAllData.length} records</Text>
-      ) : null}
+      {tabData.length ? <Text style={s.listInfo}>{filteredData.length} of {tabData.length} records</Text> : null}
     </View>
   );
 
@@ -252,20 +251,37 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
 
   return (
     <View style={s.root}>
+      {/* Request / All tabs and shared criteria + refresh actions */}
+      <View style={s.tabsOuter}>
+        <View style={s.tabsRow}>
+          <View style={s.tabs} accessibilityRole="tablist">
+            <TabBtn label="Request" count={getAllData.filter((item) => String(item?.ProcessCompleteRequest ?? '').trim() === '1').length} active={activeTab === 'request'} onPress={() => setActiveTab('request')} />
+            <TabBtn label="All" count={loadedOnce ? getAllData.length : undefined} active={activeTab === 'all'} onPress={() => setActiveTab('all')} />
+          </View>
+          <TouchableOpacity style={s.iconBtn} onPress={() => setCriteriaFormOpen(true)} accessibilityLabel="Criteria">
+            <Icon name="tune" size={20} color={T.nav} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.iconBtn} onPress={() => handleConfirmAction(getPrpType)} disabled={isLoading} accessibilityLabel="Refresh">
+            <Icon name="refresh" size={20} color={T.nav} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {summary}
+
       <FlatList
-        key={`cols-${cols}`}
+        key={`cols-${cols}-${activeTab}`}
         data={visible}
         numColumns={cols}
-        keyExtractor={(_item, index) => index.toString()}
+        keyExtractor={(item, index) => String(item?.PrUid ?? item?.Gruid ?? index)}
         renderItem={({ item }) => (
           <View style={{ flex: 1 / cols, padding: cols > 1 ? 6 : 0, paddingVertical: 6 }}>
             <PCACard item={item} onSave={handleCardPress} />
           </View>
         )}
-        ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={isLoadingMore ? <ActivityIndicator color={T.copper} style={{ marginVertical: 12 }} /> : null}
-        contentContainerStyle={s.content}
+        contentContainerStyle={s.listContent}
         onEndReached={loadMoreData}
         onEndReachedThreshold={0.5}
         initialNumToRender={10}
@@ -333,6 +349,24 @@ export default function ProcessCompleteAuthNEW({ token, API }: Props) {
   );
 }
 
+function TabBtn({ label, count, active, onPress }: { label: string; count?: number; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={[s.tab, active && s.tabActive]}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[s.tabText, active && s.tabTextActive]}>{label}</Text>
+      {typeof count === 'number' ? (
+        <View style={[s.tabBadge, active && s.tabBadgeActive]}>
+          <Text style={[s.tabBadgeText, active && { color: '#fff' }]}>{count}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 function Kpi({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <View style={s.kpi}>
@@ -353,11 +387,22 @@ function KV({ k, v, full }: { k: string; v: any; full?: boolean }) {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  content: { padding: 12, width: '100%', maxWidth: 1200, alignSelf: 'center', flexGrow: 1 },
+  summary: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 12, paddingTop: 12, gap: 12 },
+  listContent: { paddingHorizontal: 12, paddingBottom: 12, width: '100%', maxWidth: 1200, alignSelf: 'center', flexGrow: 1 },
   kpiWrap: { flexDirection: 'row', gap: 8, backgroundColor: T.nav, borderRadius: 14, padding: 10 },
   kpi: { flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, minWidth: 0 },
   kpiLabel: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.6)', letterSpacing: 0.6, textTransform: 'uppercase' },
   kpiValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },
+  tabsOuter: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 12, paddingTop: 12 },
+  tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tabs: { flex: 1, flexDirection: 'row', gap: 4, padding: 4, borderRadius: 12, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  tab: { flex: 1, height: 38, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  tabActive: { backgroundColor: T.nav },
+  tabText: { fontSize: 13.5, fontWeight: '800', color: T.muted },
+  tabTextActive: { color: '#fff' },
+  tabBadge: { minWidth: 22, paddingHorizontal: 6, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: T.border },
+  tabBadgeActive: { backgroundColor: T.copper },
+  tabBadgeText: { fontSize: 10.5, fontWeight: '800', color: T.nav },
   toolbar: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   search: { flex: 1, minWidth: 0, height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingHorizontal: 12 },
   searchInput: { flex: 1, minWidth: 0, fontSize: 14, color: T.ink, height: 42 },

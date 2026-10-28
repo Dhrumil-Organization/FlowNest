@@ -86,7 +86,7 @@ export function createRollCutApi(API: string, token: string) {
         prpcode: p.prpcode,
         yearno: p.yearno,
         uid: str(r.UId),
-        srno: str(r.SrNo),
+        // srno: str(r.SrNo),
         beamno: str(r.BeamNo),
         takano: str(r.TakaNo),
       };

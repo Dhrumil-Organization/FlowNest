@@ -565,9 +565,18 @@ export async function fetchMakeMasterList(API: string, token: string, sc: Scope)
     if (d && !Array.isArray(d) && Array.isArray(d.makes)) {
       const makes: any[] = d.makes;
       const models: any[] = Array.isArray(d.models) ? d.models : [];
+      // Index models once by make code. Filtering the full model array for every make
+      // was O(makes × models), causing a long blank/loading period after the API returned.
+      const modelsByMake = new Map<string, any[]>();
+      for (const model of models) {
+        const code = String(model?.MakCode ?? model?.make_code ?? model?.makeCode ?? '');
+        const bucket = modelsByMake.get(code);
+        if (bucket) bucket.push(model);
+        else modelsByMake.set(code, [model]);
+      }
       return makes.flatMap((mk: any, i: number) => {
         const code = s(mk?.MakCode ?? mk?.make_code ?? mk?.makeCode);
-        const related = models.filter((m: any) => String(m?.MakCode ?? m?.make_code ?? m?.makeCode) === code);
+        const related = modelsByMake.get(code) ?? [];
         const common = { makeCode: code, makeName: s(mk?.MakName ?? mk?.make_name ?? mk?.makeName), shortName: s(mk?.ShtName ?? mk?.short_name ?? mk?.shortName), status: s(mk?.Status ?? mk?.status) || 'A' };
         if (!related.length) return [{ key: `${code}-0-${i}`, ...common, model: '', srNo: 0 }];
         return related.map((m: any, j: number) => ({ key: `${code}-${Number(m?.SrNo ?? m?.srno ?? 0)}-${i}-${j}`, ...common, model: s(m?.Model ?? m?.model ?? m?.ModelJ), srNo: Number(m?.SrNo ?? m?.srno ?? m?.sr_no) || 0 }));

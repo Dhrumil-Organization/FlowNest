@@ -158,8 +158,10 @@ export default function MakeSheet({
         {/* Section: Make & model */}
         <Text style={g.section}>MAKE & MODEL</Text>
         <View style={g.grid}>
-          {/* Make name (+ master button) - always a full row on phone so the dropdown has room */}
-          <Cell cols={cols} span={2} gutter={gut}>
+          {/* Keep Make code first, followed by Make name. On phones both share one row. */}
+          {codeCell}
+
+          <Cell cols={cols} span={roomy ? 2 : 1} gutter={gut}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <SelectField
@@ -208,8 +210,6 @@ export default function MakeSheet({
             </View>
           </Cell>
 
-          {roomy ? codeCell : null}
-
           <Cell cols={cols} span={2} gutter={gut}>
             <SelectField
               label="Model"
@@ -241,8 +241,17 @@ export default function MakeSheet({
             />
           </Cell>
 
-          {!roomy ? codeCell : null}
 
+        </View>
+
+        <Text style={[g.section, { marginTop: 18 }]}>QUANTITY & RATES</Text>
+        <View style={g.grid}>
+          {numF('opQty', 'Opening qty')}
+          {numF('rate1', 'Rate 1')}
+          {numF('rate2', 'Rate 2')}
+          {numF('rate3', 'Rate 3')}
+          {numF('rate4', 'Rate 4')}
+          {numF('saleRate', 'Sale rate')}
           <Cell cols={cols} span={1} gutter={gut}>
             <SelectField
               label="Status"
@@ -254,16 +263,6 @@ export default function MakeSheet({
           </Cell>
         </View>
 
-        <Text style={[g.section, { marginTop: 18 }]}>QUANTITY & RATES</Text>
-        <View style={g.grid}>
-          {numF('opQty', 'Opening qty')}
-          {numF('rate1', 'Rate 1')}
-          {numF('rate2', 'Rate 2')}
-          {numF('rate3', 'Rate 3')}
-          {numF('rate4', 'Rate 4')}
-          {numF('saleRate', 'Sale rate')}
-        </View>
-
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: gut / 2, marginTop: 16, flexWrap: 'wrap' }}>
           <CheckChip label="Dead" value={m.dead} onChange={(v) => set('dead', v)} disabled={!editable} />
           {(() => {
@@ -271,6 +270,7 @@ export default function MakeSheet({
             return <StatusPill kind={m.dead ? 'dead' : st === 'Active' ? 'active' : 'passive'} label={m.dead ? 'Dead' : st} />;
           })()}
         </View>
+
       </View>
 
       {masterOpen && canManageMasters ? (

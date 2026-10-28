@@ -62,6 +62,7 @@ export type CostMonth = {
   heads: Record<CostHead, number>;
   metres: number;
   weightedPicks: number;
+  picksReliable: boolean;
   machineDays: number;
   mode: 'section_ab' | 'legacy_rapier_waterjet';
   coverageDate?: number;
@@ -75,7 +76,7 @@ export function fromMonth(year: number, index: number, item?: MonthState): CostM
   const empty = { electricity: 0, salary: 0, stores: 0, maintenance: 0, other: 0 };
   if (!item || item.status !== 'ready' || !item.data) return {
     ...base, available: false, complete: false, hasSource: false, amount: null,
-    heads: empty, metres: 0, weightedPicks: 0, machineDays: 0,
+    heads: empty, metres: 0, weightedPicks: 0, picksReliable: false, machineDays: 0,
     mode: index >= 6 && year >= 2026 ? 'section_ab' as const : 'legacy_rapier_waterjet' as const,
     status: item?.status ?? 'not-requested', reason: item?.reason,
   };
@@ -98,13 +99,30 @@ export function fromMonth(year: number, index: number, item?: MonthState): CostM
   const complete = d.period?.is_complete === true && (headsMatch || !hasHeads);
   const avg = num(d.summary?.avg_picks);
   const metres = num(d.summary?.production_mtr);
+  const mode = (d.meta as any)?.calculation_mode === 'section_ab'
+    ? 'section_ab' as const : 'legacy_rapier_waterjet' as const;
+
+  // Legacy month-start ExpCosting picks can be blank although the checked
+  // rolls have a verified design/plan PPI. Reuse *those ERP checking records*
+  // (not an average or estimated PPI) only when every recorded metre has
+  // design PPI coverage. This keeps the historical monthly cost unchanged.
+  const existingWeighted = num((d.picks as any)?.weighted_total);
+  const checking = Array.isArray(d.production?.daily_trend)
+    ? (d.production.daily_trend as Array<Record<string, unknown>>) : [];
+  const checkingMetres = checking.reduce((v, r) => v + num(r.section_a_mtr) + num(r.section_b_mtr), 0);
+  const checkingWeighted = checking.reduce((v, r) => v + num(r.section_a_weighted_picks) + num(r.section_b_weighted_picks), 0);
+  const missingPpiMetres = checking.reduce((v, r) => v + num(r.missing_ppi_mtr), 0);
+  const verifiedCheckingPpi = metres > 0 && checking.length > 0 && checkingWeighted > 0
+    && missingPpiMetres < 0.005 && Math.abs(checkingMetres - metres) < Math.max(0.1, checking.length * .005);
+  const weightedPicks = existingWeighted > 0 ? existingWeighted
+    : (verifiedCheckingPpi ? checkingWeighted : 0);
+  const picksReliable = weightedPicks > 0;
   return {
     ...base, available: hasSource, complete, hasSource,
     amount: hasSource && headsMatch ? total : null,
-    heads, metres, weightedPicks: num((d.picks as any)?.weighted_total) || metres * avg,
+    heads, metres, weightedPicks, picksReliable,
     machineDays: num(d.summary?.machine_days),
-    mode: (d.meta as any)?.calculation_mode === 'section_ab'
-      ? 'section_ab' : 'legacy_rapier_waterjet',
+    mode,
     coverageDate: sourceDate || undefined,
     raw: d, status: 'ready',
     reason: !hasSource ? 'No expense entries for this month'
@@ -139,17 +157,222 @@ export function summarizeYear(year: number, months: CostMonth[]): YearStats {
   const total = withData.reduce((s, m) => s + num(m.amount), 0);
   const metres = withData.reduce((s, m) => s + m.metres, 0);
   const weightedPicks = withData.reduce((s, m) => s + m.weightedPicks, 0);
+  const allPpiVerified = withData.every(m => m.metres <= 0 || m.picksReliable);
   const machineDays = withData.reduce((s, m) => s + m.machineDays, 0);
   const bestMonth = withData.length ? withData.reduce((a,b)=>num(b.amount)>num(a.amount)?b:a) : null;
   return {
     year, months, total,
     verified: pending === 0 && missing === 0 && partial === 0 && withData.length === months.length,
     pending, missing, partial, ready: withData.length, heads, metres, weightedPicks, machineDays,
-    costPerPick: weightedPicks > 0 ? total / weightedPicks : null,
+    costPerPick: allPpiVerified && weightedPicks > 0 ? total / weightedPicks : null,
     costPerMetre: metres > 0 ? total / metres : null,
     costPerMcDay: machineDays > 0 ? total / machineDays : null,
     monthlyAverage: withData.length > 0 ? total / withData.length : null,
     bestMonth,
+  };
+}
+
+
+/**
+ * Count the actual daily cost-entry events signalled by the existing Expense
+ * report, not the calculated Section A/B or Rapier/Waterjet allocations.
+ * Each (date, expense type) is one entry; a single calendar day can contain
+ * separate Electricity and Salary entries. The ERP does not expose raw Stores
+ * voucher counts here, so those are intentionally outside this KPI.
+ *
+ * null means the API supplied no entry evidence; it never means zero.
+ */
+export function countSavedExpenseEntries(month: CostMonth): number | null {
+  if (!month.available || month.amount === null || !month.raw) return null;
+  const source = (month.raw as any).entries;
+  // The optional RC8 read-only source returns actual saved Store records as
+  // well as Unit/Salary/Daily Expense. Prefer it to any inferred day count.
+  if (source && source.basis === 'saved_erp_records' &&
+      Number.isInteger(Number(source.total)) && Number(source.total) >= 0 &&
+      source.includes_stores === true) return Number(source.total);
+
+  // Compatibility for servers not yet upgraded: legacy trends omit Salary
+  // allocation flags even when ExpCosting has saved salary. A nonzero manual
+  // salary is evidence of a record; a Section allocation is NOT an entry.
+  const rows = month.raw.trends?.expense_daily;
+  if (!Array.isArray(rows)) return null;
+  const counted = new Set<string>();
+  let evidencePresent = false;
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const date = num(row.date_ymd);
+    if (!Number.isInteger(date) || date <= 0) continue;
+    for (const key of ['electricity_entry_exists', 'salary_entry_exists',
+                       'maintenance_entry_exists', 'other_entry_exists']) {
+      if (typeof row[key] !== 'boolean') continue;
+      if (row[key] === true) {
+        evidencePresent = true;
+        counted.add(`${date}:${key}`);
+      }
+    }
+    if (month.mode === 'legacy_rapier_waterjet') {
+      if (Math.abs(num(row.rapier_salary)) + Math.abs(num(row.waterjet_salary)) > .005) {
+        evidencePresent = true;
+        counted.add(`${date}:salary_entry_exists`);
+      }
+      if (num(row.electricity) > .005) {
+        evidencePresent = true;
+        counted.add(`${date}:electricity_entry_exists`);
+      }
+    }
+  }
+  // The old API does not expose raw Store vouchers. When Stores have a cost,
+  // showing 0 from the four other heads would be actively misleading.
+  if (month.heads.stores > .005) return null;
+  return evidencePresent ? counted.size : null;
+}
+
+/**
+ * Only publish a cost-based year-over-year % when BOTH periods have adequate
+ * comparable cost input coverage. Older FYs can contain production and Stores
+ * but lack historical daily Electricity/Salary entries; comparing such costs
+ * against complete 2026 expenses creates dramatic but misleading percentages.
+ * This is a validation of comparison eligibility, not an adjustment to cost.
+ *
+ * A partial as-of final month is allowed when both daily inputs have been
+ * entered for most of the days production was recorded. Historical/full
+ * months still need source expense coverage of their own.
+ */
+export function hasComparableCostCoverage(month: CostMonth): boolean {
+  if (!month.available || month.amount === null || !month.raw) return false;
+  const period = month.raw.period;
+  // A genuine cost comparison requires BOTH independent expenses for the
+  // selected month, not merely production and allocated Stores. Otherwise the
+  // historical total is a different accounting basis from the current one.
+  if (month.metres <= 0 || month.heads.electricity <= 0 || month.heads.salary <= 0) return false;
+  if (month.complete) return true;
+  // Open month may lag data entry by up to two days, as permitted by the
+  // existing monthly expense dashboard (no backfilled value is invented).
+  const requested = num(period?.requested_upto_ymd);
+  const through = num(period?.complete_through_ymd);
+  const end = num(fyMonthEnd(month.year, month.index).replace(/-/g, ''));
+  const toUTC = (ymd: number) => {
+    const raw = String(Math.trunc(ymd));
+    if (!/^\d{8}$/.test(raw)) return NaN;
+    return Date.UTC(+raw.slice(0,4), +raw.slice(4,6)-1, +raw.slice(6,8));
+  };
+  const lag = (toUTC(requested) - toUTC(through)) / 86400000;
+  return requested > 0 && requested < end && through > 0 && lag >= 0 && lag <= 2;
+}
+
+export function areComparableCostPeriods(
+  focus: YearStats,
+  previous: YearStats,
+): boolean {
+  if (focus.months.length === 0 || focus.months.length !== previous.months.length) return false;
+  if (focus.ready !== focus.months.length || previous.ready !== previous.months.length) return false;
+  return focus.months.every((m, i) =>
+    hasComparableCostCoverage(m) && hasComparableCostCoverage(previous.months[i])
+  );
+}
+
+
+/** Read-only, per-month reconciliation of the values received from the existing
+ * monthly Production Cost API. This does not manufacture missing expenses,
+ * overwrite cost or infer undocumented historical accounting entries. */
+export type CostMonthAudit = {
+  month: CostMonth;
+  expenseTotal: number | null;
+  expenseHeadSum: number | null;
+  costReconciles: boolean | null;
+  electricity: number | null;
+  salary: number | null;
+  stores: number | null;
+  checkedMetres: number | null;
+  dailyCheckedMetres: number | null;
+  metresReconcile: boolean | null;
+  checkedWeightedPicks: number | null;
+  missingPpiMetres: number | null;
+  ppiSource: 'monthly_erp' | 'checked_design' | 'unavailable';
+  electricityLastDate: number | null;
+  salaryLastDate: number | null;
+  costThroughDate: number | null;
+  requestedThroughDate: number | null;
+  latestProductionDate: number | null;
+  dailyExpenseEntries: number | null;
+  storeRecords: number | null;
+  totalEntries: number | null;
+  entriesReconcile: boolean | null;
+  comparableCost: boolean;
+  issues: string[];
+};
+const validNumber = (v: unknown): number | null =>
+  v === undefined || v === null || v === '' || !Number.isFinite(Number(v))
+    ? null : Number(v);
+export function auditCostMonth(m: CostMonth): CostMonthAudit {
+  const d = m.raw as any;
+  const summary = d?.summary;
+  const composition = d?.composition;
+  const period = d?.period;
+  const daily = Array.isArray(d?.production?.daily_trend) ? d.production.daily_trend : [];
+  const checks = daily.map((r:any) => num(r.section_a_mtr) + num(r.section_b_mtr));
+  const dailyCheckedMetres = d ? checks.reduce((a:number,b:number)=>a+b,0) : null;
+  const expenseTotal = d ? validNumber(summary?.total_cost) : null;
+  const expenseHeadSum = composition
+    ? ['electricity','salary','stores','maintenance','other'].reduce((t,h)=>t+num(composition[h]),0) : null;
+  const costReconciles = expenseTotal === null || expenseHeadSum === null ? null
+    : Math.abs(expenseTotal-expenseHeadSum) <= Math.max(1,Math.abs(expenseTotal)*.000001);
+  const checkedMetres = d ? validNumber(summary?.production_mtr) : null;
+  const metresReconcile = checkedMetres === null || dailyCheckedMetres === null ? null
+    : Math.abs(checkedMetres-dailyCheckedMetres) <= Math.max(.1,daily.length*.005);
+  const saved = d?.entries;
+  const dailyExpenseEntries = saved?.basis === 'saved_erp_records'
+    ? ['electricity','salary','maintenance','other'].reduce((t,h)=>t+num(saved[h]),0) : null;
+  const storeRecords = saved?.basis === 'saved_erp_records'
+    ? num(saved.stores_receipt_rows)+num(saved.stores_issue_vouchers) : null;
+  const totalEntries = saved?.basis === 'saved_erp_records' ? validNumber(saved.total) : null;
+  const entriesReconcile = totalEntries === null || dailyExpenseEntries === null || storeRecords === null
+    ? null : Math.abs(totalEntries-dailyExpenseEntries-storeRecords)<.005;
+  const missingPpiMetres = daily.length
+    ? daily.reduce((t:number,r:any)=>t+num(r.missing_ppi_mtr),0) : null;
+  const checkedWeightedPicks = daily.length
+    ? daily.reduce((t:number,r:any)=>t+num(r.section_a_weighted_picks)+num(r.section_b_weighted_picks),0) : null;
+  const ppiSource = !m.picksReliable ? 'unavailable'
+    : num(d?.picks?.weighted_total)>0 ? 'monthly_erp' : 'checked_design';
+  const electricityLastDate = validNumber(period?.source_coverage?.electricity_last_entered_ymd);
+  const salaryLastDate = validNumber(period?.source_coverage?.salary_last_entered_ymd);
+  const latestProductionDate = validNumber(d?.production?.latest_date_ymd)
+    ?? (daily.length ? Math.max(...daily.map((r:any)=>num(r.date_ymd))) : null);
+  const costThroughDate = validNumber(period?.upto_date_ymd);
+  const requestedThroughDate = validNumber(period?.requested_upto_ymd);
+  const issues: string[] = [];
+  if (!d) issues.push(m.status === 'loading' ? 'Loading' : m.status === 'error' ? 'Could not load monthly expense data' : 'No monthly expense data');
+  else {
+    if (expenseTotal === null) issues.push('Monthly cost is missing');
+    if (costReconciles === false) issues.push('Cost does not match expense-head total');
+    if (metresReconcile === false) issues.push('Checking metres differ from the daily records');
+    if (num(composition?.electricity) <= 0) issues.push('Electricity not recorded');
+    if (num(composition?.salary) <= 0) issues.push('Salary not recorded');
+    if (ppiSource === 'unavailable' && num(checkedMetres) > 0) issues.push('Checked-design picks not fully available');
+    if (missingPpiMetres !== null && missingPpiMetres > .005) issues.push('Design PPI missing on checked metres');
+    if (entriesReconcile === false) issues.push('Expense entry count does not reconcile');
+    if (costThroughDate !== null && requestedThroughDate !== null && costThroughDate < requestedThroughDate)
+      issues.push('Cost inputs end before the requested date');
+  }
+  return {
+    month:m, expenseTotal, expenseHeadSum, costReconciles,
+    electricity: d?validNumber(composition?.electricity):null,
+    salary: d?validNumber(composition?.salary):null,
+    stores: d?validNumber(composition?.stores):null,
+    checkedMetres,dailyCheckedMetres,metresReconcile,checkedWeightedPicks,missingPpiMetres,ppiSource,
+    electricityLastDate,salaryLastDate,costThroughDate,requestedThroughDate,latestProductionDate,
+    dailyExpenseEntries,storeRecords,totalEntries,entriesReconcile,
+    comparableCost:hasComparableCostCoverage(m),issues,
+  };
+}
+export function sumEntryTypes(months: CostMonth[]) {
+  const audits=months.map(auditCostMonth);
+  if (audits.some(a=>a.dailyExpenseEntries===null || a.storeRecords===null || a.totalEntries===null)) return null;
+  return {
+    daily: audits.reduce((t,a)=>t+num(a.dailyExpenseEntries),0),
+    stores: audits.reduce((t,a)=>t+num(a.storeRecords),0),
+    total: audits.reduce((t,a)=>t+num(a.totalEntries),0),
+    reconciled: audits.every(a=>a.entriesReconcile===true),
   };
 }
 
@@ -193,4 +416,56 @@ export function monthSectionRows(m: CostMonth, head: CostHead): SectionCost[] | 
   const sum = rows.reduce((s, r) => s + r.amount, 0);
   if (Math.abs(sum - amount) > Math.max(1, (trend.length || 1) * .03)) return null;
   return rows.filter(row => Math.abs(row.amount) > 0.005);
+}
+
+/**
+ * Claude Artifact's "Entries" means one non-zero expense-head / section
+ * line in a month, NOT each ERP voucher, Store issue or dated save.
+ * Build those lines from the same verified cost breakdown already used by
+ * the FY expense drilldown. Never count an unreconciled section allocation.
+ */
+export function countExpenseCostLines(month: CostMonth): number | null {
+  if (!month.available || month.amount === null || !month.raw) return null;
+  // Read-only monthly KPI from the service: source lines were individually
+  // reconciled with the same recorded cost-head amounts shown in this report.
+  const saved = (month.raw as any).fy_cost_lines;
+  if (saved?.basis === 'expense_head_section') {
+    if (saved.verified !== true) return null;
+    const rows = Array.isArray(saved.lines) ? saved.lines : [];
+    const count = Number(saved.count);
+    if (Number.isInteger(count) && count >= 0 && rows.length === count
+      && rows.every((r: any) => r && typeof r.head === 'string'
+        && typeof r.section === 'string' && Number(r.amount) > .005)) return count;
+    return null;
+  }
+  let count = 0;
+  for (const head of HEADS) {
+    const reported = month.heads[head.key];
+    if (Math.abs(reported) <= 0.005) continue;
+    const lines = monthSectionRows(month, head.key);
+    if (lines !== null) {
+      const sum = lines.reduce((acc, line) => acc + line.amount, 0);
+      if (Math.abs(sum - reported) > 1) return null;
+      count += lines.filter(line => line.amount > 0.005).length;
+      continue;
+    }
+    // Section A/B's monthly totals are authoritative even when its day-by-day
+    // allocation is not yet ready for the drilldown. Count them only if they
+    // independently reconcile to the reported expense head.
+    if (month.mode !== 'section_ab') return null;
+    const section = (month.raw as any).section_ab || {};
+    const sectionHead = section[head.key] || {};
+    const fieldA = head.key === 'stores' ? 'final_section_a_amount'
+      : head.key === 'maintenance' || head.key === 'other' ? 'section_a_allocated'
+      : 'section_a_amount';
+    const fieldB = head.key === 'stores' ? 'final_section_b_amount'
+      : head.key === 'maintenance' || head.key === 'other' ? 'section_b_allocated'
+      : 'section_b_amount';
+    const a = sectionHead[fieldA], b = sectionHead[fieldB];
+    if (a == null || b == null || !Number.isFinite(Number(a)) || !Number.isFinite(Number(b))) return null;
+    if (Math.abs(Number(a) + Number(b) - reported) > 1) return null;
+    count += Number(a) > 0.005 ? 1 : 0;
+    count += Number(b) > 0.005 ? 1 : 0;
+  }
+  return count;
 }

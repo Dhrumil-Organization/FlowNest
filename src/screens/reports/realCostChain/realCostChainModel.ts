@@ -7,13 +7,20 @@ export type Assumed = {
   shrink: number; fent: number; proc: number; warp_waste: number; fin_shrink: number; final: number; costing_final: number;
 };
 export type Actual = {
-  rm: number; weaving: number; greige_mfg: number; short_pct: number; short: number; has_short: boolean;
+  rm: number;
+  /** actual = every closed beam priced from its carton issues · mixed = some beams at costing RM · costing = none found */
+  rm_source: 'actual' | 'mixed' | 'costing' | string;
+  rm_warp: number; rm_weft: number; rm_costing: number; rm_metres: number; rm_fb_metres: number;
+  rm_fallback_kg: number; rm_missing_kg: number; rm_no_weft_beams: number;
+  /** warp shortage already inside the actual RM (yarn ÷ checked metres) */
+  short_in_rm: boolean;
+  weaving: number; greige_mfg: number; short_pct: number; short: number; has_short: boolean;
   fin_shrink_pct: number; fin_shrink_source: string; shrink: number; fent_pct: number; fent: number;
   proc: number; proc_metres: number; proc_source: string; final: number;
 };
 export type BeamCost = {
   beamuid: string; beam: string; loom: string; shed: 'Rapier' | 'Waterjet' | 'Other' | string; date: string;
-  rate: number | null; metres: number; weave_per_m: number; greige_per_m: number; cost: number;
+  rate: number | null; metres: number; rm_per_m: number; rm_source: string; weave_per_m: number; greige_per_m: number; cost: number;
 };
 export type DesignChain = {
   key: string; prpcode: string; dsncode: string; name: string;
@@ -29,6 +36,8 @@ export type ChainData = {
   prptype: string;
   fy: { yearno: string; name: string; from: string; to: string };
   month: string; months: string[];
+  /** true = period is a From–To date range of the last taka (not a month) */
+  range: boolean;
   period: { from: string; to: string };
   fent_default: number;
   designs: DesignChain[];
@@ -76,6 +85,7 @@ export function normalizeChain(raw: any): ChainData {
     fy: { yearno: s(fy.yearno), name: s(fy.name) || 'FY ' + s(fy.yearno), from: s(fy.from), to: s(fy.to) },
     month: s(raw.month),
     months: arr(raw.months).map(s).filter(Boolean),
+    range: !!raw.range,
     built_at: s(raw.built_at),
     build_secs: n(raw.build_secs),
     stale: !!raw.stale,
@@ -88,7 +98,10 @@ export function normalizeChain(raw: any): ChainData {
         key: s(d.key), prpcode: s(d.prpcode), dsncode: s(d.dsncode), name: s(d.name) || s(d.dsncode),
         has_costing: !!d.has_costing, has_fin: !!d.has_fin, made: n(d.made), nbeams: n(d.nbeams),
         actual: {
-          rm: n(a.rm), weaving: n(a.weaving), greige_mfg: n(a.greige_mfg), short_pct: n(a.short_pct), short: n(a.short), has_short: !!a.has_short,
+          rm: n(a.rm), rm_source: s(a.rm_source), rm_warp: n(a.rm_warp), rm_weft: n(a.rm_weft), rm_costing: n(a.rm_costing),
+          rm_metres: n(a.rm_metres), rm_fb_metres: n(a.rm_fb_metres), rm_fallback_kg: n(a.rm_fallback_kg), rm_missing_kg: n(a.rm_missing_kg),
+          rm_no_weft_beams: n(a.rm_no_weft_beams), short_in_rm: !!a.short_in_rm,
+          weaving: n(a.weaving), greige_mfg: n(a.greige_mfg), short_pct: n(a.short_pct), short: n(a.short), has_short: !!a.has_short,
           fin_shrink_pct: n(a.fin_shrink_pct), fin_shrink_source: s(a.fin_shrink_source), shrink: n(a.shrink), fent_pct: n(a.fent_pct), fent: n(a.fent),
           proc: n(a.proc), proc_metres: n(a.proc_metres), proc_source: s(a.proc_source), final: n(a.final),
         },
@@ -103,7 +116,7 @@ export function normalizeChain(raw: any): ChainData {
         flags: { no_rate_metres: n(d.flags?.no_rate_metres), no_pick_metres: n(d.flags?.no_pick_metres) },
         beams: arr(d.beams).map((b: any) => ({
           beamuid: s(b.beamuid), beam: s(b.beam), loom: s(b.loom), shed: s(b.shed), date: s(b.date), rate: nn(b.rate),
-          metres: n(b.metres), weave_per_m: n(b.weave_per_m), greige_per_m: n(b.greige_per_m), cost: n(b.cost),
+          metres: n(b.metres), rm_per_m: n(b.rm_per_m), rm_source: s(b.rm_source), weave_per_m: n(b.weave_per_m), greige_per_m: n(b.greige_per_m), cost: n(b.cost),
         })),
       };
     }),
@@ -130,11 +143,11 @@ export function compareRows(d: DesignChain): CmpRow[] {
   const a = d.assumed;
   const A = d.actual;
   const rows: CmpRow[] = [
-    { label: 'Raw material', asm: a?.rm || 0, act: A.rm },
+    { label: A.rm_source === 'actual' ? 'Raw material (issued yarn)' : A.rm_source === 'mixed' ? 'Raw material (part issued)' : 'Raw material', asm: a?.rm || 0, act: A.rm },
     { label: 'Weaving', asm: a?.weaving || 0, act: A.weaving },
     { label: 'Greige mfg', asm: a?.greige_mfg || 0, act: A.greige_mfg },
   ];
-  if (A.short > 0 || (a && a.warp_waste)) rows.push({ label: 'Warp shortage', asm: (a?.greige_mfg || A.greige_mfg) * ((a?.warp_waste || 0) / 100), act: A.short });
+  if (A.short > 0 || (a && a.warp_waste)) rows.push({ label: A.short_in_rm ? 'Warp shortage (yarn part in RM)' : 'Warp shortage',asm: (a?.greige_mfg || A.greige_mfg) * ((a?.warp_waste || 0) / 100), act: A.short });
   if (d.has_fin) {
     rows.push({ label: 'Finish shrink', asm: a?.shrink || 0, act: A.shrink });
     rows.push({ label: `Fent wastage · ${A.fent_pct}%`, asm: a?.fent || 0, act: A.fent });
@@ -160,6 +173,20 @@ export const monthLbl = (ym: string) => {
 export const dateShort = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
   return m ? `${m[3]} ${MON[+m[2] - 1]}` : iso || '—';
+};
+/** period chip value of a date range: 'R:YYYY-MM-DD:YYYY-MM-DD' */
+export const isRange = (p: string) => /^R:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$/.test(p || '');
+/** request body of a period: date range → from_date / to_date, else month */
+export const periodBody = (p: string): Record<string, string> =>
+  isRange(p) ? { from_date: p.slice(2, 12), to_date: p.slice(13, 23) } : { month: p };
+/** 'DD-MM-YYYY' / 'YYYY-MM-DD' typed by the user → 'YYYY-MM-DD', '' when not a real date */
+export const isoOf = (v: string) => {
+  const t = (v || '').trim();
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+  let y = 0, mo = 0, d = 0;
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; } else if ((m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(t))) { y = +m[3]; mo = +m[2]; d = +m[1]; } else return '';
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d ? `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
 };
 export const dateFull = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');

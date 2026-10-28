@@ -36,6 +36,7 @@ type ReopenCostingRequest = {
 type ReopenedCostingInfo = {
     id: string;
     createdAt?: string | null;
+    needsReview?: boolean;
 };
 
 
@@ -269,7 +270,11 @@ function CostSheetPreviewModal({
                     <Text style={pm.td}>{Math.round(Number(r.cnt || 0))}{String(r.sys || '').toUpperCase().startsWith('DEN') ? 'D' : r.sys}</Text>
                     <Text style={pm.td}>{r.yarn_type === 'warp' ? r.epi : r.ppi}</Text>
                     <Text style={pm.td}>{Math.round(Number(r.grams_per_metre || 0))}</Text>
-                    <Text style={pm.td}>₹{Math.round(Number(r.rate || 0))}</Text>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={pm.td}>₹{Math.round(Number(r.rate || 0))}</Text>
+                        {r.yarn_type === 'warp' && Number(r.sizing_cost || 0) > 0 &&
+                            <Text style={{ fontSize: 8, fontWeight: '800', color: T.copper }}>SIZING ₹{Number(r.sizing_cost).toFixed(2)}/kg</Text>}
+                    </View>
                     <Text style={[pm.td, pm.money]}>{r2(Number(r.cost || 0))}</Text>
                 </View>
             ))}
@@ -299,7 +304,9 @@ function CostSheetPreviewModal({
 
                         <View style={pm.block}>
                             <Text style={pm.blockTitle}>BUILD-UP · per metre</Text>
-                            <PreviewRow label="Total yarn cost" value={r2(result.snap_rm)} strong />
+                            <PreviewRow label="Total yarn cost (incl. sizing)" value={r2(result.snap_rm)} strong />
+                            {Number((result as any).sizing_cost || (result as any).snap_sizing_cost || 0) > 0 &&
+                                <PreviewRow label="Of which · warp sizing" value={r2(Number((result as any).sizing_cost || (result as any).snap_sizing_cost || 0))} />}
                             <PreviewRow label={`Weaving (${result.snap_ppi_table} picks)`} value={r2(result.snap_weaving_cost)} />
                             <PreviewRow label="Greige mfg cost" value={r2(result.snap_greige_mfg)} strong />
                             <PreviewRow label="Greige brokerage" value={r2(result.snap_greige_brok_amt)} />
@@ -412,10 +419,8 @@ function CostingTab({
     const [mdId, setMdId] = useState('');
     const [design, setDesign] = useState<Design | null>(null);
     const [priceMap, setPriceMap] = useState<Record<string, number>>({});
-    /** where each yarn row's starting price came from: Yarn Rates (latest date → highest rate) or the yarn master */
-    type RateSrc = { from: 'rates'; rate: number; date: string; entries: number; via_main: boolean } | { from: 'none' };
-    const [rateSrc, setRateSrc] = useState<Record<string, RateSrc>>({});
     const [dyeMap, setDyeMap] = useState<Record<string, number>>({});
+    const [sizingMap, setSizingMap] = useState<Record<string, number>>({});
     const [ydTiers, setYdTiers] = useState<YdTierRates>({ ...DEFAULT_YD_TIERS });
     const [subTiers, setSubTiers] = useState<Record<string, YdTierCode>>({});
     const [colourways, setColourways] = useState<SubDesign[]>([]);
@@ -436,6 +441,14 @@ function CostingTab({
 
     // build yarn key
     const yKey = (miId: string, br: string | null) => `${miId}|${br ?? ''}`;
+    // CostingEngine chooses W/F/S:<database line id>.  A pre-upgrade design
+    // API without row ids falls back to the legacy yarn+blend key.
+    const costingRowKey = (y: any, type: 'W' | 'F' | 'S') =>
+        y.id !== undefined && y.id !== null && String(y.id).trim() !== ''
+            ? `${type}:${String(y.id)}`
+            : yKey(String(y.mi_id), y.blend_ratio ?? null);
+    const sizedWarpRows = (full: Design) =>
+        (full.warp_yarns || []).filter((y: any) => y.sizing === true || y.sizing === 1 || y.sizing === '1');
 
     const designAdjustments = (full: Design) => ({
         greige_width: Number(full.greige_width || 0),
@@ -450,48 +463,25 @@ function CostingTab({
     const masterRateMaps = (full: Design) => {
         const pm: Record<string, number> = {};
         const dm: Record<string, number> = {};
-        const allYarns = [
-            ...(full.warp_yarns || []),
-            ...(full.weft_yarns || []),
-            ...(full.selvedge_yarns || []),
+        const entries = [
+            ...(full.warp_yarns || []).map((y: any) => ({ y, type: 'W' as const })),
+            ...(full.weft_yarns || []).map((y: any) => ({ y, type: 'F' as const })),
+            ...(full.selvedge_yarns || []).map((y: any) => ({ y, type: 'S' as const })),
         ];
-        allYarns.forEach((y: any) => {
-            const k = yKey(String(y.mi_id), y.blend_ratio ?? null);
-            if (!(k in pm)) {
-                pm[k] = Number(y.base_price || 0);
-                // Claude YD starting point: Medium dye tier (₹70/kg). PD
-                // remains zero. Users can still set an individual yarn row to
-                // zero when it must stay undyed.
-                dm[k] = String(full.type || '').toUpperCase() === 'YD' ? DEFAULT_YD_TIERS.M : 0;
-            }
+        entries.forEach(({ y, type }) => {
+            const key = costingRowKey(y, type);
+            pm[key] = Number(y.base_price || 0);
+            dm[key] = String(full.type || '').toUpperCase() === 'YD'
+                ? DEFAULT_YD_TIERS.M : 0;
         });
         return { pm, dm };
-    };
-
-    /**
-     * Yarn prices of a NEW costing come from the BACKEND: the design API's base_price of every yarn is already the
-     * Yarn Rates value (latest date → highest rate on that date; a sub item uses its main yarn; every rate book), and
-     * 0 when the yarn has no Yarn Rates entry (the old master rate is not used). price_source tells which — shown under each row.
-     * A reopened saved costing keeps its saved prices (rateSrc is cleared there).
-     */
-    const sourcesOf = (full: Design): Record<string, RateSrc> => {
-        const out: Record<string, RateSrc> = {};
-        [...(full.warp_yarns || []), ...(full.weft_yarns || []), ...(full.selvedge_yarns || [])].forEach((y: any) => {
-            const k = yKey(String(y.mi_id), y.blend_ratio ?? null);
-            if (k in out) return;
-            const ps = y.price_source || {};
-            out[k] = ps.from === 'rates'
-                ? { from: 'rates', rate: Number(ps.rate) || 0, date: String(ps.date || ''), entries: Number(ps.entries) || 1, via_main: !!ps.via_main }
-                : { from: 'none' };
-        });
-        return out;
     };
 
     const applyMasters = (full: Design) => {
         const maps = masterRateMaps(full);
         setPriceMap(maps.pm);
-        setRateSrc(sourcesOf(full));
         setDyeMap(maps.dm);
+        setSizingMap({});  // No fabricated sizing rate: only user input/saved rate.
         setYdTiers({ ...DEFAULT_YD_TIERS });
         setSubTiers({});
         setParams({ ...DEFAULT_P });
@@ -527,6 +517,10 @@ function CostingTab({
             const saved = detailResponse?.data?.data;
             const inputs = saved?.inputs || {};
             if (!saved) return;
+            const lastDesignEdit = Date.parse(String((full as any).updated_at || ''));
+            const lastCostingSave = Date.parse(String(saved.created_at || latest.created_at || ''));
+            const designChangedAfterCosting = Number.isFinite(lastDesignEdit) &&
+                Number.isFinite(lastCostingSave) && lastDesignEdit > lastCostingSave;
 
             setParams({
                 weaving_rate: Number(inputs.weaving_rate ?? DEFAULT_P.weaving_rate),
@@ -549,6 +543,27 @@ function CostingTab({
                 gf_shrink: Number(inputs.gf_shrink ?? masterAdjust.gf_shrink),
             });
 
+            const historicalSizing = (inputs.sizing_map || {}) as Record<string, number>;
+            const historicalLines: any[] = Array.isArray(saved.yarn_lines) ? saved.yarn_lines : [];
+            const restoredSizing: Record<string, number> = {};
+            sizedWarpRows(full).forEach((y: any) => {
+                const key = costingRowKey(y, 'W');
+                const matching = historicalLines.find((line: any) =>
+                    line.yarn_type === 'warp' &&
+                    String(line.design_line_id ?? '') === String(y.id ?? '__missing__')) ||
+                    historicalLines.find((line: any) =>
+                        line.yarn_type === 'warp' &&
+                        String(line.mi_id) === String(y.mi_id) &&
+                        String(line.blend_ratio ?? '') === String(y.blend_ratio ?? ''));
+                const historicalKey = matching?.yarn_key;
+                const rate = historicalKey ? Number(historicalSizing[historicalKey] ?? matching?.sizing_cost ?? 0) : 0;
+                // Positive previous sizing rate can be offered as a prefill;
+                // newly sized yarns stay blank for explicit confirmation.
+                if (Number.isFinite(rate) && rate > 0) restoredSizing[key] = rate;
+            });
+            // A design edit invalidates any automatic sizing-rate carry-over.
+            setSizingMap(designChangedAfterCosting ? {} : restoredSizing);
+
             if (String(full.type || '').toUpperCase() === 'YD') {
                 const savedTiers = inputs.yd_tiers || {};
                 setYdTiers({
@@ -562,6 +577,7 @@ function CostingTab({
             setPrefilledInfo({
                 id: String(saved.id || latest.id),
                 createdAt: saved.created_at || latest.created_at || null,
+                needsReview: designChangedAfterCosting,
             });
         } catch (e: any) {
             // Prefill is best-effort. A history outage must never block a new
@@ -666,6 +682,10 @@ function CostingTab({
                 if (cancelled) return;
 
                 const inputs = saved.inputs || {};
+                const designEditTime = Date.parse(String((fullDesign as any).updated_at || ''));
+                const priorCostTime = Date.parse(String(saved.created_at || ''));
+                const changedAfterSaving = Number.isFinite(designEditTime) &&
+                    Number.isFinite(priorCostTime) && designEditTime > priorCostTime;
 
                 setDesign(fullDesign);
                 setMdId(String(saved.md_id));
@@ -688,19 +708,23 @@ function CostingTab({
 
                 const reopenedPriceMap: Record<string, number> = {};
                 const reopenedDyeMap: Record<string, number> = {};
+                const reopenedSizingMap: Record<string, number> = {};
+                const savedSizingMap = (inputs.sizing_map || {}) as Record<string, number>;
 
                 const allDesignYarns = [
-                    ...(fullDesign.warp_yarns || []),
-                    ...(fullDesign.weft_yarns || []),
+                    ...(fullDesign.warp_yarns || []).map((y: any) => ({ ...y, _dir: 'W' })),
+                    ...(fullDesign.weft_yarns || []).map((y: any) => ({ ...y, _dir: 'F' })),
+                    ...(fullDesign.selvedge_yarns || []).map((y: any) => ({ ...y, _dir: 'S' })),
                 ];
 
                 allDesignYarns.forEach((yarn: any) => {
-                    const currentKey = yKey(
-                        String(yarn.mi_id),
-                        yarn.blend_ratio ?? null
-                    );
+                    const currentKey = costingRowKey(yarn, yarn._dir);
+                    const legacyKey = yKey(String(yarn.mi_id), yarn.blend_ratio ?? null);
 
-                    const matchedLine = savedLines.find((line: any) => {
+                    const matchedLine = savedLines.find((line: any) =>
+                        String(line.design_line_id ?? '') === String(yarn.id ?? '__missing__') &&
+                        String(line.yarn_type || '') === ({ W: 'warp', F: 'weft', S: 'selvedge' } as any)[yarn._dir]
+                    ) || savedLines.find((line: any) => {
                         const sameItem =
                             String(line.mi_id || '') ===
                             String(yarn.mi_id || '');
@@ -709,13 +733,15 @@ function CostingTab({
                             String(line.blend_ratio || '').trim() ===
                             String(yarn.blend_ratio || '').trim();
 
-                        return sameItem && sameBlend;
+                        return sameItem && sameBlend &&
+                            String(line.yarn_type || '') === ({ W: 'warp', F: 'weft', S: 'selvedge' } as any)[yarn._dir];
                     });
 
                     const savedKey = matchedLine?.yarn_key;
 
                     const savedPrice =
                         savedPriceMap[currentKey] ??
+                        savedPriceMap[legacyKey] ??
                         (savedKey ? savedPriceMap[savedKey] : undefined) ??
                         matchedLine?.price ??
                         yarn.base_price ??
@@ -723,6 +749,7 @@ function CostingTab({
 
                     const savedDye =
                         savedDyeMap[currentKey] ??
+                        savedDyeMap[legacyKey] ??
                         (savedKey ? savedDyeMap[savedKey] : undefined) ??
                         matchedLine?.dye_cost ??
                         0;
@@ -732,11 +759,17 @@ function CostingTab({
 
                     reopenedDyeMap[currentKey] =
                         Number(savedDye) || 0;
+                    if (yarn._dir === 'W' && yarn.sizing) {
+                        const storedSizing = savedSizingMap[currentKey] ??
+                            (savedKey ? savedSizingMap[savedKey] : undefined) ??
+                            matchedLine?.sizing_cost;
+                        if (Number(storedSizing) > 0) reopenedSizingMap[currentKey] = Number(storedSizing);
+                    }
                 });
 
-                setRateSrc({});   // a reopened costing keeps its saved prices
                 setPriceMap(reopenedPriceMap);
                 setDyeMap(reopenedDyeMap);
+                setSizingMap(changedAfterSaving ? {} : reopenedSizingMap);
 
                 if (String(fullDesign.type || '').toUpperCase() === 'YD') {
                     const savedTiers = saved.inputs?.yd_tiers || {};
@@ -790,6 +823,7 @@ function CostingTab({
                 setReopenedInfo({
                     id: String(saved.id || reopenRequest.costingId),
                     createdAt: saved.created_at || null,
+                    needsReview: changedAfterSaving,
                 });
             } catch (e: any) {
                 if (!cancelled) {
@@ -882,30 +916,32 @@ function CostingTab({
         }
         setComputing(true);
         try {
-            const res = await CostingAPI.compute({
+            const costingPayload = {
                 md_id: mdId,
                 price_map: priceMap,
                 dye_map: dyeMap,
+                sizing_map: sizingMap,
                 tier_code: 'STD',
                 yd_tiers: ydTiers,
                 yd_sub_tiers: subTiers,
                 ...params,
                 ...adjust,
-            });
+            };
+            const res = await CostingAPI.compute(costingPayload);
             setResult(res.data.data);
         } catch (e: any) {
             AppAlert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
-    }, [mdId, design, priceMap, dyeMap, ydTiers, subTiers, params, adjust]);
+    }, [mdId, design, priceMap, dyeMap, sizingMap, ydTiers, subTiers, params, adjust]);
 
     // debounce compute on input changes
     useEffect(() => {
         if (!mdId) return;
         const t = setTimeout(compute, 600);
         return () => clearTimeout(t);
-    }, [mdId, priceMap, dyeMap, ydTiers, subTiers, params, adjust]);
+    }, [mdId, priceMap, dyeMap, sizingMap, ydTiers, subTiers, params, adjust]);
 
     // const save = async () => {
     //     if (!result) { AppAlert.alert('Compute first'); return; }
@@ -933,12 +969,20 @@ function CostingTab({
             AppAlert.alert('Compute first');
             return;
         }
+        const missingSizing = design && sizedWarpRows(design).find((y: any) =>
+            !(Number(sizingMap[costingRowKey(y, 'W')]) > 0));
+        if (missingSizing) {
+            AppAlert.alert('Sizing rate required',
+                `Enter Sizing ₹/kg for warp yarn ${missingSizing.name || missingSizing.mi_id} before saving.`);
+            return;
+        }
         setSaving(true);
         try {
             const payload = {
                 md_id: mdId,
                 price_map: priceMap,
                 dye_map: dyeMap,
+                sizing_map: sizingMap,
                 tier_code: 'STD',
                 yd_tiers: ydTiers,
                 yd_sub_tiers: subTiers,
@@ -962,16 +1006,15 @@ function CostingTab({
         }
     };
 
-    // unique yarn keys for price inputs
-    const yarnKeys = useMemo(() => {
+    // Costing rates are per design row, not per unique yarn code.
+    // The same yarn may occur in Warp/Weft or multiple Warp rows.
+    const yarnRows = useMemo(() => {
         if (!design) return [];
-        const all = [...(design.warp_yarns || []), ...(design.weft_yarns || []), ...(design.selvedge_yarns || [])];
-        const seen = new Set<string>();
-        return all.filter(y => {
-            const k = yKey(y.mi_id, y.blend_ratio);
-            if (seen.has(k)) return false;
-            seen.add(k); return true;
-        });
+        return [
+            ...(design.warp_yarns || []).map((y: any) => ({ y, dir: 'W' as const })),
+            ...(design.weft_yarns || []).map((y: any) => ({ y, dir: 'F' as const })),
+            ...(design.selvedge_yarns || []).map((y: any) => ({ y, dir: 'S' as const })),
+        ];
     }, [design]);
 
     const numeric = (v: string, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
@@ -995,6 +1038,9 @@ function CostingTab({
                         <Text style={c.prefillText}>
                             Historical revision reopened for editing. Save creates a new version; the original stays unchanged.
                         </Text>
+                        {reopenedInfo.needsReview && <Text style={{ color: T.copper, fontSize: 11, fontWeight: '800', marginTop: 6 }}>
+                            The design has changed since this revision. Re-enter sizing rates and save a new revision for Production Orders.
+                        </Text>}
                     </View>
                 </View>
             ) : null}
@@ -1017,6 +1063,9 @@ function CostingTab({
                         {prefilledInfo.createdAt ? `${historyDateTimeLabel(prefilledInfo.createdAt)} · ` : ''}
                         Conversion, finishing and costing adjustments carry the latest saved costing. Yarn prices are refreshed from the current masters. Change what you need and Save to create a new version.
                     </Text>
+                    {prefilledInfo.needsReview && <Text style={{ color: T.copper, fontSize: 11, fontWeight: '800', marginTop: 6 }}>
+                        Design changed after this costing. Enter the current sizing rates and save a new revision before using it in a Production Order.
+                    </Text>}
                     <TouchableOpacity onPress={() => void openSavedRevision(prefilledInfo.id)} disabled={savedPreviewLoading} style={c.freshLink}>
                         <Text style={c.freshLinkText}>{savedPreviewLoading ? 'Loading saved revision…' : 'View original saved costing (unchanged)'}</Text>
                     </TouchableOpacity>
@@ -1041,45 +1090,43 @@ function CostingTab({
                         <Text style={c.infoText}>No closed beams for this design yet — using the recipe assumption of 0%. Once beams close, costing can switch to cumulative floor actual + buffer when that production feed is available.</Text>
                     </View>
 
-                    {/* Yarn prices */}
+                    {/* Claude Artifact · per-row yarn pricing and warp sizing */}
                     <View style={c.section}>
                         <Text style={c.sHdr}>YARN PRICES · ₹/KG PER ROW</Text>
-                        <Text style={c.help}>Rates are per row — the same yarn can carry different rates where the costing engine exposes separate row keys. Starting value = Yarn Rates: the yarn's latest date, and on that date the highest rate. A yarn without a Yarn Rates entry starts at 0 — enter its rate in Yarn Rates.</Text>
-                        {yarnKeys.map(y => {
-                            const k = yKey(y.mi_id, y.blend_ratio);
+                        <Text style={c.help}>Rates are per row. Sized warp yarns have an additional Sizing ₹/kg rate, included in the yarn cost.</Text>
+                        {yarnRows.map(({ y, dir }, i) => {
+                            const key = costingRowKey(y, dir);
+                            const isSized = dir === 'W' && (y.sizing === true || y.sizing === 1 || y.sizing === '1');
                             return (
-                                <View key={k} style={c.yarnRow}>
+                                <View key={`${dir}:${key}:${i}`} style={c.yarnRow}>
                                     <View style={c.yarnIdentity}>
-                                        <Text style={[c.yarnTypeLabel, { color: (design.weft_yarns || []).some((x: any) => x.mi_id === y.mi_id) && !(design.warp_yarns || []).some((x: any) => x.mi_id === y.mi_id) ? T.copper : T.ink }]}>
-                                            {(design.selvedge_yarns || []).some((x: any) => x.mi_id === y.mi_id) ? 'SELV' : ((design.weft_yarns || []).some((x: any) => x.mi_id === y.mi_id) && !(design.warp_yarns || []).some((x: any) => x.mi_id === y.mi_id) ? 'WEFT' : 'WARP')}
+                                        <Text style={[c.yarnTypeLabel, { color: dir === 'W' ? T.ink : T.copper }]}>
+                                            {dir === 'W' ? 'WARP' : dir === 'F' ? 'WEFT' : 'SELV'}
                                         </Text>
-                                        <Text style={c.yarnLabel}>{y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}</Text>
-                                        {(() => {
-                                            const src = rateSrc[k];
-                                            if (!src) return null;
-                                            if (src.from === 'none') return <Text style={[c.rateSrc, { color: T.red }]}>No Yarn Rates entry · 0</Text>;
-                                            const edited = Number(priceMap[k]) !== src.rate;
-                                            return (
-                                                <Text style={[c.rateSrc, { color: edited ? T.muted : T.copper }]}>
-                                                    Yarn Rates · {src.date ? src.date.split('-').reverse().join('-') : ''}{src.entries > 1 ? ` · highest of ${src.entries}` : ''}{src.via_main ? ' · main yarn' : ''}{edited ? ` · was ₹${src.rate}` : ''}
-                                                </Text>
-                                            );
-                                        })()}
+                                        <Text style={c.yarnLabel}>{y.name || y.mi_id}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}</Text>
+                                        {isSized && <Text style={{ color: T.copper, fontSize: 10, fontWeight: '800', marginTop: 3 }}>✓ SIZED</Text>}
                                     </View>
-                                    <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-                                        <View style={{ flex: 1 }}>
-                                            <Inp
-                                                value={String(priceMap[k] ?? '')}
-                                                onChange={v => setPriceMap(p => ({ ...p, [k]: numeric(v, 0) }))}
-                                            />
+                                    <View style={{ flex: 1, gap: 6 }}>
+                                        <View style={{ flexDirection: 'row', gap: 7 }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={c.subHdr}>YARN ₹/KG</Text>
+                                                <Inp value={String(priceMap[key] ?? '')}
+                                                    onChange={v => setPriceMap(m => ({ ...m, [key]: numeric(v, 0) }))} />
+                                            </View>
+                                            {design.type === 'YD' && (
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={c.subHdr}>DYE ₹/KG</Text>
+                                                    <Inp value={String(dyeMap[key] ?? '')}
+                                                        onChange={v => setDyeMap(m => ({ ...m, [key]: numeric(v, 0) }))} />
+                                                </View>
+                                            )}
                                         </View>
-                                        {design.type === 'YD' && (
-                                            <View style={{ flex: 0.6 }}>
-                                                <Inp
-                                                    value={String(dyeMap[k] ?? '')}
-                                                    onChange={v => setDyeMap(p => ({ ...p, [k]: numeric(v, 0) }))}
-                                                    suffix="dye"
-                                                />
+                                        {isSized && (
+                                            <View>
+                                                <Text style={[c.subHdr, { color: T.copper }]}>SIZING ₹/KG</Text>
+                                                <Inp value={sizingMap[key] === undefined ? '' : String(sizingMap[key])}
+                                                    onChange={v => setSizingMap(m => ({ ...m, [key]: numeric(v, 0) }))}
+                                                    suffix="₹/kg" />
                                             </View>
                                         )}
                                     </View>
@@ -1287,7 +1334,9 @@ function CostingTab({
                                     <CostCompareRow label="Selvedge" yarn={Number((result as any).selvedge_cost || 0)} waste={0} />
                                 )}
                                 <View style={c.divider} />
-                                <ResRow label="Total yarn cost" value={r2(result.snap_rm)} highlight />
+                                <ResRow label="Total yarn cost (incl. sizing)" value={r2(result.snap_rm)} highlight />
+                                {Number((result as any).sizing_cost || (result as any).snap_sizing_cost || 0) > 0 &&
+                                    <ResRow label="Of which · warp sizing" value={r2(Number((result as any).sizing_cost || (result as any).snap_sizing_cost || 0))} />}
                                 <View style={c.contribRow}>
                                     <Text style={c.contribRm}>RM contribution {pct(result.snap_rm_pct)}</Text>
                                     <Text style={c.contribWeave}>Weaving {pct(result.snap_weave_pct)}</Text>
@@ -1390,7 +1439,6 @@ const c = StyleSheet.create({
     yarnIdentity: { width: 130 },
     yarnTypeLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 0.5, marginBottom: 2 },
     yarnLabel: { fontSize: 11.5, fontWeight: '700', color: T.ink },
-    rateSrc: { fontSize: 9.5, fontWeight: '700', color: T.muted, marginTop: 2 },
     tierInputRow: { flexDirection: 'row', gap: 8 },
     tierInputCell: { flex: 1 },
     tierInputLabel: { fontSize: 8, fontWeight: '900', color: T.muted, letterSpacing: 0.4, marginBottom: 5 },

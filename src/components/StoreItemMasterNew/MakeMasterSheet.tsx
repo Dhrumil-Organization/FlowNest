@@ -70,10 +70,12 @@ export default function MakeMasterSheet({
   const [done, setDone] = useState('');
   const [qInput, setQInput] = useState(''); // what the person is typing (input stays instant)
   const [q, setQ] = useState('');           // what the grid filters by (debounced, so typing never freezes the grid)
+  const [loadLimit, setLoadLimit] = useState(50); // render only the first batch of make/model rows
   useEffect(() => {
     const t = setTimeout(() => setQ(qInput), 250);
     return () => clearTimeout(t);
   }, [qInput]);
+  useEffect(() => { setLoadLimit(50); }, [q]); // new search starts from the first batch
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   // Position of the dropdown RELATIVE to the sheet body (not the window) — measured on open / resize.
   const [modelDropdownPosition, setModelDropdownPosition] = useState({ top: 0, left: 0, width: 320, maxHeight: 240 });
@@ -100,7 +102,10 @@ export default function MakeMasterSheet({
 
   const reload = useCallback(async () => {
     const list = await fetchMakeMasterList(API, token, scope);
-    if (alive.current) setRows(list);
+    if (alive.current) {
+      setRows(list);
+      setLoadLimit(50);
+    }
     return list;
   }, [API, token, scope]);
 
@@ -459,20 +464,30 @@ export default function MakeMasterSheet({
     | { k: 'g'; id: string; g: (typeof visibleGroups)[number]; open: boolean }
     | { k: 'h'; id: string }
     | { k: 'm'; id: string; r: MakeMasterRow };
+  const totalFlatCount = useMemo(() => visibleGroups.reduce((total, g) => {
+    const code = String(g.makeCode || g.makeName);
+    return total + 1 + (expandedCodes.has(code) ? (wideGrid ? 1 : 0) + g.rows.length : 0);
+  }, 0), [visibleGroups, expandedCodes, wideGrid]);
+
+  // Build only the rows that should be rendered now. Do not allocate thousands of
+  // flattened make/model entries before FlatList's virtualization can help.
   const flatRows = useMemo<Flat[]>(() => {
     const out: Flat[] = [];
     for (const g of visibleGroups) {
+      if (out.length >= loadLimit) break;
       const code = String(g.makeCode || g.makeName);
-      // a make opens ONLY when the user expands it (search results stay collapsed)
       const open = expandedCodes.has(code);
       out.push({ k: 'g', id: `g-${code}`, g, open });
       if (open) {
-        if (wideGrid) out.push({ k: 'h', id: `h-${code}` });
-        for (const r of g.rows) out.push({ k: 'm', id: `m-${code}-${r.key}`, r });
+        if (wideGrid && out.length < loadLimit) out.push({ k: 'h', id: `h-${code}` });
+        for (const r of g.rows) {
+          if (out.length >= loadLimit) break;
+          out.push({ k: 'm', id: `m-${code}-${r.key}`, r });
+        }
       }
     }
     return out;
-  }, [visibleGroups, expandedCodes, wideGrid]);
+  }, [visibleGroups, expandedCodes, wideGrid, loadLimit]);
 
   const renderGroupRow = (item: (typeof visibleGroups)[number], expanded: boolean) => {
     const code = String(item.makeCode || item.makeName);
@@ -676,6 +691,15 @@ export default function MakeMasterSheet({
             updateCellsBatchingPeriod={40}
             windowSize={9}
             ListEmptyComponent={<Text style={{ padding: 24, textAlign: 'center', color: T.muted }}>{qInput ? `Nothing matches “${qInput}”.` : 'No makes yet — add the first one above.'}</Text>}
+            ListFooterComponent={flatRows.length < totalFlatCount ? (
+              <View style={{ alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12 }}>
+                <Btn
+                  label={`Show more (${flatRows.length} of ${totalFlatCount})`}
+                  onPress={() => setLoadLimit((n) => Math.min(n + 50, totalFlatCount))}
+                  kind="quiet"
+                />
+              </View>
+            ) : <View style={{ height: 8 }} />}
           />
         )}
         {modelDropdownOpen ? (

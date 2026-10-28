@@ -2,8 +2,8 @@
 // Madhusudhan ERP · Production Orders > Pools ONLY.
 // Layout based on the client's Claude Artifact PoolBoard / PoolCard / PoolDetail.
 // Existing production entry, Job work, registry and API client are untouched.
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 const T = {
   nav:'#0D1B2A',bg:'#F5F2EE',surface:'#FFFFFF',border:'#E5E0DA',muted:'#9A9590',sub:'#F8F5F1',alt:'#F0EDE8',
@@ -116,9 +116,14 @@ function PoolDetail({pool,onBack,view}) {
   </View>;
 }
 
+// This is a virtual scrolling list, not a paginated user experience.
+// Laravel still reads bounded batches in the background to avoid retrieving
+// thousands of designs and all their historical transactions in one request.
+// The user sees one continuous list, with search across the source universe.
 const QUERY_LIMIT=100;
-// The endpoint paginates designs. Never present page 1 KPIs as the entire
-// design universe, or silently discard PO/SO cards beyond the first 100.
+const WEB_LIST_HEIGHT=520;
+const MOBILE_LIST_HEIGHT=390;
+const SEARCH_DELAY_MS=350;
 function combinePoolPages(a,b) {
   const byKey=new Map();
   for(const pool of [...(a?.pools||[]),...(b?.pools||[])]) byKey.set(pool.key,pool);
@@ -132,129 +137,202 @@ function combinePoolPages(a,b) {
     so_pending:my?sumMy('my_so_pending'):sumNullable('so_pending'),
     loose_stock:sumNullable('loose_metres'),overdue_lines:sumNullable('overdue_count'),
     marked_binds:sumNullable('marked_binds'),below_cost_pos:sumNullable('below_cost_count')};
-  const more=Boolean(b?.pagination?.more_available);
+  // Even after reading all conversion-source records, Prompt 1's eligible
+  // PO/SO-only design universe is not yet certified by the current source.
   return {...a,...b,pools,loaded_page_kpis:loaded,monthly_totals_complete:false,
     kpis:Object.fromEntries(Object.keys(loaded).map(k=>[k,null])),
     so_summary_status:pools.every(p=>nonNull(p.so_pending))?'reconstructed':'partial'};
 }
-function endpoint(apiBase,params){const qs=Object.entries(params).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');return `${apiBase.replace(/\/$/,'')}/getProductionOrderPools?${qs}`;}
+function endpoint(apiBase,params){
+  const qs=Object.entries(params).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
+  return `${apiBase.replace(/\/$/,'')}/getProductionOrderPools?${qs}`;
+}
 export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,property='',requestFn,view='owner'}) {
   const {width}=useWindowDimensions(),columns=width>=780?3:2;
+  const listHeight=Platform.OS==='web'?WEB_LIST_HEIGHT:MOBILE_LIST_HEIGHT;
+  const listRef=useRef(null);
+  const pageBusy=useRef(false);
   const [month,setMonth]=useState(ymNow()),[filter,setFilter]=useState('all'),[selected,setSelected]=useState(null),[showStatus,setShowStatus]=useState(false);
-  const [data,setData]=useState(null),[detail,setDetail]=useState(null),[loading,setLoading]=useState(false),[detailLoading,setDetailLoading]=useState(false),[error,setError]=useState(null),[detailError,setDetailError]=useState(null),[refresh,setRefresh]=useState(0),[loadingMore,setLoadingMore]=useState(false),[loadMoreError,setLoadMoreError]=useState(null);
-  // Rolling six calendar months, including the selected current month; no
-  // financial-year boundary restriction. Each request uses that month's FY.
+  const [searchInput,setSearchInput]=useState(''),[search,setSearch]=useState('');
+  const [data,setData]=useState(null),[overview,setOverview]=useState(null),[detail,setDetail]=useState(null);
+  const [loading,setLoading]=useState(false),[detailLoading,setDetailLoading]=useState(false),[error,setError]=useState(null),[detailError,setDetailError]=useState(null);
+  const [refresh,setRefresh]=useState(0),[loadingMore,setLoadingMore]=useState(false),[loadMoreError,setLoadMoreError]=useState(null);
   const months=useMemo(()=>Array.from({length:6},(_,i)=>shift(ymNow(),-i)),[]);
   const fy=fyOf(month);
   const isReady=Boolean(prptype&&property&&yearno&&typeof requestFn==='function');
+  const requestKey=`${prptype}|${property}|${fy}|${month}|${view}|${search}`;
+  useEffect(()=>{const timer=setTimeout(()=>setSearch(searchInput.trim()),SEARCH_DELAY_MS);return ()=>clearTimeout(timer);},[searchInput]);
+  // Keep month-wide headline values independent of the search box. When
+  // search is active, retain the unfiltered baseline rather than replacing
+  // KPI values with the subset returned by a filtered query.
+  useEffect(()=>{setOverview(null);},[month,view,property,prptype,refresh]);
 
   useEffect(()=>{
     let live=true;
+    pageBusy.current=false;
     if(!isReady) {setData(null);setLoading(false);return ()=>{live=false};}
-    setLoading(true);setError(null);setSelected(null);setDetail(null);setData(null);setLoadMoreError(null);
-    const url=endpoint(apiBase,{prptype,yearno:fy,month,view,pool_ui:1,include_detail:0,per_page:QUERY_LIMIT,page:1,property});
-    (async()=>{try{const raw=await requestFn(url),json=raw?.data??raw;if(!json?.success||!json?.response?.pool_view)throw new Error('Unable to read the monthly Pools response.');if(live)setData(json.response.pool_view);}catch(e){if(live){setError(e?.response?.data?.message||e?.message||'Unable to load Pools');setData(null);}}finally{if(live)setLoading(false);}})();
+    setLoading(true);setError(null);setSelected(null);setDetail(null);setData(null);setLoadMoreError(null);setLoadingMore(false);
+    listRef.current?.scrollToOffset?.({offset:0,animated:false});
+    const url=endpoint(apiBase,{prptype,yearno:fy,month,view,pool_ui:1,include_detail:0,per_page:QUERY_LIMIT,page:1,property,search});
+    (async()=>{try{
+      const raw=await requestFn(url),json=raw?.data??raw;
+      if(!json?.success||!json?.response?.pool_view)throw new Error('Unable to read the monthly Pools response.');
+      const next={...json.response.pool_view,__key:requestKey};
+      if(live){setData(next);if(!search)setOverview(next);}
+    }catch(e){if(live){setError(e?.response?.data?.message||e?.message||'Unable to load Pools');setData(null);}}
+    finally{if(live)setLoading(false);}})();
     return ()=>{live=false};
-  },[apiBase,prptype,fy,month,view,property,requestFn,refresh,isReady]);
+  },[apiBase,prptype,fy,month,view,property,requestFn,refresh,isReady,search,requestKey]);
 
   useEffect(()=>{
     let live=true;
-    if(!selected||!isReady) return ()=>{live=false};
+    if(!selected||!isReady)return ()=>{live=false};
     setDetailLoading(true);setDetailError(null);setDetail(null);
     const url=endpoint(apiBase,{prptype,yearno:fy,month,view,pool_ui:1,include_detail:1,per_page:1,page:1,property:selected.property,design_code:selected.design_code});
-    (async()=>{try{const raw=await requestFn(url),json=raw?.data??raw;
+    (async()=>{try{
+      const raw=await requestFn(url),json=raw?.data??raw;
       const one=json?.response?.pool_view?.pools?.find(p=>String(p.design_code)===String(selected.design_code)&&String(p.property)===String(selected.property));
-      if(!json?.success||!one)throw new Error('Unable to load selected pool details.');if(live)setDetail(one);
-    }catch(e){if(live)setDetailError(e?.response?.data?.message||e?.message||'Unable to load selected pool');}finally{if(live)setDetailLoading(false);}})();
+      if(!json?.success||!one)throw new Error('Unable to load selected pool details.');
+      if(live)setDetail(one);
+    }catch(e){if(live)setDetailError(e?.response?.data?.message||e?.message||'Unable to load selected pool');}
+    finally{if(live)setDetailLoading(false);}})();
     return ()=>{live=false};
   },[selected,month,fy,prptype,view,requestFn,apiBase,isReady]);
 
   const poolPagination=data?.pagination||null;
-  const mayLoadMore=!!poolPagination?.more_available && !loading && !loadingMore;
-  const loadMore=async()=>{
-    if(!mayLoadMore) return;
-    const nextPage=(Number(poolPagination.page)||1)+1;
-    setLoadingMore(true);setLoadMoreError(null);
-    const activeMonth=month;
+  const mayFetchNext=Boolean(data&&poolPagination?.more_available&&!loading&&!loadingMore);
+  const fetchNext=async()=>{
+    if(!mayFetchNext||pageBusy.current)return;
+    pageBusy.current=true;setLoadingMore(true);setLoadMoreError(null);
+    const keyAtStart=requestKey;
+    const nextPage=Number(poolPagination?.page||1)+1;
     try {
-      const url=endpoint(apiBase,{prptype,yearno:fy,month:activeMonth,view,pool_ui:1,include_detail:0,per_page:QUERY_LIMIT,page:nextPage,property});
+      const url=endpoint(apiBase,{prptype,yearno:fy,month,view,pool_ui:1,include_detail:0,per_page:QUERY_LIMIT,page:nextPage,property,search});
       const raw=await requestFn(url),json=raw?.data??raw;
-      if(!json?.success||!json?.response?.pool_view) throw new Error('Unable to load the next pool page.');
-      // Guard while the selected month is being changed. Changing the month
-      // unmounts/restarts the main request; the next result is discarded.
-      setData(old=>old&&old.month===activeMonth?combinePoolPages(old,json.response.pool_view):old);
-    } catch(e) {setLoadMoreError(e?.response?.data?.message||e?.message||'Unable to load more pools');}
-    finally {setLoadingMore(false);}
+      if(!json?.success||!json?.response?.pool_view)throw new Error('Unable to retrieve more pools while scrolling.');
+      setData(old=>old?.__key===keyAtStart?
+        {...combinePoolPages(old,json.response.pool_view),__key:keyAtStart}:old);
+    }catch(e){
+      setLoadMoreError(e?.response?.data?.message||e?.message||'Unable to load additional pools');
+    }finally{pageBusy.current=false;setLoadingMore(false);}
   };
   const pools=data?.pools||[];
   const sorted=useMemo(()=>pools.slice().sort((a,b)=>(b.entries?.length||0)-(a.entries?.length||0)||String(a.design_code).localeCompare(String(b.design_code))),[pools]);
   const cnt={all:sorted.length,overdue:sorted.every(x=>nonNull(x.overdue_count))?sorted.filter(x=>x.overdue_count>0).length:null,
     marked:sorted.every(x=>nonNull(x.marked_binds))?sorted.filter(x=>x.marked_binds>0).length:null,
     below:sorted.every(x=>nonNull(x.below_cost_count))?sorted.filter(x=>x.below_cost_count>0).length:null};
-  const listed=sorted.filter(p=>filter==='all'||(filter==='overdue'&&p.overdue_count>0)||(filter==='marked'&&p.marked_binds>0)||(filter==='below'&&p.below_cost_count>0));
-  const k=data?.kpis||{};
-  const kpisComplete=data?.monthly_totals_complete!==false;
-  // Never disguise a 100-card sum as a month-wide total. But hiding all
-  // values as dashes also conceals valid ERP quantities. Display the exact
-  // LOADED-PAGE subtotal while clearly marking it as partial until every
-  // eligible design (including PO/SO-only) has been reconciled.
-  const shown=kpisComplete?k:{...k,...(data?.loaded_page_kpis||{})};
-  const totals=[['PO quantity',fmt(shown.po_quantity)],['SO pending',fmt(shown.so_pending)],['Loose stock',fmt(shown.loose_stock)],['Overdue lines',integer(shown.overdue_lines)],['Marked binds',integer(shown.marked_binds)],['Below-cost POs',integer(shown.below_cost_pos)]];
-  return <ScrollView style={styles.page} contentContainerStyle={styles.pageContent} refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>setRefresh(x=>x+1)} tintColor={T.copper}/> }>
-    {selected? <>
-      {detailLoading&&<View style={styles.loading}><ActivityIndicator size="small" color={T.copper}/><Txt style={styles.aux}>Loading {selected.design_name||selected.design_code} · {monthName(month)}…</Txt></View>}
-      {detailError&&<TouchableOpacity style={styles.issue} onPress={()=>setSelected({...selected})}><Txt style={{color:T.red}}>{detailError} · Tap to retry</Txt></TouchableOpacity>}
-      <PoolDetail pool={detail||selected} view={view} onBack={()=>{setSelected(null);setDetail(null);setDetailError(null);}}/>
-    </>:<>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingBottom:9}}>{months.map(m=><Chip month key={m} active={month===m} onPress={()=>{setMonth(m);setFilter('all');}}>{monthName(m)}</Chip>)}</ScrollView>
+  const listed=useMemo(()=>sorted.filter(p=>filter==='all'||(filter==='overdue'&&p.overdue_count>0)||(filter==='marked'&&p.marked_binds>0)||(filter==='below'&&p.below_cost_count>0)),[sorted,filter]);
+  // Search filters design records at the API before page retrieval; only the
+  // already-returned matching rows are mounted in the virtualized list.
+  const kpiSource=search?(overview?.month===month?overview:null):data;
+  const kpiComplete=kpiSource?.monthly_totals_complete===true;
+  const k=kpiSource?.kpis||{};
+  const shown=kpiComplete?k:{...k,...(kpiSource?.loaded_page_kpis||{})};
+  const totals=[['PO quantity',fmt(shown.po_quantity)],['SO pending',fmt(shown.so_pending)],['Loose stock',fmt(shown.loose_stock)],
+    ['Overdue lines',integer(shown.overdue_lines)],['Marked binds',integer(shown.marked_binds)],['Below-cost POs',integer(shown.below_cost_pos)]];
+  const countSuffix=poolPagination?.more_available?'+':'';
+  const changeMonth=m=>{setMonth(m);setFilter('all');setSearchInput('');setSearch('');};
+  const retryNext=()=>{pageBusy.current=false;fetchNext();};
+  const closeDetail=()=>{setSelected(null);setDetail(null);setDetailError(null);};
 
+  if(selected) return <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
+    {detailLoading&&<View style={styles.loading}><ActivityIndicator size="small" color={T.copper}/><Txt style={styles.aux}>Loading {selected.design_name||selected.design_code} · {monthName(month)}…</Txt></View>}
+    {detailError&&<TouchableOpacity style={styles.issue} onPress={()=>setSelected({...selected})}><Txt style={{color:T.red}}>{detailError} · Tap to retry</Txt></TouchableOpacity>}
+    <PoolDetail pool={detail||selected} view={view} onBack={closeDetail}/>
+  </ScrollView>;
+
+  return <View style={styles.page}>
+    <View style={styles.boardContent}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flexGrow:0}} contentContainerStyle={{gap:6,paddingBottom:9}}>
+        {months.map(m=><Chip month key={m} active={month===m} onPress={()=>changeMonth(m)}>{monthName(m)}</Chip>)}
+      </ScrollView>
       {view==='my'&&<View style={[styles.section,{marginBottom:12}]}>
         <Txt style={{fontSize:18,fontWeight:'800',marginBottom:4}}>My orders</Txt>
         <Txt style={[styles.aux,{marginBottom:8}]}>Your production and sales orders inside the design pools · production share follows each executive’s proportion of the pool</Txt>
         <Row style={{gap:6,flexWrap:'wrap'}}>
-          <Mini name="My PO qty · loaded" value={pools.every(p=>nonNull(p.my_orders?.my_po_quantity))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_po_quantity||0),0)):'—'}/>
-          <Mini name="My SO pending · loaded" value={pools.every(p=>nonNull(p.my_orders?.my_so_pending))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_so_pending||0),0)):'—'}/>
-          <Mini name="Production share · loaded" value={pools.every(p=>nonNull(p.my_orders?.production_share_metres))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.production_share_metres||0),0)):'—'}/>
+          <Mini name="My PO qty · visible" value={pools.every(p=>nonNull(p.my_orders?.my_po_quantity))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_po_quantity||0),0)):'—'}/>
+          <Mini name="My SO pending · visible" value={pools.every(p=>nonNull(p.my_orders?.my_so_pending))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.my_so_pending||0),0)):'—'}/>
+          <Mini name="Production share · visible" value={pools.every(p=>nonNull(p.my_orders?.production_share_metres))?fmt(pools.reduce((v,p)=>v+Number(p.my_orders.production_share_metres||0),0)):'—'}/>
         </Row>
-        {poolPagination?.more_available&&<Txt style={[styles.aux,{marginTop:5}]}>Showing loaded pools only · more designs available</Txt>}
       </View>}
-
       <View style={styles.metrics}>{totals.map(([name,value],i)=><KPI key={name} label={name} value={value} hi={i===0} columns={columns}/>)}</View>
-      {!kpisComplete&&<Row style={{justifyContent:'space-between',alignItems:'center',marginTop:-7,marginBottom:10,gap:8,flexWrap:'wrap'}}><Txt style={[styles.aux,{color:T.copper,fontWeight:'800'}]}>Loaded-page quantities · NOT full-month totals</Txt><Txt style={styles.aux}>{pools.length} of {poolPagination?.total??'more'} shown · PO/SO-only designs may still be absent</Txt></Row>}
-
-      <Row style={{gap:6,flexWrap:'wrap',marginBottom:10}}>{[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>setFilter(key)}>{name} · {cnt[key]===null?'—':`${cnt[key]}${poolPagination?.more_available?'+':''}`}</Chip>)}</Row>
+      {!kpiComplete&&<Txt style={[styles.aux,{color:T.copper,marginBottom:7}]}>
+        {search?'Month KPIs are not changed by search. ':''}{kpiSource?'Displayed subtotals are from retrieved designs; complete monthly reconciliation is pending.':'Complete monthly KPI source not available.'}
+      </Txt>}
+      <Row style={{gap:6,flexWrap:'wrap',marginBottom:9}}>
+        {[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>{setFilter(key);listRef.current?.scrollToOffset?.({offset:0,animated:false});}}>{name} · {cnt[key]===null?'—':`${cnt[key]}${countSuffix}`}</Chip>)}
+      </Row>
+      <Row style={styles.searchBox}>
+        <Txt style={{fontSize:19,color:T.muted,marginRight:8}}>⌕</Txt>
+        <TextInput
+          accessibilityLabel="Search production order pools"
+          placeholder="Search design name or design code…"
+          placeholderTextColor={T.muted}
+          value={searchInput}
+          onChangeText={setSearchInput}
+          autoCorrect={false}
+          returnKeyType="search"
+          style={styles.searchInput}
+        />
+        {!!searchInput&&<TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear pool search" onPress={()=>setSearchInput('')} style={{paddingHorizontal:8,paddingVertical:4}}><Txt style={{fontSize:17,color:T.muted}}>×</Txt></TouchableOpacity>}
+        {loading&&<ActivityIndicator size="small" color={T.copper}/>}
+      </Row>
+      <Row style={{alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+        <Txt style={styles.listTitle}>Design pools · {monthName(month)}</Txt>
+        <TouchableOpacity accessibilityRole="button" onPress={()=>setShowStatus(x=>!x)}><Txt style={styles.aux}>{showStatus?'▾':'▸'} Data status</Txt></TouchableOpacity>
+      </Row>
+      {showStatus&&<View style={[styles.section,{marginBottom:8}]}><Txt style={[styles.aux,{lineHeight:17}]}>
+        The list searches all designs available to the existing ERP pool source and automatically loads more while scrolling. Month-wide KPIs are not yet independently certified; PO/SO-only designs not present in the conversion source may still be absent. Stock and binds are shown only when supported by dated, verified records. FY {fyLabel(month)}.
+      </Txt></View>}
       {filter==='marked'&&<Section label={`Marked binds · ${monthName(month)}`}>
         {sorted.flatMap(p=>(p.bind_events||[]).filter(e=>e.no_po||Number(e.over_metres)>0||(e.ahead_of||[]).length).map(e=>({...e,pool:p})))
           .sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date))).map((e,i)=><TouchableOpacity key={`${e.pool.key}:${e.id||i}`} onPress={()=>setSelected(e.pool)} style={styles.entry}>
             <Row style={{alignItems:'center',gap:8}}><View style={styles.designTag}><Txt mono style={{fontSize:10,fontWeight:'800'}}>{e.pool.design_code}</Txt></View><View style={{flex:1}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date)} · {e.executive} · {e.via}</Txt><Txt style={styles.aux}>{e.reference||'—'}</Txt></View><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)}</Txt></Row>
             <Row style={{gap:5,flexWrap:'wrap',marginTop:4}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF {e.ahead_of.map(x=>x.po_no||x.po_uid).join(', ')}</Pill>}</Row>
           </TouchableOpacity>)}
-        {cnt.marked===null&&<Empty>Saved bind history is incomplete; displayed events are recorded, not a complete monthly count.</Empty>}
-        {cnt.marked===0&&<Empty>No drew-ahead, over-quantity or no-PO binds this month.</Empty>}
+        {cnt.marked===null&&<Empty>Saved bind history is incomplete. Recorded events do not establish the complete monthly count.</Empty>}
+        {cnt.marked===0&&<Empty>No recorded flagged binds in the currently retrieved records.</Empty>}
       </Section>}
-      {filter==='below'&&<Section label={`Approved below cost · ${monthName(month)}`}><Empty>{cnt.below===null?'Verified costing comparisons are not yet available.':cnt.below===0?'No below-cost POs in this month.':'Select a flagged pool to see the costing.'}</Empty></Section>}
-      <Row style={{alignItems:'center',justifyContent:'space-between',marginBottom:9,gap:8}}>
-        <TouchableOpacity accessibilityRole="button" onPress={()=>setShowStatus(s=>!s)} style={{paddingVertical:3}}><Txt style={{color:T.muted,fontSize:10,fontWeight:'700'}}>{showStatus?'▾':'▸'} Data status</Txt></TouchableOpacity>
-        {poolPagination?.more_available&&<TouchableOpacity accessibilityRole="button" onPress={loadMore} disabled={!mayLoadMore} style={{paddingVertical:3}}><Txt style={{color:T.copper,fontSize:10,fontWeight:'800'}}>{loadingMore?'Loading…':`Showing ${pools.length} of ${poolPagination.total??'more'} · Load more`}</Txt></TouchableOpacity>}
-      </Row>
-      {showStatus&&<View style={[styles.section,{marginBottom:10}]}><Txt style={[styles.aux,{lineHeight:17}]}>FY {fyLabel(month)} · {monthName(month)}. PO totals are from the current pool source; historical SO balances are reconstructed from dated dispatches. Checking metres are recorded production. Loose stock, confirmed draws, marks and cost comparison appear only after their dated source events are verified. {poolPagination?.more_available?'Totals and filters currently include only loaded designs.':''}</Txt></View>}
-      {listed.map(p=><PoolItem key={p.key} pool={p} view={view} open={()=>setSelected(p)}/>)}
-      {!loading&&!listed.length&&<View style={styles.pool}><Empty>{filter!=='all'&&cnt[filter]===null?'Verified figures for this filter are not yet available.':data?`Nothing ${filter==='all'?'available':'flagged'} in ${monthName(month)}.`:'No pools loaded.'}</Empty></View>}
-      {poolPagination&&<Row style={{alignItems:'center',justifyContent:'space-between',marginTop:6,marginBottom:12,gap:10}}>
-        <Txt style={styles.aux}>{poolPagination.total!=null?`Loaded ${pools.length} of ${poolPagination.total} design pools`:`Loaded ${pools.length} design pools`}{poolPagination.more_available?' · more available':''}</Txt>
-        {mayLoadMore&&<TouchableOpacity onPress={loadMore} style={[styles.chip,{borderColor:T.copper}]}><Txt style={{color:T.copper,fontWeight:'800',fontSize:11}}>Load more pools</Txt></TouchableOpacity>}
-        {loadingMore&&<ActivityIndicator size="small" color={T.copper}/>}
-      </Row>}
-      {!!loadMoreError&&<TouchableOpacity onPress={loadMore} style={styles.issue}><Txt style={{color:T.red}}>{loadMoreError} · Tap to retry</Txt></TouchableOpacity>}
-      {!!loading&&<View style={styles.loading}><ActivityIndicator color={T.copper}/><Txt style={styles.aux}>Loading monthly pools…</Txt></View>}
+      {filter==='below'&&<Section label={`Below cost · ${monthName(month)}`}><Empty>{cnt.below===null?'Verified costing comparisons are not yet available.':cnt.below===0?'No below-cost POs in the currently retrieved records.':'Select a flagged pool to see costing.'}</Empty></Section>}
+      <View style={[styles.listViewport,{height:listHeight}]}>
+        <FlatList
+          ref={listRef}
+          data={listed}
+          style={{flex:1}}
+          keyExtractor={p=>p.key}
+          renderItem={({item})=><PoolItem pool={item} view={view} open={()=>setSelected(item)}/>}
+          showsVerticalScrollIndicator
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+          initialNumToRender={8}
+          maxToRenderPerBatch={12}
+          windowSize={9}
+          onEndReachedThreshold={0.55}
+          onEndReached={fetchNext}
+          onScroll={e=>{const n=e.nativeEvent||{};const y=n.contentOffset?.y||0;const h=n.layoutMeasurement?.height||0;const full=n.contentSize?.height||0;if(full>0&&y+h>=full-300)fetchNext();}}
+          scrollEventThrottle={240}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>setRefresh(x=>x+1)} tintColor={T.copper}/>}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={!loading?<View style={styles.pool}><Empty>{search?`No pool design found for “${search}”.`:filter!=='all'&&cnt[filter]===null?'Verified values for this filter are not yet available.':filter!=='all'?`No ${filter} designs in the currently retrieved records.`:'No pools loaded.'}</Empty></View>:null}
+          ListFooterComponent={<View style={{paddingVertical:7,minHeight:32,alignItems:'center',justifyContent:'center'}}>
+            {loadingMore&&<Row style={{gap:8,alignItems:'center'}}><ActivityIndicator size="small" color={T.copper}/><Txt style={styles.aux}>Loading more design pools…</Txt></Row>}
+            {!!loadMoreError&&<TouchableOpacity onPress={retryNext} accessibilityRole="button"><Txt style={{color:T.red,fontWeight:'700',fontSize:11}}>{loadMoreError} · Retry</Txt></TouchableOpacity>}
+            {!loading&&!loadingMore&&!loadMoreError&&!poolPagination?.more_available&&pools.length>0&&<Txt style={styles.aux}>End of available results</Txt>}
+          </View>}
+        />
+      </View>
       {!!error&&<TouchableOpacity onPress={()=>setRefresh(x=>x+1)} style={styles.issue}><Txt style={{color:T.red}}>{error} · Tap to retry</Txt></TouchableOpacity>}
-
-    </>}
-  </ScrollView>;
+    </View>
+  </View>;
 }
 
 const styles=StyleSheet.create({
-  page:{flex:1,backgroundColor:T.bg},pageContent:{width:'100%',maxWidth:1220,alignSelf:'center',paddingHorizontal:12,paddingTop:10,paddingBottom:36},
+  page:{flex:1,backgroundColor:T.bg},pageContent:{width:'100%',maxWidth:1220,alignSelf:'center',paddingHorizontal:12,paddingTop:10,paddingBottom:20},
+  boardContent:{flex:1,width:'100%',maxWidth:1220,alignSelf:'center',paddingHorizontal:12,paddingTop:10,paddingBottom:12},
+  searchBox:{flexDirection:'row',alignItems:'center',borderRadius:9,borderColor:T.border,borderWidth:1,backgroundColor:T.surface,paddingHorizontal:12,minHeight:43,marginBottom:10},
+  searchInput:{flex:1,fontFamily:'DMSans',fontSize:13,color:T.ink,paddingVertical:7,outlineStyle:'none'},
+  listTitle:{fontWeight:'800',fontSize:11,color:T.muted,textTransform:'uppercase',letterSpacing:0.5},
+  listViewport:{flexShrink:1,minHeight:220,backgroundColor:T.bg,borderRadius:9,borderWidth:1,borderColor:T.border,overflow:'hidden'},listContent:{paddingHorizontal:5,paddingTop:7,paddingBottom:8},
   text:{color:T.ink,fontSize:11,fontFamily:'DMSans'},mono:{fontFamily:'DMMono',fontVariant:['tabular-nums']},aux:{fontSize:9.5,color:T.muted,lineHeight:15},row:{flexDirection:'row'},
   chip:{paddingHorizontal:12,paddingVertical:7,borderRadius:20,borderWidth:1.5,borderColor:T.border,backgroundColor:T.surface,alignItems:'center',justifyContent:'center'},activeMonth:{backgroundColor:'rgba(200,117,51,0.12)',borderColor:T.copper},activeFilter:{backgroundColor:T.nav,borderColor:T.nav},
   metrics:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:12,justifyContent:'space-between'},kpi:{backgroundColor:T.sub,borderWidth:1,borderColor:T.border,borderRadius:9,paddingVertical:9,paddingHorizontal:11,minHeight:58},kpiHi:{backgroundColor:'#FCF5ED',borderColor:'#E2C6AB'},kpiTitle:{fontSize:8.5,color:T.muted,textTransform:'uppercase',letterSpacing:0.4,fontWeight:'800'},kpiValue:{fontSize:14,fontWeight:'800',marginTop:3},

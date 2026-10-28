@@ -119,30 +119,72 @@ export default function BrowseSheet({
   const cols = layout === 'desktop' ? [...DESKTOP_COLS, ...dynamicCols, UOM_COL] : TABLET_COLS;
 
   /* ---------------- lazy loading: first page fast, the rest while scrolling ---------------- */
-  // Phone: small pages + manual "Show more" button (light on memory / data). Tablet & desktop: bigger pages + auto-load on scroll.
-  const manual = layout === 'phone';
-  const PER_PAGE = manual ? 20 : 50;
+  // All layouts use an explicit Show more button (like Owner Dashboard).
+  // Phone reveals smaller batches; tablet/desktop reveal 50 rows at a time.
+  const manual = true;
+  const PER_PAGE = layout === 'phone' ? 10 : 50;
   const rk = (r: BrowseRow) => `${r.code}|${r.mItmCode}`;
   const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0); // server total (0 = unknown)
   const [loadingMore, setLoadingMore] = useState(false);
   const [qServer, setQServer] = useState('');   // debounced search text that is sent to the server
   const pageRef = useRef(1);
   const rowsRef = useRef<BrowseRow[]>([]);
   rowsRef.current = rows;
   const mounted = useRef(false);
+  // Search over the WHOLE list: if the server does not filter by `search`, the full list is fetched once (cached)
+  // and searched on the device; it is still shown PER_PAGE at a time ("localMode").
+  const [localMode, setLocalMode] = useState(false);
+  const [shown, setShown] = useState(PER_PAGE);
+  const allRef = useRef<BrowseRow[] | null>(null);
+
+  const dedupe = (list: BrowseRow[]) => {
+    const seen = new Set<string>();
+    return list.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true)));
+  };
+  /** Every row of the store, page by page (only used when the server ignores `search`). */
+  const loadAll = async (id: number): Promise<BrowseRow[] | null> => {
+    const out: BrowseRow[] = [];
+    const seen = new Set<string>();
+    for (let p = 1; p <= 100; p++) {
+      const r = await fetchPage(p, 200, '');
+      if (id !== seq.current) return null;
+      const add = r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true)));
+      out.push(...add);
+      if (!add.length || !r.hasMore) break;
+    }
+    return out;
+  };
 
   const fetchFirst = useCallback(async (search: string) => {
     const id = ++seq.current; // also cancels any page still in flight
     setLoading(true);
     setLoadingMore(false);
     setError('');
+    setShown(PER_PAGE);
     try {
+      // 1) search already known to need the whole list -> use the cache
+      if (search && allRef.current) {
+        setRows(allRef.current); setLocalMode(true); setHasMore(false); setTotal(0);
+        return;
+      }
       const r = await fetchPage(1, PER_PAGE, search);
       if (id !== seq.current) return;
-      const seen = new Set<string>();
-      setRows(r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true))));
+      const first = dedupe(r.rows);
+      // 2) does the server really filter by `search`? (every returned row should match what was typed)
+      const honored = !search || first.length === 0 || filterBrowse(first, search, '', NO_COLUMN_FILTERS, 'name', 'asc').length === first.length;
+      if (!honored) {
+        const all = await loadAll(id);
+        if (!all || id !== seq.current) return;
+        allRef.current = all;
+        setRows(all); setLocalMode(true); setHasMore(false); setTotal(0);
+        return;
+      }
+      setLocalMode(false);
+      setRows(first);
       pageRef.current = 1;
       setHasMore(r.hasMore);
+      setTotal(r.total || 0);
     } catch (e: any) {
       if (id === seq.current) { setError(e?.message || 'Could not load the item list.'); setHasMore(false); }
     } finally {
@@ -151,26 +193,6 @@ export default function BrowseSheet({
   }, [fetchPage, PER_PAGE]);
 
   const load = useCallback(() => fetchFirst(qServer), [fetchFirst, qServer]);
-
-  const loadMore = useCallback(async () => {
-    if (loading || loadingMore || !hasMore || error) return;
-    const id = seq.current;
-    setLoadingMore(true);
-    try {
-      const next = pageRef.current + 1;
-      const r = await fetchPage(next, PER_PAGE, qServer);
-      if (id !== seq.current) return;
-      const seen = new Set(rowsRef.current.map(rk));
-      const add = r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true)));
-      pageRef.current = next;
-      if (add.length) setRows((prev) => [...prev, ...add]);
-      setHasMore(add.length > 0 && r.hasMore); // a page with nothing new = server has no more
-    } catch (e: any) {
-      if (id === seq.current) setHasMore(false);
-    } finally {
-      if (id === seq.current) setLoadingMore(false);
-    }
-  }, [loading, loadingMore, hasMore, error, fetchPage, qServer, PER_PAGE]);
 
   useEffect(() => {
     void fetchFirst('');
@@ -203,13 +225,40 @@ export default function BrowseSheet({
     const value = (r: BrowseRow) => String((r.apiData || {})[groupBy] ?? (r as any)[groupBy] ?? '—');
     return [...filtered].sort((a, b) => value(a).localeCompare(value(b), undefined, { numeric: true }) || a.name.localeCompare(b.name));
   }, [rows, q, group, colF, dynamicColF, dynamicCols, sortKey, sortDir, groupBy]);
+  const loadMore = useCallback(async () => {
+    // If the API already returned more rows than are visible, reveal the next batch locally.
+    if (data.length > shown) { setShown((n) => n + PER_PAGE); return; }
+    if (localMode) { setShown((n) => n + PER_PAGE); return; }
+    if (loading || loadingMore || !hasMore || error) return;
+    const id = seq.current;
+    setLoadingMore(true);
+    try {
+      const next = pageRef.current + 1;
+      const r = await fetchPage(next, PER_PAGE, qServer);
+      if (id !== seq.current) return;
+      const seen = new Set(rowsRef.current.map(rk));
+      const add = r.rows.filter((x) => (seen.has(rk(x)) ? false : (seen.add(rk(x)), true)));
+      pageRef.current = next;
+      if (add.length) setRows((prev) => [...prev, ...add]);
+      if (add.length) setShown((n) => n + PER_PAGE);
+      if (r.total) setTotal(r.total);
+      setHasMore(add.length > 0 && r.hasMore); // a page with nothing new = server has no more
+    } catch (e: any) {
+      if (id === seq.current) setHasMore(false);
+    } finally {
+      if (id === seq.current) setLoadingMore(false);
+    }
+  }, [data.length, shown, localMode, loading, loadingMore, hasMore, error, fetchPage, qServer, PER_PAGE]);
+
+  // Always cap the visible list. Some APIs return every record despite page parameters,
+  // so this also prevents a huge browse list from rendering all rows at once.
+  const shownData = useMemo(() => data.slice(0, shown), [data, shown]);
+  const canMore = data.length > shown || (!localMode && hasMore);
+  // any new search / filter starts again from the first PER_PAGE
+  useEffect(() => setShown(PER_PAGE), [q, group, colF, dynamicColF, sortKey, sortDir, groupBy, PER_PAGE]);
   const filtering = !!(q || group || Object.values(colF).some(Boolean) || Object.values(dynamicColF).some(Boolean));
-  // Not enough rows to fill the list (tall screen, or column / group filters hide most of the loaded rows)
-  // -> keep pulling pages so scrolling / filtering never dead-ends.
-  useEffect(() => {
-    if (manual) return; // phone: only when the user taps "Show more"
-    if (hasMore && !loading && !loadingMore && !error && data.length < (filtering ? 40 : 20)) void loadMore();
-  }, [manual, hasMore, loading, loadingMore, error, data.length, filtering, loadMore]);
+  // Never auto-fetch on scroll: users explicitly choose Show more on every screen size.
+  // This keeps browse responsive even when the store contains tens of thousands of items.
   const exportRows = (format: 'csv' | 'pdf') => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const exportCols = cols.map((c) => ({ key: c.key, label: c.label }));
@@ -448,7 +497,7 @@ export default function BrowseSheet({
       {header}
       <FlatList
         ref={listRef}
-        data={loading || error ? [] : data}
+        data={loading || error ? [] : shownData}
         keyExtractor={(r) => r.key}
         renderItem={layout === 'phone' ? renderCard : renderGridRow}
         getItemLayout={layout === 'phone' ? undefined : (_, index) => ({ length: rowH, offset: rowH * index, index })}
@@ -460,21 +509,34 @@ export default function BrowseSheet({
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={layout === 'phone' ? { padding: 16, paddingTop: 4, gap: 10 } : undefined}
         onScrollToIndexFailed={() => { }}
-        onEndReached={manual ? undefined : () => void loadMore()}
-        onEndReachedThreshold={0.6}
+        onEndReached={undefined}
         ListFooterComponent={
           loadingMore ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 }}>
               <ActivityIndicator size="small" color={T.copper} />
               <Text style={g.count}>Loading more…</Text>
             </View>
-          ) : hasMore && !loading && data.length > 0 ? (
-            <View style={{ alignItems: 'stretch', paddingVertical: 12, paddingHorizontal: manual ? 0 : 16 }}>
-              <Btn icon="expand-more" label={manual ? `Show more (${PER_PAGE} more)` : 'Show more'} onPress={() => void loadMore()} />
+          ) : canMore && !loading && shownData.length > 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 14 }}>
+              {/* same pill as Owner Dashboard: "Show more (50 of 214)" */}
+              <Pressable
+                onPress={() => void loadMore()}
+                accessibilityRole="button"
+                accessibilityLabel="Show more items"
+                style={(st: any) => [
+                  { minHeight: 44, paddingHorizontal: 24, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: 'center', justifyContent: 'center' },
+                  st.hovered && { backgroundColor: T.alt },
+                  st.pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={{ color: T.copper, fontSize: 14, fontWeight: '800' }}>
+                  {`Show more  (${shownData.length} of ${localMode ? data.length : total && !filtering ? total : hasMore ? `${rows.length}+` : data.length})`}
+                </Text>
+              </Pressable>
             </View>
           ) : null
         }
-        extraData={{ active, widths, wrapW, loadingMore, hasMore }}
+        extraData={{ active, widths, wrapW, loadingMore, hasMore, canMore, shown }}
       />
     </>
   );
@@ -490,15 +552,17 @@ export default function BrowseSheet({
       onClose={onClose}
       headerRight={<Btn icon="refresh" iconOnly kind="quiet" compact onPress={load} disabled={loading} accessibilityLabel="Refresh item list" />}
       footer={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={g.count} numberOfLines={1}>
-              {loading ? 'Loading…' : `Showing ${data.length} of ${rows.length}${hasMore ? '+' : ''} lines`}
+        <View style={{ gap: 10 }}>
+          <View style={{ minWidth: 0 }}>
+            <Text style={g.count} numberOfLines={2}>
+              {loading ? 'Loading…' : `Showing ${shownData.length} of ${localMode ? data.length : total && !filtering ? total : hasMore ? `${rows.length}+` : data.length} lines`}
             </Text>
             {layout === 'desktop' && !loading && data.length > 0 ? <Text style={g.hint}>Use ↑ ↓ to move, Enter to open, Esc to close</Text> : null}
           </View>
-          {filtering ? <Btn compact label="Clear filters" onPress={clearFilters} /> : null}
-          <Btn label="Cancel" onPress={onClose} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+            {filtering ? <Btn compact label="Clear filters" onPress={clearFilters} /> : null}
+            <Btn label="Cancel" onPress={onClose} />
+          </View>
         </View>
       }
     >
@@ -506,13 +570,20 @@ export default function BrowseSheet({
         {/* search + group chips + (phone) sort chips */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
           <SearchBox value={q} onChangeText={setQ} placeholder="Search code, item or group" autoFocus={Platform.OS === 'web' && win >= 760} />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: T.muted, fontSize: 12, fontWeight: '700' }}>Group by</Text>
-            <Pressable onPress={() => { const fields = ['']; setGroupBy(fields[0]); }} style={g.toolBtn}><Text style={g.toolText}>None</Text></Pressable>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-              {cols.map((c) => { const fieldKey = c.key.startsWith('api:') ? c.key.slice(4) : c.key; return <FilterChip key={c.key} label={c.label} active={groupBy === fieldKey} onPress={() => setGroupBy(groupBy === fieldKey ? '' : fieldKey)} />; })}
-            </ScrollView>
-            {Platform.OS === 'web' ? <><Btn compact label="Excel / CSV" onPress={() => exportRows('csv')} /><Btn compact label="PDF / Print" onPress={() => exportRows('pdf')} /></> : null}
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: T.muted, fontSize: 12, fontWeight: '700' }}>Group by</Text>
+              <Pressable onPress={() => setGroupBy('')} style={g.toolBtn}><Text style={g.toolText}>None</Text></Pressable>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} style={{ flexGrow: 0, maxWidth: '100%' }}>
+                {cols.map((c) => { const fieldKey = c.key.startsWith('api:') ? c.key.slice(4) : c.key; return <FilterChip key={c.key} label={c.label} active={groupBy === fieldKey} onPress={() => setGroupBy(groupBy === fieldKey ? '' : fieldKey)} />; })}
+              </ScrollView>
+            </View>
+            {Platform.OS === 'web' ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+                <Btn compact label="Excel / CSV" onPress={() => exportRows('csv')} />
+                <Btn compact label="PDF / Print" onPress={() => exportRows('pdf')} />
+              </View>
+            ) : null}
           </View>
           {groups.length > 1 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 2 }} keyboardShouldPersistTaps="handled">

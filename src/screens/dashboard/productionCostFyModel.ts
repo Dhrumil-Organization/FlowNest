@@ -58,6 +58,7 @@ export type CostMonth = {
   available: boolean;
   complete: boolean;
   hasSource: boolean;
+  costSourceReady: boolean;
   amount: number | null;
   heads: Record<CostHead, number>;
   metres: number;
@@ -75,7 +76,7 @@ export function fromMonth(year: number, index: number, item?: MonthState): CostM
   const base = { year, index, label: fyMonths(year)[index].label, key: fyMonthKey(year, index) };
   const empty = { electricity: 0, salary: 0, stores: 0, maintenance: 0, other: 0 };
   if (!item || item.status !== 'ready' || !item.data) return {
-    ...base, available: false, complete: false, hasSource: false, amount: null,
+    ...base, available: false, complete: false, hasSource: false, costSourceReady: false, amount: null,
     heads: empty, metres: 0, weightedPicks: 0, picksReliable: false, machineDays: 0,
     mode: index >= 6 && year >= 2026 ? 'section_ab' as const : 'legacy_rapier_waterjet' as const,
     status: item?.status ?? 'not-requested', reason: item?.reason,
@@ -97,6 +98,22 @@ export function fromMonth(year: number, index: number, item?: MonthState): CostM
   const hasHeads = d.composition && typeof (d.composition as any).maintenance !== 'undefined'
     && typeof (d.composition as any).other !== 'undefined';
   const complete = d.period?.is_complete === true && (headsMatch || !hasHeads);
+  /*
+   * Production Cost is NOT total cost when historical ExpCosting has no
+   * Electricity/Salary rows. Older FY databases can return Stores cost and
+   * valid checking metres although both daily expense heads are absent.
+   * The monthly Expense API exposes both source dates independently. Require
+   * each source to cover the effective month cutoff, not the browser date:
+   * Oct '26 can legitimately be costed through 26 Oct on a 28 Oct request.
+   * This is FY-only eligibility; it never changes the monthly card's total.
+   */
+  const sourceCoverage = (d.period as any)?.source_coverage;
+  const electricityLast = num(sourceCoverage?.electricity_last_entered_ymd);
+  const salaryLast = num(sourceCoverage?.salary_last_entered_ymd);
+  const effectiveThrough = num(d.period?.upto_date_ymd);
+  const costSourceReady = headsMatch && effectiveThrough > 0
+    && electricityLast >= effectiveThrough && salaryLast >= effectiveThrough
+    && heads.electricity > 0.005 && heads.salary > 0.005;
   const avg = num(d.summary?.avg_picks);
   const metres = num(d.summary?.production_mtr);
   const mode = (d.meta as any)?.calculation_mode === 'section_ab'
@@ -118,15 +135,19 @@ export function fromMonth(year: number, index: number, item?: MonthState): CostM
     : (verifiedCheckingPpi ? checkingWeighted : 0);
   const picksReliable = weightedPicks > 0;
   return {
-    ...base, available: hasSource, complete, hasSource,
-    amount: hasSource && headsMatch ? total : null,
+    ...base, available: hasSource, complete: complete && costSourceReady,
+    hasSource, costSourceReady,
+    // Exclude partial historical months from FY TOTALS and COST-RATE
+    // denominators; their original source rows stay in raw for drilldowns.
+    amount: hasSource && costSourceReady ? total : null,
     heads, metres, weightedPicks, picksReliable,
     machineDays: num(d.summary?.machine_days),
     mode,
     coverageDate: sourceDate || undefined,
     raw: d, status: 'ready',
-    reason: !hasSource ? 'No expense entries for this month'
-      : !headsMatch ? 'Cost components do not reconcile with monthly total' : undefined,
+    reason: !hasSource ? 'No recorded expenses for this month'
+      : !headsMatch ? 'Monthly expense totals do not match'
+      : !costSourceReady ? 'Electricity or Salary not recorded for this month' : undefined,
   };
 }
 export type YearStats = {
@@ -155,7 +176,12 @@ export function summarizeYear(year: number, months: CostMonth[]): YearStats {
   const partial = withData.filter(m => !m.complete).length;
   const heads = HEADS.reduce((a, h) => { a[h.key] = withData.reduce((t, m) => t + m.heads[h.key], 0); return a; }, {} as Record<CostHead, number>);
   const total = withData.reduce((s, m) => s + num(m.amount), 0);
-  const metres = withData.reduce((s, m) => s + m.metres, 0);
+  // Production is an independent, valid ERP measure even where historical
+  // Electricity/Salary were not entered. Do not erase production when
+  // excluding an incomplete month from COST aggregation.
+  const metres = months.filter(m => m.raw && m.status === 'ready')
+    .reduce((s, m) => s + m.metres, 0);
+  const costMetres = withData.reduce((s, m) => s + m.metres, 0);
   const weightedPicks = withData.reduce((s, m) => s + m.weightedPicks, 0);
   const allPpiVerified = withData.every(m => m.metres <= 0 || m.picksReliable);
   const machineDays = withData.reduce((s, m) => s + m.machineDays, 0);
@@ -165,7 +191,7 @@ export function summarizeYear(year: number, months: CostMonth[]): YearStats {
     verified: pending === 0 && missing === 0 && partial === 0 && withData.length === months.length,
     pending, missing, partial, ready: withData.length, heads, metres, weightedPicks, machineDays,
     costPerPick: allPpiVerified && weightedPicks > 0 ? total / weightedPicks : null,
-    costPerMetre: metres > 0 ? total / metres : null,
+    costPerMetre: costMetres > 0 ? total / costMetres : null,
     costPerMcDay: machineDays > 0 ? total / machineDays : null,
     monthlyAverage: withData.length > 0 ? total / withData.length : null,
     bestMonth,
@@ -419,53 +445,81 @@ export function monthSectionRows(m: CostMonth, head: CostHead): SectionCost[] | 
 }
 
 /**
- * Claude Artifact's "Entries" means one non-zero expense-head / section
- * line in a month, NOT each ERP voucher, Store issue or dated save.
- * Build those lines from the same verified cost breakdown already used by
- * the FY expense drilldown. Never count an unreconciled section allocation.
+ * Claude's Entries tile counts non-zero cost lines by Expense Head and
+ * Section / historical division. It does NOT count voucher rows or daily
+ * save events. The monthly expense-card's composition is authoritative.
+ *
+ * Some legitimate monthly heads cannot be split into sections: for example,
+ * October's independently entered Electricity may extend beyond the final
+ * Salary cutoff, and historical shared meters need not add to the legacy
+ * rapier/waterjet display allocations. In those cases one real, non-zero
+ * Expense Head is one line. Never fail the ENTIRE FY entry count merely
+ * because a single head's section allocation is unavailable.
+ *
+ * No monetary values are added, changed, estimated or redistributed here.
  */
 export function countExpenseCostLines(month: CostMonth): number | null {
   if (!month.available || month.amount === null || !month.raw) return null;
-  // Read-only monthly KPI from the service: source lines were individually
-  // reconciled with the same recorded cost-head amounts shown in this report.
-  const saved = (month.raw as any).fy_cost_lines;
-  if (saved?.basis === 'expense_head_section') {
-    if (saved.verified !== true) return null;
-    const rows = Array.isArray(saved.lines) ? saved.lines : [];
-    const count = Number(saved.count);
-    if (Number.isInteger(count) && count >= 0 && rows.length === count
-      && rows.every((r: any) => r && typeof r.head === 'string'
-        && typeof r.section === 'string' && Number(r.amount) > .005)) return count;
-    return null;
-  }
-  let count = 0;
-  for (const head of HEADS) {
-    const reported = month.heads[head.key];
-    if (Math.abs(reported) <= 0.005) continue;
-    const lines = monthSectionRows(month, head.key);
-    if (lines !== null) {
-      const sum = lines.reduce((acc, line) => acc + line.amount, 0);
-      if (Math.abs(sum - reported) > 1) return null;
-      count += lines.filter(line => line.amount > 0.005).length;
-      continue;
+  const tolerance = (v: number) => Math.max(1, Math.abs(v) * 0.000001);
+  const raw = month.raw as any;
+
+  // The optional server-side breakdown can be used when *every* head in it
+  // reconciles to the monthly card. If its all-or-nothing verification failed,
+  // compute per-head counts below instead of returning a blank KPI.
+  const fromServer = raw.fy_cost_lines;
+  if (fromServer?.basis === 'expense_head_section' && fromServer.verified === true) {
+    const lines: any[] = Array.isArray(fromServer.lines) ? fromServer.lines : [];
+    const reported = Number(fromServer.count);
+    const validLines = Number.isInteger(reported) && reported === lines.length
+      && lines.every((r: any) => r && typeof r.head === 'string'
+        && typeof r.section === 'string' && Number.isFinite(Number(r.amount))
+        && Number(r.amount) > .005);
+    if (validLines) {
+      const validHeads = HEADS.every(h => {
+        const sum = lines.filter(r => r.head === h.key)
+          .reduce((t, r) => t + Number(r.amount), 0);
+        return Math.abs(sum - month.heads[h.key]) <= tolerance(month.heads[h.key]);
+      });
+      if (validHeads) return reported;
     }
-    // Section A/B's monthly totals are authoritative even when its day-by-day
-    // allocation is not yet ready for the drilldown. Count them only if they
-    // independently reconcile to the reported expense head.
-    if (month.mode !== 'section_ab') return null;
-    const section = (month.raw as any).section_ab || {};
-    const sectionHead = section[head.key] || {};
-    const fieldA = head.key === 'stores' ? 'final_section_a_amount'
-      : head.key === 'maintenance' || head.key === 'other' ? 'section_a_allocated'
-      : 'section_a_amount';
-    const fieldB = head.key === 'stores' ? 'final_section_b_amount'
-      : head.key === 'maintenance' || head.key === 'other' ? 'section_b_allocated'
-      : 'section_b_amount';
-    const a = sectionHead[fieldA], b = sectionHead[fieldB];
-    if (a == null || b == null || !Number.isFinite(Number(a)) || !Number.isFinite(Number(b))) return null;
-    if (Math.abs(Number(a) + Number(b) - reported) > 1) return null;
-    count += Number(a) > 0.005 ? 1 : 0;
-    count += Number(b) > 0.005 ? 1 : 0;
+  }
+
+  let count = 0;
+  for (const { key } of HEADS) {
+    const amount = month.heads[key];
+    if (!Number.isFinite(amount)) return null;
+    if (amount <= .005) continue;
+    let shares: number[] | null = null;
+    if (month.mode === 'legacy_rapier_waterjet') {
+      const a = raw.division?.rapier?.[key];
+      const b = raw.division?.waterjet?.[key];
+      if (a != null && b != null && Number.isFinite(Number(a)) && Number.isFinite(Number(b))) {
+        shares = [Number(a), Number(b)];
+      }
+    } else {
+      const group = raw.section_ab?.[key];
+      if (group && typeof group === 'object') {
+        const aField = key === 'stores' ? 'final_section_a_amount'
+          : key === 'maintenance' || key === 'other' ? 'section_a_allocated'
+          : 'section_a_amount';
+        const bField = key === 'stores' ? 'final_section_b_amount'
+          : key === 'maintenance' || key === 'other' ? 'section_b_allocated'
+          : 'section_b_amount';
+        if (group[aField] != null && group[bField] != null
+          && Number.isFinite(Number(group[aField])) && Number.isFinite(Number(group[bField]))) {
+          shares = [Number(group[aField]), Number(group[bField])];
+        }
+      }
+    }
+    if (shares && shares.every(v => v >= -.005)
+      && Math.abs(shares[0] + shares[1] - amount) <= tolerance(amount)) {
+      count += shares.filter(v => v > .005).length;
+    } else {
+      // Authoritative expense head exists, but its section split is not
+      // comparable to the monthly summary: count the saved head ONCE, not
+      // two guessed section lines, and never suppress unrelated heads.
+      count += 1;
+    }
   }
   return count;
 }

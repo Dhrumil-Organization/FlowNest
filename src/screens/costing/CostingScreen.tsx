@@ -412,6 +412,9 @@ function CostingTab({
     const [mdId, setMdId] = useState('');
     const [design, setDesign] = useState<Design | null>(null);
     const [priceMap, setPriceMap] = useState<Record<string, number>>({});
+    /** where each yarn row's starting price came from: Yarn Rates (latest date → highest rate) or the yarn master */
+    type RateSrc = { from: 'rates'; rate: number; date: string; entries: number; via_main: boolean } | { from: 'none' };
+    const [rateSrc, setRateSrc] = useState<Record<string, RateSrc>>({});
     const [dyeMap, setDyeMap] = useState<Record<string, number>>({});
     const [ydTiers, setYdTiers] = useState<YdTierRates>({ ...DEFAULT_YD_TIERS });
     const [subTiers, setSubTiers] = useState<Record<string, YdTierCode>>({});
@@ -465,9 +468,29 @@ function CostingTab({
         return { pm, dm };
     };
 
+    /**
+     * Yarn prices of a NEW costing come from the BACKEND: the design API's base_price of every yarn is already the
+     * Yarn Rates value (latest date → highest rate on that date; a sub item uses its main yarn; every rate book), and
+     * 0 when the yarn has no Yarn Rates entry (the old master rate is not used). price_source tells which — shown under each row.
+     * A reopened saved costing keeps its saved prices (rateSrc is cleared there).
+     */
+    const sourcesOf = (full: Design): Record<string, RateSrc> => {
+        const out: Record<string, RateSrc> = {};
+        [...(full.warp_yarns || []), ...(full.weft_yarns || []), ...(full.selvedge_yarns || [])].forEach((y: any) => {
+            const k = yKey(String(y.mi_id), y.blend_ratio ?? null);
+            if (k in out) return;
+            const ps = y.price_source || {};
+            out[k] = ps.from === 'rates'
+                ? { from: 'rates', rate: Number(ps.rate) || 0, date: String(ps.date || ''), entries: Number(ps.entries) || 1, via_main: !!ps.via_main }
+                : { from: 'none' };
+        });
+        return out;
+    };
+
     const applyMasters = (full: Design) => {
         const maps = masterRateMaps(full);
         setPriceMap(maps.pm);
+        setRateSrc(sourcesOf(full));
         setDyeMap(maps.dm);
         setYdTiers({ ...DEFAULT_YD_TIERS });
         setSubTiers({});
@@ -711,6 +734,7 @@ function CostingTab({
                         Number(savedDye) || 0;
                 });
 
+                setRateSrc({});   // a reopened costing keeps its saved prices
                 setPriceMap(reopenedPriceMap);
                 setDyeMap(reopenedDyeMap);
 
@@ -1020,7 +1044,7 @@ function CostingTab({
                     {/* Yarn prices */}
                     <View style={c.section}>
                         <Text style={c.sHdr}>YARN PRICES · ₹/KG PER ROW</Text>
-                        <Text style={c.help}>Rates are per row — the same yarn can carry different rates where the costing engine exposes separate row keys. Current master rate is used as the starting value.</Text>
+                        <Text style={c.help}>Rates are per row — the same yarn can carry different rates where the costing engine exposes separate row keys. Starting value = Yarn Rates: the yarn's latest date, and on that date the highest rate. A yarn without a Yarn Rates entry starts at 0 — enter its rate in Yarn Rates.</Text>
                         {yarnKeys.map(y => {
                             const k = yKey(y.mi_id, y.blend_ratio);
                             return (
@@ -1030,6 +1054,17 @@ function CostingTab({
                                             {(design.selvedge_yarns || []).some((x: any) => x.mi_id === y.mi_id) ? 'SELV' : ((design.weft_yarns || []).some((x: any) => x.mi_id === y.mi_id) && !(design.warp_yarns || []).some((x: any) => x.mi_id === y.mi_id) ? 'WEFT' : 'WARP')}
                                         </Text>
                                         <Text style={c.yarnLabel}>{y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}</Text>
+                                        {(() => {
+                                            const src = rateSrc[k];
+                                            if (!src) return null;
+                                            if (src.from === 'none') return <Text style={[c.rateSrc, { color: T.red }]}>No Yarn Rates entry · 0</Text>;
+                                            const edited = Number(priceMap[k]) !== src.rate;
+                                            return (
+                                                <Text style={[c.rateSrc, { color: edited ? T.muted : T.copper }]}>
+                                                    Yarn Rates · {src.date ? src.date.split('-').reverse().join('-') : ''}{src.entries > 1 ? ` · highest of ${src.entries}` : ''}{src.via_main ? ' · main yarn' : ''}{edited ? ` · was ₹${src.rate}` : ''}
+                                                </Text>
+                                            );
+                                        })()}
                                     </View>
                                     <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
                                         <View style={{ flex: 1 }}>
@@ -1355,6 +1390,7 @@ const c = StyleSheet.create({
     yarnIdentity: { width: 130 },
     yarnTypeLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 0.5, marginBottom: 2 },
     yarnLabel: { fontSize: 11.5, fontWeight: '700', color: T.ink },
+    rateSrc: { fontSize: 9.5, fontWeight: '700', color: T.muted, marginTop: 2 },
     tierInputRow: { flexDirection: 'row', gap: 8 },
     tierInputCell: { flex: 1 },
     tierInputLabel: { fontSize: 8, fontWeight: '900', color: T.muted, letterSpacing: 0.4, marginBottom: 5 },

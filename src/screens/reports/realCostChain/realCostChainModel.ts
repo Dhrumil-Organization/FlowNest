@@ -35,6 +35,10 @@ export type ChainData = {
   rates: RateUsed[];
   /** server time the numbers were built ("YYYY-MM-DD HH:mm:ss") — the answer may come from the 10-minute cache */
   built_at: string;
+  /** seconds the build took on the server */
+  build_secs: number;
+  /** true = the last figures built for this period, shown at once while new ones are being built */
+  stale: boolean;
 };
 
 const s = (v: any) => (v == null ? '' : String(v)).trim();
@@ -73,6 +77,8 @@ export function normalizeChain(raw: any): ChainData {
     month: s(raw.month),
     months: arr(raw.months).map(s).filter(Boolean),
     built_at: s(raw.built_at),
+    build_secs: n(raw.build_secs),
+    stale: !!raw.stale,
     period: { from: s(raw.period?.from), to: s(raw.period?.to) },
     fent_default: n(raw.fent_default) || 3,
     designs: arr(raw.designs).map((d: any): DesignChain => {

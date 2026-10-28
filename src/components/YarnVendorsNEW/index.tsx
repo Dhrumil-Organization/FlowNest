@@ -52,7 +52,7 @@ import { previewStyle } from '../VisitorsReportNEW/xlsxLite';
 import { Coverage, loadYarnMaster, SearchError, SearchResult, searchVendors, Vendor, Yarn, YarnMaster } from './api';
 import { ITEM_EXAMPLES, MAX_CITIES, MAX_CITY_BOX_CHARS, MAX_ITEM_BOX_CHARS, MAX_ITEMS, splitList } from './config';
 import { buildSheet, downloadExcel, excelFileName, HEADER_ROWS, NOTICE, searchedCities, searchedItems } from './excel';
-import { YarnPicker, yarnStats } from './YarnPicker';
+import { YarnPicker, isRayonsApi, yarnStats } from './YarnPicker';
 
 type Props = { token?: string; API?: string; username?: string };
 type View2 = 'excel' | 'cards';
@@ -380,7 +380,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
               <View style={s.pickedHead}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.pickedName} numberOfLines={2}>{y.name}</Text>
-                  <Text style={s.pickedCode}>#{y.itmcode} · {y.kind}{y.is_sub ? ' · sub item' : ''}</Text>
+                  <Text style={s.pickedCode}>#{y.itmcode} · {y.kind || y.store}{y.is_sub ? ' · sub item' : ''}</Text>
                 </View>
                 {!loading ? (
                   <TouchableOpacity onPress={openPicker} hitSlop={HIT} accessibilityLabel="Change yarn">
@@ -572,6 +572,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
         canAdd={picked.length > 0 || room > 0}
         onSelect={selectYarn}
         onClose={() => setPickerOpen(false)}
+        rayons={isRayonsApi(API)}
       />
     </View>
   );

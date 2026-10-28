@@ -9,6 +9,8 @@
 // Tap a yarn to select it (another tap on a different yarn replaces it). The backend reads every detail of the
 // selected yarn again from the master and puts it in the AI question.
 // Data: GET /api/yarn-vendors-yarns (./api.ts loadYarnMaster) — one call.
+// ONE app for both servers: Sudamo yarns are Spun / Filament with blend, count, ply… (filters + all columns);
+// Rayons yarns have no Spun / Filament — only their store (POY / TEX YARN): no Spun / Filament filter, columns Yarn + Store.
 // ─────────────────────────────────────────────────────────────
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -28,16 +30,23 @@ type Props = {
   canAdd: boolean;
   onSelect: (y: Yarn | null) => void;
   onClose: () => void;
+  /** the app is on the Rayons server (API https://apiy.tms-webapp.com): no Spun / Filament, only "All" */
+  rayons?: boolean;
 };
+
+/** Rayons server = the apiy API (same check as GreyYarnPurchaseOrderNEW: API === "https://apiy.tms-webapp.com") */
+export const isRayonsApi = (api?: string) => /^https?:\/\/apiy\.tms-webapp\.com\/?$/i.test(String(api || '').trim());
 
 /** a yarn of the flat list: a main item, or a sub item with the name of its main item */
 type Row = Yarn & { parentName: string };
 
 const norm = (v: string) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
-const textOf = (y: Row) => norm([y.name, y.itmcode, y.parentName, y.kind, y.blend_label, y.count, y.count_type, y.ply, y.denier, y.filament_type, y.lustre, y.other].join(' '));
+const textOf = (y: Row) => norm([y.name, y.itmcode, y.parentName, y.kind, y.store, y.blend_label, y.count, y.count_type, y.ply, y.denier, y.filament_type, y.lustre, y.other].join(' '));
 
 /** the details of a yarn (same fields as the Yarns card) — used on the form too */
 export function yarnStats(y: Yarn): [string, string][] {
+  // Rayons: no Spun / Filament master — the store is the detail (plus Other when the master has it)
+  if (!y.kind) return [['Store', y.store || '-'], ...(y.other ? [['Other', y.other] as [string, string]] : [])];
   const rows: [string, string][] = [
     ['Blend', y.blend_label || '-'],
     ['Count', y.count || '-'],
@@ -52,8 +61,10 @@ export function yarnStats(y: Yarn): [string, string][] {
 
 // table columns (wide screen): label, flex
 const COLS: [string, number][] = [['Yarn', 2.4], ['Kind', 0.8], ['Blend', 1.8], ['Count', 0.9], ['Ply', 0.5], ['Denier', 0.7], ['Type · Lustre', 1.1], ['Other', 1]];
+// Rayons (no Spun / Filament): yarn + store
+const COLS_STORE: [string, number][] = [['Yarn', 3], ['Store', 1.2], ['Other', 1.2]];
 
-export function YarnPicker({ visible, master, loading, error, onReload, selected, canAdd, onSelect, onClose }: Props) {
+export function YarnPicker({ visible, master, loading, error, onReload, selected, canAdd, onSelect, onClose, rayons = false }: Props) {
   const { width, height } = useWindowDimensions();
   const wide = width >= 900;
   const [q, setQ] = useState('');
@@ -71,9 +82,13 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
   }, [master]);
   const rows = useMemo(() => {
     const query = norm(q);
-    return all.filter((y) => (!kind || y.kind === kind) && (!query || textOf(y).includes(query)));
-  }, [all, q, kind]);
+    return all.filter((y) => (rayons || !kind || y.kind === kind) && (!query || textOf(y).includes(query)));
+  }, [all, q, kind, rayons]);
   const nSpun = all.filter((y) => y.kind === 'Spun').length;
+  const nFil = all.filter((y) => y.kind === 'Filament').length;
+  /** Rayons (apiy API) — or any master with no Spun / Filament yarn: only "All", store columns */
+  const plain = rayons || (all.length > 0 && nSpun + nFil === 0);
+  const cols = plain ? COLS_STORE : COLS;
 
   const pick = (y: Row) => {
     const on = selected?.itmcode === y.itmcode;
@@ -83,7 +98,7 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
 
   const tableRow = ({ item: y }: { item: Row }) => {
     const on = selected?.itmcode === y.itmcode;
-    const cells = [
+    const cells = plain ? [null, y.store || '-', y.other || '-'] : [
       null,
       y.kind,
       y.blend_label || '-',
@@ -96,12 +111,12 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
     return (
       <Pressable onPress={() => pick(y)} style={[st.tRow, on && st.rowOn]} accessibilityRole="button" accessibilityLabel={`${on ? 'Remove' : 'Select'} ${y.name}`}>
         <Icon name={on ? 'radio-button-checked' : 'radio-button-unchecked'} size={18} color={on ? T.copper : T.muted} style={{ width: 24 }} />
-        <View style={{ flex: COLS[0][1], minWidth: 0, paddingRight: 8 }}>
+        <View style={{ flex: cols[0][1], minWidth: 0, paddingRight: 8 }}>
           <Text style={st.name} numberOfLines={2}>{y.name}</Text>
           <Text style={st.code} numberOfLines={1}>#{y.itmcode}{y.parentName ? ` · sub item of ${y.parentName}` : ''}</Text>
         </View>
         {cells.slice(1).map((v, i) => (
-          <Text key={i} style={[st.cell, { flex: COLS[i + 1][1] }, i === 0 && { color: y.kind === 'Filament' ? '#652880' : T.ink }]} numberOfLines={2}>{v}</Text>
+          <Text key={i} style={[st.cell, { flex: cols[i + 1][1] }, i === 0 && { color: y.kind === 'Filament' ? '#652880' : T.ink }]} numberOfLines={2}>{v}</Text>
         ))}
       </Pressable>
     );
@@ -117,7 +132,7 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
             <Text style={st.name}>{y.name}</Text>
             <Text style={st.code}>#{y.itmcode}{y.parentName ? ` · sub item of ${y.parentName}` : ''}</Text>
           </View>
-          <View style={[st.badge, y.kind === 'Filament' && st.badgeF]}><Text style={[st.badgeT, y.kind === 'Filament' && { color: '#652880' }]}>{y.kind.toUpperCase()}</Text></View>
+          <View style={[st.badge, y.kind === 'Filament' && st.badgeF]}><Text style={[st.badgeT, y.kind === 'Filament' && { color: '#652880' }]}>{(y.kind || y.store || 'Yarn').toUpperCase()}</Text></View>
         </View>
         <View style={st.stats}>
           {yarnStats(y).map(([k, v]) => (
@@ -150,7 +165,7 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
               {q ? <TouchableOpacity onPress={() => setQ('')}><Icon name="close" size={16} color={T.muted} /></TouchableOpacity> : null}
             </View>
             <View style={st.kinds}>
-              {([['', `All · ${all.length}`], ['Spun', `Spun · ${nSpun}`], ['Filament', `Filament · ${all.length - nSpun}`]] as const).map(([k, l]) => (
+              {([['', `All · ${all.length}`], ['Spun', `Spun · ${nSpun}`], ['Filament', `Filament · ${nFil}`]] as const).filter(([k]) => !plain || !k).map(([k, l]) => (
                 <TouchableOpacity key={k || 'all'} onPress={() => setKind(k)} style={[st.kind, kind === k && st.kindOn]} accessibilityRole="button">
                   <Text style={[st.kindT, kind === k && { color: '#fff' }]}>{l}</Text>
                 </TouchableOpacity>
@@ -171,7 +186,7 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
               {wide ? (
                 <View style={st.tHead}>
                   <View style={{ width: 24 }} />
-                  {COLS.map(([l, f]) => <Text key={l} style={[st.th, { flex: f }]}>{l.toUpperCase()}</Text>)}
+                  {cols.map(([l, f]) => <Text key={l} style={[st.th, { flex: f }]}>{l.toUpperCase()}</Text>)}
                 </View>
               ) : null}
               <FlatList
@@ -189,7 +204,7 @@ export function YarnPicker({ visible, master, loading, error, onReload, selected
           ) : null}
 
           <View style={st.foot}>
-            <Text style={[st.muted, { flex: 1 }]} numberOfLines={2}>{selected ? `${selected.name} · #${selected.itmcode} · ${selected.kind}` : `${rows.length} yarn${rows.length !== 1 ? 's' : ''} shown · nothing selected yet`}</Text>
+            <Text style={[st.muted, { flex: 1 }]} numberOfLines={2}>{selected ? `${selected.name} · #${selected.itmcode} · ${selected.kind || selected.store}` : `${rows.length} yarn${rows.length !== 1 ? 's' : ''} shown · nothing selected yet`}</Text>
             <TouchableOpacity onPress={onClose} style={st.done} accessibilityRole="button" accessibilityLabel="Done">
               <Text style={st.doneT}>Done</Text>
             </TouchableOpacity>

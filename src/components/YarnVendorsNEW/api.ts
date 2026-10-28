@@ -56,7 +56,8 @@ export type Coverage = {
 
 /** One yarn of the ERP yarn master (main item, or a sub item in `subs`) — same fields as the Designs → Yarns card. */
 export type Yarn = {
-  itmcode: string; mitmcode: string; is_sub: boolean; name: string; kind: 'Spun' | 'Filament';
+  // kind '' + store = a server without Spun / Filament in its master (Rayons: store POY / TEX YARN); Sudamo: Spun / Filament
+  itmcode: string; mitmcode: string; is_sub: boolean; name: string; store: string; kind: 'Spun' | 'Filament' | '';
   blend: { name: string; per: number }[]; blend_label: string; count: string; count_type: string; ply: string;
   denier: string; filament_type: string; lustre: string; other: string;
   /** what the vendor search calls it */
@@ -69,7 +70,7 @@ export type Yarn = {
 export type YarnMaster = { items: Yarn[] };
 
 const toYarn = (r: any): Yarn => ({
-  itmcode: str(r?.itmcode), mitmcode: str(r?.mitmcode), is_sub: !!r?.is_sub, name: str(r?.name), kind: r?.kind === 'Filament' ? 'Filament' : 'Spun',
+  itmcode: str(r?.itmcode), mitmcode: str(r?.mitmcode), is_sub: !!r?.is_sub, name: str(r?.name), store: str(r?.store), kind: r?.kind === 'Filament' ? 'Filament' : r?.kind === 'Spun' ? 'Spun' : '',
   blend: Array.isArray(r?.blend) ? r.blend.map((b: any) => ({ name: str(b?.name), per: Number(b?.per) || 0 })).filter((b: any) => b.name) : [],
   blend_label: str(r?.blend_label), count: str(r?.count), count_type: str(r?.count_type), ply: str(r?.ply), denier: str(r?.denier),
   filament_type: str(r?.filament_type), lustre: str(r?.lustre), other: str(r?.other), label: str(r?.label) || str(r?.name), spec: str(r?.spec),

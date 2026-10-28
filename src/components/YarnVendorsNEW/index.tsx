@@ -50,9 +50,9 @@ import {
 } from 'react-native';
 import { previewStyle } from '../VisitorsReportNEW/xlsxLite';
 import { Coverage, loadYarnMaster, SearchError, SearchResult, searchVendors, Vendor, Yarn, YarnMaster } from './api';
-import { YarnPicker, yarnStats } from './YarnPicker';
 import { ITEM_EXAMPLES, MAX_CITIES, MAX_CITY_BOX_CHARS, MAX_ITEM_BOX_CHARS, MAX_ITEMS, splitList } from './config';
 import { buildSheet, downloadExcel, excelFileName, HEADER_ROWS, NOTICE, searchedCities, searchedItems } from './excel';
+import { YarnPicker, yarnStats } from './YarnPicker';
 
 type Props = { token?: string; API?: string; username?: string };
 type View2 = 'excel' | 'cards';
@@ -501,7 +501,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
 
         <SavedNote result={result} onAgain={() => void runSearch(undefined, true)} busy={loading} />
         <SpecsSent result={result} />
-        <PromptBox result={result} />
+        {/* <PromptBox result={result} /> */}
         <SkippedNotes result={result} />
         <CoverageTable result={result} />
 

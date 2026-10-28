@@ -233,12 +233,12 @@ export async function searchVendors(API: string, token: string, item: string, ci
   const body = data?.response ?? data;
   const pr = body?.prompt;
   if (pr && typeof pr === 'object') {
-    console.log(
-      `[YarnVendors] AI prompt${body?.from_saved ? ' (saved list — prompt of the search that built it)' : ''}`
-      + `\n\n===== MODEL =====\n${pr.model ?? ''}`
-      + `\n\n===== MESSAGE (user) =====\n${pr.user ?? ''}`
-      + `\n\n===== RULES (system) =====\n${pr.system ?? ''}`,
-    );
+    // console.log(
+    //   `[YarnVendors] AI prompt${body?.from_saved ? ' (saved list — prompt of the search that built it)' : ''}`
+    //   + `\n\n===== MODEL =====\n${pr.model ?? ''}`
+    //   + `\n\n===== MESSAGE (user) =====\n${pr.user ?? ''}`
+    //   + `\n\n===== RULES (system) =====\n${pr.system ?? ''}`,
+    // );
   } else {
     console.log(`[YarnVendors] AI prompt NOT in the reply (HTTP ${status}${body?.from_saved ? ', saved list made before the prompt was stored — press "Search the web again"' : ', is the new YarnVendorsChatController.php on the server?'})`, body);
   }

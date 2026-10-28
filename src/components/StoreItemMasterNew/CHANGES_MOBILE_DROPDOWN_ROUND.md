@@ -25,3 +25,13 @@
 - Duplicate rows (code + MItmCode) skip; koi page me naya row na mile to loading band.
 - Screen: `fetchRows` prop ki jagah `fetchPage`.
 - Note: sort / column filter / CSV-PDF export sirf load ho chuki rows par chalte hain.
+
+## Browse - "Show more (20 of 214)" pill (Owner Dashboard jaisa)
+- Button ab Owner Dashboard wale pill style me, label me loaded / total count. Total server ke paging meta se aata hai; na mile to "(20+)".
+- Footer count bhi total ke hisaab se. Phone page size = 20 (BrowseSheet.tsx `PER_PAGE`), tablet/desktop 50.
+
+## Browse - 10 at a time + search on the WHOLE data
+- Phone: pehle 10 items; "Show more" dabane par agle 10 (PER_PAGE phone=10, tablet/desktop=50).
+- Search poore data me: pehle server ko `search` bheja jaata hai. Agar server search ignore kare (returned rows match nahi karte) to poori list ek baar load hoke cache hoti hai aur device par search hota hai - phir bhi 10-10 karke dikhti hai ("Show more (10 of 37)").
+- Naya search / filter -> dobara pehle 10 se. Search clear -> normal paging.
+- Note: Group chip / column filter / sort sirf load ho chuki rows par (search ke alawa).

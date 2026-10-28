@@ -30,6 +30,7 @@ export default function DetailsStep({ token, API, nav, flow }: Props) {
   const [pcs, setPcs] = useState(isEdit ? String(oldRow?.Pcs ?? '') : '');
   const [rate, setRate] = useState(isEdit ? String(oldRow?.Rate ?? '') : '');
   const [remark, setRemark] = useState(isEdit ? String(oldRow?.Remark ?? '') : '');
+  const [remark3, setRemark3] = useState(isEdit ? String(oldRow?.Remark3 ?? oldRow?.Raw?.Remark3 ?? '') : '');
   const [isDyeing, setIsDyeing] = useState<number>(isEdit ? (oldRow?.IsDyeing ? 1 : 0) : 0);
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState<Row[]>([]);
@@ -82,6 +83,7 @@ export default function DetailsStep({ token, API, nav, flow }: Props) {
       pcs,
       rate,
       remark,
+      remark3,
       isDyeing,
     };
     const invalid = validateDetails(input);
@@ -90,7 +92,7 @@ export default function DetailsStep({ token, API, nav, flow }: Props) {
       return;
     }
     const result = isEdit
-      ? updateRowDetails(flow.workingRows, oldRow as Row, { qty, pcs, rate, remark, isDyeing })
+      ? updateRowDetails(flow.workingRows, oldRow as Row, { qty, pcs, rate, remark, remark3, isDyeing })
       : addShadeRows(input);
     nav.push('shadeDone', { flow, rows: result.rows, lastRow: result.lastRow, isEdit });
   };
@@ -139,6 +141,7 @@ export default function DetailsStep({ token, API, nav, flow }: Props) {
               <Field label="Amount" value={`₹ ${money(amount)}`} editable={false} style={{ flex: 1 }} />
             </View>
             <Field label="Remark" value={remark} onChangeText={setRemark} placeholder="Enter remark" multiline />
+            <Field label="Remark 3" value={remark3} onChangeText={setRemark3} placeholder="Enter remark 3" multiline />
           </Card>
         </View>
       </ScrollView>

@@ -130,6 +130,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
   const [dueDays, setDueDays] = useState<string>(dueDayText(params.party?.DueDay));
   const [dueDate, setDueDate] = useState('');
   const [salesParty, setSalesParty] = useState<Row | null>(null);
+  const [partyRef, setPartyRef] = useState('');
   const [remark, setRemark] = useState('');
   const [soDate, setSoDate] = useState('');
   const [soNo, setSoNo] = useState('');
@@ -238,6 +239,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
       setDueDate(main.DueDate || '');
       setCurrentParty(order.party);
       setSalesParty(order.salesParty);
+      setPartyRef(String(main.ParRef ?? ''));
       setDirty(false);
       fillBillingAddresses(order.party?.ParCode, order.salesParty?.ParCode);
     } catch (error: any) {
@@ -568,6 +570,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         dueDays,
         dueDate,
         salesParty,
+        partyRef,
         rawMain,
         rawTax,
         rawExp,
@@ -938,6 +941,19 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               <Btn label={salesParty?.ParCode ? 'Change' : 'Select'} kind="soft" compact onPress={pickSalesParty} />
             </View>
           ) : null}
+        </Card>
+
+        <Card style={{ gap: 8 }}>
+          <Field
+            label="Party Ref"
+            value={partyRef}
+            onChangeText={(text: string) => {
+              setPartyRef(text);
+              setDirty(true);
+            }}
+            placeholder="Enter party ref"
+            editable={!isViewMode}
+          />
         </Card>
 
         <KpiGrid isPhone={isPhone}>

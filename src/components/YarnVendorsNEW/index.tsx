@@ -13,10 +13,10 @@
 // contain any characters — only a comma separates two items.
 // There is no free chat: these values are the only thing sent
 // (POST /api/yarn-vendors-chat { item, city, yarns?, prptype? }, Bearer token — ./api.ts).
-// Next to the typed item box, yarns can be SELECTED from the ERP yarn master (Designs → Yarns: blend → ply → item →
-// sub items, ./YarnPicker.tsx). Every detail of a selected yarn (Spun / Filament, blend with %, count + count type,
-// ply, type, lustre, denier, other) is shown here and the backend puts it in the AI question, read again from the
-// master — so the list is for exactly that yarn. Typed + selected together: max 5.
+// Next to the typed item box, ONE yarn can be SELECTED from the ERP yarn master (./YarnPicker.tsx — the Designs →
+// Yarns cards, Spun + Filament in one list: blend → ply → item → sub items). Every detail of the selected yarn
+// (Spun / Filament, blend with %, count + count type, ply, denier, type, lustre, other) is shown here; the backend
+// reads it again from the master and puts it in the AI question. Typed + selected together: max 5.
 // The backend builds the question for Claude with its strict rules, Claude
 // searches the web and returns a fixed list: party name, what the party calls
 // the item, rate, contact no, address, city, state, remarks, source page.
@@ -94,6 +94,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
   const [city, setCity] = useState('');
   // yarns selected from the ERP yarn master (Designs → Yarns)
   const { prpGroup } = useBusinessContext();
+  // the ONE yarn selected from the master (kept as a list of 0 or 1 so the counts below stay simple)
   const [picked, setPicked] = useState<Yarn[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [master, setMaster] = useState<YarnMaster | null>(null);
@@ -169,11 +170,11 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     if (!master && !masterLoading) void loadMaster();
   }, [master, masterLoading, loadMaster]);
 
-  const togglePick = useCallback((y: Yarn) => {
+  /** single select: another yarn replaces the selected one; null clears it */
+  const selectYarn = useCallback((y: Yarn | null) => {
     setItemError('');
-    setPicked((cur) => (cur.some((x) => x.itmcode === y.itmcode) ? cur.filter((x) => x.itmcode !== y.itmcode)
-      : MAX_ITEMS - splitList(item).length - cur.length > 0 ? [...cur, y] : cur));
-  }, [item]);
+    setPicked(y ? [y] : []);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -201,7 +202,8 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
   }, [loading]);
 
   /* -------------------------------- search ------------------------------- */
-  const runSearch = useCallback(async (rawItem?: string) => {
+  /** fresh = "Search the web again": a new web search, its new parties are added to the saved list */
+  const runSearch = useCallback(async (rawItem?: string, fresh = false) => {
     if (loading) return;
     // Both boxes may hold several comma separated values.
     const itemList = splitList(rawItem ?? item);
@@ -237,7 +239,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
     try {
       const prptype = sel.length ? prptypeRef.current || (await prptypeOf()) : '';
       const r = await searchVendors(API || '', token || '', it, ct, controller.signal,
-        sel.length ? { yarns: sel.map((y) => y.itmcode), prptype } : undefined);
+        sel.length ? { yarns: sel.map((y) => y.itmcode), prptype } : undefined, fresh);
       if (!mountedRef.current || run !== runRef.current) return;
       setResult(r);
     } catch (e: any) {
@@ -322,7 +324,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
             accessibilityLabel="Select from yarn master"
           >
             <Icon name="playlist-add-check" size={18} color={T.copper} />
-            <Text style={s.pickBtnText}>Select from yarn master{picked.length ? ` · ${picked.length} selected` : ''}</Text>
+            <Text style={s.pickBtnText}>{picked.length ? 'Change yarn (yarn master)' : 'Select from yarn master'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -381,7 +383,12 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
                   <Text style={s.pickedCode}>#{y.itmcode} · {y.kind}{y.is_sub ? ' · sub item' : ''}</Text>
                 </View>
                 {!loading ? (
-                  <TouchableOpacity onPress={() => togglePick(y)} hitSlop={HIT} accessibilityLabel={`Remove ${y.name}`}>
+                  <TouchableOpacity onPress={openPicker} hitSlop={HIT} accessibilityLabel="Change yarn">
+                    <Text style={s.pickedLink}>Change</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {!loading ? (
+                  <TouchableOpacity onPress={() => selectYarn(null)} hitSlop={HIT} accessibilityLabel={`Remove ${y.name}`}>
                     <Icon name="close" size={18} color={T.muted} />
                   </TouchableOpacity>
                 ) : null}
@@ -466,7 +473,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
             ? `"${result.city}" ${result.cities.length > 1 ? 'were' : 'was'} not recognised as ${result.cities.length > 1 ? 'places' : 'a place'} in India. Only Indian cities can be searched — check the spelling, or leave the city empty for all India.`
             : `No party with a traceable web listing was found for "${result.item}" in ${result.area}. Try a more common item name${result.city ? ', or leave the city empty' : ''}.`}
       </Text>
-      {result.status === 'no_results' ? <View style={{ alignSelf: 'stretch', gap: 10 }}><SkippedNotes result={result} /><CoverageTable result={result} /></View> : null}
+      {result.status === 'no_results' ? <View style={{ alignSelf: 'stretch', gap: 10 }}><SpecsSent result={result} /><PromptBox result={result} /><SkippedNotes result={result} /><CoverageTable result={result} /></View> : null}
     </View>
   ) : null;
 
@@ -478,7 +485,7 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.eyebrow}>{result.vendors.length} {result.vendors.length === 1 ? 'PARTY' : 'PARTIES'} · {(searchedCities(result).join(', ') || result.area).toUpperCase()}</Text>
             <Text style={s.summaryTitle} numberOfLines={3}>{searchedItems(result).join(', ') || result.item}</Text>
-            <Text style={s.summaryMeta}>{result.searchedAt ? `Searched ${prettyStamp(result.searchedAt)}` : ''}</Text>
+            <Text style={s.summaryMeta}>{result.searchedAt ? `Searched ${prettyStamp(result.searchedAt)}` : ''}{result.firstSearchedAt && result.firstSearchedAt !== result.searchedAt ? ` · list started ${prettyStamp(result.firstSearchedAt)}` : ''}</Text>
           </View>
           <TouchableOpacity
             style={[s.downloadBtn, saving && { opacity: 0.6 }]}
@@ -492,6 +499,9 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
           </TouchableOpacity>
         </View>
 
+        <SavedNote result={result} onAgain={() => void runSearch(undefined, true)} busy={loading} />
+        <SpecsSent result={result} />
+        <PromptBox result={result} />
         <SkippedNotes result={result} />
         <CoverageTable result={result} />
 
@@ -558,9 +568,9 @@ export default function YarnVendorsNEW({ token, API, username }: Props) {
         loading={masterLoading}
         error={masterErr}
         onReload={() => void loadMaster()}
-        selected={picked}
-        room={room}
-        onToggle={togglePick}
+        selected={picked[0] || null}
+        canAdd={picked.length > 0 || room > 0}
+        onSelect={selectYarn}
         onClose={() => setPickerOpen(false)}
       />
     </View>
@@ -581,6 +591,59 @@ function ValueChips({ values, max }: { values: string[]; max: number }) {
 }
 
 /** Values that were entered but not searched, and items whose search failed. */
+/** the same search returns its saved list (a web search finds different pages each time); "again" adds new parties */
+function SavedNote({ result, onAgain, busy }: { result: SearchResult; onAgain: () => void; busy: boolean }) {
+  return (
+    <View style={s.savedBox}>
+      <Text style={s.savedText}>
+        {result.fromSaved
+          ? `Saved list of ${prettyStamp(result.searchedAt)} — the same search always shows this same list. `
+          : result.added > 0 ? `${result.added} new ${result.added === 1 ? 'party' : 'parties'} added to the saved list. ` : 'This list is saved: the same search shows it again. '}
+        "Search the web again" runs a new web search and only ADDS the new parties — nothing found earlier is dropped.
+      </Text>
+      <TouchableOpacity onPress={onAgain} disabled={busy} style={[s.ghostBtn, { alignSelf: 'flex-start' }, busy && { opacity: 0.5 }]} accessibilityRole="button" accessibilityLabel="Search the web again">
+        <Icon name="travel-explore" size={16} color={T.nav} />
+        <Text style={s.ghostBtnText}>Search the web again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/** the whole question the AI got — to check what was asked */
+function PromptBox({ result }: { result: SearchResult }) {
+  const [open, setOpen] = useState(false);
+  if (!result.prompt) return null;
+  return (
+    <View style={s.promptBox} testID="ai-prompt">
+      <TouchableOpacity onPress={() => setOpen(!open)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityRole="button" accessibilityLabel="AI prompt">
+        <Icon name={open ? 'expand-less' : 'expand-more'} size={18} color={T.nav} />
+        <Text style={s.specHead}>AI PROMPT · WHAT WAS ASKED{result.prompt.model ? ` · ${result.prompt.model}` : ''}</Text>
+      </TouchableOpacity>
+      {open ? (
+        <View style={{ gap: 8, marginTop: 6 }}>
+          <Text style={s.promptLbl}>MESSAGE (items, cities, yarn details)</Text>
+          <Text style={s.promptText} selectable>{result.prompt.user}</Text>
+          <Text style={s.promptLbl}>RULES (system prompt of the server)</Text>
+          <Text style={s.promptText} selectable>{result.prompt.system}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** what the AI got for a yarn selected from the master — every detail, as the server read it from the master */
+function SpecsSent({ result }: { result: SearchResult }) {
+  if (!result.specs.length) return null;
+  return (
+    <View style={s.specBox} testID="specs-sent">
+      <Text style={s.specHead}>SENT TO THE AI · FROM THE YARN MASTER</Text>
+      {result.specs.map((x) => (
+        <Text key={x.item} style={s.specText}><Text style={{ fontWeight: '800' }}>{x.item}: </Text>{x.spec}</Text>
+      ))}
+    </View>
+  );
+}
+
 function SkippedNotes({ result }: { result: SearchResult }) {
   const lines: string[] = [];
   if (result.skippedItems.length) lines.push(`Not searched — not a yarn item: ${result.skippedItems.join(', ')}`);
@@ -778,6 +841,14 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 const noOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null;
 
 const s = StyleSheet.create({
+  savedBox: { marginTop: 10, gap: 8, borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 10, backgroundColor: '#fff' },
+  savedText: { fontSize: 12, color: T.ink, lineHeight: 17 },
+  promptBox: { marginTop: 10, borderWidth: 1, borderColor: T.border, borderRadius: 8, padding: 10, backgroundColor: '#fff' },
+  promptLbl: { fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.5 },
+  promptText: { fontSize: 11.5, color: T.ink, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), backgroundColor: T.sub, borderRadius: 6, padding: 8, lineHeight: 16 },
+  specBox: { marginTop: 10, borderWidth: 1, borderColor: T.border, borderLeftWidth: 3, borderLeftColor: T.copper, borderRadius: 8, padding: 10, backgroundColor: T.sub, gap: 3 },
+  specHead: { fontSize: 10, fontWeight: '800', color: T.copper, letterSpacing: 0.6 },
+  specText: { fontSize: 12.5, color: T.ink, lineHeight: 18 },
   pickBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1, borderColor: T.copper, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff' },
   pickBtnText: { color: T.copper, fontWeight: '800', fontSize: 12.5 },
   pickedWrap: { marginTop: 12, gap: 8 },
@@ -788,6 +859,7 @@ const s = StyleSheet.create({
   pickedStats: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 3 },
   pickedStat: { fontSize: 12, color: T.ink },
   pickedK: { color: T.muted, fontWeight: '700' },
+  pickedLink: { color: T.copper, fontWeight: '800', fontSize: 12 },
   root: { flex: 1, backgroundColor: T.bg },
   content: { padding: 12, flexGrow: 1 },
   page: { width: '100%', maxWidth: 1200, alignSelf: 'center', gap: 10 },

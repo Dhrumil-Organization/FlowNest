@@ -24,14 +24,20 @@ import {
   DesignChain,
   errText,
   fm,
+  isoOf,
+  isRange,
   matches,
   money,
   moneyC,
   monthLbl,
   normalizeChain,
+  periodBody,
   summaryOf,
   unwrap,
 } from './realCostChainModel';
+
+/** label of a period value: month chip, or 'DD Mon YY – DD Mon YY' for a date range */
+const periodLbl = (p: string) => (isRange(p) ? `${dateFull(p.slice(2, 12))} – ${dateFull(p.slice(13, 23))}` : monthLbl(p));
 
 const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
 const GREEN = '#2A6044';
@@ -57,6 +63,10 @@ export function RealCostChainView() {
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState('');
   const [showRates, setShowRates] = useState(false);
+  /** last-taka date range typed by the user (DD-MM-YYYY or YYYY-MM-DD) */
+  const [rFrom, setRFrom] = useState('');
+  const [rTo, setRTo] = useState('');
+  const [rErr, setRErr] = useState('');
   const req = useRef(0);
 
   /**
@@ -71,14 +81,14 @@ export function RealCostChainView() {
     setErr('');
     setUpdating(false);
     try {
-      const d = normalizeChain(unwrap(await RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: m, ...(pull ? { fresh: 1 } : {}) })));
+      const d = normalizeChain(unwrap(await RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, ...periodBody(m), ...(pull ? { fresh: 1 } : {}) })));
       if (id !== req.current) return;
       setData(d);
       if (m === 'current') setMonth(d.month);   // the chip of the month the server used
       if (d.stale) {
         // shown at once; the new figures come in the background (another period picked meanwhile → dropped)
         setUpdating(true);
-        RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: d.month, rebuild: 1 })
+        RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, ...(isRange(m) ? periodBody(m) : { month: d.month }), rebuild: 1 })
           .then((r) => { if (id === req.current) setData(normalizeChain(unwrap(r))); })
           .catch(() => { /* keep the last figures; Refresh can try again */ })
           .finally(() => { if (id === req.current) setUpdating(false); });
@@ -109,6 +119,19 @@ export function RealCostChainView() {
     setMonth(m);
     setOpen(null);
     void load(m);
+  };
+
+  /** Apply the From–To range: beams whose LAST TAKA was checked in it */
+  const applyRange = () => {
+    const f = isoOf(rFrom);
+    const t = isoOf(rTo);
+    if (!f || !t) { setRErr('Enter both dates as DD-MM-YYYY.'); return; }
+    if (f > t) { setRErr('From date is after To date.'); return; }
+    setRErr('');
+    const p = `R:${f}:${t}`;
+    setMonth(p);
+    setOpen(null);
+    void load(p);
   };
 
   const rows = useMemo(() => (data ? data.designs.filter((d) => matches(`${d.dsncode} ${d.name}`, q)) : []), [data, q]);
@@ -175,6 +198,20 @@ export function RealCostChainView() {
           Recipe now learns warp {d.learned_warp != null ? d.learned_warp + '%' : '—'} · finish {d.learned_fin != null ? d.learned_fin + '%' : '—'} (actual + 1% buffer).
         </Text>
         <Text style={st.foot}>
+          {A.rm_source === 'actual' || A.rm_source === 'mixed'
+            ? `RM from yarn really issued: warp ${money(A.rm_warp)}/m (creel cartons − returns, split by warp length) + weft ${money(A.rm_weft)}/m (beam cartons − returns) on ${fm(A.rm_metres)} m` +
+              (A.rm_fb_metres > 0 ? ` · ${fm(A.rm_fb_metres)} m had no creel issue → costing RM ${money(A.rm_costing)}/m added` : '') +
+              '. Each carton priced from its reference: purchase, job inward (rate + job rate), or the issue it was returned from. Warp shortage yarn is inside this RM. '
+            : 'RM from the costing — no creel issue found for these beams. '}
+        </Text>
+        {A.rm_fallback_kg > 0 || A.rm_missing_kg > 0 || A.rm_no_weft_beams > 0 ? (
+          <Text style={st.warn}>
+            {A.rm_fallback_kg > 0 ? `${fm(A.rm_fallback_kg)} kg cartons had no traceable reference — priced at the item's latest purchase rate. ` : ''}
+            {A.rm_missing_kg > 0 ? `${fm(A.rm_missing_kg)} kg had no rate at all (counted at ₹0). ` : ''}
+            {A.rm_no_weft_beams > 0 ? `${A.rm_no_weft_beams} beam(s) had no weft issue on them.` : ''}
+          </Text>
+        ) : null}
+        <Text style={st.foot}>
           {A.has_short ? `Warp shortage ${A.short_pct}% on closed beams. ` : ''}
           {d.has_fin ? `Finish shrink ${A.fin_shrink_pct}% ${A.fin_shrink_source === 'mill' && d.mill ? `(mill: ${fm(d.mill.out)} m sent → ${fm(d.mill.in)} m back, ${d.mill.takas} takas)` : '(design value)'} · ` : ''}
           {d.has_fin ? `processing ${A.proc_source === 'mill' ? `from mill bills on ${fm(A.proc_metres)} m` : 'from costing'} · fent ${A.fent_pct}% default.` : ''}
@@ -191,8 +228,8 @@ export function RealCostChainView() {
           <>
             <Text style={[st.sec, { marginTop: 14 }]}>BEAM-WISE · woven-month conversion rate</Text>
             <View style={st.bRow}>
-              {['BEAM', 'SHED', 'CLOSED', '₹/PK·M', 'METRES', 'COST'].map((h, i) => (
-                <Text key={h} style={[st.gHead, { flex: [1.1, 0.7, 0.8, 0.8, 0.8, 0.9][i] }, i > 2 && st.r]}>{h}</Text>
+              {['BEAM', 'SHED', 'CLOSED', '₹/PK·M', 'RM/M', 'METRES', 'COST'].map((h, i) => (
+                <Text key={h} style={[st.gHead, { flex: [1.1, 0.7, 0.8, 0.8, 0.8, 0.8, 0.9][i] }, i > 2 && st.r]}>{h}</Text>
               ))}
             </View>
             {d.beams.map((b) => (
@@ -203,13 +240,14 @@ export function RealCostChainView() {
                 </View>
                 <Text style={[st.bTxt, { flex: 0.8, fontFamily: MF, color: C.mut, fontSize: 10 }]}>{dateShort(b.date)}</Text>
                 <Text style={[st.bTxt, st.r, { flex: 0.8, fontFamily: MF }]}>{b.rate != null ? b.rate.toFixed(4) : '—'}</Text>
+                <Text style={[st.bTxt, st.r, { flex: 0.8, fontFamily: MF, color: b.rm_source === 'actual' ? T.ink : C.mut }]}>{b.rm_per_m.toFixed(2)}{b.rm_source === 'actual' ? '' : '*'}</Text>
                 <Text style={[st.bTxt, st.r, { flex: 0.8, fontFamily: MF }]}>{fm(b.metres)}</Text>
                 <Text style={[st.bTxt, st.r, { flex: 0.9, fontFamily: MF, fontWeight: '700' }]}>{moneyC(b.cost)}</Text>
               </View>
             ))}
             <Text style={st.foot}>
               Each beam's weaving = its checked metres × picks × the Rapier / Waterjet conversion rate of the month each taka was checked
-              (RM {money(A.rm)}/m + weaving). ₹/PK·M = rate per pick-metre.
+              (+ RM/M of that beam from its own creel share and weft issue; * = costing RM, no creel issue found). ₹/PK·M = rate per pick-metre.
             </Text>
           </>
         ) : (
@@ -271,6 +309,20 @@ export function RealCostChainView() {
             ))}
           </ScrollView>
 
+          <View style={st.rangeRow}>
+            <Text style={st.rangeLbl}>Last taka</Text>
+            <TextInput
+              value={rFrom} onChangeText={setRFrom} placeholder="From DD-MM-YYYY" placeholderTextColor={T.muted}
+              style={[st.input, st.rangeIn, isRange(month) && { borderColor: T.copper }]} autoCorrect={false} autoCapitalize="none" accessibilityLabel="From date"
+            />
+            <TextInput
+              value={rTo} onChangeText={setRTo} placeholder="To DD-MM-YYYY" placeholderTextColor={T.muted} onSubmitEditing={applyRange}
+              style={[st.input, st.rangeIn, isRange(month) && { borderColor: T.copper }]} autoCorrect={false} autoCapitalize="none" accessibilityLabel="To date"
+            />
+            <Btn label="Apply" icon="refresh" kind="ghost" compact onPress={applyRange} />
+          </View>
+          {rErr ? <Text style={[st.warn, { marginBottom: 6 }]}>{rErr}</Text> : null}
+
           <View style={st.refRow}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {updating ? <ActivityIndicator size="small" color={T.copper} /> : null}
@@ -290,14 +342,14 @@ export function RealCostChainView() {
           {loading && !refreshing ? (
             <View style={[st.card, st.loadingCard]}>
               <ActivityIndicator color={T.copper} />
-              <Text style={st.muted}>Gathering beams, conversion rates and mill returns{month === 'current' ? ' for this month' : month ? ` for ${monthLbl(month)}` : ''}…</Text>
+              <Text style={st.muted}>Gathering beams, conversion rates and mill returns{month === 'current' ? ' for this month' : month ? ` for ${periodLbl(month)}` : ''}…</Text>
             </View>
           ) : null}
 
           {data && !loading ? (
             <>
               <View style={[st.card, st.sumCard]}>
-                <Text style={st.eyebrow}>MONTHLY REAL-COSTING SUMMARY{chosen.length ? ` · ${chosen.length} selected` : ' · all designs'}{data.month ? ` · ${monthLbl(data.month)}` : ''}</Text>
+                <Text style={st.eyebrow}>MONTHLY REAL-COSTING SUMMARY{chosen.length ? ` · ${chosen.length} selected` : ' · all designs'}{data.range ? ` · last taka ${dateFull(data.period.from)} – ${dateFull(data.period.to)}` : data.month ? ` · ${monthLbl(data.month)}` : ''}</Text>
                 <View style={st.stats}>
                   {stat('Designs', String(sum.designs))}
                   {stat('Costed output', fm(sum.made) + ' m')}
@@ -365,6 +417,9 @@ const st = StyleSheet.create({
   h1: { fontSize: 20, fontWeight: '800', color: T.ink },
   intro: { fontSize: 12, color: C.mut, lineHeight: 18, marginTop: -4 },
   chipRow: { flexDirection: 'row', gap: 6, paddingVertical: 2 },
+  rangeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 4 },
+  rangeLbl: { fontSize: 11, fontWeight: '800', color: C.mut, letterSpacing: 0.4 },
+  rangeIn: { flexGrow: 1, flexBasis: 120, minWidth: 110, paddingVertical: 6, fontSize: 12.5 },
   chip: { flexShrink: 0, fontSize: 12, fontWeight: '700', color: C.mut, borderWidth: 1, borderColor: C.bd, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 5, overflow: 'hidden', backgroundColor: T.surface },
   chipOn: { backgroundColor: T.copper, borderColor: T.copper, color: '#fff' },
   card: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: C.bd },

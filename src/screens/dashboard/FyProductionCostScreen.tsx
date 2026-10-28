@@ -10,7 +10,7 @@ import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode
 import { fetchExpenseDashboardCard } from '@/src/services/Dashboard/expenseDashboardApi';
 import {
   CostHead, CostMonth, HEADS, MonthCache, SectionCost, dateYmd,
-  countExpenseCostLines,
+  countExpenseCostLines, areComparableCostPeriods,
   fromMonth, fyMonthEnd, fyMonths, fyStageIndex, fyYearNo,
   monthCacheKey, monthSectionRows, num, pad, stageDate, startYearOf,
   summarizeYear, yearLabel,
@@ -46,15 +46,20 @@ const deltaPct = (current: number | null, previous: number | null) =>
 type TileKey = 'avg' | 'best' | 'entries' | 'pick' | 'metre' | 'prod';
 type CostStats = ReturnType<typeof summarizeYear>;
 function tileMetric(key: TileKey, stats: CostStats): number | null {
+  // Production is sourced from checking and is valid even in months where
+  // Electricity/Salary were never entered in historical ExpCosting.
+  if (key === 'prod') return stats.months.some(m => m.status === 'ready' && m.raw)
+    ? stats.metres : null;
   if (!stats.ready) return null;
   if (key === 'avg') return stats.monthlyAverage;
   if (key === 'best') return stats.bestMonth?.amount ?? null;
   if (key === 'pick') return stats.costPerPick;
   if (key === 'metre') return stats.costPerMetre;
-  if (key === 'prod') return stats.metres;
   let result = 0;
   for (const month of stats.months) {
-    if (!month.available || month.amount === null) return null;
+    // Pending months do not contribute a made-up zero. The card label already
+    // states how many months have been recorded in this FY.
+    if (!month.available || month.amount === null) continue;
     const lines = countExpenseCostLines(month);
     if (lines === null) return null;
     result += lines;
@@ -62,9 +67,9 @@ function tileMetric(key: TileKey, stats: CostStats): number | null {
   return result;
 }
 function tileMonthValue(key: TileKey, month: CostMonth): number | null {
+  if (key === 'prod') return month.raw && month.status === 'ready' ? month.metres : null;
   if (!month.available || month.amount === null) return null;
   if (key === 'entries') return countExpenseCostLines(month);
-  if (key === 'prod') return month.metres;
   if (key === 'pick') return month.weightedPicks > 0 ? month.amount / month.weightedPicks : null;
   if (key === 'metre') return month.metres > 0 ? month.amount / month.metres : null;
   return month.amount;
@@ -305,15 +310,11 @@ export default function FyProductionCostScreen() {
   // a full historical year with a seven-month historical year.
   const compareFocus = stageStats[years.indexOf(year)];
   const comparePrevious = baseline;
-  // The open FY's final month is legitimately partial. Compare actual
-  // available-as-of figures when all equivalent elapsed months have loaded;
-  // do not require a closed month for a to-date comparison.
-  // Display the mathematical change in *recorded* expense values. Do not
-  // imply that FY 24-25/25-26 expense entry coverage matches the current FY.
-  const compareReady = !!comparePrevious && compareFocus.months.length > 0
-    && compareFocus.months.length === comparePrevious.months.length
-    && compareFocus.ready === compareFocus.months.length
-    && comparePrevious.ready === comparePrevious.months.length;
+  // Historical months without Electricity/Salary are not comparable total
+  // production cost. Never display a huge cost increase against Stores-only
+  // months. The current open month may still use its authentic cost cutoff.
+  const compareReady = !!comparePrevious
+    && areComparableCostPeriods(compareFocus, comparePrevious);
   const change = compareReady ? deltaPct(compareFocus.total, comparePrevious!.total) : null;
   const compareGap = compareReady ? compareFocus.total - comparePrevious!.total : null;
   const monthList = fyMonths(year);
@@ -344,13 +345,21 @@ export default function FyProductionCostScreen() {
   const chartRows = useMemo(() => years.map(y => {
     const series: Array<number|null> = [];
     let running = 0;
-    let continuous = true;
     for (let i=0; i<12; i++) {
       if (y === currentFY && i>stageIdx) { series.push(null); continue; }
-      // Historical lines always use full-month figures through March.
-      // Only the current FY uses the as-of date for its final elapsed month.
+      // Historic years can start with months that have checking/Stores but
+      // lack actual Electricity and Salary inputs. Do not let those missing
+      // months hide valid later months (e.g. Nov '25–Mar '26).
+      // Each contiguous block is a separate *recorded-period* cumulative
+      // series, not a full-FY total. Reset at every gap; FyGraph itself splits
+      // the polyline where the value is null, so it never bridges a gap.
+      // The current FY still ends at its effective monthly cost cutoff.
       const m = getMonth(y, i, y === currentFY);
-      if (m.amount === null || !m.available || !continuous) { continuous = false; series.push(null); continue; }
+      if (m.amount === null || !m.available) {
+        running = 0;
+        series.push(null);
+        continue;
+      }
       running += m.amount;
       series.push(running);
     }
@@ -401,11 +410,19 @@ export default function FyProductionCostScreen() {
     const previous = y - 1;
     if (!years.includes(previous)) return null;
     const a = comparisonStatsOf(y), b = comparisonStatsOf(previous);
-    if (!a || !b || a.months.length !== b.months.length
-      || a.ready !== a.months.length || b.ready !== b.months.length) return null;
-    // Values are comparisons of the recorded FY figures shown in this very
-    // table, not assertions that every historic expense has been entered.
-    // Cost / pick stays blank if historic verified design PPI is absent.
+    if (!a || !b || a.months.length !== b.months.length) return null;
+    // Checking metres can be compared without an Expense entry; cost cannot.
+    if (key === 'prod') {
+      const productionAvailable = (st: CostStats) => st.months.every(m =>
+        m.status === 'ready' && m.raw && Number.isFinite(m.metres));
+      return productionAvailable(a) && productionAvailable(b)
+        ? deltaPct(tileMetric(key, a), tileMetric(key, b)) : null;
+    }
+    // "Entries" is a head/section line count. Section A/B only begins in
+    // October 2026, so it must not be compared with historical Rapier/Waterjet
+    // allocation line counts as though they were the same measure.
+    if (!areComparableCostPeriods(a,b)) return null;
+    if (key === 'entries' && a.months.some((m,i)=>m.mode !== b.months[i].mode)) return null;
     return deltaPct(tileMetric(key, a), tileMetric(key, b));
   };
   const tileInfo: Array<{key: TileKey; label: string; note: string}> = [
@@ -493,9 +510,9 @@ export default function FyProductionCostScreen() {
             <>
               <View style={s.hero}>
                 <View style={s.heroTop}>
-                  <View style={{flex:1,minWidth:210}}><Text style={s.eyebrow}>COST · {title} · {isCurrent?'TO DATE':'FULL YEAR'}</Text>
+                  <View style={{flex:1,minWidth:210}}><Text style={s.eyebrow}>COST · {title} · {isCurrent?'TO DATE':selectedStats.ready===12?'FULL YEAR':selectedStats.ready>0?'AVAILABLE MONTHS':'NO COST DATA'}</Text>
                     <Text style={s.heroAmount}>{currency(totalShow,amountMode)}</Text>
-                    <Text style={s.heroHint}>{selectedStats.ready} month{selectedStats.ready===1?'':'s'} with figures</Text>
+                    <Text style={s.heroHint}>{selectedStats.ready} month{selectedStats.ready===1?'':'s'} with complete costs{selectedStats.ready<selectedStats.months.length?' · other months unavailable':''}</Text>
                     {change!=null && <Text style={[s.delta,{color:change<=0?C.green:C.red}]}>{change>=0?'▲':'▼'} {Math.abs(change).toFixed(1)}% cost vs {yearLabel(year-1)} · comparable months</Text>}
                   </View>
                   <View style={s.insights}>
@@ -512,13 +529,13 @@ export default function FyProductionCostScreen() {
                     const value=y===currentFY?stageRow:fullRow;
                     const prevY=y-1;
                     const totalChange=years.includes(prevY) && !(year!==currentFY && y===currentFY)
-                      && comparisonStatsOf(y)?.ready === comparisonStatsOf(y)?.months.length
-                      && comparisonStatsOf(prevY)?.ready === comparisonStatsOf(prevY)?.months.length
+                      && areComparableCostPeriods(comparisonStatsOf(y), comparisonStatsOf(prevY))
                       ? deltaPct(comparisonStatsOf(y).total, comparisonStatsOf(prevY).total) : null;
                     return <Pressable key={y} style={[s.yearCard,selected&&s.yearActive]} onPress={()=>pickYear(y)}>
                       <Text style={[s.yearName,selected&&s.yearActiveText]}>{yearLabel(y)}{y===currentFY?' · to date':''}</Text>
                       <Text style={[s.yearValue,selected&&s.yearActiveText]}>{value.ready?currency(value.total,amountMode):'—'}</Text>
-                      {y !== currentFY && <Text style={[s.small,selected&&s.yearActiveText]}>At this stage {stageRow.ready?currency(stageRow.total,amountMode):'—'}</Text>}
+                      {y !== currentFY && <Text style={[s.small,selected&&s.yearActiveText]}>At this stage {stageRow.ready===stageRow.months.length?currency(stageRow.total,amountMode):'—'}</Text>}
+                      {y !== currentFY && value.ready>0 && value.ready<value.months.length && <Text style={[s.small,selected&&s.yearActiveText]}>{value.ready} months available</Text>}
                       {y === currentFY && <Text style={[s.small,selected&&s.yearActiveText]}>{selectedLastCostDate?`Cost through ${ymdLabel(selectedLastCostDate)}`:`Requested ${ymdLabel(today)}`}</Text>}
                       {totalChange!==null && <Text style={[s.small,selected&&s.yearActiveText,{fontWeight:'800',color:selected?'#fff':totalChange<=0?C.green:C.red}]}>{fmtChange(totalChange)} vs {yearLabel(prevY)}</Text>}
                     </Pressable>;
@@ -565,9 +582,6 @@ export default function FyProductionCostScreen() {
                           <Text style={[s.tableColDelta,s.compareNumber,{color:delta==null?C.faint:((tile.key==='pick'||tile.key==='metre'||tile.key==='avg'||tile.key==='best') ? (delta<=0?C.green:C.red) : (delta>=0?C.green:C.red))}]}>{fmtChange(delta)}</Text>
                         </Pressable>;
                       })}
-                      {tile.key !== 'prod' && tile.key !== 'entries' && (
-                        <Text style={s.small}>Comparison of recorded figures.</Text>
-                      )}
                       <View style={s.tileActions}>
                         {tile.key==='best' && selectedStats.bestMonth && <Pressable onPress={()=>openBreakdown(selectedStats.bestMonth!.index)}><Text style={s.link}>Open {selectedStats.bestMonth.label} ›</Text></Pressable>}
                         <Pressable onPress={()=>setTileMonthsOpen(v=>!v)} accessibilityRole="button"><Text style={s.link}>{tileMonthsOpen?'Hide monthly details':'Full breakdown'} ›</Text></Pressable>
@@ -585,7 +599,13 @@ export default function FyProductionCostScreen() {
               <View style={s.sectionHead}><Text style={s.sectionLabel}>CUMULATIVE · THE CHASE</Text><Text style={s.small}>Hover or tap a month</Text></View>
               <View style={s.chartCard}>
                 <FyGraph chart="line" labels={monthList.map(m=>m.label)} data={chartRows} hovered={chartHovered} onPick={setHover}/>
-                <View style={s.legend}>{years.map((y,i)=><View key={y} style={s.legendItem}><View style={[s.legendDot,{backgroundColor:selectedColors[i]}]}/><Text style={s.small}>{yearLabel(y)}</Text></View>)}</View>
+                <View style={s.legend}>{years.map((y,i)=>{
+                  const full = historicalFullStats[i];
+                  const visible = full.months.filter(m => m.amount !== null && m.available);
+                  const partialLabel = y !== currentFY && visible.length > 0 && visible.length < 12
+                    ? ` · ${visible[0].label}–${visible[visible.length-1].label} only` : '';
+                  return <View key={y} style={s.legendItem}><View style={[s.legendDot,{backgroundColor:selectedColors[i]}]}/><Text style={s.small}>{yearLabel(y)}{partialLabel}</Text></View>;
+                })}</View>
                 <View style={s.hoverBox}><Text style={s.hoverTitle}>{monthList[hover].label} · cumulative</Text>
                   {pointData.map(item=><Text key={item.year} style={s.hoverRow}>{yearLabel(item.year)}  {currency(item.cumulative,amountMode)}</Text>)}
                 </View>

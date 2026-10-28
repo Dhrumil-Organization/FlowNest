@@ -807,6 +807,9 @@ export const YarnRateAPI = {
   list: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('list'), body, { timeout: 120000 }),
   item: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('item'), body, { timeout: 120000 }),
   parties: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('parties'), body),
+  /** { prptype, codes: [itmcode] } → { rates: { code: { rate, date, entries, party, main, via_main } } } —
+   *  per yarn: the LATEST date of the group's rate book, and on that date the HIGHEST rate (Costing yarn prices) */
+  latest: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('latest'), body, { timeout: 60000 }),
   save: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('save'), body, { timeout: 60000 }),
   remove: (body: Record<string, any>) => client.post(LEGACY_ROUTES.yarnRates('delete'), body, { timeout: 60000 }),
 };

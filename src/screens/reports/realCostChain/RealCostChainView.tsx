@@ -50,6 +50,8 @@ export function RealCostChainView() {
   const [data, setData] = useState<ChainData | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  /** the shown figures are the last ones built; new ones are being built in the background */
+  const [updating, setUpdating] = useState(false);
   const [err, setErr] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<string, boolean>>({});
@@ -57,17 +59,30 @@ export function RealCostChainView() {
   const [showRates, setShowRates] = useState(false);
   const req = useRef(0);
 
-  /** pull / Refresh = fresh: built again now (else the server may answer from its 10-minute cache — much faster) */
+  /**
+   * Opening a period: the server answers at once — figures of the last 10 minutes, or the LAST figures built for that
+   * period (stale) — and if stale, new figures are built in the background (rebuild) and swapped in when ready.
+   * pull / Refresh = fresh: everything built again now, no cache at all.
+   */
   const load = useCallback(async (m: string, pull = false) => {
     if (!ready) return;
     const id = ++req.current;
     pull ? setRefreshing(true) : setLoading(true);
     setErr('');
+    setUpdating(false);
     try {
       const d = normalizeChain(unwrap(await RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: m, ...(pull ? { fresh: 1 } : {}) })));
       if (id !== req.current) return;
       setData(d);
       if (m === 'current') setMonth(d.month);   // the chip of the month the server used
+      if (d.stale) {
+        // shown at once; the new figures come in the background (another period picked meanwhile → dropped)
+        setUpdating(true);
+        RealCostChainAPI.report({ prptype: prpGroup, prpcode: prpCode, yearno, month: d.month, rebuild: 1 })
+          .then((r) => { if (id === req.current) setData(normalizeChain(unwrap(r))); })
+          .catch(() => { /* keep the last figures; Refresh can try again */ })
+          .finally(() => { if (id === req.current) setUpdating(false); });
+      }
     } catch (e) {
       if (id === req.current) setErr(errText(e, 'Unable to load the real cost chain.'));
     } finally {
@@ -257,7 +272,13 @@ export function RealCostChainView() {
           </ScrollView>
 
           <View style={st.refRow}>
-            <Text style={st.muted}>{data?.built_at ? `Figures as of ${data.built_at.slice(11, 16)}${data.built_at.slice(0, 10) !== todayIso() ? ' · ' + dateShort(data.built_at.slice(0, 10)) : ''} · Refresh builds them again now` : ''}</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {updating ? <ActivityIndicator size="small" color={T.copper} /> : null}
+              <Text style={[st.muted, { textAlign: 'left', flexShrink: 1 }]}>
+                {data?.built_at ? `Figures as of ${data.built_at.slice(11, 16)}${data.built_at.slice(0, 10) !== todayIso() ? ' · ' + dateShort(data.built_at.slice(0, 10)) : ''}` : ''}
+                {updating ? ' · updating to the latest figures…' : data?.build_secs ? ` · built in ${Math.round(data.build_secs)} s` : ''}
+              </Text>
+            </View>
             <Btn label={refreshing ? 'Refreshing…' : 'Refresh'} icon="refresh" kind="ghost" compact onPress={() => void load(month, true)} />
           </View>
           {err ? (

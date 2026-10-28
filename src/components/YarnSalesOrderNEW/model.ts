@@ -682,6 +682,7 @@ export type DetailsInput = {
   pcs: string;
   rate: string;
   remark: string;
+  remark3: string;
   isDyeing: number;
 };
 
@@ -733,6 +734,7 @@ export const addShadeRows = (input: DetailsInput): { rows: Row[]; lastRow: Row |
       Rate: num(input.rate),
       Amount: num(amount),
       Remark: input.remark,
+      Remark3: input.remark3,
       IsDyeing: input.isDyeing ? 1 : 0,
       RowKey: `${selectedItem?.ItmCode || ''}_${selectedGrade?.GrdCode || ''}_${shadeItem?.ShdCode || ''}`,
     };
@@ -754,7 +756,7 @@ export const addShadeRows = (input: DetailsInput): { rows: Row[]; lastRow: Row |
 export const updateRowDetails = (
   workingRows: Row[],
   oldRow: Row,
-  values: { qty: string; pcs: string; rate: string; remark: string; isDyeing: number },
+  values: { qty: string; pcs: string; rate: string; remark: string; remark3: string; isDyeing: number },
 ): { rows: Row[]; lastRow: Row } => {
   const amount = lineAmount(values.qty, values.rate);
   let lastRow: Row = oldRow;
@@ -767,6 +769,7 @@ export const updateRowDetails = (
       Rate: num(values.rate),
       Amount: num(amount),
       Remark: values.remark,
+      Remark3: values.remark3,
       IsDyeing: values.isDyeing ? 1 : 0,
     };
     return lastRow;
@@ -907,6 +910,8 @@ export type SaveInput = {
   dueDate: string;
   /** Sales Party picked after the main party (null = none, saved blank). */
   salesParty: Row | null;
+  /** Free-text party reference saved in main.ParRef. */
+  partyRef: string;
   /** mobappshow `main` of a saved order (null for a new order). */
   rawMain: Row | null;
   rawTax: Row[];
@@ -923,7 +928,7 @@ export const DEFAULT_ENT_TYPE = 'G02';
 
 /** Legacy buildMainPayload() — same keys, same value sources, same fallbacks. */
 export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row[] } => {
-  const { mode, uid, ctx, party: currentParty, remark, dueDays } = input;
+  const { mode, uid, ctx, party: currentParty, remark, dueDays, partyRef } = input;
   const dueDayText = toText(dueDays);
   const salesParty = effectiveSalesParty(input.salesParty, currentParty);
   const totals = computeTotals(input.rows);
@@ -998,6 +1003,7 @@ export const buildMainPayload = (input: SaveInput): { main: Row; newsoparty: Row
     D1NetAmt: fmt(totals.totalAmount) || '.00',
 
     Remark: remark || '',
+    ParRef: partyRef || '',
     // Delivery Days is no longer entered: a saved order keeps its own value, a new one
     // sends '0' (never '' — DDays is numeric; the web leaves it 0 for Rayons).
     DDays: toText(base.DDays) !== '' ? base.DDays : '0',
@@ -1082,7 +1088,7 @@ export const buildD1Payload = (input: SaveInput): { d1: Row[]; newsoitem: Row[] 
 
       Remark1: row.Remark || raw.Remark1 || '',
       Remark2: raw.Remark2 || '',
-      Remark3: raw.Remark3 || '',
+      Remark3: row.Remark3 ?? raw.Remark3 ?? '',
       Remark4: raw.Remark4 || '',
       Remark5: raw.Remark5 || '',
 

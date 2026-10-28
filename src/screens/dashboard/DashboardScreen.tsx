@@ -36,7 +36,30 @@ function cardByKey(cards: DashboardCard[], key: DashboardCard['key']) {
   return cards.find((card) => card.key === key);
 }
 
-function TargetSummary({ cards, label, onOpen, amountMode }: { cards: DashboardCard[]; label: string; onOpen: () => void; amountMode: 'compact' | 'actual' }) {
+// FY navigation follows the selected ERP financial year, not a hard-coded FY.
+// The card's existing monthly amounts always come from the current Target API.
+function targetFyNavigation(yearno: string | number, today: Date) {
+  const parsed = Number(yearno);
+  const defaultEndYear = today.getFullYear() + (today.getMonth() >= 3 ? 1 : 0);
+  const endYear = Number.isInteger(parsed) && parsed > 0
+    ? (parsed < 100 ? 2000 + parsed : parsed)
+    : defaultEndYear;
+  const startYear = endYear - 1;
+  const monthIndex = today.getMonth();
+  const reportYear = monthIndex >= 3 ? startYear : endYear;
+  const day = Math.min(today.getDate(), new Date(reportYear, monthIndex + 1, 0).getDate());
+  const date = `${reportYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { label: `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`, date };
+}
+
+function TargetSummary({ cards, label, onOpen, onOpenFY, fyLabel, amountMode }: {
+  cards: DashboardCard[];
+  label: string;
+  onOpen: () => void;
+  onOpenFY: () => void;
+  fyLabel: string;
+  amountMode: 'compact' | 'actual';
+}) {
   const so = cardByKey(cards, 'SALES_ORDER');
   const billing = cardByKey(cards, 'BILLING');
   const collection = cardByKey(cards, 'COLLECTION');
@@ -47,16 +70,39 @@ function TargetSummary({ cards, label, onOpen, amountMode }: { cards: DashboardC
   const billedPct = salesActual > 0 ? (billingActual / salesActual) * 100 : 0;
 
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onOpen} style={styles.targetCard}>
+    <View style={styles.targetCard}>
       <View style={styles.targetHeader}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open monthly Target report"
+          style={{ flex: 1, minWidth: 0 }}
+        >
           <Text style={styles.targetTitle} numberOfLines={1}>{label}</Text>
           <Text style={styles.targetSub}>Tap for target breakdown</Text>
-        </View>
-        <Text style={styles.targetArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onOpenFY}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${fyLabel} financial-year Sales report`}
+          style={styles.targetFYBadge}
+        >
+          <Text style={styles.targetFYText}>{fyLabel} ›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open monthly Target breakdown"
+          style={styles.targetHeaderArrowButton}
+        >
+          <Text style={styles.targetArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.targetBody}>
+      <TouchableOpacity activeOpacity={0.92} onPress={onOpen} style={styles.targetBody}>
         <View style={styles.targetMain}>
           <View style={styles.ringOuter}>
             <View style={styles.ringInner}>
@@ -82,8 +128,8 @@ function TargetSummary({ cards, label, onOpen, amountMode }: { cards: DashboardC
           <View style={[styles.legendDot, { backgroundColor: T.blue, marginLeft: 12 }]} />
           <Text style={styles.legendText}>Billed %</Text>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -239,6 +285,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
   const monthno = now.getMonth() + 1;
+  const targetFY = targetFyNavigation(yearno, now);
   // Backend scope flags cannot override explicit per-card grants.
   const ownerAllowed = hasOwnerCardPermission;
 
@@ -504,7 +551,12 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                     cards={cards}
                     label={periodLabel}
                     amountMode={amountMode}
+                    fyLabel={targetFY.label}
                     onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
+                    onOpenFY={() => router.push({
+                      pathname: '/new/(tabs)/reports/financial-year',
+                      params: { metric: 'sales', view, prptype, date: targetFY.date },
+                    } as any)}
                   />
                 ),
                 'dashboard.costing_summary': () =>
@@ -672,6 +724,9 @@ const styles = StyleSheet.create({
   targetHeader: { backgroundColor: T.nav, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   targetTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
   targetSub: { color: '#92A8BA', fontSize: 10, marginTop: 2 },
+  targetFYBadge: { borderWidth: 1, borderColor: '#8595A6', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 5, marginLeft: 8 },
+  targetFYText: { color: '#fff', fontWeight: '900', fontSize: 10 },
+  targetHeaderArrowButton: { marginLeft: 9, minWidth: 20, alignItems: 'center', justifyContent: 'center' },
   targetArrow: { color: '#fff', fontSize: 25 },
   targetBody: { padding: 16 },
   targetMain: { flexDirection: 'row', alignItems: 'center', gap: 18 },

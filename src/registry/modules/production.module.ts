@@ -595,7 +595,7 @@ registerPermissionArea({
           key: 'storeitemmaster',
           name: 'Store Item Master',
           type: 'screen',
-          displayOrder: 163,
+          displayOrder: 167,
           actions: [
             { key: 'view', name: 'View' },
             { key: 'add', name: 'Add' },
@@ -610,7 +610,7 @@ registerPermissionArea({
           displayOrder: 164,
           actions: [{ key: 'view', name: 'View' }],
         },
-       {
+        {
           key: 'sales_challan_packing_slip',
           name: 'Sales Challan Packing Slip',
           type: 'screen',
@@ -651,6 +651,18 @@ registerPermissionArea({
             { key: 'delete', name: 'Delete sample / movement', dangerous: true },
             { key: 'move', name: 'Record movement (scan & move)' },
             { key: 'print', name: 'Print QR sticker' },
+          ],
+        },
+        {
+          key: 'processcompleterequest',
+          name: 'Process Complete Request',
+          type: 'screen',
+          displayOrder: 168,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'add', name: 'Add' },
+            // { key: 'edit', name: 'Modify' },
+            { key: 'delete', name: 'Delete', dangerous: true },
           ],
         },
         // <-- add your new feature's resource object here (step 1)
@@ -1885,7 +1897,7 @@ registerUiNodes([
     action: 'view',
     route: 'StoreItemMasterNew',
     icon: 'store',
-    order: 163,
+    order: 167,
   },
   {
     id: 'screen.storeitemmaster',
@@ -1893,7 +1905,7 @@ registerUiNodes([
     title: 'Store Item Master',
     permission: 'production.storeitemmaster',
     action: 'view',
-    order: 163,
+    order: 167,
   },
   {
     id: 'nav.Multiprint',
@@ -1913,7 +1925,7 @@ registerUiNodes([
     action: 'view',
     order: 164,
   },
-   {
+  {
     id: 'nav.sales_challan_packing_slip',
     kind: 'navigation',
     title: 'Sales Challan Packing Slip',
@@ -1966,6 +1978,24 @@ registerUiNodes([
     permission: 'production.sampling_hub',
     action: 'view',
     order: 163,
+  },
+  {
+    id: 'nav.processcompleterequest',
+    kind: 'navigation',
+    title: 'Process Complete Request',
+    permission: 'production.processcompleterequest',
+    action: 'view',
+    route: 'ProcessCompleteRequestNew',
+    icon: 'store',
+    order: 168,
+  },
+  {
+    id: 'screen.processcompleterequest',
+    kind: 'screen',
+    title: 'Process Complete Request',
+    permission: 'production.processcompleterequest',
+    action: 'view',
+    order: 168,
   },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

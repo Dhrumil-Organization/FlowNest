@@ -1,4 +1,5 @@
 import { api } from '@/src/screens/dashboard/employ/api/api';
+import { DashboardAPI } from '@/src/api/dashboard';
 import FyProductionCostScreen from '@/src/screens/dashboard/FyProductionCostScreen';
 import { useDashboardAmountMode, formatDashboardAmount } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
@@ -30,6 +31,15 @@ type FyMonth = {
   stage_amount?: number | null;
   stage_qty?: number | null;
   stage_bills?: number | null;
+};
+
+type FyBillingTargetState = {
+  status: 'loading' | 'ready' | 'error';
+  months: Array<number | null>;
+  total: number | null;
+  manualMonths: number;
+  fallbackMonths: number;
+  message?: string;
 };
 
 type FyExecutiveMonth = {
@@ -815,6 +825,21 @@ function SalesFinancialYearPerformanceScreen() {
   const currentMonthIndex = ((anchor.getMonth() + 1) - 4 + 12) % 12;
   const monthFraction = anchor.getDate() / new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
 
+  // Define FY specifications before callback dependency arrays and effects.
+  // This also guards against temporal-dead-zone initialization regressions.
+  const specs = useMemo<YearSpec[]>(() => Array.from({ length: 3 }, (_, offset) => {
+    const startYear = anchorStartYear - offset;
+    const isCurrent = offset === 0;
+    return {
+      startYear,
+      id: fyId(startYear),
+      fromDate: fyStartDate(startYear),
+      fullEndDate: fyEndDate(startYear),
+      toDate: isCurrent ? anchorDate : fyEndDate(startYear),
+      isCurrent,
+    };
+  }), [anchorStartYear, anchorDate]);
+
   const [years, setYears] = useState<LoadedYear[]>([]);
   const [selectedYear, setSelectedYear] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -837,6 +862,8 @@ function SalesFinancialYearPerformanceScreen() {
   const [executiveLoadingId, setExecutiveLoadingId] = useState<string | null>(null);
   const executiveRequestedRef = useRef<Set<string>>(new Set());
   const initialLoadKeyRef = useRef('');
+  const [billingTargets, setBillingTargets] = useState<Record<string, FyBillingTargetState>>({});
+  const billingTargetRequestedRef = useRef<Set<string>>(new Set());
 
   const exitFinancialYear = useCallback(() => {
     // FY Sales is launched from the main dashboard. Replace the FY route
@@ -845,18 +872,6 @@ function SalesFinancialYearPerformanceScreen() {
     router.replace('/new' as any);
   }, [router]);
 
-  const specs = useMemo<YearSpec[]>(() => Array.from({ length: 3 }, (_, offset) => {
-    const startYear = anchorStartYear - offset;
-    const isCurrent = offset === 0;
-    return {
-      startYear,
-      id: fyId(startYear),
-      fromDate: fyStartDate(startYear),
-      fullEndDate: fyEndDate(startYear),
-      toDate: isCurrent ? anchorDate : fyEndDate(startYear),
-      isCurrent,
-    };
-  }), [anchorStartYear, anchorDate]);
 
   const loadYear = useCallback(async (
     specIndex: number,
@@ -994,6 +1009,81 @@ function SalesFinancialYearPerformanceScreen() {
       setExecutiveLoadingId(current => current === spec.id ? null : current);
     }
   }, [specs, metric, view, selectedExecutiveCode, executiveOverview, anchorDate, anchorStartYear, prptype]);
+
+  // Match the Monthly Target report's backend-authoritative BILLING target.
+  // The annual target is the sum of monthly targets, not a guessed FY quota.
+  // Requests are bounded (2 at a time), cached per scope and FY, and never
+  // re-compute or replace Sales FY actual billing values.
+  const targetScopeKey = `${prptype}|${view}|${selectedExecutiveCode}`;
+  const loadBillingTargets = useCallback(async (spec: YearSpec) => {
+    const cacheKey = `${prptype}|${view}|${selectedExecutiveCode}|${spec.id}`;
+    if (billingTargetRequestedRef.current.has(cacheKey)) return;
+    billingTargetRequestedRef.current.add(cacheKey);
+    setBillingTargets(prev => ({
+      ...prev, [cacheKey]: {
+        status: 'loading', total: null, months: Array(12).fill(null),
+        manualMonths: 0, fallbackMonths: 0,
+      },
+    }));
+    const count = spec.isCurrent ? currentMonthIndex + 1 : 12;
+    const months: Array<number | null> = Array(12).fill(null);
+    const sources: Array<string | null> = Array(12).fill(null);
+    let next = 0;
+    let firstError = '';
+    // Two workers bound network and server load; each month uses the exact
+    // existing target-card rules, including manual Billing vs SO fallback.
+    await Promise.all(Array.from({ length: 2 }, async () => {
+      while (next < count) {
+        const index = next++;
+        const period = monthPeriod(spec.startYear, index, anchorDate, spec.isCurrent);
+        try {
+          const result = await DashboardAPI.targetCard({
+            prptype,
+            yearno: spec.startYear + 1 - 2000,
+            monthno: period.month,
+            view: view === 'my' ? 'my' : 'owner',
+            upto_date: period.last,
+            ...(view === 'my' && selectedExecutiveCode ? { sexe: selectedExecutiveCode } : {}),
+          });
+          if (!result?.success || !Array.isArray(result?.response?.cards)) {
+            throw new Error(result?.message || 'Monthly Billing target unavailable');
+          }
+          const billing = result.response.cards.find(card => card.key === 'BILLING');
+          if (!billing || !Number.isFinite(Number(billing.target))) {
+            throw new Error('Monthly Billing target missing from Target API');
+          }
+          months[index] = Math.max(0, Number(billing.target));
+          sources[index] = billing.target_configured ? 'manual' : 'fallback';
+        } catch (error: any) {
+          if (!firstError) firstError = String(error?.message || 'Target API unavailable');
+        }
+      }
+    }));
+    const complete = months.slice(0, count).every(value => value !== null);
+    setBillingTargets(prev => ({
+      ...prev,
+      [cacheKey]: {
+        status: complete ? 'ready' : 'error',
+        months,
+        total: complete ? months.slice(0, count).reduce<number>((sum, value) => sum + (value || 0), 0) : null,
+        manualMonths: sources.filter(source => source === 'manual').length,
+        fallbackMonths: sources.filter(source => source === 'fallback').length,
+        message: complete ? undefined : firstError || 'Some monthly targets could not be retrieved',
+      },
+    }));
+  }, [prptype, view, selectedExecutiveCode, currentMonthIndex, anchorDate]);
+  const getBillingTarget = (year: LoadedYear) => billingTargets[`${targetScopeKey}|${year.id}`];
+  // Start on the focused year after the FY Sales API report is available.
+  // Opening the tile requests previous-year targets lazily, not on mount.
+  const focusedTargetSpec = specs[selectedYear];
+  useEffect(() => {
+    if (focusedTargetSpec && years.some(item => item.id === focusedTargetSpec.id)) {
+      void loadBillingTargets(focusedTargetSpec);
+    }
+  }, [focusedTargetSpec, years, loadBillingTargets]);
+  useEffect(() => {
+    if (openTile === 'tgt') specs.forEach(spec => { void loadBillingTargets(spec); });
+  }, [openTile, specs, loadBillingTargets]);
 
   const selectedSpec = specs[selectedYear];
   const focus = selectedSpec ? years.find(year => year.id === selectedSpec.id) : undefined;
@@ -1394,6 +1484,11 @@ function SalesFinancialYearPerformanceScreen() {
   };
 
   const tileValueForYear = (key: string, year: LoadedYear): number => {
+    if (key === 'tgt') {
+      const target = getBillingTarget(year);
+      return target?.status === 'ready' && n(target.total) > 0
+        ? fullMetric(year.report, 'amount') / n(target.total) * 100 : 0;
+    }
     if (key === 'avg') return averageMonths(year.report, focus.isCurrent ? currentMonthIndex : null);
     if (key === 'bills' || key === 'qty') {
       const field = key as 'bills' | 'qty';
@@ -1423,6 +1518,21 @@ function SalesFinancialYearPerformanceScreen() {
     { key: 'bills', label: 'Bills', value: formatCount(fullMetric(focus.report, 'bills')), sub: 'Invoices', raw: tileValueForYear('bills', focus), compare: previous ? tileValueForYear('bills', previous) : 0, fmt: formatCount },
     { key: 'qty', label: 'Metres', value: formatQty(fullMetric(focus.report, 'qty')), sub: 'Billed quantity', raw: tileValueForYear('qty', focus), compare: previous ? tileValueForYear('qty', previous) : 0, fmt: formatQty },
     { key: 'rate', label: 'Avg rate', value: formatRate(focus.report?.total?.avg_rate), sub: 'Amount ÷ metres', raw: tileValueForYear('rate', focus), compare: previous ? tileValueForYear('rate', previous) : 0, fmt: formatRate },
+    {
+      key: 'tgt', label: 'Achievement vs target',
+      value: getBillingTarget(focus)?.status === 'ready' && n(getBillingTarget(focus)?.total) > 0
+        ? `${Math.round(tileValueForYear('tgt', focus))}%` : '—',
+      sub: getBillingTarget(focus)?.status === 'loading' || !getBillingTarget(focus)
+        ? 'Loading Billing targets…'
+        : getBillingTarget(focus)?.status === 'error'
+          ? 'Billing targets unavailable'
+          : n(getBillingTarget(focus)?.total) > 0
+            ? `${amount(focusTotal)} of ${amount(getBillingTarget(focus)?.total)}`
+            : 'No Billing target for this FY',
+      raw: tileValueForYear('tgt', focus),
+      compare: previous ? tileValueForYear('tgt', previous) : 0,
+      fmt: (value: number) => `${Math.round(value)}%`,
+    },
   ];
 
   return (
@@ -1443,7 +1553,11 @@ function SalesFinancialYearPerformanceScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, width > 900 && styles.contentWide]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadYear(selectedYear, { refresh: true })} tintColor={C.owner} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+          billingTargetRequestedRef.current.delete(`${targetScopeKey}|${selectedSpec.id}`);
+          void loadBillingTargets(selectedSpec);
+          void loadYear(selectedYear, { refresh: true });
+        }} tintColor={C.owner} />}
       >
         <YearChips years={specs} selected={selectedYear} onSelect={(index) => void selectYear(index)} />
 
@@ -1497,7 +1611,11 @@ function SalesFinancialYearPerformanceScreen() {
                       return (
                         <View key={year.id} style={styles.kpiTableRow}>
                           <Text style={[styles.kpiTableYear, styles.kpiTableYearCol, year.id === focus.id && { color: C.bill, fontWeight: '800' }]}>{fyLabel(year.startYear)}<Text style={styles.kpiTableSuffix}>{suffix}</Text></Text>
-                          <Text style={[styles.kpiTableValue, styles.kpiTableValueCol]}>{tile.fmt(value)}{bestForYear >= 0 ? <Text style={styles.kpiTableSuffix}> {monthDate(year.startYear, bestForYear).label}</Text> : null}</Text>
+                          <Text style={[styles.kpiTableValue, styles.kpiTableValueCol]}>
+                            {tile.key === 'tgt' && (getBillingTarget(year)?.status !== 'ready' || n(getBillingTarget(year)?.total) <= 0)
+                              ? '—' : tile.fmt(value)}
+                            {bestForYear >= 0 ? <Text style={styles.kpiTableSuffix}> {monthDate(year.startYear, bestForYear).label}</Text> : null}
+                          </Text>
                           <View style={styles.kpiTableDeltaCol}>{previousYear ? <Delta value={rowDelta} /> : <Text style={styles.deltaMuted}>—</Text>}</View>
                         </View>
                       );

@@ -10,10 +10,10 @@
 //   body     { item: string, city: string, yarns?: string[], prptype?: string }
 //            item: one or more yarn items, comma separated (typed)
 //            city: one or more INDIAN cities, comma separated — '' = all India
-//            yarns: item codes SELECTED from the ERP yarn master (Designs → Yarns, main or sub item); the backend reads
-//                   their full details from the master and puts them in the AI question. prptype: login group.
+//            yarns: [itmcode] — the ONE yarn SELECTED from the ERP yarn master (main or sub item, Spun or Filament); the
+//                   backend reads its full details again from the master and puts them in the AI question. prptype: login group.
 //
-//   GET  {API}/api/yarn-vendors-yarns?prptype=   → { success, response: { spun: [Yarn], filament: [Yarn] } }  (the selection)
+//   GET  {API}/api/yarn-vendors-yarns?prptype=   → { success, response: { items: [Yarn + subs] } }   (ONE list: Spun + Filament)
 //
 //   reply    { success: true, response: { status, item, city, area, items, cities,
 //              skipped_items, skipped_cities, failed_items, coverage, count, searched_at, note,
@@ -65,7 +65,8 @@ export type Yarn = {
   spec: string;
   subs: Yarn[];
 };
-export type YarnMaster = { spun: Yarn[]; filament: Yarn[] };
+/** The yarn master for the selection: every main item (Spun + Filament together) with its sub items. */
+export type YarnMaster = { items: Yarn[] };
 
 const toYarn = (r: any): Yarn => ({
   itmcode: str(r?.itmcode), mitmcode: str(r?.mitmcode), is_sub: !!r?.is_sub, name: str(r?.name), kind: r?.kind === 'Filament' ? 'Filament' : 'Spun',
@@ -75,7 +76,7 @@ const toYarn = (r: any): Yarn => ({
   subs: Array.isArray(r?.subs) ? r.subs.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
 });
 
-/** The ERP yarn master for the selection (Designs → Yarns: main items with their sub items). */
+/** The ERP yarn master for the selection: Spun + Filament main items with their sub items (one call). */
 export async function loadYarnMaster(API: string, token: string, prptype: string): Promise<YarnMaster> {
   if (!API || !token) throw new SearchError('auth', 'Your login session was not found. Please sign in again.');
   let res: any;
@@ -94,10 +95,7 @@ export async function loadYarnMaster(API: string, token: string, prptype: string
     throw new SearchError('server', str(data?.message) || (res.status === 404 ? 'The yarn master API was not found on this server (/api/yarn-vendors-yarns).' : 'The yarn master could not be loaded.'));
   }
   const r = data.response || {};
-  return {
-    spun: Array.isArray(r.spun) ? r.spun.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
-    filament: Array.isArray(r.filament) ? r.filament.map(toYarn).filter((y: Yarn) => y.itmcode) : [],
-  };
+  return { items: Array.isArray(r.items) ? r.items.map(toYarn).filter((y: Yarn) => y.itmcode) : [] };
 }
 
 export type SearchStatus = 'ok' | 'no_results' | 'not_yarn_item' | 'invalid_city';
@@ -123,6 +121,16 @@ export type SearchResult = {
   note: string;
   /** Server time of the search, "YYYY-MM-DD HH:mm:ss". */
   searchedAt: string;
+  /** For a yarn selected from the master: exactly the details the AI got (read from the master by the server). */
+  specs: { item: string; spec: string }[];
+  /** the whole question the AI got (for checking) */
+  prompt: { model: string; system: string; user: string } | null;
+  /** true = the saved list of this same search (no new web search) */
+  fromSaved: boolean;
+  /** "Search the web again": parties added to the saved list */
+  added: number;
+  /** when this list was first searched (it grows with every "Search the web again") */
+  firstSearchedAt: string;
 };
 
 export type SearchErrorKind = 'cancelled' | 'network' | 'timeout' | 'auth' | 'rate-limit' | 'not-configured' | 'invalid' | 'server';
@@ -167,7 +175,7 @@ const toVendor = (row: any): Vendor => ({
 
 /** Ask the backend for the parties selling `item` in `city` (both may be comma lists; city '' = all India). */
 export async function searchVendors(API: string, token: string, item: string, city: string, signal?: AbortSignal,
-  sel?: { yarns: string[]; prptype: string }): Promise<SearchResult> {
+  sel?: { yarns: string[]; prptype: string }, fresh = false): Promise<SearchResult> {
   if (!API || !token) {
     throw new SearchError('auth', 'Your login session was not found. Please sign in again.');
   }
@@ -185,6 +193,9 @@ export async function searchVendors(API: string, token: string, item: string, ci
     controller.abort();
   }, SEARCH_TIMEOUT_MS);
 
+  const reqBody = { ...(sel && sel.yarns.length ? { item, city, yarns: sel.yarns, prptype: sel.prptype } : { item, city }), ...(fresh ? { fresh: 1 } : {}) };
+  console.log('[YarnVendors] request', reqBody);
+
   let res: any;
   let text = '';
   try {
@@ -195,7 +206,7 @@ export async function searchVendors(API: string, token: string, item: string, ci
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify(sel && sel.yarns.length ? { item, city, yarns: sel.yarns, prptype: sel.prptype } : { item, city }),
+      body: JSON.stringify(reqBody),
       signal: controller.signal,
     });
     text = await res.text();
@@ -217,6 +228,20 @@ export async function searchVendors(API: string, token: string, item: string, ci
 
   const status = Number(res.status) || 0;
   const serverMessage = str(data?.message);
+
+  // The exact prompt the server sent to the AI (F12 → Console, filter "[YarnVendors]").
+  const body = data?.response ?? data;
+  const pr = body?.prompt;
+  if (pr && typeof pr === 'object') {
+    console.log(
+      `[YarnVendors] AI prompt${body?.from_saved ? ' (saved list — prompt of the search that built it)' : ''}`
+      + `\n\n===== MODEL =====\n${pr.model ?? ''}`
+      + `\n\n===== MESSAGE (user) =====\n${pr.user ?? ''}`
+      + `\n\n===== RULES (system) =====\n${pr.system ?? ''}`,
+    );
+  } else {
+    console.log(`[YarnVendors] AI prompt NOT in the reply (HTTP ${status}${body?.from_saved ? ', saved list made before the prompt was stored — press "Search the web again"' : ', is the new YarnVendorsChatController.php on the server?'})`, body);
+  }
 
   // Login expired (backend convention) or a plain 401.
   if (status === 401 || data?.response?.isauth === '_AUTHFAILED' || /unauthenticated/i.test(serverMessage)) {
@@ -272,5 +297,10 @@ export async function searchVendors(API: string, token: string, item: string, ci
     vendors: resultStatus === 'ok' ? vendors : [],
     note: str(r.note),
     searchedAt: str(r.searched_at),
+    specs: Array.isArray(r.specs) ? r.specs.map((x: any) => ({ item: str(x?.item), spec: str(x?.spec) })).filter((x: any) => x.spec) : [],
+    prompt: r.prompt && typeof r.prompt === 'object' ? { model: str(r.prompt.model), system: String(r.prompt.system ?? ''), user: String(r.prompt.user ?? '') } : null,
+    fromSaved: !!r.from_saved,
+    added: Number(r.added) || 0,
+    firstSearchedAt: str(r.first_searched_at),
   };
 }

@@ -2,9 +2,8 @@
 // FILE: src/mill/MillShell.tsx
 // MILL MODE — the whole app while the header "Mills" switch is ON.
 //
-//  1. The same Sudamo user is logged into the MILLS server (through Sudamo,
-//     /api/mill/session/*) — silently with the saved login; if that is not
-//     possible a small password box is shown (Mill colours).
+//  1. NO Mills login: it is the same Sudamo user. Sudamo gives his Mill Hub rights
+//     (/api/mill/session/status) and fetches the data from the Mills server.
 //  2. Rights = his MILL HUB rights (saved on Sudamo, given to his Mills user /
 //     Mills roles in Permission Manager → Mills). Not the Sudamo ERP rights.
 //  3. The Process House ERP page runs inside with LIVE Mills data only:
@@ -15,9 +14,9 @@ import AppAlert from '@/common/utils/appAlert';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MILL_LOGIN_REQUIRED, MILL_RIGHTS, MillApi, MillSessionApi, buildMillHtml, millCan, millRightsReason } from './millBridge';
+import { MILL_ACTION_RIGHTS, MILL_LOGIN_REQUIRED, MILL_RIGHTS, MillApi, MillSessionApi, buildMillHtml, millCan, millRightsReason } from './millBridge';
 import { MillHubFrame, type MillHubFrameHandle, type MillPageMessage } from './MillHubFrame';
 import { useMillModeStore } from './millMode';
 
@@ -29,7 +28,7 @@ function displayName(u: any): string {
   return full || String(u.name || u.username || 'User').trim();
 }
 
-type Phase = 'session' | 'login' | 'norights' | 'loading' | 'ready';
+type Phase = 'session' | 'login' | 'error' | 'norights' | 'loading' | 'ready';
 
 export function MillShell() {
   const router = useRouter();
@@ -44,9 +43,6 @@ export function MillShell() {
 
   const [phase, setPhase] = useState<Phase>(millSession ? 'loading' : loginError ? 'login' : 'session');
   const [loginMsg, setLoginMsg] = useState(loginError || '');
-  const [loginName, setLoginName] = useState(() => String(((rawLoginResponse as any)?.user || sessionUser)?.name || ''));
-  const [loginPass, setLoginPass] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
   const [boot, setBoot] = useState<{ data: Record<string, any>; today?: string; live: boolean; offline: boolean; note: string } | null>(null);
   const [nonce, setNonce] = useState(0);
   const frameRef = useRef<MillHubFrameHandle>(null);
@@ -62,8 +58,9 @@ export function MillShell() {
       if (r.session) {
         setMillSession(r.session);
       } else {
-        setLoginMsg(r.message || 'Please log in to Mills.');
-        setPhase('login');
+        // no password box any more — show why, with Try again
+        setLoginMsg(r.message || 'Could not read the Mill rights from Sudamo.');
+        setPhase('error');
       }
     })();
     return () => { alive = false; };
@@ -73,23 +70,23 @@ export function MillShell() {
   const rights = useMemo(() => {
     const r: Record<string, boolean> = {};
     for (const [k, path] of Object.entries(MILL_RIGHTS)) r[k] = millCan(millSession?.permissions, path);
+    for (const [k, [path, action]] of Object.entries(MILL_ACTION_RIGHTS)) r[k] = millCan(millSession?.permissions, path, action);
     return r;
   }, [millSession]);
   const anyScreen = ['dash', 'inward', 'lots', 'machines', 'lab', 'recipe', 'dispatch', 'expense', 'reports'].some((k) => rights[k]);
 
   const user = useMemo(() => {
     const mu: any = millSession?.millUser;
-    return { name: displayName(mu), role: mu?.is_superadmin ? 'Mills · Super Admin' : 'Mills user' };
+    return { name: displayName(mu), role: mu?.is_superadmin ? 'Super Admin' : 'Sudamo user' };
   }, [millSession]);
 
   // ── 3. live data ──
   const load = useCallback(async () => {
     setPhase('loading');
     const res = await MillApi.bootstrap();
-    if (!res.success && res.code === MILL_LOGIN_REQUIRED) {
-      // saved login no longer works on Mills (password changed …) → ask for it
-      setLoginMsg('Mills login expired or the password changed. Enter your Mills user name and password.');
-      setPhase('login');
+    if (!res.success && (res.code === MILL_LOGIN_REQUIRED || res.code === 'MILL_BRIDGE_CONFIG')) {
+      setLoginMsg(res.message || 'Mills data is not available right now.');
+      setPhase('error');
       return;
     }
     const d: any = res.data || {};
@@ -127,14 +124,6 @@ export function MillShell() {
     }
   }, [router, turnOff]);
 
-  const doLogin = useCallback(async () => {
-    if (!loginName.trim() || !loginPass.trim()) { setLoginMsg('Enter user name and password.'); return; }
-    setLoggingIn(true);
-    const r = await MillSessionApi.login(loginName, loginPass);
-    setLoggingIn(false);
-    if (r.session) { setLoginPass(''); setMillSession(r.session); }
-    else setLoginMsg(r.message || 'Mills login failed.');
-  }, [loginName, loginPass, setMillSession]);
 
   const onMessage = useCallback(
     (m: MillPageMessage) => {
@@ -149,7 +138,10 @@ export function MillShell() {
         })();
       } else if (m.type === 'api') {
         // the page asks for data → apig → Sudamo (checks the Mill right) → Mills
-        const allowed = ['expense/summary', 'expense/ledger', 'expense/issues', 'reports/summary', 'reports/party', 'discover', 'schema', 'lots', 'inward', 'machines', 'dispatch', 'lab', 'ping'];
+        const allowed = ['expense/summary', 'expense/ledger', 'expense/issues', 'reports/summary', 'reports/party', 'discover', 'schema', 'lots', 'inward', 'machines', 'dispatch', 'lab', 'ping',
+          'expense/coal', 'expense/coal/split/save', 'expense/coal/steam', 'expense/coal/steam/save', 'expense/coal/steam/delete',
+          'expense/coal/offers', 'expense/coal/offers/save', 'expense/coal/offers/delete', 'expense/coal/constraints/save', 'expense/coal/suppliers/save',
+          'expense/dyeing', 'expense/electricity', 'expense/electricity/save', 'expense/electricity/meters/save'];
         if (!allowed.includes(m.action)) {
           frameRef.current?.reply(m.id, { success: false, message: 'Not allowed: ' + m.action });
           return;
@@ -182,18 +174,25 @@ export function MillShell() {
     [exitMill, load, logout, reset, router, setMillSession],
   );
 
-  if (phase === 'login') {
+  if (phase === 'error' || phase === 'login') {
     return (
       <SafeAreaView style={s.root} edges={['top', 'bottom']}>
         <StatusBar barStyle="light-content" backgroundColor={NAV} />
         <View style={s.center}>
           <Text style={s.small}>MADHUSUDHAN PROCESS HOUSE</Text>
-          <Text style={s.title}>Mills login</Text>
+          <Text style={s.title}>Mill Hub not available</Text>
           <Text style={s.sub}>{loginMsg}</Text>
-          <TextInput style={s.input} value={loginName} onChangeText={setLoginName} placeholder="User name" placeholderTextColor="#818cf8" autoCapitalize="none" autoCorrect={false} />
-          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder="Password" placeholderTextColor="#818cf8" secureTextEntry autoCapitalize="none" onSubmitEditing={() => void doLogin()} />
-          <TouchableOpacity style={[s.btn, s.btnSolid]} disabled={loggingIn} onPress={() => void doLogin()}>
-            {loggingIn ? <ActivityIndicator color={NAV} /> : <Text style={[s.btnText, { color: NAV }]}>Log in to Mills</Text>}
+          <TouchableOpacity
+            style={[s.btn, s.btnSolid]}
+            onPress={() => {
+              setPhase('session');
+              void MillSessionApi.status().then((r) => {
+                if (r.session) setMillSession(r.session);
+                else { setLoginMsg(r.message || 'Could not read the Mill rights from Sudamo.'); setPhase('error'); }
+              });
+            }}
+          >
+            <Text style={[s.btnText, { color: NAV }]}>Try again</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.btn} onPress={() => void exitMill()}>
             <Text style={s.btnText}>Back to ERP</Text>
@@ -241,7 +240,16 @@ export function MillShell() {
           <ActivityIndicator color="#5eead4" style={{ marginTop: 14 }} />
         </View>
       ) : (
-        <MillHubFrame ref={frameRef} key={nonce} html={html} onMessage={onMessage} />
+        <>
+          {millSession?.underDevelopment ? (
+            <View style={s.devBar} accessibilityRole="text">
+              <Text style={s.devText} numberOfLines={2}>
+                🚧 UNDER DEVELOPMENT — Mill Hub screens and figures are still being built and checked. Please do not rely on them yet.
+              </Text>
+            </View>
+          ) : null}
+          <MillHubFrame ref={frameRef} key={nonce} html={html} onMessage={onMessage} />
+        </>
       )}
     </SafeAreaView>
   );
@@ -258,4 +266,7 @@ const s = StyleSheet.create({
   btn: { marginTop: 14, borderWidth: 1, borderColor: '#818cf8', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 9, minWidth: 180, alignItems: 'center' },
   btnSolid: { backgroundColor: '#5eead4', borderColor: '#5eead4' },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  // "Under development" strip — shown on every Mill page while that right is ON
+  devBar: { backgroundColor: '#f59e0b', paddingHorizontal: 14, paddingVertical: 7, alignItems: 'center' },
+  devText: { color: '#1e1b4b', fontSize: 12, fontWeight: '800', textAlign: 'center', letterSpacing: 0.2 },
 });

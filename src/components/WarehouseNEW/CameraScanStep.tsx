@@ -9,13 +9,12 @@
 //     suppressed until it has been out of frame for 700 ms (sliding window)
 // expo-camera is imported directly, exactly like the other NEW scanners
 // (StockVerificationNEW/QrScanSheet, greyPacking scanner) — it has a web build.
-import { AppAlert } from '@/common/utils/appAlert';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { cleanScannerValue, findIndexedQrMatch, indexCartonRow, QrIndex, ScanParams } from './model';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { cleanScannerValue, findIndexedQrMatch, indexCartonRow, QrIndex, ScanParams, searchScanMatch } from './model';
 import { ScanLayout, StagePill, useScanSession } from './scanShared';
 
 type Props = { params: ScanParams; onClose: () => void };
@@ -29,6 +28,8 @@ export default function CameraScanStep({ params, onClose }: Props) {
 
   const [permission, requestPermission] = useCameraPermissions();
   const hasPermission = !!permission?.granted;
+  const [permissionBusy, setPermissionBusy] = useState(false);
+  const [permissionMessage, setPermissionMessage] = useState('');
   const [torch, setTorch] = useState<'on' | 'off'>('off');
 
   const processingRef = useRef(false);
@@ -44,23 +45,35 @@ export default function CameraScanStep({ params, onClose }: Props) {
     };
   }, []);
 
+  // Request camera access when this scanner opens. Keep the screen open
+  // when access is denied so the user can retry after changing browser settings.
   useEffect(() => {
-    if (!permission) return;
-    if (!permission.granted) {
-      const refused = () => {
-        if (!mountedRef.current) return;
-        AppAlert.alert('Camera Permission Required', 'Please allow camera permission.', [
-          { text: 'OK', onPress: () => onClose() },
-        ]);
-      };
-      requestPermission()
-        .then((res: any) => {
-          if (!res?.granted) refused();
-        })
-        .catch(refused);
-    }
+    if (!permission || permission.granted || permissionBusy) return;
+    let active = true;
+    setPermissionBusy(true);
+    requestPermission()
+      .then((res: any) => {
+        if (!active) return;
+        setPermissionMessage(res?.granted ? '' : (
+          Platform.OS === 'web'
+            ? 'Camera access is blocked. Allow Camera for this site in browser settings, then tap Try Again.'
+            : 'Camera permission was not granted. Tap Try Again and allow camera access.'
+        ));
+      })
+      .catch(() => {
+        if (!active) return;
+        setPermissionMessage(
+          Platform.OS === 'web'
+            ? 'Could not access the camera. Check browser site permissions and try again.'
+            : 'Could not access the camera. Check app permissions and try again.',
+        );
+      })
+      .finally(() => {
+        if (active) setPermissionBusy(false);
+      });
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permission]);
+  }, [permission?.granted, permission?.canAskAgain]);
 
   // Build the exact-match map after the camera screen has painted (batched).
   const qrIndexRef = useRef<QrIndex>(new Map());
@@ -106,6 +119,10 @@ export default function CameraScanStep({ params, onClose }: Props) {
   const processScan = (value: any) => {
     const rawInput = cleanScannerValue(value);
     if (!rawInput) return;
+    if (mode === 'SEARCH') {
+      session.applyMatch(searchScanMatch(rawInput));
+      return;
+    }
     session.applyMatch(findIndexedQrMatch(qrIndexRef.current, rawInput));
   };
 
@@ -141,10 +158,46 @@ export default function CameraScanStep({ params, onClose }: Props) {
   };
 
   if (!hasPermission) {
+    const retryPermission = async () => {
+      if (permissionBusy) return;
+      setPermissionBusy(true);
+      setPermissionMessage('');
+      try {
+        const res: any = await requestPermission();
+        if (!res?.granted) {
+          setPermissionMessage(
+            Platform.OS === 'web'
+              ? 'Camera is still blocked. In Chrome, click the site icon beside the address, open Site settings, set Camera to Allow, reload this page and try again.'
+              : 'Camera permission is still denied. Open your device app settings, allow Camera for this app, then tap Try Again.',
+          );
+        }
+      } catch {
+        setPermissionMessage(
+          Platform.OS === 'web'
+            ? 'Camera access failed. Check Chrome site settings and make sure this page uses localhost or HTTPS.'
+            : 'Camera access failed. Check this app’s camera permission in device settings.',
+        );
+      } finally {
+        setPermissionBusy(false);
+      }
+    };
+
     return (
       <View style={st.center}>
-        <Icon name="photo-camera" size={40} color={T.copper} />
-        <Text style={st.waitText}>Waiting for camera permission...</Text>
+        <Icon name="photo-camera" size={44} color={T.copper} />
+        <Text style={st.permissionTitle}>Camera Permission Required</Text>
+        <Text style={st.waitText}>
+          {permissionMessage || 'Allow camera access to scan carton QR codes.'}
+        </Text>
+        <TouchableOpacity
+          onPress={retryPermission}
+          disabled={permissionBusy}
+          style={[st.allowBtn, permissionBusy && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Allow camera permission"
+        >
+          <Text style={st.closeText}>{permissionBusy ? 'REQUESTING...' : 'TRY AGAIN / ALLOW CAMERA'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onClose} style={st.closeBtn} accessibilityRole="button" accessibilityLabel="Close scanner">
           <Text style={st.closeText}>CLOSE</Text>
         </TouchableOpacity>
@@ -154,7 +207,7 @@ export default function CameraScanStep({ params, onClose }: Props) {
 
   return (
     <ScanLayout
-      title={mode === 'TRANSFER' ? 'Transfer Scan' : 'Assign Scan'}
+      title={mode === 'SEARCH' ? 'Search Scan' : mode === 'TRANSFER' ? 'Transfer Scan' : 'Assign Scan'}
       hint="Scan Carton QR Code"
       session={session}
       onClose={onClose}
@@ -177,7 +230,17 @@ export default function CameraScanStep({ params, onClose }: Props) {
 
 const st = StyleSheet.create({
   center: { flex: 1, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
-  waitText: { color: '#fff', fontWeight: '900', fontSize: 15, textAlign: 'center' },
+  permissionTitle: { color: '#fff', fontWeight: '900', fontSize: 19, textAlign: 'center' },
+  waitText: { color: '#fff', fontWeight: '600', fontSize: 14, textAlign: 'center', lineHeight: 21, maxWidth: 440 },
+  allowBtn: {
+    minHeight: 46,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: T.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
   closeBtn: {
     minHeight: 44,
     paddingHorizontal: 22,

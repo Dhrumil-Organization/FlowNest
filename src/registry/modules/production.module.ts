@@ -475,7 +475,11 @@ registerPermissionArea({
           name: 'Warehouse',
           type: 'screen',
           displayOrder: 150,
-          actions: [{ key: 'view', name: 'View' }],
+          // actions: [{ key: 'view', name: 'View' }],
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'delete', name: 'Delete cartons', dangerous: true },
+          ],
         },
         // {
         //   key: 'yarn_management_system',

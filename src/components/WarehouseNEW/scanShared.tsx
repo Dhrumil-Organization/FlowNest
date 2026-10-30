@@ -59,7 +59,13 @@ export function useScanSession(selected: Record<string, Row>) {
     return set;
   }, [scanned]);
 
-  const scannedRows = useMemo(() => Object.values(scanned || {}).reverse(), [scanned]);
+  // JS objects list integer-like keys ("262970295") before text keys ("RM17727"), so the order of
+  // scanning is kept in `_scanSeq` and used for the list (newest first) and by the callers.
+  const seq = useRef(1_000_000);
+  const scannedRows = useMemo(
+    () => Object.values(scanned || {}).sort((a, b) => (a?._scanSeq ?? 0) - (b?._scanSeq ?? 0)).reverse(),
+    [scanned],
+  );
 
   const playStatusAnimation = (type: ScanStatusType) => {
     scaleAnim.setValue(0.7);
@@ -93,7 +99,7 @@ export function useScanSession(selected: Record<string, Row>) {
 
     setScanned((prev) => ({
       ...prev,
-      [stockRowKey]: { ...row, _scanCartonKey: cartKey, _scanStockRowKey: stockRowKey },
+      [stockRowKey]: { ...row, _scanCartonKey: cartKey, _scanStockRowKey: stockRowKey, _scanSeq: ++seq.current },
     }));
     setScanStatus('success', 'Scan Successful!', `Carton ${displayCarton} added`);
     return true;

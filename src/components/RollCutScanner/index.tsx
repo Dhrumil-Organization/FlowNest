@@ -145,11 +145,12 @@ export default function RollCutScanner({ token, API }: Props) {
     async (row: any) => {
       try {
         const r = await api.remove({ prpcode: prpCode, yearno: getCurrentFinancialYear(), row });
-        if (r && r.success === false) {
+        if (r?.success !== true) {
           AppAlert.alert('Error', r?.message || 'Delete failed');
           return false;
         }
         setRows((list) => list.filter((x) => x !== row));
+        AppAlert.alert('Success', r?.message || 'Delete successfully');
         return true;
       } catch (e: any) {
         AppAlert.alert('Error', errMsg(e, 'Delete failed'));

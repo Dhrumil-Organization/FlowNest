@@ -82,11 +82,22 @@ The screen never checks `view` itself, because the route guard already did. It r
 
 In scan mode, every line has two buttons: **Hardware scanner** and **Mobile camera**. The one you tap is the scanner type for that line's carton screen.
 
-The carton screen has two parts:
+The carton screen has two views:
 
-- **Summary** (no scanner on it, so the Carton list is in view): Summary card, scanner type with **Change**, Carton list. **Scan QR** (top right) scans any carton. **Scan** on a row asks for that carton, and another label is reported as *Wrong carton*.
-- **Scanner screen** (opens on Scan QR / Scan): uses the chosen type. A good scan selects the carton and goes straight back to the summary, with a green "C-… selected" strip. A bad scan (not found, locked, already scanned, wrong carton) stays on the scanner with the reason, so you just scan again. **Type a label** is there for a damaged sticker.
-- **Remove:** a carton scanned by mistake is removed with ✕ on its row (asks first). Cartons already saved on a saved line (`D1Flag = 1`) stay, as on the web.
+1. **Locations** — the Summary card, the scanner bar, and a table with one row per warehouse location (`WarehouseLoction` from `getcartondetail`): **Location · Cartons · Net wt. · Selected (n · qty)**, with a **Total** row. Locked cartons and cartons already on other lines of this slip are counted under the row.
+   - **Tap a location** to open its cartons.
+   - **Tick a location** to select every free carton there (it asks first if that goes over the balance qty). Tick it again to take them all off (asks first).
+   - **All cartons** at the bottom opens every location together.
+   - **Back to slip · n cartons** is the only way back to the slip with the selection (Done of the web).
+2. **Cartons** (one location, or all) — search, chips (All · Selected · To pick · Locked), and the cartons. There is no Scan button per carton:
+   - **Tap a carton** (○) to pick it by hand; it is tagged *Picked by hand*. Tap ✓ to take it off (asks first).
+   - **Scanning works on both views.** With the hardware scanner, the scanner bar is always listening and a scanned label is selected straight away, from any location. With the mobile camera, **Scan QR** opens the camera; a good scan selects the carton and comes back.
+   - **Type a label** is there for a damaged sticker.
+   - **Done · n in <location>** goes back to the Locations summary.
+
+A carton on this slip is no longer returned by `getcartondetail`, so its location is remembered for the app session and it stays under its location after Done or a save. A carton saved in an earlier session whose location is not known shows under **Saved earlier**.
+
+Every selection — scan, hand pick or a whole location — goes through the same checks (`pickCarton` in `rules.ts`): locked or already on a line → refused, with the reason in a red strip. Cartons already saved on a saved line (`D1Flag = 1`) stay, as on the web. Back goes camera → cartons → locations → slip.
 
 | Device | Behaviour (copied from WarehouseNEW HardwareScanStep / CameraScanStep) |
 |---|---|

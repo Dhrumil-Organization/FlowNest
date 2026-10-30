@@ -30,6 +30,9 @@ registerPermissionArea({
       actions: [view],
       children: [
         { key: 'dashboard', name: 'Plant Dashboard', type: 'screen', displayOrder: 10, actions: [view] },
+        // ON (ALLOW) = an "Under development" strip on EVERY Mill page; OFF = no strip.
+        // Only its own ALLOW counts (not inherited from "Mill Hub"); it does not open any page.
+        { key: 'under_development', name: 'Under Development banner (all Mill pages)', type: 'section', displayOrder: 5, actions: [view] },
         { key: 'inward', name: 'Greige Inward', type: 'screen', displayOrder: 20, actions: [view, { key: 'create', name: 'Create' }, { key: 'edit', name: 'Edit' }] },
         { key: 'lots', name: 'Lot Board', type: 'screen', displayOrder: 30, actions: [view, { key: 'edit', name: 'Edit' }] },
         { key: 'machines', name: 'Machine Planner', type: 'screen', displayOrder: 40, actions: [view, { key: 'edit', name: 'Edit' }] },
@@ -46,7 +49,7 @@ registerPermissionArea({
             { key: 'coal', name: 'Coal — Boiler + Thermopack', type: 'screen', displayOrder: 10, actions: [view] },
             { key: 'coal_steam_entry', name: 'FBC Steam Entry', type: 'section', displayOrder: 15, actions: [view, { key: 'edit', name: 'Enter steam' }] },
             { key: 'coal_optimiser', name: 'Coal Mix Optimiser', type: 'screen', displayOrder: 20, actions: [view, { key: 'edit', name: 'Edit offers / constraints' }] },
-            { key: 'electricity', name: 'Electricity — Torrent', type: 'screen', displayOrder: 30, actions: [view] },
+            { key: 'electricity', name: 'Electricity — Torrent', type: 'screen', displayOrder: 30, actions: [view, { key: 'edit', name: 'Enter meter readings / meters' }] },
             { key: 'chemicals', name: 'Chemicals & Dyes', type: 'screen', displayOrder: 40, actions: [view] },
             { key: 'labour', name: 'Labour & Wages', type: 'screen', displayOrder: 50, actions: [view] },
             { key: 'maintenance', name: 'Maintenance & Stores', type: 'screen', displayOrder: 60, actions: [view] },

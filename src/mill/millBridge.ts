@@ -7,6 +7,8 @@
 //   • buildMillHtml  → the artifact page + window.MILL (user, rights, live data)
 // ─────────────────────────────────────────────────────────────
 import { ApiClient } from '@/src/api/client';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { useEffect, useState } from 'react';
 import { getCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 import { MILL_HUB_HTML_TEMPLATE } from './millHubHtml';
 
@@ -121,6 +123,44 @@ export const MillSessionApi = {
     return post('/api/mill/session/logout');
   },
 };
+
+/**
+ * Header "Mills" switch: shown ONLY when this user has an explicit right on the Mill DASHBOARD
+ * (Permission Manager → Mills → Dashboard, mill.dashboard — the Mill Hub parent does not count) — Sudamo POST /api/mill/switch_access.
+ * No super-admin shortcut. Hidden while unknown, on any error, and when the route is missing.
+ * On Rayons (apiy has no Mill rights) the last answer from apig for the same user name is used.
+ */
+export function useMillSwitchAllowed(enabled: boolean, userName: string, sessionKey: unknown): boolean {
+  const [allowed, setAllowed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const name = String(userName || '').trim().toLowerCase();
+    if (!enabled || !name) {
+      setAllowed(false);
+      return () => { alive = false; };
+    }
+    const cacheKey = `mill_switch_allowed:${name}`;
+    (async () => {
+      try {
+        const prop = await AsyncStorage.getItem('selected_property');
+        if (prop === 'rayons') {
+          const cached = await AsyncStorage.getItem(cacheKey);
+          if (alive) setAllowed(cached === '1');
+          return;
+        }
+        const r = await post<{ allowed?: boolean }>('/api/mill/switch_access');
+        const ok = !!(r.success && r.data && r.data.allowed);
+        if (!alive) return;
+        setAllowed(ok);
+        if (r.success) await AsyncStorage.setItem(cacheKey, ok ? '1' : '0');
+      } catch {
+        if (alive) setAllowed(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [enabled, userName, sessionKey]);
+  return allowed;
+}
 
 export const MillApi = {
   /** Data call; on an expired Mills session it logs in again silently and retries once. */

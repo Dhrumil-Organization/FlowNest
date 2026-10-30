@@ -15,6 +15,7 @@ import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 import { useMillModeStore } from '@/src/mill/millMode';
+import { useMillSwitchAllowed } from '@/src/mill/millBridge';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -67,11 +68,11 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   const switchUserLogin = !embedded && Number(rawLoginResponse?.switchuserlogin ?? 0) === 1;
 
   // MILL MODE switch — separate from Switch Property, default OFF.
-  // Mill Hub rights belong to the user's MILLS login (Permission Manager →
-  // Mills), so the switch is offered to every signed-in user; turning it ON
-  // logs the same user into Mills and only enters Mill mode when he has a
-  // Mill Hub right there (otherwise a message, and he stays in the ERP).
-  const millAllowed = !embedded && !!rawLoginResponse;
+  // Shown ONLY to a user who has the Mill DASHBOARD right (Permission Manager →
+  // Mills → Dashboard; the Mill Hub parent does not count) — checked on Sudamo, no super-admin
+  // shortcut: a super admin without that right does not see it either.
+  const millRight = useMillSwitchAllowed(!embedded && !!rawLoginResponse, String(profileUser?.name || ''), rawLoginResponse);
+  const millAllowed = !embedded && !!rawLoginResponse && millRight;
   const millBusy = useMillModeStore((s) => s.busy);
   const millTurnOn = useMillModeStore((s) => s.turnOn);
   const openMill = async () => {

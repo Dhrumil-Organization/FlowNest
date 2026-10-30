@@ -222,6 +222,16 @@ export type PriorityShade = {
   outwardLots: OutwardLotBrief[]; // shade's outward lots (lot no + lot qty + challan + mill)
   LotNos: string; // "3365/3378"
   LotQty: number | null; // total lot qty (null = no lot / some lot without qty)
+  outwards?: PriorityOutward[];
+};
+
+export type PriorityOutward = {
+  OutwardUId: string;
+  OutwardNo: string | null;
+  OutwardDate?: string | null;
+  Status: ShadeStatus | null;
+  Details?: Record<string, any>;
+  lots: any[];
 };
 
 export type PriorityChart = {
@@ -282,6 +292,7 @@ export type SaveStatusPayload = {
   Rate: number | null;
   Lots?: LotEntry[];
   SplitFromLotId?: number | null;
+  OutwardUId?: string | number | null;
 };
 
 /** Add / edit / remove one or many lots (split a colour / a lot into lots). */
@@ -305,6 +316,7 @@ export type SaveLotPayload = {
   Remove?: boolean;
   Lots?: LotEntry[];
   SplitFromLotId?: number | null;
+  OutwardUId?: string | number | null;
 };
 
 /** Flat event row used by Daily Update + Mill Hub (history + chart context). */

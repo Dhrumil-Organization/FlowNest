@@ -31,7 +31,7 @@
 // - Status: FIXED sequence (see NEXT_STATUSES in dyeingModel):
 //     Sent for job -> Dying -> Finish -> Job inward  OR  Lorry Cut
 //   Only the next step of the latest status is enabled — no skip, no going
-//   back, no repeat. Tap it -> Save -> /dyeing/save_status for THIS shade only
+//   back, no repeat. Tap it -> Save -> /dyeing/save_status for THIS outward + shade only
 //   (own OrderSrNo / ShdCode / AllocationId), dated today, full shade qty.
 //   Lorry Cut needs a reason (backend rule).
 // - Chips = the shade's status history with date, in sequence (oldest first).
@@ -76,6 +76,7 @@ import {
   STATUS_LETTER,
   STATUS_SEQ,
   todayISO,
+  normalizeStatus,
 } from './dyeingModel';
 import { chipDate, lineKeyOf, OutwardRow, outwardSaveOk, rowShadeMatch, toOutwardRows } from './dyeingOutward';
 import { DyeingGuide } from './DyeingGuide';
@@ -368,44 +369,248 @@ export function ColourStatusSheet({
                 ? withLot.reduce((sum, r) => sum + (r.lotQty ?? 0), 0)
                 : (table.loading ? shade.LotQty : null);
               const others = group.filter((g) => g !== shade).map((g) => g.ShdName).filter(Boolean);
+              // Build one independent status block per outward actually assigned
+              // to this shade. lotnos rows are the authoritative selected outward
+              // lines; group lots by the outward UUID so one outward with multiple
+              // lots still gets only one status timeline.
+              const statusOutwards = (shade.outwards || []).filter((ow) =>
+                String(ow.OutwardUId ?? (ow as any).uuid ?? '').trim() || ow.OutwardNo || ow.Status || (ow.lots || []).length
+              );
+              const groupedLotOutwards = (() => {
+                const groups = new Map<string, any>();
+                // Each outward must have its own status card. The API's `uuid`
+                // is the outward UID; `uid` is the SO line UID and must NOT be
+                // used to merge different outward documents.
+                table.rows.filter((row) => !!row.lotNo).forEach((row) => {
+                  const uid = String(row.uuid || '').trim();
+                  const outwardNo = String(row.outNo || row.challanNo || '').trim();
+                  const identity = uid ? `uuid:${uid}` : `outno:${outwardNo}|${row.srno || ''}`;
+                  if (!uid && !outwardNo) return;
+                  const current = groups.get(identity) || {
+                    OutwardUId: uid,
+                    uuid: uid,
+                    OutwardNo: row.outNo || (row.hasChallan ? row.challanNo : null),
+                    OutDate: row.OutDate || row.date || null,
+                    Status: null,
+                    Details: { Qty: 0 },
+                    lots: [],
+                    __lotRows: [],
+                  };
+                  current.__lotRows.push(row);
+                  current.lots.push({
+                    LotNo: row.lotNo,
+                    LotQty: row.lotQty,
+                    OutwardUId: uid,
+                    history: [],
+                  });
+                  current.Details.Qty += Number(row.lotQty || 0);
+                  groups.set(identity, current);
+                });
+
+                const lotTokens = (values: any[]) => Array.from(new Set(
+                  (values || []).flatMap((value: any) => String(value ?? '').split('/'))
+                    .map((value: string) => value.trim())
+                    .filter(Boolean)
+                ));
+
+                return Array.from(groups.values()).map((group) => {
+                  const groupLotTokens = lotTokens((group.__lotRows || []).map((row: any) => row.lotNo));
+                  const groupUid = String(group.OutwardUId ?? '').trim();
+                  const groupOutwardNo = String(group.OutwardNo ?? '').trim();
+                  // UID is the primary key. Only use outward number/lot matching
+                  // when the browse status record has no UID of its own.
+                  const matchedStatus = statusOutwards.find((ow: any) => {
+                    const statusUid = String(ow.OutwardUId ?? ow.uuid ?? '').trim();
+                    return !!groupUid && !!statusUid && statusUid === groupUid;
+                  }) || statusOutwards.find((ow: any) => {
+                    const statusUid = String(ow.OutwardUId ?? ow.uuid ?? '').trim();
+                    const statusNo = String(ow.OutwardNo ?? ow.OutNo ?? '').trim();
+                    return !statusUid && !!groupOutwardNo && !!statusNo && statusNo === groupOutwardNo;
+                  }) || statusOutwards.find((ow: any) => {
+                    const statusUid = String(ow.OutwardUId ?? ow.uuid ?? '').trim();
+                    if (statusUid) return false;
+                    const statusLotTokens = lotTokens((ow.lots || []).map((lot: any) => lot?.LotNo));
+                    return statusLotTokens.length > 0 && groupLotTokens.some((lotNo: string) => statusLotTokens.includes(lotNo));
+                  });
+
+                  return matchedStatus ? {
+                    ...group,
+                    ...matchedStatus,
+                    // Preserve the actual outward UID from the selected outward
+                    // row even if the browse status response contains an empty UID.
+                    OutwardUId: groupUid || matchedStatus.OutwardUId || matchedStatus.uuid || '',
+                    uuid: groupUid || matchedStatus.uuid || matchedStatus.OutwardUId || '',
+                    OutwardNo: matchedStatus.OutwardNo || matchedStatus.OutNo || group.OutwardNo,
+                    lots: (matchedStatus.lots?.length ? matchedStatus.lots : group.lots),
+                    Details: { ...(group.Details || {}), ...(matchedStatus.Details || {}), Qty: matchedStatus.Details?.Qty ?? group.Details?.Qty },
+                    __lotRows: group.__lotRows,
+                  } : group;
+                });
+              })();
+
+              // Every outward that has at least one saved lot gets its own status
+              // card immediately after the lot list refreshes. Also retain browse
+              // status entries for older records whose lot rows are not returned.
+              const statusTargets = (() => {
+                const targets = [...groupedLotOutwards];
+                statusOutwards.forEach((ow: any) => {
+                  const uid = String(ow.OutwardUId ?? ow.uuid ?? '').trim();
+                  const no = String(ow.OutwardNo ?? ow.OutNo ?? '').trim();
+                  const exists = targets.some((target: any) => {
+                    const targetUid = String(target.OutwardUId ?? target.uuid ?? '').trim();
+                    const targetNo = String(target.OutwardNo ?? target.OutNo ?? '').trim();
+                    return (uid && targetUid === uid) || (!uid && no && targetNo === no);
+                  });
+                  if (!exists) targets.push(ow);
+                });
+                return targets;
+              })();
+              // props shared by the entry form and every per-outward row table of this shade
+              const lotSectionProps = {
+                shdCode: shade.ShdCode,
+                shdName: shade.ShdName,
+                ownsUntagged: group.length === 1,
+                chartNo: chart.ChartNo,
+                orderUId: chart.OrderUId,
+                parCode: chart.ParCode,
+                shadeQty: shade.AllocationQty,
+                orderSrNo: shade.OrderSrNo,
+                prpGroup,
+                yearNo,
+                help: shadeHelp,
+                table,
+                loadAdvance: () => loadAdvance(shade),
+                challanOf,
+                canEdit: perms.canLot,
+                onRetry: () => { void loadLots(shade); void loadHelp(shade); },
+                onSaved: async (message: string) => {
+                  setToast(`${shade.ShdName ? `${shade.ShdName} · ` : ''}${message}`);
+                  await Promise.all([loadLots(shade), loadHelp(shade), Promise.resolve(onSaved())]);
+                },
+              };
               return (
-                <ShadeCard
-                  key={shadeKeyOf(shade)}
+                <View key={shadeKeyOf(shade)} style={st.shadeCard}>
+                {/* SHADE header + the ONE add form of this shade */}
+                <View style={st.shadeHead}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={st.shadeName} numberOfLines={1}>{shade.ShdName}</Text>
+                    <Text style={st.shadeMeta} numberOfLines={1}>
+                      {shade.ShdCode ? `Code ${shade.ShdCode} · ` : ''}Sr {shade.OrderSrNo} · {qtyLabel(shade.AllocationQty)} m
+                      {lotQtyTotal != null ? ` · Lot qty ${qtyLabel(lotQtyTotal)} m` : ''}
+                    </Text>
+                  </View>
+                </View>
+                <OutwardLotSection
+                  {...lotSectionProps}
+                  title={`Outward · Lot No. — ${shade.ShdName || shade.ShdCode || `Sr ${shade.OrderSrNo}`}`}
+                  note={others.length ? `Sr ${shade.OrderSrNo} is shared with ${others.join(' · ')} — lot nos. here are for ${shade.ShdName} only` : null}
+                  showEntry
+                  showTable={false}
+                />
+                {/* ONE BLOCK PER OUTWARD: outward · lot · ✎ 🗑 + its own status buttons + timeline */}
+                {statusTargets.map((outwardEntry: any, outwardIndex: number) => {
+                  // Browse status rows can have an empty OutwardUId. The outward_details
+                  // endpoint provides the actual outward identity as `uuid`; resolve it
+                  // from this shade's outward-help rows before building save/remove payloads.
+                  const entryLotNos = (outwardEntry.lots || [])
+                    .map((lot: any) => String(lot?.LotNo ?? '').trim())
+                    .filter(Boolean)
+                    .flatMap((lotNo: string) => lotNo.split('/').map((part) => part.trim()).filter(Boolean));
+                  const shadeOutwardRows = shadeHelp.rows.filter((row) => rowShadeMatch(row, shade) !== false && !!(row.uuid || row.uid));
+                  const outwardNo = String(outwardEntry.OutwardNo ?? outwardEntry.OutNo ?? '').trim();
+                  const rowByOutwardNo = outwardNo
+                    ? shadeOutwardRows.find((row) => row.outNo === outwardNo || row.challanNo === outwardNo)
+                    : undefined;
+                  // First resolve from this status/outward's own lot numbers against
+                  // the shade's outwardLots (browse response). Those rows carry the
+                  // selected outward UID; do not use the SO-line uid/srno instead.
+                  const shadeOutwardLots: any[] = Array.isArray((shade as any).outwardLots)
+                    ? (shade as any).outwardLots
+                    : [];
+                  const matchingBrowseLots = shadeOutwardLots.filter((lot: any) => {
+                    const lotNo = String(lot?.LotNo ?? '').trim();
+                    return lotNo && entryLotNos.includes(lotNo);
+                  });
+                  const browseLotUids = Array.from(new Set(matchingBrowseLots
+                    .map((lot: any) => String(lot?.OutwardUId ?? lot?.uuid ?? '').trim())
+                    .filter((uid: string) => uid && uid !== '0')));
+                  const allBrowseUids = Array.from(new Set(shadeOutwardLots
+                    .map((lot: any) => String(lot?.OutwardUId ?? lot?.uuid ?? '').trim())
+                    .filter((uid: string) => uid && uid !== '0')));
+                  const rowByLot = entryLotNos.length
+                    ? shadeOutwardRows.find((row) => row.lotNo && entryLotNos.includes(row.lotNo))
+                    : undefined;
+                  const onlyShadeRow = shadeOutwardRows.length === 1 ? shadeOutwardRows[0] : undefined;
+                  const resolvedOutwardUid = String(
+                    outwardEntry.OutwardUId || outwardEntry.uuid || outwardEntry.outwarduid ||
+                    (outwardEntry.lots || []).find((lot: any) => lot?.OutwardUId || lot?.uuid)?.OutwardUId ||
+                    (outwardEntry.lots || []).find((lot: any) => lot?.OutwardUId || lot?.uuid)?.uuid ||
+                    (browseLotUids.length === 1 ? browseLotUids[0] : '') ||
+                    (allBrowseUids.length === 1 ? allBrowseUids[0] : '') ||
+                    rowByOutwardNo?.uuid || rowByOutwardNo?.uid || rowByLot?.uuid || rowByLot?.uid || onlyShadeRow?.uuid || onlyShadeRow?.uid || ''
+                  );
+                  const outwardEvents: DyeEvent[] = (outwardEntry.lots || []).flatMap((lot: any) => (lot.history || []).map((event: any) => ({
+                    Id: event.Id ?? `${event.Status}-${event.StatusDate ?? ''}-${outwardEntry.OutwardUId}`,
+                    Status: normalizeStatus(event.Status) || normalizeStatus(lot.Status) || 'Sent for job',
+                    StatusDate: parseAnyDate(event.StatusDate ?? lot.StatusDate), Qty: num(event.Qty ?? lot.LotQty),
+                    IsRework: !!event.IsRework, LorryCutReason: event.LorryCutReason ?? null, Remarks: event.Remarks ?? null,
+                    ChallanNo: event.ChallanNo ?? null, AgainstChallanNo: event.AgainstChallanNo ?? null,
+                    MillName: event.MillName ?? null, Rate: event.Rate == null ? null : num(event.Rate),
+                    CreatedBy: event.CreatedBy ?? null, CreatedAt: event.CreatedAt ?? null,
+                  } as DyeEvent)));
+                  const outwardQty = Number(outwardEntry?.Details?.Qty ?? (outwardEntry?.lots || []).reduce((sum: number, lot: any) => sum + Number(lot?.LotQty || 0), 0));
+                  const statusShade: PriorityShade = {
+                    ...shade,
+                    // Each card owns only its matching outward's timeline. Never
+                    // copy another outward's current status onto this card.
+                    Status: normalizeStatus(outwardEntry.Status) || (outwardEvents.length ? outwardEvents[outwardEvents.length - 1].Status : null),
+                    colourHistory: outwardEvents,
+                    lots: [],
+                  };
+                  // DELETE RULE: an outward's lot can be deleted only while the outward is at
+                  // "Sent for job" (or has no status). Dying / Finish / Job inward / Lorry Cut
+                  // -> block, the user must remove those statuses first (latest chip ✕).
+                  const outwardTrail = shadeTrail(statusShade);
+                  const outwardCurrentStatus: ShadeStatus | null = outwardTrail.length
+                    ? outwardTrail[outwardTrail.length - 1].Status
+                    : statusShade.Status;
+                  const lotRemoveBlock = outwardCurrentStatus && outwardCurrentStatus !== 'Sent for job'
+                    ? `This outward is already at "${outwardCurrentStatus}". Remove its status first.`
+                    : null;
+                  const cardLotNos = Array.from(new Set(
+                    (outwardEntry.__lotRows || [])
+                      .map((row: any) => String(row.lotNo || '').trim())
+                      .filter(Boolean)
+                  ));
+                  const cardLotQty = Number(outwardEntry?.Details?.Qty ?? (outwardEntry.lots || []).reduce((sum: number, lot: any) => sum + Number(lot?.LotQty || 0), 0));
+                  return <ShadeCard
+                  key={`${shadeKeyOf(shade)}::outward:${outwardEntry.OutwardUId || outwardEntry.OutwardNo || outwardIndex}`}
                   chart={chart}
-                  shade={shade}
+                  shade={statusShade}
+                  outwardUid={resolvedOutwardUid}
+                  outwardLabel={outwardEntry.OutwardNo ? `Outward ${outwardEntry.OutwardNo}` : `Outward ${outwardIndex + 1}`}
+                  outwardMeta={[
+                    outwardEntry.OutDate ? chipDate(outwardEntry.OutDate) : '',
+                    cardLotNos.length ? `Lot ${cardLotNos.join('/')}` : '',
+                  ].filter(Boolean).join(' · ')}
                   perms={perms}
                   prpGroup={prpGroup}
                   yearNo={yearNo}
-                  outwardLotNos={outwardLots}
-                  lotQtyTotal={lotQtyTotal ?? null}
-                  outward={(
+                  outwardLotNos={cardLotNos.length ? cardLotNos : outwardLots}
+                  lotQtyTotal={cardLotQty > 0 ? cardLotQty : (outwardQty > 0 ? outwardQty : (lotQtyTotal ?? null))}
+                  outward={(outwardEntry.__lotRows || []).length ? (
                     <OutwardLotSection
-                      title={`Outward · Lot No. — ${shade.ShdName || shade.ShdCode || `Sr ${shade.OrderSrNo}`}`}
-                      shdCode={shade.ShdCode}
-                      shdName={shade.ShdName}
-                      ownsUntagged={group.length === 1}
-                      note={others.length ? `Sr ${shade.OrderSrNo} is shared with ${others.join(' · ')} — lot nos. here are for ${shade.ShdName} only` : null}
-                      chartNo={chart.ChartNo}
-                      orderUId={chart.OrderUId}
-                      parCode={chart.ParCode}
-                      shadeQty={shade.AllocationQty}
-                      orderSrNo={shade.OrderSrNo}
-                      prpGroup={prpGroup}
-                      yearNo={yearNo}
-                      help={shadeHelp}
-                      table={table}
-                      loadAdvance={() => loadAdvance(shade)}
-                      challanOf={challanOf}
-                      canEdit={perms.canLot}
-                      onRetry={() => { void loadLots(shade); void loadHelp(shade); }}
-                      onSaved={async (message) => {
-                        setToast(`${shade.ShdName ? `${shade.ShdName} · ` : ''}${message}`);
-                        await Promise.all([loadLots(shade), loadHelp(shade), Promise.resolve(onSaved())]);
-                      }}
+                      {...lotSectionProps}
+                      showEntry={false}
+                      compact
+                      rows={outwardEntry.__lotRows}
+                      removeBlockReason={lotRemoveBlock}
                     />
-                  )}
+                  ) : null}
                   onSaved={afterStatusSave}
-                />
+                />;
+                })}
+                </View>
               );
             })}
             <View style={{ height: 24 }} />
@@ -422,10 +627,13 @@ export function ColourStatusSheet({
 /* -------------------------------------------------------------------------- */
 
 function ShadeCard({
-  chart, shade, perms, prpGroup, yearNo, outwardLotNos, lotQtyTotal, outward, onSaved,
+  chart, shade, perms, prpGroup, yearNo, outwardLotNos, lotQtyTotal, outward, onSaved, outwardUid, outwardLabel, outwardMeta,
 }: {
   chart: PriorityChart;
   shade: PriorityShade;
+  outwardUid: string;
+  outwardLabel: string;
+  outwardMeta: string;
   perms: SheetPerms;
   prpGroup: string;
   yearNo: string | number;
@@ -476,6 +684,10 @@ function ShadeCard({
 
   const save = async () => {
     if (!picked || saving || removing) return;
+    if (!String(outwardUid ?? '').trim()) {
+      setError('Selected outward UUID is missing. Refresh outward details and select the correct outward before saving.');
+      return;
+    }
     // guard again at save time — never send an out-of-sequence status
     if (!canMoveTo(current, picked)) {
       setError(`Next status can only be ${allowed.join(' or ') || '—'}.`);
@@ -514,6 +726,7 @@ function ShadeCard({
       AgainstChallanNo: null,
       MillName: null,
       Rate: null,
+      OutwardUId: outwardUid || null,
     };
     setSaving(true);
     try {
@@ -535,6 +748,10 @@ function ShadeCard({
   /** POST /dyeing/remove_status — ONLY the latest status of this shade. */
   const removeLatest = async () => {
     if (!current || removing || saving) return;
+    if (!String(outwardUid ?? '').trim()) {
+      setError('Selected outward UUID is missing. Refresh outward details before deleting this status.');
+      return;
+    }
     setError(null);
     const payload: RemoveStatusPayload = {
       OrderUId: asNum(chart.OrderUId),
@@ -543,6 +760,7 @@ function ShadeCard({
       ParCode: String(chart.ParCode ?? ''),
       ShdCode: String(shade.ShdCode ?? ''),
       Status: current,
+      OutwardUId: outwardUid || null,
       prptype: prpGroup,
       yearno: asNum(yearNo),
     };
@@ -562,14 +780,13 @@ function ShadeCard({
   };
 
   return (
-    <View style={st.shadeCard}>
-      <View style={st.shadeHead}>
+    <View style={st.outBlock}>
+      <View style={st.outHead}>
+        <Icon name="local-shipping" size={14} color={T.copper} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={st.shadeName} numberOfLines={1}>{shade.ShdName}</Text>
+          <Text style={st.outTitle} numberOfLines={1}>{outwardLabel}</Text>
           <Text style={st.shadeMeta} numberOfLines={1}>
-            {shade.ShdCode ? `Code ${shade.ShdCode} · ` : ''}Sr {shade.OrderSrNo} · {qtyLabel(shade.AllocationQty)} m
-            {outwardLotNos.length ? ` · Lot ${outwardLotNos.join('/')}` : ''}
-            {lotQtyTotal != null ? ` · Lot qty ${qtyLabel(lotQtyTotal)} m` : ''}
+            {outwardMeta}{outwardMeta && lotQtyTotal != null ? ' · ' : ''}{lotQtyTotal != null ? `Lot qty ${qtyLabel(lotQtyTotal)} m` : ''}
           </Text>
         </View>
         <View style={[st.curChip, { borderColor: current ? STATUS_COLORS[current] : T.border }]}>
@@ -765,6 +982,12 @@ const st = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 10,
   },
   shadeHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  outBlock: {
+    marginTop: 10, padding: 9, borderWidth: 1, borderColor: T.border, borderLeftWidth: 3, borderLeftColor: T.copper,
+    borderRadius: 10, backgroundColor: T.sub,
+  },
+  outHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  outTitle: { fontSize: 13, fontWeight: '900', color: T.ink },
   shadeName: { fontSize: 15, fontWeight: '900', color: T.ink },
   shadeMeta: { fontSize: 10.5, fontWeight: '600', color: T.muted, marginTop: 1 },
   curChip: {

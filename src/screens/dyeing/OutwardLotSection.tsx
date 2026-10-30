@@ -84,6 +84,20 @@ type Props = {
   canEdit: boolean;
   onRetry: () => void;
   onSaved: (message: string) => Promise<void> | void;
+  /** true = the "Select Outward / Lot No. / Lot Qty / Add" form + outward help (once per shade) */
+  showEntry?: boolean;
+  /** true = the lot table (✎ edit / 🗑 delete). false = entry form only */
+  showTable?: boolean;
+  /** only these lot rows are listed (one outward's own block) — add-duplicate check still uses the full table */
+  rows?: OutwardRow[];
+  /** compact = no box / title / total — used INSIDE a per-outward status block */
+  compact?: boolean;
+  /**
+   * Set (by the status sheet) when this outward's lot may NOT be deleted yet —
+   * i.e. the outward is already past "Sent for job". The 🗑 then shows this
+   * message instead of asking for confirmation, and remove() refuses too.
+   */
+  removeBlockReason?: string | null;
 };
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
@@ -120,7 +134,7 @@ const parseQty = (text: string): number | null | 'BAD' => {
 
 export function OutwardLotSection({
   title = 'Outward · Lot No.', note, chartNo, orderUId, parCode = '', shadeQty, orderSrNo, shdCode, shdName = '', ownsUntagged = true, prpGroup, yearNo, help, table, loadAdvance,
-  challanOf, canEdit, onRetry, onSaved,
+  challanOf, canEdit, onRetry, onSaved, showEntry = true, showTable = true, rows, compact = false, removeBlockReason = null,
 }: Props) {
   const [selected, setSelected] = useState<OutwardRow | null>(null);
   const [lotNo, setLotNo] = useState('');
@@ -134,6 +148,8 @@ export function OutwardLotSection({
   const [error, setError] = useState<string | null>(null);
 
   const saved = useMemo(() => table.rows.filter((r) => r.lotNo), [table.rows]);
+  // rows listed in the table below: all of the shade, or only ONE outward's rows (per-outward block)
+  const shown = useMemo(() => (rows ? rows.filter((r) => r.lotNo) : saved), [rows, saved]);
   const labelOf = useCallback((r: OutwardRow) => outNoOf(r, challanOf), [challanOf]);
   const lotTotal = useMemo(() => saved.reduce((sum, r) => sum + (r.lotQty ?? 0), 0), [saved]);
   const missingQty = useMemo(() => saved.filter((r) => !(r.lotQty != null && r.lotQty > 0)).length, [saved]);
@@ -222,7 +238,11 @@ export function OutwardLotSection({
   /** POST /dyeing/remove_lotno — uid + srno of the /dyeing/lotnos row. */
   const remove = async (row: OutwardRow) => {
     if (savingKey) return;
+    if (removeBlockReason) { setConfirmKey(null); setError(removeBlockReason); return; }
     if (!canSaveRow(row)) { setError('This outward has no UId / SrNo — cannot remove.'); return; }
+    // outward UID of THIS lot's outward: `uuid` when the API sends it, else the row's own UId
+    const outwardUid = String(row.uuid || row.uid || '').trim();
+    if (!outwardUid) { setError('Selected outward UUID is missing. Refresh outward details before removing this lot no.'); return; }
     setError(null);
     setSavingKey(row.key);
     try {
@@ -236,6 +256,7 @@ export function OutwardLotSection({
         orderuid: orderUId ?? row.saveUid,
         ordersrno: orderSrNo,
         lotid: row.lotId ?? undefined, // lot row id when the lot is in the lot table
+        outwarduid: outwardUid, // the outward this lot belongs to — remove only THIS outward's lot
         shdcode: String(shdCode ?? '').trim(), // THIS shade's code (delete is shade-wise)
         shdname: String(shdName ?? '').trim(), // THIS shade's name
         prptype: prpGroup,
@@ -265,7 +286,8 @@ export function OutwardLotSection({
   };
 
   return (
-    <View style={st.box}>
+    <View style={compact ? st.boxCompact : st.box}>
+      {!compact && (
       <View style={st.headRow}>
         <Icon name="local-shipping" size={13} color={T.copper} />
         <Text style={st.head} numberOfLines={1}>{title}</Text>
@@ -280,9 +302,10 @@ export function OutwardLotSection({
           <Icon name="refresh" size={15} color={table.loading ? T.border : T.muted} />
         </TouchableOpacity>
       </View>
-      {!!note && <Text style={st.note}>{note}</Text>}
+      )}
+      {!compact && !!note && <Text style={st.note}>{note}</Text>}
 
-      {canEdit && (
+      {showEntry && canEdit && (
         <View style={st.entryRow}>
           <TouchableOpacity
             style={[st.picker, !!selected && { borderColor: T.copper }]}
@@ -346,11 +369,13 @@ export function OutwardLotSection({
 
       {/* table — /dyeing/lotnos */}
       {table.error ? (
-        <TouchableOpacity onPress={onRetry} style={st.loadErr}>
-          <Icon name="refresh" size={13} color={T.red} />
-          <Text style={st.loadErrText} numberOfLines={2}>{table.error} — tap to retry</Text>
-        </TouchableOpacity>
-      ) : saved.length > 0 ? (
+        showEntry ? (
+          <TouchableOpacity onPress={onRetry} style={st.loadErr}>
+            <Icon name="refresh" size={13} color={T.red} />
+            <Text style={st.loadErrText} numberOfLines={2}>{table.error} — tap to retry</Text>
+          </TouchableOpacity>
+        ) : null
+      ) : showTable && shown.length > 0 ? (
         <View style={st.table}>
           <View style={[st.tr, st.th]}>
             <Text style={[st.thText, { flex: 1.3 }]}>Outward No.</Text>
@@ -358,12 +383,12 @@ export function OutwardLotSection({
             <Text style={[st.thText, st.qtyCol]}>Lot Qty</Text>
             {canEdit && <View style={st.actCellWide} />}
           </View>
-          {saved.map((row, i) => {
+          {shown.map((row, i) => {
             const editing = editKey === row.key;
             const confirming = confirmKey === row.key;
             const busy = savingKey === row.key;
             return (
-              <View key={row.key} style={[st.tr, i < saved.length - 1 && st.trLine, editing && st.trEdit, confirming && st.trRemove]}>
+              <View key={row.key} style={[st.tr, i < shown.length - 1 && st.trLine, editing && st.trEdit, confirming && st.trRemove]}>
                 <View style={{ flex: 1.3, minWidth: 0 }}>
                   <Text style={st.tdText} numberOfLines={1}>{labelOf(row)}</Text>
                   <Text style={st.tdSub} numberOfLines={1}>
@@ -447,10 +472,14 @@ export function OutwardLotSection({
                           <Icon name="edit" size={16} color={T.blue} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                          onPress={() => { setError(null); setEditKey(null); setConfirmKey(row.key); }}
+                          onPress={() => {
+                            // outward already past "Sent for job": do not even ask — tell the user what to do first
+                            if (removeBlockReason) { setEditKey(null); setConfirmKey(null); setError(removeBlockReason); return; }
+                            setError(null); setEditKey(null); setConfirmKey(row.key);
+                          }}
                           disabled={!!savingKey || !canSaveRow(row)}
                           hitSlop={HIT}
-                          style={st.iconBtn}
+                          style={[st.iconBtn, !!removeBlockReason && { opacity: 0.4 }]}
                         >
                           <Icon name="delete-outline" size={17} color={T.red} />
                         </TouchableOpacity>
@@ -461,6 +490,7 @@ export function OutwardLotSection({
               </View>
             );
           })}
+          {!compact && (
           <View style={[st.tr, st.totalRow]}>
             <Text style={[st.totalText, { flex: 1 }]} numberOfLines={2}>
               Total lot qty{shadeQty ? ` · shade ${qtyLabel(shadeQty)} m` : ''}
@@ -469,11 +499,13 @@ export function OutwardLotSection({
             <Text style={[st.qtyCol, st.totalQty]}>{qtyLabel(lotTotal)}</Text>
             {canEdit && <View style={st.actCellWide} />}
           </View>
+          )}
         </View>
-      ) : !table.loading ? (
+      ) : showEntry && !table.loading && saved.length === 0 ? (
         <Text style={st.empty}>No lot no. added yet — select an outward, enter its lot no. + lot qty and add.</Text>
       ) : null}
 
+      {showEntry && (
       <OutwardHelp
         visible={helpOpen}
         chartNo={chartNo}
@@ -485,6 +517,7 @@ export function OutwardLotSection({
         onClose={() => setHelpOpen(false)}
         onPick={(row) => { setHelpOpen(false); setSelected(row); setLotQty(defaultQtyOf(row)); setError(null); }}
       />
+      )}
     </View>
   );
 }
@@ -656,6 +689,7 @@ const st = StyleSheet.create({
     marginTop: 4, marginBottom: 6, padding: 9,
     borderWidth: 1, borderColor: T.border, borderRadius: 10, backgroundColor: T.sub,
   },
+  boxCompact: { marginTop: 6, marginBottom: 2 },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 7 },
   head: { fontSize: 11, fontWeight: '900', color: T.ink, textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 1 },
   count: { fontSize: 10, fontWeight: '800', color: T.muted },

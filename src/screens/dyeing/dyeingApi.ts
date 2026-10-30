@@ -136,6 +136,7 @@ export type RemoveLotNoPayload = {
   orderuid?: number | string; // SO line of the shade
   ordersrno?: number | string;
   lotid?: number; // lot row id (lot table)
+  outwarduid?: string | number | null; // outward UID of the lot being removed (same key as save_status / remove_status)
   shdcode: string;
   prptype: string;
   yearno: number | string;
@@ -148,6 +149,7 @@ export type RemoveStatusPayload = {
   ParCode: string;
   ShdCode: string;
   Status: string;
+  OutwardUId?: string | number | null;
   prptype: string;
   yearno: number | string;
 };

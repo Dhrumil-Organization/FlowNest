@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AccessPermissionRow, AccessRole, AccessUser, AppAccessAPI, unwrapAccessResponse } from '../../api/accessControl';
+import { getCurrentErpProperty } from '../../../common/API/dynamicAPI';
 import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
 import { createPermissionRegistrySyncPayload, flattenPermissionRegistry, getPermissionRegistry } from '../../registry';
 
@@ -34,6 +35,13 @@ import { createPermissionRegistrySyncPayload, flattenPermissionRegistry, getPerm
 // ─────────────────────────────────────────────────────────────────────────
 
 type Mode = 'role' | 'user';
+// SCOPE (UI only): "erp" = Sudamo / Rayons modules, "mills" = Mill Hub modules.
+// SAME roles, SAME users, SAME tables and SAME API (app-access) for both — the
+// tab only decides which modules are listed, so Mill rights are easy to find.
+// Save always sends ALL rows of the role / user (ERP + Mill), so saving one tab
+// never removes the rights of the other.
+type Scope = 'erp' | 'mills';
+const isMillPath = (p: string) => p === 'mill' || p.startsWith('mill.');
 type Decision = 'allow' | 'deny' | 'inherit';
 type Entry = {
   path: string;
@@ -49,8 +57,17 @@ const displayUser = (u: AccessUser) =>
   [u.first_name, u.last_name].filter(Boolean).join(' ') || u.name || u.email || `User #${u.id}`;
 
 export function PermissionManagerScreen() {
-  const registry = useMemo(() => getPermissionRegistry(), []);
-  const entries: Entry[] = useMemo(
+  const [scope, setScope] = useState<Scope>('erp');
+  const scopeRef = React.useRef<Scope>('erp');
+  scopeRef.current = scope;
+  const millsTab = getCurrentErpProperty() !== 'rayons';
+  const api: any = AppAccessAPI;
+  const apiRef = React.useRef<any>(AppAccessAPI);
+  const registry = useMemo(
+    () => getPermissionRegistry().filter((a) => (scope === 'mills' ? a.key === 'mill' : a.key !== 'mill')),
+    [scope],
+  );
+  const allEntries: Entry[] = useMemo(
     () =>
       flattenPermissionRegistry().map((x) => ({
         path: x.resourcePath,
@@ -61,6 +78,10 @@ export function PermissionManagerScreen() {
         areaName: x.areaName,
       })),
     [],
+  );
+  const entries: Entry[] = useMemo(
+    () => allEntries.filter((e) => (scope === 'mills' ? isMillPath(e.path) : !isMillPath(e.path))),
+    [allEntries, scope],
   );
 
   const [mode, setMode] = useState<Mode>('role');
@@ -85,7 +106,7 @@ export function PermissionManagerScreen() {
   const loadRole = useCallback(async (id: number) => {
     setLoading(true);
     try {
-      const d = unwrapAccessResponse<any>(await AppAccessAPI.getRole(id));
+      const d = unwrapAccessResponse<any>(await apiRef.current.getRole(id));
       const n: Record<string, Decision> = {};
       for (const p of d.permissions || []) n[keyOf(p.resource_path, p.action_key || '')] = p.decision === 'allow' ? 'allow' : 'deny';
       setInherited({});
@@ -99,7 +120,7 @@ export function PermissionManagerScreen() {
   const loadUser = useCallback(async (id: number) => {
     setLoading(true);
     try {
-      const d = unwrapAccessResponse<any>(await AppAccessAPI.getUser(id));
+      const d = unwrapAccessResponse<any>(await apiRef.current.getUser(id));
       setUserRoleIds((d.role_ids || []).map(Number));
       const inheritedMap: Record<string, Decision> = {};
       for (const p of d.inherited_permissions || []) inheritedMap[keyOf(p.resource_path, p.action_key || '')] = p.decision === 'allow' ? 'allow' : 'deny';
@@ -117,16 +138,21 @@ export function PermissionManagerScreen() {
     setLoading(true);
     try {
       setSyncing(true);
+      // the registry (incl. mill.*) always syncs into THIS property's server
       await AppAccessAPI.syncRegistry({ ...createPermissionRegistrySyncPayload('sudamo-mobile-registry-v1'), full_snapshot: true });
-      const d = unwrapAccessResponse<any>(await AppAccessAPI.bootstrap());
+      const d = unwrapAccessResponse<any>(await apiRef.current.bootstrap());
       const rr = d.roles || [], uu = d.users || [];
       setRoles(rr);
       setUsers(uu);
       const rid = Number(rr[0]?.id || 0), uid = Number(uu[0]?.id || 0);
       setRoleId(rid || null);
       setUserId(uid || null);
+      setMode('role');
+      setValues({});
+      setBaseline({});
       if (rid) await loadRole(rid);
     } catch (e: any) {
+
       AppAlert.alert('Access setup', e?.message || 'Unable to load access control.');
     } finally {
       setSyncing(false);
@@ -135,6 +161,14 @@ export function PermissionManagerScreen() {
   }, [loadRole]);
 
   useEffect(() => { void boot(); }, [boot]);
+
+  const changeScope = (next: Scope) => {
+    if (next === scope) return;
+    if (dirty) { AppAlert.alert('Unsaved changes', 'Save or discard changes before switching.'); return; }
+    setArea('all');
+    setQuery('');
+    setScope(next); // same role / user stays selected — only the module list changes
+  };
 
   // The header itself (title/eyebrow/sign-out) is rendered once by
   // app/new/(tabs)/_layout.tsx. Only the "Sync Registry" button needs to
@@ -203,8 +237,9 @@ export function PermissionManagerScreen() {
     });
     try {
       setSaving(true);
-      if (mode === 'role') { await AppAccessAPI.saveRole(roleId!, rows); await loadRole(roleId!); }
-      else { await AppAccessAPI.saveUser(userId!, userRoleIds, rows); await loadUser(userId!); }
+      // ALL rows (ERP + Mill) — the server replaces the whole set of this role / user
+      if (mode === 'role') { await api.saveRole(roleId!, rows); await loadRole(roleId!); }
+      else { await api.saveUser(userId!, userRoleIds, rows); await loadUser(userId!); }
       AppAlert.alert('Saved', 'Permissions were saved and reloaded from the database.');
     } catch (e: any) {
       AppAlert.alert('Save failed', e?.message || 'Unable to save permissions.');
@@ -233,6 +268,19 @@ export function PermissionManagerScreen() {
         // controls were fixed siblings above a separate scrollable list,
         // which is what left so little room to actually browse the list).
         <ScrollView style={s.list} contentContainerStyle={{ paddingBottom: 110 }} keyboardShouldPersistTaps="handled">
+          {millsTab && (
+            <View style={s.segment}>
+              <TouchableOpacity onPress={() => changeScope('erp')} style={[s.seg, scope === 'erp' && s.segOn]}>
+                <Text style={[s.segText, scope === 'erp' && s.segTextOn]}>Sudamo ERP</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => changeScope('mills')} style={[s.seg, scope === 'mills' && s.segOn]}>
+                <Text style={[s.segText, scope === 'mills' && s.segTextOn]}>Mills</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {scope === 'mills' && (
+            <Text style={s.scopeHint}>Mill Hub modules · same Sudamo roles and users</Text>
+          )}
           <View style={s.segment}>
             <TouchableOpacity onPress={() => changeMode('role')} style={[s.seg, mode === 'role' && s.segOn]}>
               <Text style={[s.segText, mode === 'role' && s.segTextOn]}>Role</Text>
@@ -380,6 +428,7 @@ const s = StyleSheet.create({
   syncText: { color: '#D5A35C', fontWeight: '800', fontSize: 11 },
 
   segment: { flexDirection: 'row', margin: 12, marginBottom: 8, backgroundColor: '#E7E0D6', borderRadius: 10, padding: 3 },
+  scopeHint: { marginHorizontal: 12, marginTop: -2, marginBottom: 4, fontSize: 10, fontWeight: '700', color: '#8A8177' },
   seg: { flex: 1, padding: 9, alignItems: 'center', borderRadius: 8 },
   segOn: { backgroundColor: '#fff' },
   segText: { fontWeight: '800', color: '#6B7280' },

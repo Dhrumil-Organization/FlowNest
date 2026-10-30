@@ -14,6 +14,7 @@ import { T } from '../../theme';
 import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
+import { useMillModeStore } from '@/src/mill/millMode';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -64,6 +65,24 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   const [currentProperty, setCurrentProperty] = useState<NewErpProperty | null>(null);
   const embedded = isEmbeddedWeb();
   const switchUserLogin = !embedded && Number(rawLoginResponse?.switchuserlogin ?? 0) === 1;
+
+  // MILL MODE switch — separate from Switch Property, default OFF.
+  // Mill Hub rights belong to the user's MILLS login (Permission Manager →
+  // Mills), so the switch is offered to every signed-in user; turning it ON
+  // logs the same user into Mills and only enters Mill mode when he has a
+  // Mill Hub right there (otherwise a message, and he stays in the ERP).
+  const millAllowed = !embedded && !!rawLoginResponse;
+  const millBusy = useMillModeStore((s) => s.busy);
+  const millTurnOn = useMillModeStore((s) => s.turnOn);
+  const openMill = async () => {
+    if (millBusy || switchingProperty) return;
+    try {
+      await millTurnOn();
+      router.replace('/new/mill' as any);
+    } catch (error: any) {
+      AppAlert.alert('Mills', error?.message || 'Unable to open Mill mode.');
+    }
+  };
 
   const PROPERTY_LABELS: Record<NewErpProperty, string> = {
     sudamo_knits: 'Sudamo / Knits',
@@ -165,7 +184,7 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   // and icon buttons sized per breakpoint so more of every screen is visible.
   const size = isDesktop ? 'desktop' : isTablet ? 'tablet' : 'mobile';
   const iconSize = isDesktop ? 20 : 18;
-  const showMeta = !isGreyPackingRoute && (!!appVersion || switchUserLogin);
+  const showMeta = !isGreyPackingRoute && (!!appVersion || switchUserLogin || millAllowed);
 
   return <View style={s.safe}>
     <StatusBar barStyle="light-content" backgroundColor={T.nav} />
@@ -222,6 +241,22 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
                   }
                   disabled={switchingProperty || !currentProperty}
                   trackColor={{ false: '#3A5068', true: T.copper }}
+                  thumbColor="#FFFFFF"
+                  style={s.propertySwitchToggle}
+                />
+              </View>
+            )}
+
+            {millAllowed && (
+              <View style={s.propertySwitchRow}>
+                <Text style={s.propertySwitchText} numberOfLines={1}>
+                  {millBusy ? 'Opening Mills...' : 'Mills'}
+                </Text>
+                <Switch
+                  value={false}
+                  onValueChange={(value) => { if (value) void openMill(); }}
+                  disabled={millBusy || switchingProperty}
+                  trackColor={{ false: '#3A5068', true: '#2dd4bf' }}
                   thumbColor="#FFFFFF"
                   style={s.propertySwitchToggle}
                 />

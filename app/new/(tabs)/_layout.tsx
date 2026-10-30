@@ -13,7 +13,8 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import { Redirect, Tabs, usePathname, useRouter } from 'expo-router';
+import { useMillModeStore } from '@/src/mill/millMode';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -238,6 +239,14 @@ export default function TabsLayout() {
   // Settings > My screens. Rights are not involved in that second step.
   const { shownItems: visibleItems } = useMyScreens();
 
+  // MILL MODE: while the header "Mills" switch is ON the ERP tabs never render
+  // (Sudamo / Rayons modules must not be reachable from Mill mode).
+  const millOn = useMillModeStore((state) => state.enabled);
+  const hydrateMill = useMillModeStore((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateMill();
+  }, [hydrateMill]);
+
   const primaryItems = useMemo(() => visibleItems.slice(0, MAX_PRIMARY_TABS), [visibleItems]);
   const primaryRouteNames = useMemo(
     () => new Set(primaryItems.map((item) => item.routeName)),
@@ -283,6 +292,8 @@ export default function TabsLayout() {
     const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
     router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
   };
+
+  if (millOn) return <Redirect href={'/new/mill' as any} />;
 
   return (
     <TopInsetHandled.Provider value={true}>

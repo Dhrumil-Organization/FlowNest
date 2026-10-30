@@ -160,7 +160,7 @@
 //     </View>
 //   ) : null;
 
-//   const tableMin = narrow ? 420 : undefined;
+//   const tableMin = narrow ? 470 : undefined;
 
 //   if (loading && !events.length) {
 //     return <View style={st.loading}><ActivityIndicator color={T.copper} /></View>;
@@ -512,7 +512,9 @@ import { addDaysISO, todayISO } from './dyeingModel';
 import {
   buildDesignRows,
   buildItemRows,
+  buildKItemRows,
   failMessage,
+  KAgg,
   filterLots,
   HubAgg,
   HubLot,
@@ -523,6 +525,7 @@ import {
   normalizeLotDetail,
   normalizeLots,
   partiesOf,
+  reportMode,
   statusCounts,
   StatusFilter,
 } from './millHubModel';
@@ -545,8 +548,8 @@ const fyStart = (iso: string) => {
 };
 const plural = (k: number, w: string) => `${k} ${w}${k !== 1 ? 's' : ''}`;
 
-const W = { out: 52, in: 52, pend: 48, short: 46, pct: 36, amt: 58 };
-const WT = { out: 60, in: 60, diff: 54 }; // taka table
+const W = { out: 52, in: 52, ret: 48, pend: 48, short: 46, pct: 36, amt: 58 };
+const WT = { out: 60, in: 60, ret: 54, diff: 54 }; // taka table
 const AMBER = '#C98A1A';
 const STATUS_COLOR: Record<LotStatus, string> = { COMPLETE: '#2A6044', PARTIAL: AMBER, PENDING: '#5A6B7A' };
 
@@ -571,6 +574,9 @@ export function MillHubTab() {
   const [isel, setIsel] = useState<string | null>(null);   // item (parent level)
   const [dsel, setDsel] = useState<string | null>(null);   // design inside that item
   const [lsel, setLsel] = useState<HubLot | null>(null);
+  /** 'K' = property type K rules from the server (item-wise summary in MTR / KG blocks); 'S' = as before */
+  const [mode, setMode] = useState<'K' | 'S'>('S');
+  const statusTouched = useRef(false);
   const reqId = useRef(0);
 
   const load = useCallback(async (f: string, t: string) => {
@@ -585,6 +591,10 @@ export function MillHubTab() {
       if (id !== reqId.current) return;
       const fail = failMessage(response);
       if (fail) throw new Error(fail);
+      const md = reportMode(response);
+      setMode(md);
+      // K is read as a pending report: start on ALL until the user picks a status chip
+      if (md === 'K' && !statusTouched.current) setStatus('ALL');
       setLots(normalizeLots(response));
       setLoaded(true);
     } catch (err: any) {
@@ -616,11 +626,13 @@ export function MillHubTab() {
   const counts = useMemo(() => statusCounts(partyLots), [partyLots]);
   const shown = useMemo(() => filterLots(lots, party, status), [lots, party, status]);
   const items = useMemo(() => buildItemRows(shown), [shown]);
+  const isK = mode === 'K';
+  const kBlocks = useMemo(() => (isK ? buildKItemRows(shown) : []), [isK, shown]);
   const itemLots = useMemo(() => (isel ? lotsOfItem(shown, isel) : []), [shown, isel]);
   const hub = useMemo(() => buildDesignRows(itemLots), [itemLots]);
   const challans = useMemo(() => new Set(shown.map((l) => l.outUId)).size, [shown]);
 
-  const tableMin = narrow ? 420 : undefined;
+  const tableMin = narrow ? 470 : undefined;
 
   const Rng = (
     <View style={st.rng}>
@@ -657,6 +669,46 @@ export function MillHubTab() {
     );
   }
 
+  /* --------------- K: item → outward lines directly (no design level) --------------- */
+  if (isK && isel) {
+    const rows = [...itemLots].sort((a, b) => b.outDate.localeCompare(a.outDate) || b.outNo.localeCompare(a.outNo));
+    const CT = buildDesignRows(rows).G;
+    const kTot = buildKItemRows(rows)[0];
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
+        <View style={st.drillHead}>
+          <TouchableOpacity onPress={() => setIsel(null)} hitSlop={HIT}><Text style={st.back}>‹ Items</Text></TouchableOpacity>
+          <Text style={st.drillTitle}>{isel}</Text>
+          <Text style={st.drillSub}>
+            challan / annexure-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}
+          </Text>
+        </View>
+        {Rng}
+        {!!kTot && (
+          <HScroll on={width < 860}>
+            <View style={[st.card, { paddingVertical: 4, minWidth: width < 860 ? (kTot.unit === 'MTR' ? 820 : 760) : undefined }]}>
+              <KHeadRow unit={kTot.unit} />
+              <KItemLine r={{ ...kTot.G, item: `TOTAL · ${isel}` }} total />
+            </View>
+          </HScroll>
+        )}
+        <HScroll on={!!tableMin}>
+          <View style={[st.card, { paddingVertical: 4, minWidth: tableMin }]}>
+            <HeadRow first="CHALLAN · DATE" k />
+            {rows.length === 0 && <Text style={st.emptyRow}>No outward lines in this range.</Text>}
+            {rows.map((l) => <LotLine key={l.key} l={l} k onPress={() => setLsel(l)} />)}
+            {rows.length > 0 && <DesignLine r={{ ...CT, design: `TOTAL · ${plural(rows.length, 'line')}` }} total />}
+          </View>
+        </HScroll>
+        <Text style={st.footer}>
+          One row per outward line (annexure). OUT = quantity sent ({isel.endsWith('· MTR') ? 'metres' : 'kg'}), IN = inward + return,
+          BAL = OUT − inward − waste − return − short − excess, LOSS = waste + short (once nothing is left), IN ₹ = inward × rate.
+          Tap a line for its inward entries and the whole annexure.
+        </Text>
+      </ScrollView>
+    );
+  }
+
   /* ------------------------------ lot-wise -------------------------------- */
   if (dsel) {
     const rows = lotsOfDesign(itemLots, dsel);
@@ -672,18 +724,26 @@ export function MillHubTab() {
         </View>
         {Rng}
         <HScroll on={!!tableMin}>
-          <View style={[st.card, { paddingVertical: 4, minWidth: tableMin, flex: 1 }]}>
-            <HeadRow first="CHALLAN · DATE" />
+          <View style={[st.card, { paddingVertical: 4, minWidth: tableMin }]}>
+            <HeadRow first="CHALLAN · DATE" k={isK} />
             {rows.length === 0 && <Text style={st.emptyRow}>No outward lots in this range.</Text>}
-            {rows.map((l) => <LotLine key={l.key} l={l} onPress={() => setLsel(l)} />)}
+            {rows.map((l) => <LotLine key={l.key} l={l} k={isK} onPress={() => setLsel(l)} />)}
             {rows.length > 0 && <DesignLine r={{ ...CT, design: `TOTAL · ${plural(rows.length, 'lot')}` }} total />}
           </View>
         </HScroll>
-        <Text style={st.footer}>
-          One row per outward lot (job outward item line). OUT = metres sent, IN = metres received back so far, PEND = metres of
-          takas not yet received. SHORT and % are worked out only when every taka of the lot has come back (COMPLETE).
-          Tap a lot for its challan details, inward entries and taka-wise out vs in.
-        </Text>
+        {isK ? (
+          <Text style={st.footer}>
+            One row per outward line (annexure). OUT = quantity sent ({isel?.endsWith('· MTR') ? 'metres' : 'kg'}), IN = inward + return,
+            BAL = OUT − inward − waste − return − short − excess, LOSS = waste + short (once nothing is left), IN ₹ = inward × rate.
+            Tap a line for its inward entries and the whole annexure.
+          </Text>
+        ) : (
+          <Text style={st.footer}>
+            One row per outward lot (job outward item line). OUT = metres sent, IN = metres received back so far, PEND = metres of
+            takas not yet received. SHORT and % are worked out only when every taka of the lot has come back (COMPLETE).
+            Tap a lot for its challan details, inward entries and taka-wise out vs in.
+          </Text>
+        )}
       </ScrollView>
     );
   }
@@ -753,7 +813,7 @@ export function MillHubTab() {
           {([['ALL', `All ${partyLots.length}`], ['COMPLETE', `Complete ${counts.COMPLETE}`], ['PARTIAL', `Partial ${counts.PARTIAL}`], ['PENDING', `Pending ${counts.PENDING}`]] as [StatusFilter, string][]).map(([k, l]) => {
             const on = status === k;
             return (
-              <TouchableOpacity key={k} onPress={() => setStatus(k)} style={[st.chip, on && st.chipOn]}>
+              <TouchableOpacity key={k} onPress={() => { statusTouched.current = true; setStatus(k); }} style={[st.chip, on && st.chipOn]}>
                 <Text style={[st.chipText, on && { color: T.copper }]}>{l}</Text>
               </TouchableOpacity>
             );
@@ -761,9 +821,45 @@ export function MillHubTab() {
         </View>
       </View>
 
+      {isK && !isel ? (
+        <>
+          {kBlocks.length === 0 && !loading && !error && (
+            <View style={[st.card, st.emptyBox]}>
+              <Text style={st.emptyText}>
+                No job outward (with annexure) between <Text style={st.bold}>{fmtD(from)}</Text> and <Text style={st.bold}>{fmtD(to)}</Text>
+                {party !== 'ALL' ? ` for ${party}` : ''}{status !== 'ALL' ? ` (${status.toLowerCase()})` : ''}.
+              </Text>
+              {from !== fyStart(today) && (
+                <TouchableOpacity onPress={() => setRange(fyStart(today), today)} style={st.showAllBtn}>
+                  <Text style={st.showAllText}>Show this financial year</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {kBlocks.map((b) => (
+            <View key={b.unit}>
+              <Text style={st.section}>{b.unit === 'MTR' ? 'ITEMS IN METRES (amount on mtr)' : 'ITEMS IN KG (amount on kg)'}</Text>
+              <HScroll on={width < 860}>
+                <View style={[st.card, { paddingVertical: 4, minWidth: width < 860 ? (b.unit === 'MTR' ? 820 : 760) : undefined }]}>
+                  <KHeadRow unit={b.unit} />
+                  {b.rows.map((r) => <KItemLine key={r.key} r={r} onPress={() => setIsel(r.key)} />)}
+                  <KItemLine r={b.G} total />
+                </View>
+              </HScroll>
+            </View>
+          ))}
+          <Text style={st.footer}>
+            Property type K: job outward with an annexure no., unit by the amount basis of the line — MTR and KG are shown in
+            separate blocks and never added together. INW / WASTE come from inward entries, RET from return entries, SHORT /
+            EXCESS from the short weight. BAL = OUT − INW − WASTE − RET − SHORT − EXCESS (never below 0), BAL ₹ = BAL × rate.
+            Tap an item for its outward lines, then a line for its inward entries.
+          </Text>
+        </>
+      ) : (
+      <>
       <HScroll on={!!tableMin}>
-        <View style={[st.card, { paddingVertical: 4, minWidth: tableMin, flex: 1 }]}>
-          <HeadRow first={isel ? 'DESIGN' : 'ITEM'} />
+        <View style={[st.card, { paddingVertical: 4, minWidth: tableMin }]}>
+          <HeadRow first={isel ? 'DESIGN' : 'ITEM'} k={isK} />
           {(isel ? hub.rows : items.rows).length === 0 && !loading && !error && (
             <View style={st.emptyBox}>
               <Text style={st.emptyText}>
@@ -791,11 +887,20 @@ export function MillHubTab() {
         </View>
       </HScroll>
 
-      <Text style={st.footer}>
-        Built from job outward and job inward. Lots are picked by outward challan date; inward is counted whenever it came.
-        Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
-        {isel ? ' Tap a design for the lot-wise breakdown.' : ' Tap an item for its designs, then a design for the lot-wise breakdown.'}
-      </Text>
+      {isK ? (
+        <Text style={st.footer}>
+          OUT = quantity sent, IN = inward + return, BAL = what is still at the mill, LOSS = waste + short (once nothing is
+          left), IN ₹ = inward × rate. Tap a design for its outward lines.
+        </Text>
+      ) : (
+        <Text style={st.footer}>
+          Built from job outward and job inward. Lots are picked by outward challan date; inward is counted whenever it came.
+          Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
+          {isel ? ' Tap a design for the lot-wise breakdown.' : ' Tap an item for its designs, then a design for the lot-wise breakdown.'}
+        </Text>
+      )}
+      </>
+      )}
     </ScrollView>
   );
 }
@@ -838,6 +943,126 @@ function LotDetailPage({
   useEffect(() => { void load(); }, [load]);
 
   const takas = (detail?.takas || []).filter((t) => !onlyPending || !t.received);
+
+  /* ---------------- property type K: one outward line + its inward entries + annexure ---------------- */
+  if (lot.unit) {
+    const u = lot.unit === 'MTR' ? 'm' : 'kg';
+    const q = (v: number) => `${m1(v)} ${u}`;
+    const kFacts: [string, string][] = [
+      ['Outward no.', lot.outNo || '—'],
+      ['Annexure no.', lot.annNo || '—'],
+      ['Outward date', fmtDY(lot.outDate)],
+      ['Party (mill)', lot.party],
+      ['Job', lot.jobName || '—'],
+      ['Item', lot.item || '—'],
+      ['Shade', lot.shade || '—'],
+      ['Merge', lot.merge || '—'],
+      ['Grade', lot.grade || '—'],
+      ['Department', lot.dept || '—'],
+      ['Amount on', lot.unit === 'MTR' ? `metres (also ${m1(lot.outKg)} kg)` : `kg${lot.outMtrQ ? ` (also ${m1(lot.outMtrQ)} m)` : ''}`],
+      ['Rate', lot.rate ? `₹${lot.rate}` : '—'],
+      ['Balance ₹', lot.balAmt ? money(lot.balAmt) : '—'],
+      ['Last inward', fmtDY(lot.lastInw)],
+      ['Remark', lot.remark || '—'],
+    ];
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={[st.body, wide && st.bodyWide]}>
+        <View style={st.drillHead}>
+          <TouchableOpacity onPress={onBack} hitSlop={HIT}><Text style={st.back}>‹ {lot.item || 'Items'}</Text></TouchableOpacity>
+        </View>
+        <View style={st.titleRow}>
+          <Text style={st.lotTitle}>{lot.outNo}{lot.annNo ? ` · annexure ${lot.annNo}` : ''} · {lot.unit}</Text>
+          <Text style={[st.stateBadge, { backgroundColor: STATUS_COLOR[lot.status] }]}>{lot.status}</Text>
+        </View>
+
+        <View style={st.stats}>
+          <Stat label="Outward" value={q(lot.outQ)} />
+          <Stat label="Inward + return" value={q(lot.inwQ + lot.retQ)} />
+          <Stat label="Balance at mill" value={q(lot.balQ)} color={lot.balQ > 0 ? AMBER : undefined} />
+          <Stat label="Waste + short" value={q(lot.wstQ + lot.shtQ)} color={lot.wstQ + lot.shtQ > 0 ? T.red : undefined} />
+        </View>
+
+        <View style={[st.card, st.factsCard]}>
+          {kFacts.map(([k, v]) => (
+            <View key={k} style={[st.fact, wide && { width: '25%' }]}>
+              <Text style={st.factK}>{k}</Text>
+              <Text style={st.factV} numberOfLines={2}>{v}</Text>
+            </View>
+          ))}
+        </View>
+
+        {loading && <ActivityIndicator color={T.copper} size="small" />}
+        {!!error && (
+          <TouchableOpacity onPress={load} style={st.errorBox}>
+            <Text style={st.errorText}>{error} — tap to retry</Text>
+          </TouchableOpacity>
+        )}
+
+        {!!detail && (
+          <>
+            <Text style={st.section}>INWARD / RETURN ENTRIES ({lot.unit})</Text>
+            <HScroll on={narrow}>
+              <View style={[st.card, { paddingVertical: 4, minWidth: narrow ? 520 : undefined }]}>
+                <View style={[st.row, { paddingVertical: 8 }]}>
+                  <Text style={[st.first, st.head]}>ENTRY · DATE</Text>
+                  <Text style={[st.num, st.head, { width: 60 }]}>INW</Text>
+                  <Text style={[st.num, st.head, { width: 54 }]}>WASTE</Text>
+                  <Text style={[st.num, st.head, { width: 54 }]}>SHORT</Text>
+                  <Text style={[st.num, st.head, { width: 54 }]}>RET</Text>
+                  <Text style={[st.num, st.head, { width: 60 }]}>INW ₹</Text>
+                </View>
+                {detail.inwards.length === 0 && <Text style={st.emptyRow}>Nothing received against this line yet.</Text>}
+                {detail.inwards.map((i, k) => (
+                  <View key={`${i.inwNo}-${k}`} style={[st.row, st.line]}>
+                    <View style={st.first}>
+                      <Text style={[st.mono, st.cChallan]}><Text style={st.bold}>{i.inwNo}</Text> <Text style={{ color: T.muted }}>{fmtDY(i.inwDate)}</Text></Text>
+                      <Text style={st.infoText}>
+                        {[i.typeName, i.chalNo ? `challan ${i.chalNo}` : '', i.billNo ? `bill ${i.billNo}` : '', i.excQ > 0 ? `excess ${m1(i.excQ)}` : ''].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    <Text style={[st.num, st.mono, { width: 60 }]}>{i.inwQ ? m1(i.inwQ) : '—'}</Text>
+                    <Text style={[st.num, st.mono, { width: 54 }]}>{i.wstQ ? m1(i.wstQ) : '—'}</Text>
+                    <Text style={[st.num, st.mono, { width: 54, color: i.shtQ > 0 ? T.red : T.ink }]}>{i.shtQ ? m1(i.shtQ) : '—'}</Text>
+                    <Text style={[st.num, st.mono, { width: 54 }]}>{i.retQ ? m1(i.retQ) : '—'}</Text>
+                    <Text style={[st.num, st.mono, { width: 60 }]}>{i.jobAmt ? money(i.jobAmt) : '—'}</Text>
+                  </View>
+                ))}
+              </View>
+            </HScroll>
+
+            {detail.annexure.length > 0 && (
+              <>
+                <Text style={st.section}>
+                  ANNEXURE {lot.annNo} · {plural(detail.annexure.length, 'line')}
+                  {detail.annexureBal !== null ? ` · annexure balance ${m1(detail.annexureBal)}` : ''}
+                </Text>
+                <View style={[st.card, { paddingVertical: 4 }]}>
+                  {detail.annexure.map((a) => {
+                    const me = a.outUId === lot.outUId && a.outSrNo === lot.outSrNo;
+                    return (
+                      <View key={`${a.outUId}-${a.outSrNo}`} style={[st.row, st.line, me && { backgroundColor: '#FBF6EC' }]}>
+                        <View style={st.first}>
+                          <Text style={[st.mono, st.cChallan]}><Text style={st.bold}>{a.outNo}</Text> <Text style={{ color: T.muted }}>{fmtDY(a.outDate)}</Text></Text>
+                          <Text style={st.infoText} numberOfLines={1}>{[a.item, a.shade, a.unit, a.status.toLowerCase()].filter(Boolean).join(' · ')}</Text>
+                        </View>
+                        <Text style={[st.num, st.mono, { width: 64 }]}>{m1(a.outQ)}</Text>
+                        <Text style={[st.num, st.mono, { width: 64, color: a.balQ > 0 ? AMBER : T.ink }]}>{a.balQ > 0 ? m1(a.balQ) : '—'}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </>
+        )}
+
+        <Text style={st.footer}>
+          BAL = outward − inward − waste − return − short − excess (never below 0). The annexure balance is the same sum over all
+          lines of the annexure, as in the job-work pending report.
+        </Text>
+      </ScrollView>
+    );
+  }
   const facts: [string, string][] = [
     ['Outward no.', lot.outNo || '—'],
     ['Outward date', fmtDY(lot.outDate)],
@@ -849,7 +1074,7 @@ function LotDetailPage({
     ['Shade', lot.shade || '—'],
     ['Item', lot.item || '—'],
     ['Customer', lot.customer || '—'],
-    ['Takas back', `${lot.recvTakas} of ${lot.outTakas}`],
+    ['Takas back', `${lot.recvTakas} of ${lot.outTakas}${lot.retTakas ? ` (${lot.retTakas} returned)` : ''}`],
     ['Last inward', fmtDY(lot.lastInw)],
   ];
 
@@ -866,6 +1091,7 @@ function LotDetailPage({
       <View style={st.stats}>
         <Stat label="Outward" value={`${m1(lot.outM)} m`} />
         <Stat label="Inward" value={`${m1(lot.inM)} m`} />
+        <Stat label="Returned" value={lot.retM > 0 ? `${m1(lot.retM)} m` : '—'} />
         <Stat label="Pending" value={`${m1(lot.pend)} m`} color={lot.pend > 0 ? AMBER : undefined} />
         <Stat
           label={lot.short === null ? 'Shortage (on completion)' : 'Shortage'}
@@ -909,6 +1135,23 @@ function LotDetailPage({
             ))}
           </View>
 
+          {detail.returns.length > 0 && (
+            <>
+              <Text style={st.section}>RETURN ENTRIES (job outward return)</Text>
+              <View style={[st.card, { paddingVertical: 4 }]}>
+                {detail.returns.map((r, k) => (
+                  <View key={`${r.retNo}-${k}`} style={[st.row, st.line]}>
+                    <View style={st.first}>
+                      <Text style={[st.mono, st.cChallan]}><Text style={st.bold}>{r.retNo || '—'}</Text> <Text style={{ color: T.muted }}>{fmtDY(r.retDate)}</Text></Text>
+                      <Text style={st.infoText}>{[r.chalNo ? `challan ${r.chalNo}` : '', plural(r.takas, 'taka')].filter(Boolean).join(' · ')}</Text>
+                    </View>
+                    <Text style={[st.num, st.mono, { width: 70 }]}>{m1(r.retM)} m</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
           <View style={st.sectionRow}>
             <Text style={st.section}>TAKA-WISE · {detail.takas.filter((t) => t.received).length} of {detail.takas.length} back</Text>
             {detail.takas.some((t) => !t.received) && (
@@ -918,11 +1161,12 @@ function LotDetailPage({
             )}
           </View>
           <HScroll on={narrow}>
-            <View style={[st.card, { paddingVertical: 4, minWidth: narrow ? 380 : undefined, flex: 1 }]}>
+            <View style={[st.card, { paddingVertical: 4, minWidth: narrow ? 440 : undefined }]}>
               <View style={[st.row, { paddingVertical: 8 }]}>
                 <Text style={[st.first, st.head]}>TAKA · INWARD</Text>
                 <Text style={[st.num, st.head, { width: WT.out }]}>OUT</Text>
                 <Text style={[st.num, st.head, { width: WT.in }]}>IN</Text>
+                <Text style={[st.num, st.head, { width: WT.ret }]}>RET</Text>
                 <Text style={[st.num, st.head, { width: WT.diff }]}>DIFF</Text>
               </View>
               {takas.length === 0 && <Text style={st.emptyRow}>No taka detail on this outward lot.</Text>}
@@ -931,11 +1175,15 @@ function LotDetailPage({
                   <View style={st.first}>
                     <Text style={[st.mono, st.cChallan, st.bold]}>{t.takaNo || '—'}</Text>
                     <Text style={st.infoText} numberOfLines={1}>
-                      {t.received ? [t.inwNo, t.inwDate.split(', ').map(fmtDY).join(', ')].filter(Boolean).join(' · ') : 'not received yet'}
+                      {t.received
+                        ? [t.inwNo, t.inwDate ? t.inwDate.split(', ').map(fmtDY).join(', ') : '', t.returned ? `returned ${t.retNo} ${t.retDate.split(', ').map(fmtDY).join(', ')}` : '']
+                            .filter(Boolean).join(' · ')
+                        : 'not received yet'}
                     </Text>
                   </View>
                   <Text style={[st.num, st.mono, { width: WT.out }]}>{m1(t.outM)}</Text>
-                  <Text style={[st.num, st.mono, { width: WT.in, color: t.received ? T.ink : T.muted }]}>{t.received ? m1(t.inM) : '—'}</Text>
+                  <Text style={[st.num, st.mono, { width: WT.in, color: t.inM > 0 ? T.ink : T.muted }]}>{t.inM > 0 ? m1(t.inM) : '—'}</Text>
+                  <Text style={[st.num, st.mono, { width: WT.ret, color: t.retM > 0 ? T.ink : T.muted }]}>{t.retM > 0 ? m1(t.retM) : '—'}</Text>
                   <Text style={[st.num, st.mono, { width: WT.diff, color: (t.diff || 0) > 0 ? T.red : T.ink, fontWeight: (t.diff || 0) > 0 ? '800' : '400' }]}>
                     {t.diff === null ? '—' : m1(t.diff)}
                   </Text>
@@ -954,7 +1202,8 @@ function LotDetailPage({
       )}
 
       <Text style={st.footer}>
-        DIFF = outward minus inward metres of the taka. Shortage of the lot is shown only when every taka has come back.
+        DIFF = outward minus inward minus returned metres of the taka. A returned taka counts as back. Shortage of the lot
+        (outward − inward − returned) is shown only when every taka has come back.
       </Text>
     </ScrollView>
   );
@@ -967,8 +1216,10 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 /** Tables scroll sideways only on narrow phones; elsewhere they fill the width. */
 function HScroll({ on, children }: { on: boolean; children: React.ReactNode }) {
   if (!on) return <>{children}</>;
+  // flexGrow 0 on the scroll view itself: inside the page's vertical ScrollView a horizontal ScrollView would
+  // otherwise grow to the full page height (big empty gap under the table on web)
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ flexGrow: 1 }}>
       {children}
     </ScrollView>
   );
@@ -1063,14 +1314,15 @@ function PartySelector({
   );
 }
 
-function HeadRow({ first }: { first: string }) {
+function HeadRow({ first, k }: { first: string; k?: boolean }) {
   return (
     <View style={[st.row, { paddingVertical: 8 }]}>
       <Text style={[st.first, st.head]}>{first}</Text>
       <Text style={[st.num, st.head, { width: W.out }]}>OUT</Text>
       <Text style={[st.num, st.head, { width: W.in }]}>IN</Text>
-      <Text style={[st.num, st.head, { width: W.pend }]}>PEND</Text>
-      <Text style={[st.num, st.head, { width: W.short }]}>SHORT</Text>
+      <Text style={[st.num, st.head, { width: W.ret }]}>RET</Text>
+      <Text style={[st.num, st.head, { width: W.pend }]}>{k ? 'BAL' : 'PEND'}</Text>
+      <Text style={[st.num, st.head, { width: W.short }]}>{k ? 'LOSS' : 'SHORT'}</Text>
       <Text style={[st.num, st.head, { width: W.pct }]}>%</Text>
       <Text style={[st.num, st.head, { width: W.amt }]}>IN ₹</Text>
     </View>
@@ -1088,6 +1340,7 @@ function DesignLine({ r, onPress, total }: { r: HubAgg; onPress?: () => void; to
       </View>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.out }]}>{fmt(r.outM)}</Text>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.in }]}>{fmt(r.inM)}</Text>
+      <Text style={[st.num, st.mono, total && st.bold, { width: W.ret, color: r.ret > 0 || total ? T.ink : T.muted }]}>{r.ret > 0 || total ? fmt(r.ret) : '—'}</Text>
       <Text style={[st.num, st.mono, total && st.bold, { width: W.pend, color: r.pend > 0 ? AMBER : total ? T.ink : T.muted }]}>
         {r.pend > 0 || total ? fmt(r.pend) : '—'}
       </Text>
@@ -1104,15 +1357,74 @@ function DesignLine({ r, onPress, total }: { r: HubAgg; onPress?: () => void; to
   return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{Body}</TouchableOpacity>;
 }
 
-function LotLine({ l, onPress }: { l: HubLot; onPress: () => void }) {
-  const info = [
-    l.shade,
-    l.chartNo ? `chart ${l.chartNo}` : '',
-    l.lotNo ? `lot ${l.lotNo}` : '',
-    l.party,
-    `${l.recvTakas}/${l.outTakas} takas back`,
-    l.lastInw ? `last inward ${fmtD(l.lastInw)}` : '',
-  ].filter(Boolean).join(' · ');
+/** K item summary: columns of one unit block */
+const KW = { lines: 44, ch: 62, out: 66, kg: 62, inw: 62, wst: 54, sht: 54, ret: 54, bal: 66, amt: 64 };
+
+function KHeadRow({ unit }: { unit: 'MTR' | 'KG' }) {
+  return (
+    <View style={[st.row, { paddingVertical: 8 }]}>
+      <Text style={[st.first, st.head]}>ITEM</Text>
+      <Text style={[st.num, st.head, { width: KW.lines }]}>LINES</Text>
+      <Text style={[st.num, st.head, { width: KW.ch }]}>CHALLANS</Text>
+      <Text style={[st.num, st.head, { width: KW.out }]}>OUT {unit}</Text>
+      {unit === 'MTR' && <Text style={[st.num, st.head, { width: KW.kg }]}>OUT KG</Text>}
+      <Text style={[st.num, st.head, { width: KW.inw }]}>INW</Text>
+      <Text style={[st.num, st.head, { width: KW.wst }]}>WASTE</Text>
+      <Text style={[st.num, st.head, { width: KW.sht }]}>SHORT</Text>
+      <Text style={[st.num, st.head, { width: KW.ret }]}>RET</Text>
+      <Text style={[st.num, st.head, { width: KW.bal }]}>BAL {unit}</Text>
+      <Text style={[st.num, st.head, { width: KW.amt }]}>BAL ₹</Text>
+    </View>
+  );
+}
+
+function KItemLine({ r, onPress, total }: { r: KAgg; onPress?: () => void; total?: boolean }) {
+  const b = total ? st.bold : null;
+  const Body = (
+    <View style={[st.row, st.line, total && st.totalRow]}>
+      <View style={st.first}>
+        <Text style={[st.designName, total && { fontWeight: '800' }]} numberOfLines={2}>
+          {r.item}{!total && <Text style={{ color: T.copper }}> ›</Text>}
+        </Text>
+        {!total && <Text style={st.designMeta}>{plural(r.lines, 'line')} · {plural(r.challans, 'challan')}{r.exc > 0 ? ` · excess ${m1(r.exc)}` : ''}</Text>}
+      </View>
+      <Text style={[st.num, st.mono, b, { width: KW.lines }]}>{r.lines}</Text>
+      <Text style={[st.num, st.mono, b, { width: KW.ch }]}>{r.challans}</Text>
+      <Text style={[st.num, st.mono, b, { width: KW.out }]}>{m1(r.out)}</Text>
+      {r.unit === 'MTR' && <Text style={[st.num, st.mono, b, { width: KW.kg, color: T.muted }]}>{r.outKg > 0 ? m1(r.outKg) : '—'}</Text>}
+      <Text style={[st.num, st.mono, b, { width: KW.inw }]}>{r.inw > 0 || total ? m1(r.inw) : '—'}</Text>
+      <Text style={[st.num, st.mono, b, { width: KW.wst }]}>{r.wst > 0 || total ? m1(r.wst) : '—'}</Text>
+      <Text style={[st.num, st.mono, b, { width: KW.sht, color: r.sht > 0 ? T.red : T.ink }]}>{r.sht > 0 || total ? m1(r.sht) : '—'}</Text>
+      <Text style={[st.num, st.mono, b, { width: KW.ret }]}>{r.ret > 0 || total ? m1(r.ret) : '—'}</Text>
+      <Text style={[st.num, st.mono, { width: KW.bal, color: r.bal > 0 ? AMBER : T.ink, fontWeight: r.bal > 0 || total ? '800' : '400' }]}>
+        {r.bal > 0 || total ? m1(r.bal) : '—'}
+      </Text>
+      <Text style={[st.num, st.mono, b, { width: KW.amt }]}>{r.balAmt > 0 || total ? money(r.balAmt) : '—'}</Text>
+    </View>
+  );
+  if (!onPress) return Body;
+  return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{Body}</TouchableOpacity>;
+}
+
+function LotLine({ l, onPress, k }: { l: HubLot; onPress: () => void; k?: boolean }) {
+  const info = (k
+    ? [
+        l.shade,
+        l.annNo ? `annexure ${l.annNo}` : '',
+        l.party,
+        l.inwCount ? plural(l.inwCount, 'inward') : 'nothing back yet',
+        l.lastInw ? `last inward ${fmtD(l.lastInw)}` : '',
+      ]
+    : [
+        l.shade,
+        l.chartNo ? `chart ${l.chartNo}` : '',
+        l.lotNo ? `lot ${l.lotNo}` : '',
+        l.party,
+        `${l.recvTakas}/${l.outTakas} takas back`,
+        l.retTakas ? `${l.retTakas} returned` : '',
+        l.lastInw ? `last inward ${fmtD(l.lastInw)}` : '',
+      ]
+  ).filter(Boolean).join(' · ');
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.6}>
       <View style={[st.cRow, l.pct !== null && l.pct > 5 && { backgroundColor: '#FCEDEA' }]}>
@@ -1124,6 +1436,7 @@ function LotLine({ l, onPress }: { l: HubLot; onPress: () => void }) {
           </View>
           <Text style={[st.num, st.mono, { width: W.out }]}>{fmt(l.outM)}</Text>
           <Text style={[st.num, st.mono, { width: W.in }]}>{l.inM > 0 ? fmt(l.inM) : '—'}</Text>
+          <Text style={[st.num, st.mono, { width: W.ret, color: l.retM > 0 ? T.ink : T.muted }]}>{l.retM > 0 ? fmt(l.retM) : '—'}</Text>
           <Text style={[st.num, st.mono, { width: W.pend, color: l.pend > 0 ? AMBER : T.muted }]}>{l.pend > 0 ? fmt(l.pend) : '—'}</Text>
           <Text style={[st.num, st.mono, { width: W.short, color: (l.short || 0) > 0 ? T.red : T.ink, fontWeight: (l.short || 0) > 0 ? '800' : '400' }]}>
             {l.short !== null ? fmt(l.short) : '—'}

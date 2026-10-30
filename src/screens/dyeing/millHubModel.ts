@@ -13,6 +13,11 @@
 //   SHORT = OUT − IN, ONLY for a COMPLETE lot (every taka received)
 //   %     = SHORT ÷ OUT of the complete lots × 100   (from summed metres)
 //   IN ₹  = job amount of the inward lots
+//
+// Property type K (knitting) — same endpoints, data.mode = 'K' (DyeingMillHubController::reportK / lotK):
+//   one row per outward LINE of a challan with an annexure no.; unit by GRYOutD1.AmtCalc (MTR or KG, never added
+//   together). OUT qty, INW, WASTE, RET (return), SHORT, EXCESS, BAL = OUT − all of them, BAL ₹ = BAL × rate.
+//   The S fields are filled too (outM = OUT, inM = INW + RET, pend = BAL, short = WASTE + SHORT once complete).
 
 export type LotStatus = 'COMPLETE' | 'PARTIAL' | 'PENDING';
 
@@ -34,6 +39,9 @@ export type HubLot = {
   recvTakas: number;
   outM: number;
   inM: number;
+  /** returned back unprocessed (job outward return GRYORet / GRYORetD2) */
+  retM: number;
+  retTakas: number;
   pend: number;
   short: number | null; // null until the lot is complete
   pct: number | null;
@@ -42,6 +50,25 @@ export type HubLot = {
   lastInw: string;
   unmatched: number;
   status: LotStatus;
+  /** K only ('' for S): MTR / KG by GRYOutD1.AmtCalc, and the K quantities in that unit */
+  unit: '' | 'MTR' | 'KG';
+  annNo: string;
+  outQ: number;
+  outKg: number;
+  outMtrQ: number;
+  inwQ: number;
+  wstQ: number;
+  retQ: number;
+  shtQ: number;
+  excQ: number;
+  balQ: number;
+  rate: number;
+  balAmt: number;
+  inwAmt: number;
+  merge: string;
+  grade: string;
+  dept: string;
+  remark: string;
 };
 
 /** one aggregated line (item row / design row / grand total / challan total) */
@@ -53,6 +80,7 @@ export type HubAgg = {
   lots: number;
   outM: number;
   inM: number;
+  ret: number;
   pend: number;
   short: number;
   /** outward metres of the complete lots (base of %) */
@@ -66,14 +94,38 @@ export type HubTaka = {
   outM: number;
   received: boolean;
   inM: number;
+  retM: number;
+  returned: boolean;
+  retNo: string;
+  retDate: string;
   diff: number | null;
   inwNo: string;
   inwDate: string;
 };
 
-export type HubInward = { inwNo: string; inwDate: string; chalNo: string; lotNo: string; takas: number; inM: number; jobRate: number; jobAmt: number };
+export type HubInward = {
+  inwNo: string; inwDate: string; chalNo: string; lotNo: string; takas: number; inM: number; jobRate: number; jobAmt: number;
+  /** K only */
+  typeName: string; billNo: string; inwQ: number; wstQ: number; retQ: number; shtQ: number; excQ: number;
+};
 
-export type HubLotDetail = { takas: HubTaka[]; inwards: HubInward[]; unmatched: { takaNo: string; inM: number; inwNo: string; inwDate: string }[] };
+/** K: one line of the same annexure (party + annexure no.) */
+export type HubAnnLine = { outUId: string; outSrNo: string; outNo: string; outDate: string; item: string; design: string; shade: string; unit: string; outQ: number; balQ: number; status: LotStatus };
+
+export type HubReturn = { retNo: string; retDate: string; chalNo: string; takas: number; retM: number };
+
+export type HubLotDetail = {
+  takas: HubTaka[];
+  inwards: HubInward[];
+  returns: HubReturn[];
+  unmatched: { takaNo: string; inM: number; inwNo: string; inwDate: string }[];
+  /** K only */
+  annexure: HubAnnLine[];
+  annexureBal: number | null;
+};
+
+/** 'K' when the server answered with the property type K rules (data.mode = 'K') */
+export const reportMode = (response: any): 'K' | 'S' => (s(unwrap(response, 'lots').mode).toUpperCase() === 'K' ? 'K' : 'S');
 
 /* -------------------------------------------------------------------------- */
 
@@ -136,7 +188,10 @@ export const normalizeLots = (response: any): HubLot[] => {
       outTakas: n(r.outtakas),
       recvTakas: n(r.recvtakas),
       outM: n(r.outmtr),
-      inM: n(r.inmtr),
+      // K: IN = inward only, RET = return (the server's inmtr is inward + return for older apps)
+      inM: s(r.unit) ? n(r.inwqty) : n(r.inmtr),
+      retM: s(r.unit) ? n(r.retqty) : n(r.retmtr),
+      retTakas: n(r.rettakas),
       pend: n(r.pendmtr),
       short: nOrNull(r.shortmtr),
       pct: nOrNull(r.shortper),
@@ -145,6 +200,24 @@ export const normalizeLots = (response: any): HubLot[] => {
       lastInw: date(r.lastinw),
       unmatched: n(r.unmatchedin),
       status: (st === 'COMPLETE' || st === 'PARTIAL' ? st : 'PENDING') as LotStatus,
+      unit: (s(r.unit).toUpperCase() === 'MTR' ? 'MTR' : s(r.unit).toUpperCase() === 'KG' ? 'KG' : '') as HubLot['unit'],
+      annNo: s(r.outannno),
+      outQ: n(r.outqty),
+      outKg: n(r.outkg),
+      outMtrQ: n(r.outmtrq),
+      inwQ: n(r.inwqty),
+      wstQ: n(r.wstqty),
+      retQ: n(r.retqty),
+      shtQ: n(r.shtqty),
+      excQ: n(r.excqty),
+      balQ: n(r.balqty),
+      rate: n(r.rate),
+      balAmt: n(r.balamt),
+      inwAmt: n(r.inwamt),
+      merge: s(r.mername),
+      grade: s(r.grdname),
+      dept: s(r.department),
+      remark: s(r.remark),
     };
   });
 };
@@ -155,18 +228,35 @@ export const normalizeLotDetail = (response: any): HubLotDetail => {
     const r = lower(raw);
     return {
       takaNo: s(r.takano), outM: n(r.outmtr), received: n(r.received) > 0, inM: n(r.inmtr),
+      retM: n(r.retmtr), returned: n(r.returned) > 0, retNo: s(r.retno), retDate: s(r.retdate).split(',').map(date).filter(Boolean).join(', '),
       diff: nOrNull(r.diffmtr), inwNo: s(r.inwno), inwDate: s(r.inwdate).split(',').map(date).filter(Boolean).join(', '),
     };
   });
   const inwards = (Array.isArray(body.inwards) ? body.inwards : []).map((raw: any) => {
     const r = lower(raw);
-    return { inwNo: s(r.inwno), inwDate: date(r.inwdate), chalNo: s(r.chalno), lotNo: s(r.lotno), takas: n(r.takas), inM: n(r.inmtr), jobRate: n(r.jobrate), jobAmt: n(r.jobamt) };
+    return {
+      inwNo: s(r.inwno), inwDate: date(r.inwdate), chalNo: s(r.chalno), lotNo: s(r.lotno), takas: n(r.takas), inM: n(r.inmtr), jobRate: n(r.jobrate), jobAmt: n(r.jobamt),
+      typeName: s(r.typename), billNo: s(r.billno), inwQ: n(r.inwqty), wstQ: n(r.wstqty), retQ: n(r.retqty), shtQ: n(r.shtqty), excQ: n(r.excqty),
+    };
   });
   const unmatched = (Array.isArray(body.unmatched) ? body.unmatched : []).map((raw: any) => {
     const r = lower(raw);
     return { takaNo: s(r.takano), inM: n(r.inmtr), inwNo: s(r.inwno), inwDate: date(r.inwdate) };
   });
-  return { takas, inwards, unmatched };
+  const annexure = (Array.isArray(body.annexure) ? body.annexure : []).map((raw: any) => {
+    const r = lower(raw);
+    const st = s(r.status).toUpperCase();
+    return {
+      outUId: s(r.outuid), outSrNo: s(r.outsrno), outNo: s(r.outno), outDate: date(r.outdate), item: s(r.itmname), design: s(r.dsnname),
+      shade: s(r.shdname), unit: s(r.unit), outQ: n(r.outqty), balQ: n(r.balqty),
+      status: (st === 'COMPLETE' || st === 'PARTIAL' ? st : 'PENDING') as LotStatus,
+    };
+  });
+  const returns = (Array.isArray(body.returns) ? body.returns : []).map((raw: any) => {
+    const r = lower(raw);
+    return { retNo: s(r.retno), retDate: date(r.retdate), chalNo: s(r.chalno), takas: n(r.takas), retM: n(r.retmtr) };
+  });
+  return { takas, inwards, returns, unmatched, annexure, annexureBal: nOrNull(body.annexurebal) };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -174,10 +264,11 @@ export const normalizeLotDetail = (response: any): HubLotDetail => {
 /* -------------------------------------------------------------------------- */
 
 export const aggOf = (design: string, lots: HubLot[]): HubAgg => {
-  const a: HubAgg = { design, lots: lots.length, outM: 0, inM: 0, pend: 0, short: 0, lOut: 0, pct: 0, inAmt: 0 };
+  const a: HubAgg = { design, lots: lots.length, outM: 0, inM: 0, ret: 0, pend: 0, short: 0, lOut: 0, pct: 0, inAmt: 0 };
   lots.forEach((l) => {
     a.outM += l.outM;
     a.inM += l.inM;
+    a.ret += l.retM;
     a.pend += l.pend;
     a.inAmt += l.inAmt;
     if (l.status === 'COMPLETE' && l.short !== null) {
@@ -205,8 +296,55 @@ export const buildDesignRows = (lots: HubLot[]) => {
   return { rows, G: aggOf('GRAND TOTAL', lots) };
 };
 
-/** item of a lot as shown (GRYOutD1 item → FAMItem.ItmName) */
-export const itemOf = (l: HubLot) => l.item || '(no item)';
+/** item of a lot as shown (GRYOutD1 item → FAMItem.ItmName); K adds the unit — MTR and KG lines are never mixed */
+export const itemOf = (l: HubLot) => (l.item || '(no item)') + (l.unit ? ` · ${l.unit}` : '');
+
+/* ------------------------------ K item summary ------------------------------ */
+
+export type KAgg = {
+  key: string; // itemOf() of its lines (drill key)
+  item: string;
+  unit: 'MTR' | 'KG';
+  lines: number;
+  challans: number;
+  out: number;
+  outKg: number;
+  inw: number;
+  wst: number;
+  ret: number;
+  sht: number;
+  exc: number;
+  bal: number;
+  balAmt: number;
+  inwAmt: number;
+};
+
+const kAgg = (key: string, item: string, unit: 'MTR' | 'KG', lots: HubLot[]): KAgg => {
+  const a: KAgg = { key, item, unit, lines: lots.length, challans: new Set(lots.map((l) => l.outUId)).size, out: 0, outKg: 0, inw: 0, wst: 0, ret: 0, sht: 0, exc: 0, bal: 0, balAmt: 0, inwAmt: 0 };
+  lots.forEach((l) => {
+    a.out += l.outQ; a.outKg += l.outKg; a.inw += l.inwQ; a.wst += l.wstQ; a.ret += l.retQ; a.sht += l.shtQ; a.exc += l.excQ;
+    a.bal += l.balQ; a.balAmt += l.balAmt; a.inwAmt += l.inwAmt;
+  });
+  return a;
+};
+
+/** K: item-wise rows per unit (MTR block, KG block), most outward first, each with its own total */
+export const buildKItemRows = (lots: HubLot[]) => {
+  const blocks: { unit: 'MTR' | 'KG'; rows: KAgg[]; G: KAgg }[] = [];
+  (['MTR', 'KG'] as const).forEach((unit) => {
+    const ul = lots.filter((l) => l.unit === unit);
+    if (!ul.length) return;
+    const by = new Map<string, HubLot[]>();
+    ul.forEach((l) => {
+      const k = itemOf(l);
+      const list = by.get(k);
+      if (list) list.push(l); else by.set(k, [l]);
+    });
+    const rows = [...by.entries()].map(([k, ls]) => kAgg(k, ls[0].item || '(no item)', unit, ls)).sort((a, b) => b.out - a.out || a.item.localeCompare(b.item));
+    blocks.push({ unit, rows, G: kAgg(`TOTAL ${unit}`, `TOTAL · ${unit}`, unit, ul) });
+  });
+  return blocks;
+};
 
 /** item-wise rows (parent level, most outward first) + grand total; HubAgg.design carries the item name */
 export const buildItemRows = (lots: HubLot[]) => {

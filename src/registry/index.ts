@@ -17,6 +17,7 @@ import './modules/monthlySalesTarget.permission';
 import './modules/orders.permission';
 import './modules/priority.permission';
 import './modules/production.module';
+import './modules/mill.permission';
 
 import { validatePermissionRegistry } from './permissionRegistry';
 

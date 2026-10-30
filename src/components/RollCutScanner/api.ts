@@ -22,7 +22,7 @@ export const LIST_FROM_KEY = 'FromDate';
 export const LIST_TO_KEY = 'ToDate';
 
 export type Opt = { label: string; value: string };
-export type QrData = { prpcode: string; beamno: string; takano: string; yearno?: string; [k: string]: any };
+export type QrData = { prpcode: string; beamno: string; takano: string; yearno?: string;[k: string]: any };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -74,7 +74,7 @@ export function createRollCutApi(API: string, token: string) {
     save: async (p: { prpcode: string; yearno: string; scannedString: string }) => {
       // flat payload: QR keys go straight into the body (no scannedString, no nested object/array)
       const q = JSON.parse(p.scannedString);
-      const body = { txntype: TXN_ROLL_CUT, ...q, prpcode: p.prpcode, yearno: p.yearno };
+      const body = { txntype: TXN_ROLL_CUT, ...q, prpcode: p.prpcode, yearno: p.yearno, uid: '0' };
       return (await c.post(SAVE_ENDPOINT, body, xhr)).data;
     },
 

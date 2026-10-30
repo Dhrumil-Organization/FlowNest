@@ -45,7 +45,7 @@ const padNo = (v: string) => (/^\d+$/.test(String(v).trim()) ? String(v).trim().
 const digits = (v: string) => String(v).replace(/[^0-9]/g, '').replace(/^0+/, '').slice(0, 8);
 
 const parCode = (p: Row) => String(p?.ParCode ?? p?.acccode ?? p?.id ?? '');
-const parName = (p: Row) => String(p?.ParName ?? p?.accountname ?? parCode(p));
+const parName = (p: Row) => String(p?.ParName ?? p?.accountname ?? p?.AccountName ?? p?.accountName ?? p?.AccName ?? p?.name ?? parCode(p));
 
 export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBeforePrint, onPdf }: Props) {
   const [panel, setPanel] = useState<Panel>(null);
@@ -63,6 +63,7 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
   const [accounts, setAccounts] = useState<Row[]>([]);
   const [accLoading, setAccLoading] = useState(false);
   const [accQuery, setAccQuery] = useState('');
+  const [accVisibleCount, setAccVisibleCount] = useState(ACC_SHOWN);
   const [ptypes, setPtypes] = useState<Row[]>([]);
   const [ptLoading, setPtLoading] = useState(false);
   const [parties, setParties] = useState<Row[]>([]);
@@ -189,12 +190,17 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
   };
 
   const accShown = useMemo(() => {
-    const q = accQuery.trim().toLowerCase();
+    const q = accQuery.trim().toLocaleLowerCase();
     const list = q
-      ? accounts.filter((a) => `${a.accountname ?? ''} ${a.acccode ?? ''}`.toLowerCase().includes(q))
+      ? accounts.filter((a) => {
+          // Account-book APIs may return different casing/key aliases depending on the backend.
+          const code = a.acccode ?? a.AccCode ?? a.Acccode ?? a.accountcode ?? a.AccountCode ?? a.code ?? a.Code ?? '';
+          const name = a.accountname ?? a.AccountName ?? a.accountName ?? a.AccName ?? a.acname ?? a.name ?? a.Name ?? '';
+          return `${String(code)} ${String(name)}`.toLocaleLowerCase().includes(q);
+        })
       : accounts;
-    return { rows: list.slice(0, ACC_SHOWN), total: list.length };
-  }, [accounts, accQuery]);
+    return { rows: list.slice(0, accVisibleCount), total: list.length };
+  }, [accounts, accQuery, accVisibleCount]);
 
   const submit = async () => {
     if (busy) return;
@@ -239,7 +245,7 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
           <TouchableOpacity style={st.box} onPress={() => toggle('acc')} accessibilityRole="button" accessibilityLabel="Select sales account">
             <Icon name="account-balance-wallet" size={18} color={T.copper} />
             <Text style={[st.boxText, !salesAc && st.placeholder]} numberOfLines={1}>
-              {salesAc ? `${salesAc.acccode} · ${salesAc.accountname}` : 'All accounts'}
+              {salesAc ? `${salesAc.acccode ?? salesAc.AccCode ?? salesAc.Acccode ?? salesAc.accountcode ?? salesAc.AccountCode ?? salesAc.code ?? salesAc.Code ?? ''} · ${salesAc.accountname ?? salesAc.AccountName ?? salesAc.accountName ?? salesAc.AccName ?? salesAc.name ?? ''}` : 'All accounts'}
             </Text>
             {salesAc ? (
               <TouchableOpacity onPress={() => setSalesAc(null)} hitSlop={8} accessibilityLabel="Clear sales account">
@@ -250,13 +256,13 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
           </TouchableOpacity>
           {panel === 'acc' ? (
             <View style={st.panel}>
-              <SearchInput value={accQuery} onChangeText={setAccQuery} placeholder="Search account name or code..." />
+              <SearchInput value={accQuery} onChangeText={(value) => { setAccQuery(value); setAccVisibleCount(ACC_SHOWN); }} placeholder="Search account name or code..." />
               {accLoading ? (
                 <ActivityIndicator color={T.copper} style={{ marginVertical: 14 }} />
               ) : (
                 <ScrollView style={st.list} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {accShown.rows.map((a, i) => {
-                    const on = salesAc && String(salesAc.acccode) === String(a.acccode);
+                    const on = salesAc && String(salesAc.acccode ?? salesAc.AccCode ?? salesAc.Acccode ?? salesAc.accountcode ?? salesAc.AccountCode ?? salesAc.code ?? salesAc.Code) === String(a.acccode ?? a.AccCode ?? a.Acccode ?? a.accountcode ?? a.AccountCode ?? a.code ?? a.Code);
                     return (
                       <TouchableOpacity
                         key={`${a.acccode}_${i}`}
@@ -267,15 +273,22 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
                         }}
                       >
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={st.rowTitle} numberOfLines={1}>{a.accountname}</Text>
-                          <Text style={st.rowSub} numberOfLines={1}>{a.acccode}{a.city ? ` · ${a.city}` : ''}</Text>
+                          <Text style={st.rowTitle} numberOfLines={1}>{a.accountname ?? a.AccountName ?? a.accountName ?? a.AccName ?? a.name ?? a.Name}</Text>
+                          <Text style={st.rowSub} numberOfLines={1}>{a.acccode ?? a.AccCode ?? a.Acccode ?? a.accountcode ?? a.AccountCode ?? a.code ?? a.Code}{(a.city ?? a.City) ? ` · ${a.city ?? a.City}` : ''}</Text>
                         </View>
                         {on ? <Icon name="check" size={18} color={T.copper} /> : null}
                       </TouchableOpacity>
                     );
                   })}
                   {accShown.total > accShown.rows.length ? (
-                    <Text style={st.hint}>Showing first {ACC_SHOWN} of {accShown.total} — type to narrow down</Text>
+                    <TouchableOpacity
+                      style={st.more}
+                      onPress={() => setAccVisibleCount((count) => Math.min(count + ACC_SHOWN, accShown.total))}
+                      accessibilityRole="button"
+                      accessibilityLabel="Show more accounts"
+                    >
+                      <Text style={st.moreText}>Show More ({Math.min(ACC_SHOWN, accShown.total - accShown.rows.length)} more)</Text>
+                    </TouchableOpacity>
                   ) : null}
                   {accShown.total === 0 ? <Text style={st.hint}>No records found</Text> : null}
                 </ScrollView>
@@ -296,8 +309,6 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
                 keyboardType="number-pad"
                 onBlur={() => setFromNo((n) => padNo(n))}
                 onSubmitEditing={() => setFromNo((n) => padNo(n))}
-                placeholder="00000000"
-                placeholderTextColor={T.muted}
                 autoCorrect={false}
                 accessibilityLabel="Voucher no from"
               />
@@ -312,8 +323,6 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
                 onBlur={() => setFromNo((n) => padNo(n))}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                placeholder="FS"
-                placeholderTextColor={T.muted}
                 accessibilityLabel="Voucher series from"
               />
             </View>
@@ -328,8 +337,6 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
                 keyboardType="number-pad"
                 onBlur={() => setToNo((n) => padNo(n))}
                 onSubmitEditing={() => setToNo((n) => padNo(n))}
-                placeholder="00000000"
-                placeholderTextColor={T.muted}
                 autoCorrect={false}
                 accessibilityLabel="Voucher no to"
               />
@@ -344,8 +351,6 @@ export default function MultiPrintForm({ API, token, ctx, dateFrom, dateTo, onBe
                 onBlur={() => setToNo((n) => padNo(n))}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                placeholder="FS"
-                placeholderTextColor={T.muted}
                 accessibilityLabel="Voucher series to"
               />
             </View>

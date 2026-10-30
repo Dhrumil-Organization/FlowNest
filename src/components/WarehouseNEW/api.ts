@@ -29,6 +29,7 @@
 //   POST /api/master_crud                    { PrpCode, StrCode, YearNo, txntype, action:'browse_data', fetch, module }
 //        -> res.data.data.prodwarehouselocations | res.data.response.data | res.data.data | res.data.results
 //   POST /api/prodwarehousemanage  action 'view'      (View screen + Transfer "LOAD DATA")  -> res.data.data | res.data.results
+//   POST /api/prodwarehousemanage  action 'search'    (Dashboard "Search cartons")  -> res.data.data | res.data.results
 //   POST /api/prodwarehousemanage  action 'assign'    (Assign save)   -> res.data.success / res.data.message
 //   POST /api/prodwarehousemanage  action 'transfer'  (Transfer save) -> res.data.success / res.data.message
 //
@@ -297,6 +298,29 @@ export async function fetchLocationCartons(API: string, token: string, criteria:
   return Array.isArray(rows) ? rows : [];
 }
 
+/** POST /api/prodwarehousemanage action 'search' — sends the exact normalized dashboard search text. */
+export async function searchCartons(API: string, token: string, criteria: Row, search: string): Promise<Row[]> {
+  const userPtype = await AsyncStorage.getItem('user_prptype');
+  const payload = {
+    prptype: userPtype || 'R',
+    prpcode: criteria.prpcode,
+    yearno: getCurrentFinancialYear(),
+    strcode: criteria.strcode,
+    selectedcartons: [] as any[],
+    txntype: TXNTYPE,
+    fromlocationdetail: [] as any[],
+    tolocationdetail: [] as any[],
+    // Only the FIRST carton entered in the dashboard search box goes to the API.
+    // Example: '262970295,RM17727,262990069' -> '262970295'.
+    search: String(search || '').split(/[\s,;|]+/).map((value) => value.trim()).find(Boolean) || '',
+    action: 'search',
+  };
+  console.log('[WarehouseNEW] carton search payload', payload);
+  const res = await axios.post(`${API}/api/prodwarehousemanage`, payload, { headers: jsonHeaders(token) });
+  const rows = res?.data?.data || res?.data?.results || res?.data?.response?.data || [];
+  return Array.isArray(rows) ? rows : [];
+}
+
 /** POST /api/master_crud browse_data — "To Location" list (the from-location is filtered out). */
 export async function fetchToLocations(API: string, token: string, criteria: Row, location: Row): Promise<Row[]> {
   await AsyncStorage.getItem('user_prptype');
@@ -348,6 +372,45 @@ export async function saveTransfer(
     action: 'transfer',
   };
   console.log('[WarehouseNEW] transfer save payload', payload);
+  const res = await axios.post(`${API}/api/prodwarehousemanage`, payload, { headers: jsonHeaders(token) });
+  return res?.data;
+}
+
+/** POST /api/prodwarehousemanage action 'delete' — delete selected cartons from a location. */
+export async function deleteLocationCartons(
+  API: string,
+  token: string,
+  criteria: Row,
+  location: Row,
+  selectedRows: Row[],
+): Promise<any> {
+  const userPtype = await AsyncStorage.getItem('user_prptype');
+  const selectedcartons = selectedRows.map((row) => ({
+    prpcode: row?.prpcode ?? row?.PrpCode ?? criteria?.prpcode ?? '',
+    cartstrcode: row?.cartstrcode ?? row?.CartStrCode ?? row?.strcode ?? row?.StrCode ?? criteria?.strcode ?? '',
+    location: row?.location ?? row?.Location ?? location?.location ?? location?.locationName ?? '',
+    trantype: row?.trantype ?? row?.TranType ?? row?.ttype ?? row?.TType ?? '',
+    puid: row?.puid ?? row?.Puid ?? row?.PUID ?? '',
+    psrno: row?.psrno ?? row?.PsrNo ?? row?.PSrNo ?? row?.srno ?? row?.SrNo ?? '',
+    psubsr: row?.psubsr ?? row?.Psubsr ?? row?.PSubSr ?? row?.subsr ?? row?.SubSr ?? '',
+    uid: row?.uid ?? row?.UId ?? row?.UID ?? '',
+    cartno: row?.cartno ?? row?.CartNo ?? row?.cartonNo ?? row?.CartonNo ?? '',
+  }));
+  const payload = {
+    prptype: userPtype,
+    prpcode: criteria?.prpcode,
+    yearno: getCurrentFinancialYear(),
+    strcode: criteria?.strcode,
+    itmcode: criteria?.itmcode ?? selectedRows[0]?.itmcode ?? selectedRows[0]?.ItmCode ?? '',
+    itmcodes: false,
+    selectedcartons,
+    txntype: TXNTYPE,
+    fromlocationdetail: [location],
+    tolocationdetail: [],
+    action: 'delete',
+    return: 0,
+  };
+  console.log('[WarehouseNEW] delete cartons payload', payload);
   const res = await axios.post(`${API}/api/prodwarehousemanage`, payload, { headers: jsonHeaders(token) });
   return res?.data;
 }

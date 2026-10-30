@@ -144,7 +144,25 @@ export async function saveOrder(a: Api, c: Ctx, payload: Row, voucher: Row, main
     }),
   });
   return ok(r?.data, 'Production Order could not be saved.');
-}
+} 
+
+// export async function saveOrder(
+//   a: Api,
+//   c: Ctx,
+//   payload: Row,
+//   voucher: Row,
+//   main: Row,
+//   recordUid: number,
+//   strcode: string
+// ) {
+//   console.log('Production Order Save Payload:', payload);
+
+//   return {
+//     success: true,
+//     data: payload,
+//     message: 'Payload checked only. API not called.',
+//   };
+// }
 
 /* ---------------- costing module (NEW design costing) ---------------- */
 

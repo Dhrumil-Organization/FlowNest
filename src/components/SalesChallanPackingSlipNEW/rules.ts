@@ -223,10 +223,19 @@ export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; other
     found = p.list.find((el) => el.qrcodestring && cleanQr(dec3(String(el.qrcodestring).split('~').slice(0, -4).join('~'), '~')) === target);
   }
   if (!found) return { status: 'notfound', message: 'This label is not in stock for this item, merge, grade and shade.' };
+  return pickCarton(found, p);
+}
+
+/**
+ * The checks after a stock carton is identified — shared by a scan and a manual pick from the list:
+ * locked (lock = 1) → refused; already on this or another line → duplicate; else the D2 carton row.
+ */
+export function pickCarton(found: Row, p: { scanned: Row[]; others: Row[]; srNo: any; uid: any }): ScanResult {
+  const d = p.scanned.find((c) => String(c.CartNo) === String(found.cartno)) || p.others.find((c) => String(c.CartNo) === String(found.cartno));
+  if (d) return { status: 'duplicate', source: found, message: `Carton ${found.cartno} is already on Sr ${d.SrNo} / Sub ${d.SubSr}.` };
   if (String(found.lock ?? '0').trim() === '1') {
     return { status: 'locked', source: found, message: `Carton ${found.cartno} is locked${found.lockreason ? `: ${found.lockreason}` : ''}.` };
   }
-
   const carton: Row = {
     Amount: null, BalMtr: null, CartNo: found.cartno, Chees: found.chees, DispNo: null, DispSubSr: null,
     EntType: found.TranType, LotNo: found.LotNo, OrgBalMtr: found.qty, ParcelNo: null, ProdType: found.ProdType,

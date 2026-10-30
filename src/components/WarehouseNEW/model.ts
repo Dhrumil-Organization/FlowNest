@@ -147,6 +147,68 @@ export const locationStats = (item: Row): LocationStats => {
   };
 };
 
+/**
+ * Cartons are shown with an "O" prefix in some places (O253500677) but users type / scan them
+ * without it (253500677) and the other way round. The API gets both spellings for every
+ * numeric carton so either one finds the carton:
+ *   "253500677" -> "253500677,O253500677"      "O253500677" -> "O253500677,253500677"
+ * Non-numeric cartons (RM17727, AS465 ...) are sent as typed.
+ */
+export const expandCartonVariants = (normalized: string): string => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (x: string) => {
+    const k = x.toUpperCase();
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(x);
+    }
+  };
+  normalized
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .forEach((t) => {
+      add(t);
+      if (/^\d+$/.test(t)) add(`O${t}`);
+      else if (/^O\d+$/i.test(t)) add(t.slice(1));
+    });
+  return out.join(',');
+};
+
+/**
+ * Carton search text -> API `search` string. The user may type "123,456,789",
+ * "123 456 789", one carton per line, or a prefixed code like "AS465".
+ * Separators (comma / space / newline / ; / |) become ",", empties and duplicates are dropped.
+ */
+export const normalizeCartonSearch = (text: string): string => {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  String(text || '')
+    .split(/[\s,;|]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .forEach((x) => {
+      const k = x.toUpperCase();
+      if (!seen.has(k)) {
+        seen.add(k);
+        parts.push(x);
+      }
+    });
+  return parts.join(',');
+};
+
+const locNameOf = (row: Row): string =>
+  String(row?.location ?? row?.Location ?? row?.locationName ?? row?.LocationName ?? '')
+    .trim()
+    .toLowerCase();
+
+/** Keeps only the dashboard tiles whose location appears in the carton-search result rows. */
+export const filterLocationsByCartons = (locations: Row[], cartonRows: Row[]): Row[] => {
+  const names = new Set(cartonRows.map(locNameOf).filter(Boolean));
+  return locations.filter((loc) => names.has(locNameOf(loc)));
+};
+
 /** Dashboard search: any value of the row contains the text. */
 export const filterLocations = (locations: Row[], search: string): Row[] => {
   if (!search?.trim()) return locations;
@@ -175,7 +237,8 @@ const normalizeNumberText = (val: any): string => {
   return num.toString();
 };
 
-export const splitScanParts = (value: any): string[] => {
+/** Splits a scanned QR / barcode text into its parts WITHOUT any number normalising (keeps leading zeros). */
+export const splitScanPartsRaw = (value: any): string[] => {
   let cleanValue = cleanScannerValue(value);
   if (!cleanValue) return [];
   cleanValue = cleanValue
@@ -195,9 +258,10 @@ export const splitScanParts = (value: any): string[] => {
         .replace(/^\{|\}$/g, '')
         .trim(),
     )
-    .filter((x) => x !== '')
-    .map(normalizeNumberText);
+    .filter((x) => x !== '');
 };
+
+export const splitScanParts = (value: any): string[] => splitScanPartsRaw(value).map(normalizeNumberText);
 
 export const normalizeCart = (value: any): string =>
   String(value || '')
@@ -329,9 +393,34 @@ export const NEXT_STATUS: ScanStatus = {
   message: 'Scan another carton QR',
 };
 
+/**
+ * Dashboard "Search cartons" scan: no loaded carton list to match against, so the carton
+ * number is read straight from the code.
+ *   NEW QR (","-separated, >= 16 parts) -> part 16   OLD QR ("~"-separated, >= 7 parts) -> part 7
+ *   anything else (plain carton barcode) -> the scanned text itself.
+ */
+export const cartonNoFromScan = (value: any): string => {
+  const raw = cleanScannerValue(value);
+  if (!raw) return '';
+  const parts = splitScanPartsRaw(raw);
+  if (raw.includes('~')) {
+    if (parts.length >= 7) return parts[6];
+  } else if (parts.length >= 16) {
+    return parts[15];
+  }
+  return raw.replace(/^"+|"+$/g, '').trim();
+};
+
+/** Same shape as findIndexedQrMatch(), for the search-scan mode. */
+export const searchScanMatch = (value: any): { row: Row | null; ambiguous: boolean } => {
+  const cartonNo = cartonNoFromScan(value);
+  return { row: cartonNo ? { cartonNo } : null, ambiguous: false };
+};
+
 /** Params the legacy scanner screens received via route.params. */
 export type ScanParams = {
-  mode: 'ASSIGN' | 'TRANSFER';
+  /** 'SEARCH' = Dashboard carton search (no carton list; scanned numbers go to the search box) */
+  mode: 'ASSIGN' | 'TRANSFER' | 'SEARCH';
   cartons: Row[];
   selected: Record<string, Row>;
   onScanResult: (rows: Row[]) => void;

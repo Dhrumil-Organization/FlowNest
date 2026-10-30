@@ -22,15 +22,21 @@ import {
   Row,
 } from './model';
 
-/** Brief breakpoints: phone < 768 = 1 column, tablet 2, desktop (>= 1180) 3. */
+/**
+ * Shared responsive breakpoints:
+ * phone < 600px: single-column forms and carton lists
+ * tablet 600-1023px: two-column data grids
+ * desktop 1024-1439px: three-column grids
+ * wide desktop >= 1440px: four-column grids
+ */
 export function useCols() {
   const { width, height } = useWindowDimensions();
-  const isPhone = width < 768;
-  const cols = isPhone ? 1 : width >= 1180 ? 3 : 2;
+  const isPhone = width < 600;
+  const cols = width < 600 ? 1 : width < 1024 ? 2 : width < 1440 ? 3 : 4;
   return { width, height, isPhone, cols };
 }
 
-export const CONTENT: any = { maxWidth: 1200, alignSelf: 'center', width: '100%' };
+export const CONTENT: any = { maxWidth: 1440, alignSelf: 'center', width: '100%' };
 
 /* ------------------------------------------------------------------ */
 /* Search input with focus callbacks (kit SearchBox has none)          */
@@ -42,6 +48,7 @@ export function SearchInput({
   placeholder,
   onFocus,
   onBlur,
+  onSubmit,
   style,
 }: {
   value: string;
@@ -49,6 +56,8 @@ export function SearchInput({
   placeholder?: string;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** keyboard "search" / Enter */
+  onSubmit?: () => void;
   style?: any;
 }) {
   return (
@@ -59,6 +68,7 @@ export function SearchInput({
         onChangeText={onChangeText}
         onFocus={onFocus}
         onBlur={onBlur}
+        onSubmitEditing={onSubmit}
         placeholder={placeholder}
         placeholderTextColor={T.muted}
         style={st.searchInput}
@@ -125,12 +135,16 @@ function CartonCardBase({
   selected,
   onPress,
   hideCheckbox = false,
+  showLocation = false,
 }: {
   item: Row;
   selected?: boolean;
   onPress?: (item: Row) => void;
   hideCheckbox?: boolean;
+  /** carton search results: show which warehouse location the carton is in */
+  showLocation?: boolean;
 }) {
+  const loc = String(item?.location || item?.Location || item?.locationName || item?.LocationName || '').trim();
   const body = (
     <>
       {!hideCheckbox ? (
@@ -147,6 +161,12 @@ function CartonCardBase({
           {cartonItemOf(item)} | Grade: {cartonGradeOf(item)}
         </Text>
       </View>
+      {showLocation ? (
+        <View style={st.locBadge}>
+          <Icon name="place" size={14} color={T.copper} />
+          <Text style={st.locBadgeText} numberOfLines={1}>{loc || 'No location'}</Text>
+        </View>
+      ) : null}
     </>
   );
   if (!onPress) return <View style={st.cartCard}>{body}</View>;
@@ -370,6 +390,8 @@ const st = StyleSheet.create({
     gap: 12,
   },
   cartCardOn: { backgroundColor: `${T.copper}12`, borderColor: T.copper },
+  locBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: `${T.copper}14`, maxWidth: 110 },
+  locBadgeText: { fontSize: 12, fontWeight: '900', color: T.copper },
   cartNo: { fontSize: 15, fontWeight: '900', color: T.ink },
   cartLine: { fontSize: 12.5, color: T.nav, marginTop: 2 },
 

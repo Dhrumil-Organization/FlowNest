@@ -6,6 +6,8 @@ import type {
   PermissionResourceDefinition,
 } from '../core/permissions/types';
 
+import { getCurrentErpProperty } from '../../common/API/dynamicAPI';
+
 const areas = new Map<string, PermissionAreaDefinition>();
 const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
@@ -196,7 +198,14 @@ function registryHash(value: unknown): string {
 export function createPermissionRegistrySyncPayload(
   clientVersion = 'sudamo-mobile-registry-v2',
 ): PermissionRegistrySyncPayload & { registry_hash: string; full_snapshot: boolean } {
-  const registryAreas = getPermissionRegistry();
+  // MILL HUB rights live on SUDAMO (apig) only. Rayons (apiy) never stores
+  // them, so the "mill" area is left out of a Rayons sync.
+  let registryAreas = getPermissionRegistry();
+  try {
+    if (getCurrentErpProperty() === 'rayons') registryAreas = registryAreas.filter((a) => a.key !== 'mill');
+  } catch {
+    /* property unknown → full registry */
+  }
   return {
     client_version: clientVersion,
     registry_hash: registryHash(registryAreas),

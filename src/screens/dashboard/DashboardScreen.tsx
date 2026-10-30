@@ -11,6 +11,8 @@ import { usePermission } from '@/src/core/permissions';
 import { RegistryLayoutItem, RegistryRenderer } from '@/src/core/ui-registry';
 import { getUiNodes } from '@/src/core/ui-registry/uiRegistry';
 import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
+import { DASHBOARD_MOBILE_WIDTH, DashboardForceMobileContext } from '@/src/components/EmployDashboard/rn-app/components/responsive';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +25,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
 // FIX: the header is now rendered once, in app/new/(tabs)/_layout.tsx —
@@ -281,6 +284,23 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const [contentWidth, setContentWidth] = useState(0);
   const columns: DashCols = columnsForWidth(contentWidth);
 
+  // RESPONSIVE: Yes (default) = layout follows the screen width (as before).
+  //             No            = the phone layout, also on web / tablet (content drawn at the mobile width).
+  // UI only — remembered on this device. The switch is shown only where it changes something (wide screens).
+  const { width: windowWidth } = useWindowDimensions();
+  const [responsive, setResponsiveState] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem('dashboard_responsive')
+      .then((v: string | null) => { if (v === 'no') setResponsiveState(false); })
+      .catch(() => undefined);
+  }, []);
+  const setResponsive = (yes: boolean) => {
+    setResponsiveState(yes);
+    AsyncStorage.setItem('dashboard_responsive', yes ? 'yes' : 'no').catch(() => undefined);
+  };
+  const showResponsiveSwitch = windowWidth > DASHBOARD_MOBILE_WIDTH + 140;
+  const forceMobile = !responsive && showResponsiveSwitch;
+
   const now = new Date();
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
@@ -472,8 +492,9 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { load(true); loadExpense(true); }} tintColor={T.copper} />}
       >
+       <DashboardForceMobileContext.Provider value={forceMobile}>
        <View
-         style={styles.inner}
+         style={[styles.inner, forceMobile && styles.innerMobile]}
          onLayout={(e) => {
            const w = Math.round(e.nativeEvent.layout.width);
            if (Math.abs(w - contentWidth) > 1) setContentWidth(w);
@@ -497,6 +518,27 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         </View>
 
         <View style={styles.amountModeRow}>
+          {showResponsiveSwitch && (
+            <View style={styles.respWrap}>
+              <Text style={styles.amountModeLabel}>RESPONSIVE</Text>
+              <View style={styles.respToggle}>
+                {([[true, 'Yes'], [false, 'No']] as const).map(([v, l]) => {
+                  const on = responsive === v;
+                  return (
+                    <TouchableOpacity
+                      key={l}
+                      onPress={() => setResponsive(v)}
+                      style={[styles.respBtn, on && styles.respBtnOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[styles.respText, on && styles.respTextOn]}>{l}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           <Text style={styles.amountModeLabel}>AMOUNT</Text>
           <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
         </View>
@@ -637,6 +679,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
           </>
         )}
        </View>
+       </DashboardForceMobileContext.Provider>
       </ScrollView>
     </View>
   );
@@ -662,6 +705,14 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: '#fff' },
   amountModeRow: { marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  // "Responsive: No" — the phone layout, centred
+  innerMobile: { maxWidth: DASHBOARD_MOBILE_WIDTH },
+  respWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 'auto' },
+  respToggle: { flexDirection: 'row', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 9, overflow: 'hidden' },
+  respBtn: { paddingHorizontal: 12, paddingVertical: 6 },
+  respBtnOn: { backgroundColor: T.nav },
+  respText: { color: T.muted, fontSize: 11, fontWeight: '900' },
+  respTextOn: { color: '#fff' },
   monthlyReportCard: {
     minHeight: 82,
     flexDirection: 'row',

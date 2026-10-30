@@ -8,8 +8,8 @@
 //       he switched Mill ON, we silently re-login on apig and remember Rayons, so
 //       switching Mill OFF brings him back to Rayons.
 //
-// Login is common: the SAME user name + password logs into the Mills server
-// (through Sudamo /api/mill/session/login); his Mill Hub rights come back with it.
+// NO separate Mills login: it is the same Sudamo user. Switch ON only reads his Mill Hub rights
+// from Sudamo (/api/mill/session/status); the data comes from the Mills server through Sudamo.
 // Logout → Mill mode is cleared (next login always starts in the normal ERP).
 // ─────────────────────────────────────────────────────────────
 import AsyncStorage from '@/common/utils/compatibleStorage';
@@ -97,23 +97,19 @@ export const useMillModeStore = create<MillModeState>((set, get) => ({
       const prev = await currentProperty();
       if (prev !== MILL_PROPERTY) await reloginOnProperty(MILL_PROPERTY);
 
-      // Same user → Mills server (through Sudamo). Wrong user / no Mill right →
-      // stay in the ERP (and go back to Rayons if we came from there).
-      // always a FRESH Mills login on switch ON (rights / roles changed on Mills are picked up)
-      let r = await MillSessionApi.loginWithSaved();
-      if (!r.session && r.code === 'MILL_NO_CREDENTIALS') r = await MillSessionApi.status();
-      // Logged in but no Mill right → stay in the ERP (back to Rayons if we came from there).
-      const noRight = !!r.session && !r.session.hasAccess;
-      if (noRight) {
+      // Same Sudamo user — no Mills login. Read his Mill rights (fresh, so changes in Permission
+      // Manager are picked up). No Mill right / Sudamo not reachable → stay in the ERP
+      // (and go back to Rayons if we came from there).
+      const r = await MillSessionApi.status();
+      if (!r.session || !r.session.hasAccess) {
         if (prev !== MILL_PROPERTY) {
           try { await reloginOnProperty(prev); } catch { /* stay on apig */ }
         }
-        throw new Error('You do not have any Mill Hub rights.\n\n' + millRightsReason(r.session));
+        throw new Error(r.session
+          ? 'You do not have any Mill Hub rights.\n\n' + millRightsReason(r.session)
+          : (r.message || 'Could not read the Mill rights. Please try again.'));
       }
-      // Login problem (wrong user / password on Mills, no saved login, Mills offline …)
-      // → still open Mill mode; MillShell shows the user name + password box with the reason.
-      const loginError = r.session ? null : (r.message || 'Mills login failed. Enter your Mills user name and password.');
-      set({ session: r.session, loginError });
+      set({ session: r.session, loginError: null });
       await AsyncStorage.setItem(PREV, prev);
       await AsyncStorage.setItem(KEY, 'on');
       set({ enabled: true });

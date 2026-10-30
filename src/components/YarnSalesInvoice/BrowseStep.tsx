@@ -6,7 +6,7 @@
 //   - cards are NOT clickable; the Print icon prints that one invoice (saleschallanmultiprintnew)
 //   - Multi Print icon opens the multi print dialog (Sales A/c, voucher / date range, parties, print type)
 import { AppAlert } from '@/common/utils/appAlert';
-import { Btn, DateField, EmptyState, IconBtn, PickField } from '@/src/components/erpUi';
+import { Btn, EmptyState, IconBtn, PickField } from '@/src/components/erpUi';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -35,7 +35,7 @@ import {
   storeName,
 } from './model';
 import MultiPrintModal, { MultiPrintSeed } from './MultiPrintModal';
-import { CONTENT, ListSkeleton, PickerSheet, SearchInput, useCols } from './ui';
+import { CONTENT, DmyDateField, ListSkeleton, PickerSheet, SearchInput, useCols } from './ui';
 
 type Props = { token: string; API: string; onOpenPdf: (pdfUrl: string, title: string) => void };
 
@@ -400,11 +400,11 @@ export default function BrowseStep({ token, API, onOpenPdf }: Props) {
         <View style={st.dateRow}>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={st.label}>From Date</Text>
-            <DateField value={fromDate} onChange={setFromDate} />
+            <DmyDateField value={fromDate} onChange={setFromDate} />
           </View>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={st.label}>To Date</Text>
-            <DateField value={toDate} onChange={setToDate} />
+            <DmyDateField value={toDate} onChange={setToDate} />
           </View>
         </View>
       </FilterDrawer>

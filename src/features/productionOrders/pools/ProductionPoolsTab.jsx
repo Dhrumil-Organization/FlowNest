@@ -20,11 +20,23 @@ const dmy=v=>{const s=String(v||'').replace(/\D/g,'');return s.length>=8?`${s.sl
 const integer=v=>v==null?'—':Number(v).toLocaleString('en-IN');
 const pct=(v)=>Number.isFinite(Number(v))&&v!=null?Math.max(0,Math.min(100,Number(v))):null;
 const nonNull=v=>v!==undefined&&v!==null;
+// Artifact shows executive names: GENSEXE.LngName by code (pool_view.executive_names).
+let EXEC_NAMES={};
+const exName=c=>{const k=String(c??'').trim();return k===''||k==='—'?'—':(EXEC_NAMES[k]||k);};
+// Artifact poolAheadTxt: "Rahul (PO-0001 · 2,378 m unsold, has SO)"
+const aheadTxt=list=>{const by={};(list||[]).forEach(a=>{const b=by[a.exec]||(by[a.exec]={exec:a.exec,pos:[],unsold:0});const po=a.po_no||a.po_uid;if(po&&!b.pos.includes(po))b.pos.push(po);b.unsold+=Number(a.unsold||0);});
+  return Object.values(by).map(b=>`${exName(b.exec)} (${b.pos.join(', ')} · ${fmt(b.unsold)} unsold)`).join('; ');};
 
 function Txt({children,style,mono=false,...rest}) {return <Text {...rest} style={[styles.text,mono&&styles.mono,style]}>{children}</Text>;}
 function Row({children,style}) {return <View style={[styles.row,style]}>{children}</View>;}
 function Pill({children,tone='green'}) {const color=T[tone]||T.green;return <View style={[styles.pill,{borderColor:color+'55',backgroundColor:color+'11'}]}><Txt style={{color,fontSize:9,fontWeight:'800'}}>{children}</Txt></View>;}
 function Chip({children,active,onPress,month=false}) {return <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:!!active}} onPress={onPress} style={[styles.chip,active&&(month?styles.activeMonth:styles.activeFilter)]}><Txt style={{fontWeight:'800',fontSize:11.5,color:active?(month?T.copper:'#FFFFFF'):T.muted}}>{children}</Txt></TouchableOpacity>;}
+function PvrCell({v}) {
+  if(!v)return <Txt mono style={{flex:1,textAlign:'right',color:T.muted,fontSize:11}}>—</Txt>;
+  const net=v.rate_net??v.net_back;const m=v.margin;
+  return <View style={{flex:1,alignItems:'flex-end'}}><Txt mono style={{fontSize:11,fontWeight:'800',color:T.muted}}>{net==null?'—':`₹${Number(net).toFixed(2)}`} − {v.cost==null?'—':`₹${Number(v.cost).toFixed(2)}`}</Txt>
+    {m!=null&&<Txt mono style={{fontSize:11,fontWeight:'800',color:m>=0?T.green:T.red}}>{m>=0?'+':''}{Number(m).toFixed(2)}{v.margin_pct!=null?` · ${v.margin_pct}%`:''}</Txt>}</View>;
+}
 function KPI({label,value,hi,columns}) {return <View style={[styles.kpi,{width:columns===3?'32.7%':'49.4%'},hi&&styles.kpiHi]}><Txt style={styles.kpiTitle}>{label}</Txt><Txt mono style={[styles.kpiValue,hi&&{color:T.copper}]}>{value}</Txt></View>;}
 function Mini({name,value,tone}) {return <View style={styles.mini}><Txt style={styles.miniTitle}>{name}</Txt><Txt mono style={[styles.miniValue,tone&&{color:T[tone]}]}>{value}</Txt></View>;}
 function Track({value,tone='copper',onPress,detailText}) {
@@ -50,11 +62,12 @@ function PoolItem({pool,open,view}) {
       <View style={styles.designTag}><Txt mono style={{fontWeight:'800',fontSize:10}}>{pool.design_code}</Txt></View>
       <View style={{flex:1,minWidth:0}}>
         <Txt numberOfLines={2} style={{fontSize:13,fontWeight:'800',color:T.ink}}>{pool.design_name||pool.design_code} <Txt style={{color:T.muted,fontSize:10,fontWeight:'600'}}>· {monthName(pool.month)}</Txt></Txt>
-        <Txt style={styles.aux}>{rows.length} PO {rows.length===1?'line':'lines'} · {nonNull(pool.so_count)?pool.so_count:'—'} SO · {pool.property}</Txt>
+        <Txt style={styles.aux}>{rows.length} PO {rows.length===1?'line':'lines'} · {nonNull(pool.so_count)?pool.so_count:'—'} SO · {(pool.properties?.length?pool.properties:[pool.property]).filter(Boolean).join(' + ')}</Txt>
       </View>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:4,justifyContent:'flex-end',maxWidth:'35%'}}>
         {pool.current&&<Pill>CURRENT</Pill>}
         {nonNull(overdue)&&overdue>0&&<Pill tone="red">{overdue} OVERDUE</Pill>}
+        {Number(pool.ahead_events_count||0)>0&&<Pill tone="amber">{pool.ahead_events_count} DREW AHEAD</Pill>}
         {nonNull(pool.marked_binds)&&pool.marked_binds>0&&<Pill tone="amber">{pool.marked_binds} MARKED</Pill>}
       </View>
     </Row>
@@ -75,7 +88,7 @@ function PoolDetail({pool,onBack,view}) {
   return <View>
     <TouchableOpacity accessibilityRole="button" onPress={onBack} style={{marginBottom:10,paddingVertical:3,alignSelf:'flex-start'}}><Txt style={{color:T.copper,fontWeight:'700',fontSize:13}}>‹ {view==='my'?'My orders':'Pools'}</Txt></TouchableOpacity>
     <Row style={{alignItems:'center',gap:9,marginBottom:5}}><View style={styles.designTag}><Txt mono style={{fontWeight:'800'}}>{pool.design_code}</Txt></View><Txt style={{fontSize:17,fontWeight:'800',color:T.ink,flex:1}}>{pool.design_name||pool.design_code}</Txt><Pill>{pool.current?'CURRENT MONTH':'CLOSED MONTH'}</Pill></Row>
-    <Txt style={[styles.aux,{marginBottom:12}]}>{monthName(pool.month)} · FY {fyLabel(pool.month)} · {pool.property} · design pool</Txt>
+    <Txt style={[styles.aux,{marginBottom:12}]}>{monthName(pool.month)} · FY {fyLabel(pool.month)} · {(pool.properties?.length?pool.properties:[pool.property]).filter(Boolean).join(' + ')} · design pool</Txt>
     <View style={styles.metrics}>{summary.map(([name,v])=><KPI key={name} label={name} value={fmt(v)} columns={cols} hi={name==='PO quantity'}/>)}</View>
     <Section label="Pool pick rate · weighted by PO quantity" right={<Txt mono style={{color:T.copper,fontWeight:'800',fontSize:14}}>{pool.rate==null?'—':`₹${Number(pool.rate).toFixed(4)}/pick`}</Txt>}>
       {pool.rate_parts?.length?<View>{pool.rate_parts.map((r,i)=><Row key={`${r.po}|${i}`} style={{justifyContent:'space-between',paddingVertical:4,borderBottomWidth:i===pool.rate_parts.length-1?0:1,borderBottomColor:T.alt}}><Txt style={styles.aux}>{r.po} · {fmt(r.qty)}</Txt><Txt mono style={{fontSize:11,fontWeight:'800'}}>{r.rate==null?'—':`₹${Number(r.rate).toFixed(4)}/pick`}</Txt></Row>)}</View>:<Empty>Approved PO rate breakdown is not available.</Empty>}
@@ -88,18 +101,28 @@ function PoolDetail({pool,onBack,view}) {
         const percentage=nonNull(e.covered_percent)?e.covered_percent:null;
         const isShort=nonNull(e.gap)&&Number(e.gap)>0;
         return <View key={`${e.uid||e.po}|${i}`} style={styles.entry}>
-          <Row style={{alignItems:'center',gap:8}}><View style={styles.orderNumber}><Txt mono style={{color:'#FFF',fontSize:10,fontWeight:'800'}}>{e.entry_order||i+1}</Txt></View><View style={{flex:1}}><Txt style={{fontSize:12.5,fontWeight:'800',color:T.ink}}>{e.po} <Txt style={{color:T.muted,fontSize:10}}>· {e.executive||'—'}</Txt></Txt><Txt style={styles.aux}>{e.kind==='stock'?'Stock — no SO':'SO'} · entered {dmy(e.entered_at)}</Txt></View><View style={{alignItems:'flex-end'}}><Txt mono style={{fontWeight:'800'}}>{fmt(e.covered)} <Txt style={{color:T.muted}}> / {fmt(e.qty)}</Txt></Txt><Txt style={{fontSize:10,color:isShort?T.red:T.green,fontWeight:'800'}}>{!nonNull(e.gap)?'coverage pending':isShort?`${fmt(e.gap)} short`:'fully covered'}</Txt></View></Row>
+          <Row style={{alignItems:'center',gap:8}}><View style={styles.orderNumber}><Txt mono style={{color:'#FFF',fontSize:10,fontWeight:'800'}}>{e.entry_order||i+1}</Txt></View><View style={{flex:1}}><Txt style={{fontSize:12.5,fontWeight:'800',color:T.ink}}>{e.po} <Txt style={{color:T.muted,fontSize:10}}>· {exName(e.executive)}{(pool.properties||[]).length>1&&e.property?` · ${e.property}`:''}</Txt></Txt><Txt style={styles.aux}>{e.kind==='stock'?'Stock — no SO':'SO'} · entered {dmy(e.entered_at)}</Txt></View><View style={{alignItems:'flex-end'}}><Txt mono style={{fontWeight:'800'}}>{fmt(e.covered)} <Txt style={{color:T.muted}}> / {fmt(e.qty)}</Txt></Txt><Txt style={{fontSize:10,color:isShort?T.red:T.green,fontWeight:'800'}}>{!nonNull(e.gap)?'coverage pending':isShort?`${fmt(e.gap)} short`:'fully covered'}</Txt></View></Row>
           <Row style={{alignItems:'center',gap:8,marginTop:7}}><View style={{flex:1}}><Track value={percentage} tone={isShort?'red':'copper'} detailText={`PO ${e.po} · drawn ${fmt(e.drawn_mtd)} · covered ${fmt(e.covered)} of ${fmt(e.qty)}`}/></View><Txt mono style={styles.aux}>{percentage==null?'—':`${Math.round(percentage)}%`}</Txt></Row>
-          <Row style={{flexWrap:'wrap',gap:5,marginTop:7}}><Pill tone="blue">drawn {fmt(e.drawn_mtd)}</Pill>{e.carried&&<Pill tone="red">OVERDUE · from {monthName(e.auth_month)}</Pill>}{e.overdue&&!e.carried&&<Pill tone="red">OVERDUE</Pill>}{e.no_po&&<Pill tone="red">NO PO</Pill>}{e.over_qty&&<Pill tone="red">OVER OWN QTY</Pill>}{e.drew_ahead&&<Pill tone="amber">DREW AHEAD</Pill>}</Row>
+          <Row style={{flexWrap:'wrap',gap:5,marginTop:7}}><Pill tone="blue">drawn {fmt(e.drawn_mtd)}</Pill>{e.carried&&<Pill tone="red">OVERDUE · from {monthName(e.auth_month)}</Pill>}{e.overdue&&!e.carried&&<Pill tone="red">OVERDUE</Pill>}{e.no_po&&<Pill tone="red">NO PO</Pill>}{e.over_qty&&<Pill tone="red">OVER OWN QTY</Pill>}{e.drew_ahead&&<Pill tone="amber">DREW AHEAD</Pill>}{e.below_cost&&<Pill tone="red">BELOW COST</Pill>}</Row>
+          {(e.ahead_detail||[]).map((a,j)=><Txt key={`ah${j}`} style={[styles.aux,{color:T.amber,marginTop:3}]}>⚑ {dmy(a.event_date)} · {exName(a.executive)} drew {fmt(a.metres)} ahead of {aheadTxt(a.ahead_of)}</Txt>)}
+          {(e.passed_by||[]).map((a,j)=><Txt key={`pb${j}`} style={[styles.aux,{marginTop:3}]}>Passed by {[a.po_nos?.length?`PO ${a.po_nos.join(', ')}`:null,exName(a.executive)!=='—'?exName(a.executive):null].filter(Boolean).join(' · ')||'—'} · {dmy(a.event_date)} · {fmt(a.metres)} via {a.via||'—'}{a.reference?` · ${a.reference}`:''}</Txt>)}
         </View>;
       })}
       <Txt style={[styles.aux,{marginTop:8}]}>Covered = drawn + remaining pool production allocated in entry order; any shortfall belongs to later entrants. No transaction is blocked; ahead draws must be marked.</Txt>
     </Section>
     <Section label="Planned vs realised · per greige metre">
-      {pool.planned_vs_realised?.rows?.length?pool.planned_vs_realised.rows.map((r,i)=><Row key={i} style={{justifyContent:'space-between',paddingVertical:7,borderTopWidth:i?1:0,borderColor:T.alt,gap:8}}><View style={{flex:1}}><Txt style={{fontSize:11,fontWeight:'700'}}>{r.po_no||r.po||'Production order'}</Txt><Txt style={styles.aux}>Cost {fmt(r.cost_per_greige_m,'₹/m')} · net-back {fmt(r.netback_per_greige_m,'₹/m')}</Txt></View><Txt mono style={{fontWeight:'800',color:Number(r.margin_per_greige_m)<0?T.red:T.green}}>{fmt(r.margin_per_greige_m,'₹/m')}</Txt></Row>):<Empty>Cost and realised sale rates are not yet verified for this pool.</Empty>}
+      {pool.planned_vs_realised?.rows?.length?<View>
+        <Row style={{gap:6,paddingBottom:4}}><Txt style={[styles.pvrHead,{flex:1.3}]}>Per greige metre</Txt><Txt style={[styles.pvrHead,{flex:1,textAlign:'right'}]}>Planned · net-back − cost</Txt><Txt style={[styles.pvrHead,{flex:1,textAlign:'right'}]}>Realised · net-back − cost</Txt></Row>
+        {pool.planned_vs_realised.rows.map((r,i)=><Row key={i} style={{gap:6,paddingVertical:6,borderTopWidth:1,borderColor:T.alt,alignItems:'center'}}>
+          <View style={{flex:1.3}}><Txt style={{fontSize:11,fontWeight:'700'}}>{r.po||'—'} · {exName(r.executive)}{r.kind==='stock'?' · stock':''}</Txt><Txt style={styles.aux}>{r.kind==='stock'?'stock — realises when sold':'sale slice'}{r.below?' · BELOW COST':''}</Txt></View>
+          <PvrCell v={r.planned}/><PvrCell v={r.realised}/>
+        </Row>)}
+        {pool.planned_vs_realised.total&&<Row style={{gap:6,paddingTop:6,borderTopWidth:1.5,borderColor:T.border,alignItems:'center'}}><Txt style={{flex:1.3,fontSize:11.5,fontWeight:'800'}}>Pool · sold so far</Txt><View style={{flex:1}}/><PvrCell v={pool.planned_vs_realised.total}/></Row>}
+        <Txt style={[styles.aux,{marginTop:6}]}>Planned = the PO's saved costing and its SO rates. Realised = actual challan rate of the saved sale binds, against the PO's planned greige cost. Finished SOs are converted to greige metres: (rate − processing) × (1 − finish shrink).</Txt>
+      </View>:<Empty>{pool.below_cost_status==='no_po_costing'?'No saved PO costing for this pool.':'PO costing not available for this pool.'}</Empty>}
     </Section>
     <Section label="Sales orders in this pool">
-      {sos.length?sos.map((o,i)=><View style={styles.entry} key={`${o.so_reference}-${i}`}><Row style={{alignItems:'center',gap:6}}><View style={{flex:1}}><Txt style={{fontSize:12,fontWeight:'700'}}>{o.so_no||o.so_reference} <Txt style={styles.aux}>· {o.customer||'Customer'} · {o.executive_name||o.executive||'—'}</Txt></Txt><Txt style={styles.aux}>Due {dmy(o.delivery_date)} · {o.greige_basis==='greige_from_design_finish_shrink'?`Finished ${fmt(o.ordered_qty)} → greige ${fmt(o.ordered_greige_qty)} (${o.finish_shrink_percent}% shrink)`:(o.fabric_type||'greige')}</Txt></View><View style={{alignItems:'flex-end'}}><Txt mono style={{fontWeight:'800'}}>{fmt(o.pending_qty)}</Txt><Txt style={styles.aux}>pending</Txt></View></Row>{o.overdue&&<Pill tone="red">OVERDUE</Pill>}</View>):<Empty>Sales-order details are loaded only for a selected design.</Empty>}
+      {sos.length?sos.map((o,i)=><View style={styles.entry} key={`${o.so_reference}-${i}`}><Row style={{alignItems:'center',gap:6}}><View style={{flex:1}}><Txt style={{fontSize:12,fontWeight:'700'}}>{o.so_no||o.so_reference} <Txt style={styles.aux}>· {o.customer||'Customer'} · {o.executive_name||exName(o.executive)}{(pool.properties||[]).length>1&&o.property?` · ${o.property}`:''}{o.finished_code?` · finished ${o.finished_code}`:''}</Txt></Txt><Txt style={styles.aux}>Due {dmy(o.delivery_date)} · {o.greige_basis==='greige_from_design_finish_shrink'?`Finished ${fmt(o.ordered_qty)} → greige ${fmt(o.ordered_greige_qty)} (${o.finish_shrink_percent}% shrink)`:(o.fabric_type||'greige')}</Txt></View><View style={{alignItems:'flex-end'}}><Txt mono style={{fontWeight:'800'}}>{fmt(o.pending_qty)}</Txt><Txt style={styles.aux}>pending</Txt></View></Row><Row style={{gap:5,marginTop:4,flexWrap:'wrap'}}>{o.no_po_yet&&<Pill tone="amber">NO PO YET</Pill>}{o.overdue&&<Pill tone="red">{o.carried&&o.entry_month?`OVERDUE · from ${monthName(o.entry_month)}`:'OVERDUE'}</Pill>}</Row></View>):<Empty>Sales-order details are loaded only for a selected design.</Empty>}
       {pool.so_pending_status==='incomplete_greige_conversion_or_missing_balance'&&<Txt style={[styles.aux,{color:T.red,marginTop:5}]}>Some SO quantities require confirmed shrinkage or balance information.</Txt>}
     </Section>
     <Section label={`Loose rolls · ${nonNull(pool.loose_metres)?pool.loose_rolls?.length||0:'—'} · ${fmt(pool.loose_metres)}`} right={<TouchableOpacity onPress={()=>setShowRolls(x=>!x)}><Txt style={{color:T.copper,fontWeight:'700',fontSize:11}}>{showRolls?'Hide':'Show'}</Txt></TouchableOpacity>}>
@@ -108,9 +131,11 @@ function PoolDetail({pool,onBack,view}) {
     </Section>
     <Section label={`Bind log · ${pool.bind_status==='verified'?events.length:'—'}`}>
       {!events.length&&<Empty>{pool.bind_status==='verified'?'No saved bindings in this period.':'Saved bind history is not fully certified for the selected month.'}</Empty>}
-      {events.map((e,i)=><View key={e.id||i} style={styles.entry}><Row style={{alignItems:'center',justifyContent:'space-between'}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date||e.date)} · {e.executive||e.exec} · {e.via||'—'}</Txt><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)} → {e.po_no||e.po||'NO PO'}</Txt></Row><Txt style={styles.aux}>{e.reference||e.ref||'—'} · {e.roll_ids?.length??e.rollIds?.length??0} rolls</Txt>
+      {events.map((e,i)=><View key={e.id||i} style={styles.entry}><Row style={{alignItems:'center',justifyContent:'space-between'}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date||e.date)} · {exName(e.executive||e.exec)} · {e.via||'—'}</Txt><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)} → {e.no_po?'NO PO':([...new Set((e.allocations||[]).map(a=>a.po_no).filter(Boolean))].join(', ')||e.po_no||e.po||'NO PO')}</Txt></Row><Txt style={styles.aux}>{e.reference||e.ref||'—'} · {e.roll_ids?.length??e.rollIds?.length??0} rolls</Txt>
         {(e.allocations||[]).map((a,j)=><Txt key={`po:${j}`} style={styles.aux}>PO {a.po_no||a.po_uid||'NO PO'} · {fmt(a.metres)}{Number(a.over_metres)>0?' · OVER '+fmt(a.over_metres):''}</Txt>)}
-        {(e.rolls||[]).length>0&&<Txt style={styles.aux}>{e.rolls.map(r=>`${r.roll_id} (${fmt(r.greige_metres)})`).join(' · ')}</Txt>}<Row style={{marginTop:4,gap:5,flexWrap:'wrap'}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres||0)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF</Pill>}</Row></View>)}
+        {(e.rolls||[]).length>0&&<Txt style={styles.aux}>{e.rolls.slice(0,12).map(r=>`${r.taka_no||r.roll_id} (${fmt(r.greige_metres)})`).join(' · ')}{e.rolls.length>12?` · +${e.rolls.length-12} more`:''}</Txt>}<Row style={{marginTop:4,gap:5,flexWrap:'wrap'}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres||0)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF</Pill>}</Row>
+        {e.ahead_of?.length>0&&<Txt style={[styles.aux,{color:T.amber,marginTop:3}]}>Drew ahead of {aheadTxt(e.ahead_of)}</Txt>}
+        {e.no_po&&<Txt style={[styles.aux,{color:T.red,marginTop:3}]}>⚑ {exName(e.executive)} has no PO in this pool — {e.message||'punch a PO to cover it'}.</Txt>}</View>)}
     </Section>
     {!!pool.issues?.length&&<View style={styles.issue}><Txt style={{fontWeight:'800',color:T.amber,fontSize:10,marginBottom:3}}>Data reconciliation pending</Txt>{pool.issues.map((e,i)=><Txt style={styles.aux} key={i}>• {e}</Txt>)}</View>}
   </View>;
@@ -150,6 +175,11 @@ function endpoint(apiBase,params){
   const qs=Object.entries(params).filter(([,v])=>v!==''&&v!=null).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
   return `${apiBase.replace(/\/$/,'')}/getProductionOrderPools?${qs}`;
 }
+// Why an SO line has no greige metres (Data status).
+const MISSING_REASON=r=>r==='finish_shrink_missing'?'finished SO, design has no finish shrink (set it in Designs)'
+  :r==='so_balance_missing'?'SO balance not recorded'
+  :String(r||'').startsWith('unknown_fabric_type')?`unknown fabric type "${String(r).split(':')[1]||''}"`:String(r||'unknown');
+
 export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,property='',requestFn,view='owner'}) {
   const {width}=useWindowDimensions(),columns=width>=780?3:2;
   const listHeight=Platform.OS==='web'?WEB_LIST_HEIGHT:MOBILE_LIST_HEIGHT;
@@ -184,7 +214,8 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
       if(!json?.success||!json?.response?.pool_view)throw new Error('Unable to read the monthly Pools response.');
       const next={...json.response.pool_view,__key:requestKey};
       if(live){setData(next);if(!search)setOverview(next);
-        if(Array.isArray(next.available_months)&&next.available_months.length)setServerMonths(next.available_months);}
+        if(Array.isArray(next.available_months)&&next.available_months.length)setServerMonths(next.available_months);
+        if(next.executive_names&&typeof next.executive_names==='object')EXEC_NAMES={...EXEC_NAMES,...next.executive_names};}
     }catch(e){if(live){setError(e?.response?.data?.message||e?.message||'Unable to load Pools');setData(null);}}
     finally{if(live)setLoading(false);}})();
     return ()=>{live=false};
@@ -227,16 +258,18 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
   const cnt={all:sorted.length,overdue:sorted.every(x=>nonNull(x.overdue_count))?sorted.filter(x=>x.overdue_count>0).length:null,
     marked:sorted.every(x=>nonNull(x.marked_binds))?sorted.filter(x=>x.marked_binds>0).length:null,
     below:sorted.every(x=>nonNull(x.below_cost_count))?sorted.filter(x=>x.below_cost_count>0).length:null};
-  const listed=useMemo(()=>sorted.filter(p=>filter==='all'||(filter==='overdue'&&p.overdue_count>0)||(filter==='marked'&&p.marked_binds>0)||(filter==='below'&&p.below_cost_count>0)),[sorted,filter]);
+  const listed=useMemo(()=>sorted.filter(p=>filter==='all'||(filter==='overdue'&&p.overdue_count>0)||(filter==='marked'&&p.marked_binds>0)||(filter==='below'&&(p.below_cost_known??p.below_cost_count)>0)),[sorted,filter]);
   // Search filters design records at the API before page retrieval; only the
   // already-returned matching rows are mounted in the virtualized list.
   const kpiSource=search?(overview?.month===month?overview:null):data;
-  const kpiComplete=kpiSource?.monthly_totals_complete===true;
+  // Month totals saved on the server across every page (pool/month-totals): no scrolling needed.
+  const mt=(overview?.month===month?overview:data)?.month_totals||null;
+  const kpiComplete=Boolean(mt)||kpiSource?.monthly_totals_complete===true;
   const k=kpiSource?.kpis||{};
-  const shown=kpiComplete?k:{...k,...(kpiSource?.loaded_page_kpis||{})};
+  const shown=mt?mt.kpis:(kpiComplete?k:{...k,...(kpiSource?.loaded_page_kpis||{})});
   const totals=[['PO quantity',fmt(shown.po_quantity)],['SO pending',fmt(shown.so_pending)],['Loose stock',fmt(shown.loose_stock)],
     ['Overdue lines',integer(shown.overdue_lines)],['Marked binds',integer(shown.marked_binds)],['Below-cost POs',integer(shown.below_cost_pos)]];
-  const countSuffix=poolPagination?.more_available?'+':'';
+  const countSuffix=mt?'':(poolPagination?.more_available?'+':'');
   const changeMonth=m=>{setMonth(m);setFilter('all');setSearchInput('');setSearch('');};
   const retryNext=()=>{pageBusy.current=false;fetchNext();};
   const closeDetail=()=>{setSelected(null);setDetail(null);setDetailError(null);};
@@ -262,6 +295,8 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
         </Row>
       </View>}
       <View style={styles.metrics}>{totals.map(([name,value],i)=><KPI key={name} label={name} value={value} hi={i===0} columns={columns}/>)}</View>
+      {mt&&<Txt style={[styles.aux,{marginBottom:7}]}>Month totals of all {integer(mt.pools)} pools · worked out {mt.computed_at}
+        {Object.entries(mt.missing||{}).filter(([,n])=>n>0).map(([key,n])=>` · ${key.replace(/_/g,' ')}: ${n} pool${n===1?'':'s'} without a figure, not included`).join('')}</Txt>}
       {!kpiComplete&&<Txt style={[styles.aux,{color:T.copper,marginBottom:7}]}>
         {search?'Month KPIs are not changed by search. ':''}{!kpiSource?'Complete monthly KPI source not available.'
           :!kpiSource?.pagination?.source_universe_complete?'Subtotals of the pools loaded so far: this month is before the bind history is complete.'
@@ -270,7 +305,7 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
           :'Some pools are missing a figure, so that KPI shows —.'}
       </Txt>}
       <Row style={{gap:6,flexWrap:'wrap',marginBottom:9}}>
-        {[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>{setFilter(key);listRef.current?.scrollToOffset?.({offset:0,animated:false});}}>{name} · {cnt[key]===null?'—':`${cnt[key]}${countSuffix}`}</Chip>)}
+        {[['all','All'],['overdue','Overdue'],['marked','Marked'],['below','Below cost']].map(([key,name])=><Chip key={key} active={filter===key} onPress={()=>{setFilter(key);listRef.current?.scrollToOffset?.({offset:0,animated:false});}}>{name} · {mt&&!search?(mt.filters?.[key==='below'?'below_cost':key]??'—'):(cnt[key]===null?'—':`${cnt[key]}${countSuffix}`)}</Chip>)}
       </Row>
       <Row style={styles.searchBox}>
         <Txt style={{fontSize:19,color:T.muted,marginRight:8}}>⌕</Txt>
@@ -296,17 +331,32 @@ export default function ProductionPoolsTab({apiBase='/api',prptype,yearno,proper
           ?`One pool per design with a PO or SO open this month (POs fully drawn earlier are left out${data?.universe?.dropped_po_count?`: ${data.universe.dropped_po_count}`:''}). `
           :'This month is before the bind history is complete, so pools with fully drawn POs may still be listed. '}
         More pools load while scrolling. Stock is read roll by roll from your database and shown with its reconciliation line. FY {fyLabel(month)}.
-      </Txt></View>}
+      </Txt>
+        {mt?.so_missing_pools?.length>0&&<View style={{marginTop:8}}>
+          <Txt style={{fontWeight:'800',fontSize:11,marginBottom:3}}>No SO pending figure · {mt.so_missing_pools.length} pool{mt.so_missing_pools.length===1?'':'s'} (left out of SO pending)</Txt>
+          {mt.so_missing_pools.map(p=><Txt key={`${p.property}:${p.design_code}`} style={[styles.aux,{lineHeight:16}]}>
+            • {p.design_code} {p.design_name||''} — {(p.lines||[]).length?(p.lines||[]).map(l=>`SO ${l.so_no||'?'} (${l.property}${l.finished_code?` · finished code ${l.design_code}`:''}) ${MISSING_REASON(l.reason)}${l.pending_finished_qty!=null?` · ${fmt(l.pending_finished_qty)} finished pending`:''}`).join('; '):'SO read incomplete'}
+          </Txt>)}
+        </View>}
+      </View>}
       {filter==='marked'&&<Section label={`Marked binds · ${monthName(month)}`}>
         {sorted.flatMap(p=>(p.bind_events||[]).filter(e=>e.no_po||Number(e.over_metres)>0||(e.ahead_of||[]).length).map(e=>({...e,pool:p})))
           .sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date))).map((e,i)=><TouchableOpacity key={`${e.pool.key}:${e.id||i}`} onPress={()=>setSelected(e.pool)} style={styles.entry}>
-            <Row style={{alignItems:'center',gap:8}}><View style={styles.designTag}><Txt mono style={{fontSize:10,fontWeight:'800'}}>{e.pool.design_code}</Txt></View><View style={{flex:1}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date)} · {e.executive} · {e.via}</Txt><Txt style={styles.aux}>{e.reference||'—'}</Txt></View><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)}</Txt></Row>
+            <Row style={{alignItems:'center',gap:8}}><View style={styles.designTag}><Txt mono style={{fontSize:10,fontWeight:'800'}}>{e.pool.design_code}</Txt></View><View style={{flex:1}}><Txt style={{fontWeight:'700'}}>{dmy(e.event_date)} · {exName(e.executive)} · {e.via}</Txt><Txt style={styles.aux}>{e.reference||'—'}</Txt></View><Txt mono style={{fontWeight:'800'}}>{fmt(e.metres)}</Txt></Row>
             <Row style={{gap:5,flexWrap:'wrap',marginTop:4}}>{e.no_po&&<Pill tone="red">NO PO</Pill>}{Number(e.over_metres)>0&&<Pill tone="red">OVER {fmt(e.over_metres)}</Pill>}{e.ahead_of?.length>0&&<Pill tone="amber">DREW AHEAD OF {e.ahead_of.map(x=>x.po_no||x.po_uid).join(', ')}</Pill>}</Row>
+            {e.ahead_of?.length>0&&<Txt style={[styles.aux,{color:T.amber}]}>{aheadTxt(e.ahead_of)}</Txt>}
+            {e.no_po&&<Txt style={[styles.aux,{color:T.red}]}>{e.message||'punch a PO to cover it'}</Txt>}
           </TouchableOpacity>)}
         {cnt.marked===null&&<Empty>Saved bind history is incomplete. Recorded events do not establish the complete monthly count.</Empty>}
         {cnt.marked===0&&<Empty>No recorded flagged binds in the currently retrieved records.</Empty>}
       </Section>}
-      {filter==='below'&&<Section label={`Below cost · ${monthName(month)}`}><Empty>{cnt.below===null?'Verified costing comparisons are not yet available.':cnt.below===0?'No below-cost POs in the currently retrieved records.':'Select a flagged pool to see costing.'}</Empty></Section>}
+      {filter==='below'&&<Section label={`Below cost · ${monthName(month)}`}>
+        {mt?.kpis?.below_cost_unknown_pos>0&&<Txt style={[styles.aux,{marginBottom:6}]}>{integer(mt.kpis.below_cost_unknown_pos)} PO{mt.kpis.below_cost_unknown_pos===1?'':'s'} with finished SO lines have no processing rate or finish shrink on their costing, so whether they are below cost is not known.</Txt>}
+        {!sorted.some(p=>(p.entries||[]).some(e=>e.below_cost===true))?<Empty>{cnt.below===null?'No below-cost PO among the pools loaded so far.':'No below-cost POs this month.'}</Empty>:
+          sorted.flatMap(p=>(p.entries||[]).filter(e=>e.below_cost===true).map(e=>({e,p}))).map(({e,p},i)=><TouchableOpacity key={`${p.key}:${e.po}:${i}`} onPress={()=>setSelected(p)} style={styles.entry}>
+            <Row style={{alignItems:'center',gap:8}}><View style={styles.designTag}><Txt mono style={{fontSize:10,fontWeight:'800'}}>{p.design_code}</Txt></View><View style={{flex:1}}><Txt style={{fontWeight:'700'}}>{e.po} · {exName(e.executive)}</Txt><Txt style={styles.aux}>net-back {fmt(e.planned?.rate_net,'₹/m')} · cost {fmt(e.planned?.cost,'₹/m')}</Txt></View><Txt mono style={{fontWeight:'800',color:T.red}}>{fmt(e.planned?.margin,'₹/m')}</Txt></Row>
+          </TouchableOpacity>)}
+      </Section>}
       <View style={[styles.listViewport,{height:listHeight}]}>
         <FlatList
           ref={listRef}
@@ -348,6 +398,7 @@ const styles=StyleSheet.create({
   listViewport:{flexShrink:1,minHeight:220,backgroundColor:T.bg,borderRadius:9,borderWidth:1,borderColor:T.border,overflow:'hidden'},listContent:{paddingHorizontal:5,paddingTop:7,paddingBottom:8},
   text:{color:T.ink,fontSize:11,fontFamily:'DMSans'},mono:{fontFamily:'DMMono',fontVariant:['tabular-nums']},aux:{fontSize:9.5,color:T.muted,lineHeight:15},row:{flexDirection:'row'},
   chip:{paddingHorizontal:12,paddingVertical:7,borderRadius:20,borderWidth:1.5,borderColor:T.border,backgroundColor:T.surface,alignItems:'center',justifyContent:'center'},activeMonth:{backgroundColor:'rgba(200,117,51,0.12)',borderColor:T.copper},activeFilter:{backgroundColor:T.nav,borderColor:T.nav},
+  pvrHead:{fontSize:8,fontWeight:'800',color:T.muted,textTransform:'uppercase'},
   metrics:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:12,justifyContent:'space-between'},kpi:{backgroundColor:T.sub,borderWidth:1,borderColor:T.border,borderRadius:9,paddingVertical:9,paddingHorizontal:11,minHeight:58},kpiHi:{backgroundColor:'#FCF5ED',borderColor:'#E2C6AB'},kpiTitle:{fontSize:8.5,color:T.muted,textTransform:'uppercase',letterSpacing:0.4,fontWeight:'800'},kpiValue:{fontSize:14,fontWeight:'800',marginTop:3},
   pool:{borderWidth:1,borderColor:T.border,borderRadius:9,backgroundColor:T.surface,paddingHorizontal:14,paddingVertical:12,marginBottom:8},designTag:{backgroundColor:'#F0EDE8',paddingHorizontal:8,paddingVertical:6,borderRadius:6,borderWidth:1,borderColor:T.border},
   pill:{borderRadius:12,paddingHorizontal:7,paddingVertical:3,borderWidth:1,alignSelf:'flex-start'},mini:{backgroundColor:T.sub,borderWidth:1,borderColor:T.border,borderRadius:8,paddingVertical:6,paddingHorizontal:9,minWidth:88},miniTitle:{fontSize:8,fontWeight:'800',color:T.muted,textTransform:'uppercase',letterSpacing:0.3},miniValue:{fontSize:12,fontWeight:'700',marginTop:2},

@@ -84,6 +84,65 @@ export function SearchInput({
   );
 }
 
+
+/** Date field with a stable DD-MM-YYYY display on web and mobile. */
+export function DmyDateField({ value, onChange }: { value: Date; onChange: (date: Date) => void }) {
+  const format = (date: Date) => `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+  const [text, setText] = useState(format(value));
+  useEffect(() => setText(format(value)), [value]);
+  const commit = () => {
+    const match = text.trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    if (!match) { setText(format(value)); return; }
+    const day = Number(match[1]); const month = Number(match[2]); const year = Number(match[3]);
+    const parsed = new Date(year, month - 1, day);
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) { setText(format(value)); return; }
+    onChange(parsed);
+    setText(format(parsed));
+  };
+  const isoValue = `${String(value.getFullYear()).padStart(4, '0')}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+
+  return (
+    <View style={[st.dateField, Platform.OS === 'web' && (st.dateFieldWeb as any)]}>
+      <Icon name="calendar-today" size={17} color={T.copper} />
+      {Platform.OS === 'web' ? (
+        <>
+          {/* Keep the native browser calendar; only the visible date text is formatted DD-MM-YYYY. */}
+          <Text pointerEvents="none" style={[st.dateInput, st.dateDisplayWeb as any]} accessibilityLabel="Date (DD-MM-YYYY)">{format(value)}</Text>
+          {React.createElement('input', {
+            type: 'date',
+            value: isoValue,
+            'aria-label': 'Choose date',
+            onChange: (event: any) => {
+              const raw = event?.target?.value;
+              if (!raw) return;
+              const [year, month, day] = raw.split('-').map(Number);
+              const picked = new Date(year, month - 1, day);
+              onChange(picked);
+            },
+            style: {
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              opacity: 1,
+              color: 'transparent',
+              WebkitTextFillColor: 'transparent',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              border: 0,
+              paddingLeft: 40,
+              paddingRight: 34,
+              boxSizing: 'border-box',
+            },
+          } as any)}
+        </>
+      ) : (
+        <TextInput value={text} onChangeText={setText} onBlur={commit} placeholder="DD-MM-YYYY" placeholderTextColor={T.muted} keyboardType="numbers-and-punctuation" returnKeyType="done" onSubmitEditing={commit} style={st.dateInput} accessibilityLabel="Date (DD-MM-YYYY)" />
+      )}
+    </View>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Skeleton rows shown while a list loads                              */
 /* ------------------------------------------------------------------ */
@@ -387,6 +446,10 @@ const st = StyleSheet.create({
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null),
   },
   searchAction: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  dateField: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  dateFieldWeb: { position: 'relative', overflow: 'hidden' },
+  dateDisplayWeb: { position: 'absolute', left: 40, right: 34, top: 0, bottom: 0, height: 42, lineHeight: '42px', zIndex: 2, pointerEvents: 'none' },
+  dateInput: { flex: 1, minWidth: 0, height: 42, paddingVertical: 0, fontSize: 14, fontWeight: '600', color: T.ink, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null) },
 
   skel: {
     flexDirection: 'row',

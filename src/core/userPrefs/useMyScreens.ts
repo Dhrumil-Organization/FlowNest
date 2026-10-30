@@ -44,6 +44,8 @@ export function useMyScreens() {
   const allowedItems = useMemo<AppNavigationItem[]>(() => {
     const filtered = APP_NAVIGATION.filter((item) => {
       if (!ready) return false;
+      // MILL MODE separation: Mill Hub resources never appear in the ERP menu.
+      if (/^mill(\.|$)/i.test(String(item.resource || ''))) return false;
       return item.action && item.action !== 'view' ? canDo(item.resource, item.action) : canAccess(item.resource);
     });
     const seen = new Set<string>();

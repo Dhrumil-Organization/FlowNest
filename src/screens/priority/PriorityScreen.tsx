@@ -353,6 +353,7 @@
 //   const [dirty, setDirty] = useState(false);
 //   const [error, setError] = useState<string | null>(null);
 //   const [statusModalKey, setStatusModalKey] = useState<string | null>(null);
+  const [outwardDetailShade, setOutwardDetailShade] = useState<PriorityShade | null>(null);
 //   // View-only filter: a chart matches when any of its lots is CURRENTLY at
 //   // that status ('NONE' = has a colour/lot with no status yet). `charts`
 //   // itself is never filtered, so Self priority + save payload stay correct.
@@ -798,7 +799,7 @@
 //   return set;
 // };
 
-// const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShade }) {
+// const ShadeChip = React.memo(function ShadeChip({ shade, onPress }: { shade: PriorityShade; onPress?: () => void }) {
 //   const current = shade.Status;
 //   const colourColor = current ? STATUS_COLORS[current] : null;
 //   const reached = useMemo(() => shadeReached(shade), [shade]);
@@ -1755,6 +1756,7 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Modal,
   PanResponder,
   Platform,
   ScrollView,
@@ -1965,6 +1967,11 @@ export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
         existing.outwardLots = [...existing.outwardLots, ...outwardLots];
         existing.LotNos = Array.from(new Set(existing.outwardLots.map((l) => l.LotNo))).join('/') || existing.LotNos;
         existing.LotQty = lotsTotalQty(existing.outwardLots);
+        existing.outwards = [...(existing.outwards || []), ...(Array.isArray(sd?.outwards) ? sd.outwards.map((ow: any) => ({
+          OutwardUId: String(ow?.OutwardUId ?? ow?.outwarduid ?? ow?.uuid ?? ''), OutwardNo: ow?.OutwardNo == null ? null : String(ow.OutwardNo),
+          OutwardDate: ow?.OutwardDate ?? null, Status: normalizeStatus(ow?.Status ?? ow?.status), Details: ow?.Details ?? {},
+          lots: Array.isArray(ow?.lots) ? ow.lots : [],
+        })) : [])];
         return;
       }
 
@@ -1983,6 +1990,14 @@ export function chartsFromDyeingBrowse(rawCharts: any[]): PriorityChart[] {
         outwardLots,
         LotNos: lotNos,
         LotQty: sd?.LotQty != null && sd?.LotQty !== '' && Number(sd.LotQty) > 0 ? Number(sd.LotQty) : lotsTotalQty(outwardLots),
+        outwards: (Array.isArray(sd?.outwards) ? sd.outwards : []).map((ow: any) => ({
+          OutwardUId: String(ow?.OutwardUId ?? ow?.outwarduid ?? ow?.uuid ?? ''),
+          OutwardNo: ow?.OutwardNo == null ? null : String(ow.OutwardNo),
+          OutwardDate: ow?.OutwardDate ?? null,
+          Status: normalizeStatus(ow?.Status ?? ow?.status),
+          Details: ow?.Details ?? {},
+          lots: Array.isArray(ow?.lots) ? ow.lots : [],
+        })),
       });
     });
 
@@ -2057,6 +2072,7 @@ export function PriorityScreen({ perms }: { perms: PriorityPerms }) {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusModalKey, setStatusModalKey] = useState<string | null>(null);
+  const [outwardDetailShade, setOutwardDetailShade] = useState<PriorityShade | null>(null);
   // View-only filter: a chart matches when any of its lots is CURRENTLY at
   // that status ('NONE' = has a colour/lot with no status yet). `charts`
   // itself is never filtered, so Self priority + save payload stay correct.
@@ -2373,6 +2389,7 @@ export function PriorityScreen({ perms }: { perms: PriorityPerms }) {
           canEdit={dragEnabled}
           onReorder={reorderCharts}
           onOpenStatus={setStatusModalKey}
+          onOpenShade={setOutwardDetailShade}
         />
       ) : (
         <View style={s.center}>
@@ -2396,6 +2413,42 @@ export function PriorityScreen({ perms }: { perms: PriorityPerms }) {
         onClose={() => setStatusModalKey(null)}
         onSaved={handleStatusSaved}
       />
+      {/* Outwards of a tapped shade chip: one compact row per outward — number, status strip (S D F J ✂), lots */}
+      <Modal visible={!!outwardDetailShade} transparent animationType="fade" onRequestClose={() => setOutwardDetailShade(null)}>
+        <View style={s.owOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setOutwardDetailShade(null)} />
+          <View style={s.owCard}>
+            <View style={s.owHead}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.owTitle} numberOfLines={1}>{outwardDetailShade?.ShdName || 'Shade'} · Outwards</Text>
+                {!!outwardDetailShade?.ShdCode && <Text style={s.owSub}>Code {outwardDetailShade.ShdCode}</Text>}
+              </View>
+              <TouchableOpacity onPress={() => setOutwardDetailShade(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.owClose}>
+                <Icon name="close" size={20} color={T.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={s.owList} contentContainerStyle={s.owListContent} showsVerticalScrollIndicator={false}>
+              {(outwardDetailShade?.outwards || []).length ? outwardDetailShade!.outwards!.map((ow, i) => {
+                const { reached, current } = singleOutwardReach(ow);
+                const color = current ? STATUS_COLORS[current] : T.muted;
+                const lots = Array.from(new Set((ow.lots || []).map((lot: any) => String(lot?.LotNo ?? '').trim()).filter(Boolean))).join(' / ');
+                return (
+                  <View key={`${ow.OutwardUId}-${i}`} style={[s.owRow, current ? { borderColor: color } : null]}>
+                    <View style={s.owRowTop}>
+                      <Text style={s.owNo} numberOfLines={1}>{ow.OutwardNo || '—'}</Text>
+                      <Text style={[s.owStatus, { color }]} numberOfLines={1}>{current ?? 'Not started'}</Text>
+                    </View>
+                    <View style={s.owRowBottom}>
+                      <StatusLetters reached={reached} currents={new Set<ShadeStatus>(current ? [current] : [])} />
+                      {!!lots && <Text style={s.owLots} numberOfLines={1}>Lot {lots}</Text>}
+                    </View>
+                  </View>
+                );
+              }) : <Text style={s.owEmpty}>No outward details available for this shade.</Text>}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2491,7 +2544,66 @@ function StatusLegend({
 
 const CHIP_STATUSES: ShadeStatus[] = ['Sent for job', 'Dying', 'Finish', 'Job inward', 'Lorry Cut'];
 
+// OUTWARD-WISE highlight. API shape:  shade → outwards[] → lots[] → history[]
+// A status lights up when it appears in the history of a lot of ANY outward of
+// the shade. The ring (current) is each outward's OWN latest status — so two
+// outwards at Finish and Sent for job light S D F and ring S and F.
+// Shades without outwards (old rows) keep the old shade → lots → history logic.
+type OutwardItem = NonNullable<PriorityShade['outwards']>[number];
+
+// ONE outward: statuses found in the history of its lots (+ lot / outward status).
+// `current` = the outward's own latest status.
+const singleOutwardReach = (ow: OutwardItem): { reached: Set<ShadeStatus>; current: ShadeStatus | null } => {
+  const reached = new Set<ShadeStatus>();
+  let latest: ShadeStatus | null = null; // latest history status (fallback for ow.Status)
+  (ow.lots || []).forEach((lot: any) => {
+    (Array.isArray(lot?.history) ? lot.history : []).forEach((e: any) => {
+      const st = normalizeStatus(e?.Status);
+      if (st) { reached.add(st); latest = st; }
+    });
+    const lotStatus = normalizeStatus(lot?.Status);
+    if (lotStatus) reached.add(lotStatus);
+  });
+  const current: ShadeStatus | null = normalizeStatus(ow.Status) ?? latest;
+  if (current) reached.add(current);
+  return { reached, current };
+};
+
+const outwardReach = (shade: PriorityShade): { reached: Set<ShadeStatus>; currents: Set<ShadeStatus> } => {
+  const reached = new Set<ShadeStatus>();
+  const currents = new Set<ShadeStatus>();
+  (shade.outwards || []).forEach((ow) => {
+    const one = singleOutwardReach(ow);
+    one.reached.forEach((st) => reached.add(st));
+    if (one.current) currents.add(one.current);
+  });
+  return { reached, currents };
+};
+
+/** The S D F J ✂ strip — same look on the card chip and in the outward modal. */
+const StatusLetters = ({ reached, currents }: { reached: Set<ShadeStatus>; currents: Set<ShadeStatus> }) => (
+  <View style={s.letterRow}>
+    {CHIP_STATUSES.map((option) => {
+      const done = reached.has(option);
+      const isCurrent = currents.has(option);
+      return (
+        <View
+          key={option}
+          style={[
+            s.lotLetter,
+            done ? { backgroundColor: STATUS_COLORS[option] } : s.letterOff,
+            isCurrent && { borderWidth: 1.5, borderColor: T.ink },
+          ]}
+        >
+          <Text style={[s.lotLetterText, !done && s.letterOffText]}>{STATUS_LETTER[option]}</Text>
+        </View>
+      );
+    })}
+  </View>
+);
+
 const shadeReached = (shade: PriorityShade): Set<ShadeStatus> => {
+  if (shade.outwards?.length) return outwardReach(shade).reached;
   const set = new Set<ShadeStatus>();
   (shade.colourHistory || []).forEach((e) => set.add(e.Status));
   shade.lots.forEach((lot) => {
@@ -2502,47 +2614,33 @@ const shadeReached = (shade: PriorityShade): Set<ShadeStatus> => {
   return set;
 };
 
-const ShadeChip = React.memo(function ShadeChip({ shade }: { shade: PriorityShade }) {
+const ShadeChip = React.memo(function ShadeChip({ shade, onPress }: { shade: PriorityShade; onPress?: () => void }) {
   const current = shade.Status;
   const colourColor = current ? STATUS_COLORS[current] : null;
   const reached = useMemo(() => shadeReached(shade), [shade]);
+  // ring: each outward's own current status (outward mode) / the shade's status (old rows)
+  const currents = useMemo(
+    () => (shade.outwards?.length ? outwardReach(shade).currents : new Set<ShadeStatus>(current ? [current] : [])),
+    [shade, current],
+  );
   const cuts = shade.lots.reduce((sum, lot) => sum + lot.LorryCutCount, 0);
   const lotNos = shade.LotNos || Array.from(new Set(shade.lots.map((l) => l.LotNo).filter(Boolean))).join('/');
   return (
-    <View
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={[
         s.chip,
         colourColor ? { borderColor: colourColor, backgroundColor: `${colourColor}12` } : null,
       ]}
     >
       <Text style={s.chipText} numberOfLines={1}>{shade.ShdName}</Text>
-      <View style={s.letterRow}>
-        {CHIP_STATUSES.map((option) => {
-          const done = reached.has(option);
-          const isCurrent = current === option;
-          const color = STATUS_COLORS[option];
-          return (
-            <View
-              key={option}
-              style={[
-                s.lotLetter,
-                done ? { backgroundColor: color } : s.letterOff,
-                isCurrent && { borderWidth: 1.5, borderColor: T.ink },
-              ]}
-            >
-              {/* <Text style={[s.lotLetterText, !done && s.letterOffText]}>{STATUS_LETTER[option]}</Text> */}
-              <Text style={[s.lotLetterText, !done && s.letterOffText]}>{STATUS_LETTER[option]}</Text>
-            </View>
-          );
-        })}
-      </View>
+      <StatusLetters reached={reached} currents={currents} />
       {/* {!!lotNos && (
         <Text style={[s.lotNoText, { color: colourColor || T.muted }]} numberOfLines={1}>
           L·{lotNos}{shade.LotQty != null ? ` · ${qtyLabel(shade.LotQty)} m` : ''}
         </Text>
       )} */}
       {cuts > 1 && <Text style={s.cutText}>✂{cuts}</Text>}
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -2628,6 +2726,8 @@ type ChartCardProps = {
   /** This is the floating copy that follows the finger. */
   isFloating: boolean;
   onOpenStatus: (chartKey: string) => void;
+  /** shade chip tap -> opens that shade's outward details */
+  onOpenShade: (shade: PriorityShade) => void;
 };
 
 const ChartCard = React.memo(function ChartCard({
@@ -2639,6 +2739,7 @@ const ChartCard = React.memo(function ChartCard({
   isPlaceholder,
   isFloating,
   onOpenStatus,
+  onOpenShade,
 }: ChartCardProps) {
   // Slide to make room for the dragged card. Animated only while a drag is
   // active; when the drag ends the transform is dropped at once, so the
@@ -2757,7 +2858,7 @@ const ChartCard = React.memo(function ChartCard({
               contentContainerStyle={s.chipScrollContent}
             >
               {chart.shades.map((shade, si) => (
-                <ShadeChip key={`${shade.ShdCode || shade.ShdName}-${shade.OrderSrNo}-${si}`} shade={shade} />
+                <ShadeChip key={`${shade.ShdCode || shade.ShdName}-${shade.OrderSrNo}-${si}`} shade={shade} onPress={() => onOpenShade(shade)} />
               ))}
             </ScrollView>
           </View>
@@ -2773,7 +2874,8 @@ const ChartCard = React.memo(function ChartCard({
   prev.dragActive === next.dragActive &&
   prev.isPlaceholder === next.isPlaceholder &&
   prev.isFloating === next.isFloating &&
-  prev.onOpenStatus === next.onOpenStatus,
+  prev.onOpenStatus === next.onOpenStatus &&
+  prev.onOpenShade === next.onOpenShade,
 );
 
 /* ---------------------------------------------------------------------- */
@@ -2787,11 +2889,13 @@ function ChartList({
   canEdit,
   onReorder,
   onOpenStatus,
+  onOpenShade,
 }: {
   charts: PriorityChart[];
   canEdit: boolean;
   onReorder: (fromIndex: number, toIndex: number, list: PriorityChart[]) => void;
   onOpenStatus: (chartKey: string) => void;
+  onOpenShade: (shade: PriorityShade) => void;
 }) {
   const listRef = useRef<FlatList<PriorityChart>>(null);
   const stripRef = useRef<View>(null);
@@ -3088,9 +3192,10 @@ function ChartList({
         isPlaceholder={index === dragFrom}
         isFloating={false}
         onOpenStatus={onOpenStatus}
+        onOpenShade={onOpenShade}
       />
     );
-  }, [charts, dragFrom, dragTo, canEdit, onOpenStatus]);
+  }, [charts, dragFrom, dragTo, canEdit, onOpenStatus, onOpenShade]);
 
   const floatingChart = dragState ? charts[dragState.fromIndex] : null;
   const floatingValid = !!floatingChart && floatingChart.key === dragState?.key;
@@ -3169,6 +3274,7 @@ function ChartList({
                 isPlaceholder={false}
                 isFloating
                 onOpenStatus={onOpenStatus}
+                onOpenShade={onOpenShade}
               />
             </Animated.View>
           ) : null}
@@ -3414,6 +3520,27 @@ const s = StyleSheet.create({
   letterRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   letterOff: { backgroundColor: T.alt, borderWidth: 1, borderColor: T.border },
   letterOffText: { color: '#BDB6AE' },
+
+  // --- outward modal (centered card: full width on phones, max 420 on web) ---
+  owOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  owCard: {
+    width: '100%', maxWidth: 420, maxHeight: '75%',
+    backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border,
+    paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12,
+  },
+  owHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  owTitle: { color: T.ink, fontSize: 15, fontWeight: '900' },
+  owSub: { color: T.muted, fontSize: 10.5, fontWeight: '600', marginTop: 1 },
+  owClose: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: T.sub },
+  owList: { flexGrow: 0 },
+  owListContent: { gap: 8 },
+  owRow: { borderWidth: 1, borderColor: T.border, borderRadius: 10, backgroundColor: T.sub, paddingHorizontal: 10, paddingVertical: 8 },
+  owRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  owNo: { flex: 1, minWidth: 0, color: T.ink, fontSize: 12.5, fontWeight: '900' },
+  owStatus: { fontSize: 11, fontWeight: '800' },
+  owRowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6 },
+  owLots: { flexShrink: 1, color: T.muted, fontSize: 10.5, fontWeight: '700' },
+  owEmpty: { color: T.muted, fontSize: 12, paddingVertical: 14, textAlign: 'center' },
   cutText: { fontSize: 9.5, fontWeight: '900', color: T.purple },
 
   draggingCard: {

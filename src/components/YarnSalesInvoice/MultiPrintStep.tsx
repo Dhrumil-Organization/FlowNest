@@ -3,14 +3,14 @@
 //   Property, Year, Store, Print Type, From / To Date, and right under the dates the Multi Print form
 //   (Sales A/c, Voucher No, Party, Print Format) with the Print button. Print -> PDF screen.
 import { AppAlert } from '@/common/utils/appAlert';
-import { Card, DateField, PickField } from '@/src/components/erpUi';
+import { Card, PickField } from '@/src/components/erpUi';
 import { T } from '@/src/theme';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fetchPropertyData, fetchStores } from './api';
 import { buildYearOptions, financialYearDates, Row, storeCode, storeName, TXN_OPTIONS, txnLabel } from './model';
 import MultiPrintForm from './MultiPrintForm';
-import { CONTENT, PickerSheet } from './ui';
+import { CONTENT, DmyDateField, PickerSheet } from './ui';
 
 type Props = { token: string; API: string; onOpenPdf: (pdfUrl: string, title: string) => void };
 
@@ -119,11 +119,11 @@ export default function MultiPrintStep({ token, API, onOpenPdf }: Props) {
           <View style={st.dateRow}>
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={st.label}>From Date</Text>
-              <DateField value={fromDate} onChange={setFromDate} />
+              <DmyDateField value={fromDate} onChange={setFromDate} />
             </View>
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={st.label}>To Date</Text>
-              <DateField value={toDate} onChange={setToDate} />
+              <DmyDateField value={toDate} onChange={setToDate} />
             </View>
           </View>
           <MultiPrintForm

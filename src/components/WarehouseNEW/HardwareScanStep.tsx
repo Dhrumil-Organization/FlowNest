@@ -11,7 +11,7 @@
 import { T } from '@/src/theme';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { cleanScannerValue, findIndexedQrMatch, indexCartonRow, QrIndex, ScanParams } from './model';
+import { cleanScannerValue, findIndexedQrMatch, indexCartonRow, QrIndex, ScanParams, searchScanMatch } from './model';
 import { ScanLayout, StagePill, useScanSession } from './scanShared';
 import { useUrovoScanner } from './useUrovoScanner';
 
@@ -35,6 +35,10 @@ export default function HardwareScanStep({ params, onClose }: Props) {
   const processScan = (value: any) => {
     const rawInput = cleanScannerValue(value);
     if (!rawInput) return;
+    if (mode === 'SEARCH') {
+      session.applyMatch(searchScanMatch(rawInput));
+      return;
+    }
     session.applyMatch(findIndexedQrMatch(qrIdentityIndex, rawInput));
   };
 
@@ -123,7 +127,7 @@ export default function HardwareScanStep({ params, onClose }: Props) {
         accessibilityLabel="Hardware scanner input"
       />
       <ScanLayout
-        title={mode === 'TRANSFER' ? 'Transfer Scan' : 'Assign Scan'}
+        title={mode === 'SEARCH' ? 'Search Scan' : mode === 'TRANSFER' ? 'Transfer Scan' : 'Assign Scan'}
         hint="Press orange trigger button"
         session={session}
         onClose={onClose}

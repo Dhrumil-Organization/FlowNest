@@ -29,7 +29,8 @@
 //   POST /api/getcartondetail                Assign "LOAD DATA"
 //   POST /api/master_crud                    Transfer "To Location" list (browse_data)
 //   POST /api/prodwarehousemanage            action 'view' (View + Transfer LOAD DATA),
-//                                            'assign' (SAVE ASSIGN), 'transfer' (SAVE TRANSFER)
+//                                            'assign' (SAVE ASSIGN), 'transfer' (SAVE TRANSFER),
+//                                            'search' (Dashboard "Search cartons")
 // AsyncStorage keys: 'user_prptype' (read), 'get_property' (read + write).
 //
 // Navigation: legacy `navigation.navigate(name, params)` / `goBack()` is a local
@@ -151,12 +152,15 @@ export default function WarehouseNEW({ token, API, userid }: Props) {
       case 'dashboard':
         return (
           <DashboardStep
+            token={token}
+            API={API}
             criteria={entry.params?.criteria || {}}
             dashboardData={entry.params?.dashboardData || []}
             onBack={goBack}
             onOpen={(params: LocationParams) =>
               navigate(params.mode === 'ASSIGN' ? 'assign' : params.mode === 'TRANSFER' ? 'transfer' : 'view', params)
             }
+            onOpenScanner={openScanner}
           />
         );
       case 'assign':

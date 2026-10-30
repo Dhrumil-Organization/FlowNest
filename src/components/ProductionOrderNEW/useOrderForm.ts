@@ -50,6 +50,10 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
   const [selfGreigeQtyInput, setSelfGreigeQtyInput] = useState('');
   const [selfFinishedCost, setSelfFinishedCost] = useState('');
   const [selfGreigeCost, setSelfGreigeCost] = useState('');
+  // Keep selling rate independent for each Stock & sell fabric tab.
+  const [selfFinishedSellingRate, setSelfFinishedSellingRate] = useState('');
+  const [selfGreigeSellingRate, setSelfGreigeSellingRate] = useState('');
+  const [salesSellingRate, setSalesSellingRate] = useState('');
   const [shrinkage, setShrinkage] = useState('0');
   const [greigeRate, setGreigeRate] = useState('0');
   // Sourcing (review step): in-house + job workers + greige purchase, all greige metres.
@@ -173,6 +177,11 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       setBaseQtyInput(String(meta.base_qty || m.orderqty || ''));
       if (src === 'self') setSelfGreigeQtyInput(String(m.totqty || ''));
       setShrinkage(String(m.shkperc || 0)); setGreigeRate(String(m.greyrate || 0));
+      const savedSellingRate = firstValue(m.sellingrate, m.selling_rate, data.sellingrate, data.selling_rate, meta.sellingrate, meta.selling_rate, '');
+      setSalesSellingRate(src === 'sales' ? String(savedSellingRate ?? '') : '');
+      // The API stores the active tab's rate in sellingrate; restore it only to that tab.
+      setSelfFinishedSellingRate(fab === 'Finish' ? String(savedSellingRate ?? '') : '');
+      setSelfGreigeSellingRate(fab === 'Greige' ? String(savedSellingRate ?? '') : '');
       const sm = Number(meta.stock_meters || 0);
       if (sm > 0) { setStockMeters(String(sm)); setStockMetersTouched(true); }
       const sourcing = sourcingFromRows(data.d12 || [], data.d13 || []);
@@ -505,7 +514,9 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
       finished_rate: sourceMode === 'self' && !selfDesign.dsncode && p.fabricType === 'Finish' ? Number(selfFinishedCost || 0) : undefined,
       manual_stock_sell: sourceMode === 'self' && !selfDesign.dsncode ? 1 : 0,
       manual_greige_qty: sourceMode === 'self' ? Number(p.selfArtifactGreigeQty || 0) : 0,
-      selling_rate: sourceMode === 'sales' ? Number(p.weightedRate || 0) : 0,
+      selling_rate: sourceMode === 'sales' ? Number(salesSellingRate || p.weightedRate || 0) : Number((p.fabricType === 'Greige' ? selfGreigeSellingRate : selfFinishedSellingRate) || 0),
+      sellingrate: sourceMode === 'sales' ? Number(salesSellingRate || p.weightedRate || 0)
+        : Number((p.fabricType === 'Greige' ? selfGreigeSellingRate : selfFinishedSellingRate) || 0),
       // Sourcing. qty = greige metres (prodorderjob.Qty); rate fields are stored by the Laravel patch.
       job_rows: p.jobRows,
       purchase_rows: p.purchaseRows,
@@ -565,6 +576,9 @@ export default function useOrderForm({ api, ctx, mode, uid }: { api: Api; ctx: C
     selectedOrders, toggleOrder, setOrderQty, selfDesign, setSelfDesign,
     baseQtyInput, setBaseQtyInput, selfGreigeQtyInput, setSelfGreigeQtyInput,
     selfFinishedCost, setSelfFinishedCost, selfGreigeCost, setSelfGreigeCost,
+    selfFinishedSellingRate, setSelfFinishedSellingRate,
+    selfGreigeSellingRate, setSelfGreigeSellingRate,
+    salesSellingRate, setSalesSellingRate,
     stockMeters, setStockMeters: (v: string) => { setStockMetersTouched(true); setStockMeters(v); }, stockMetersTouched,
     poOwners, poOwnerCode, setPoOwnerCode, ownerLoading,
     jobList, addJob, updateJob, removeJob, purchaseList, addPurchase, updatePurchase, removePurchase,

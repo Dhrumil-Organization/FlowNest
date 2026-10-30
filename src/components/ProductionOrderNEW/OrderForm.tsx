@@ -154,6 +154,13 @@ function SalesSection({ f, narrow }: { f: Row; narrow: boolean }) {
               <NumInput value={f.stockMetersTouched ? f.stockMeters : '0'} editable={!f.readOnly}
                 onChangeText={(v) => f.setStockMeters(digitsOnly(v))} style={{ width: 110 }} />
             </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, marginBottom: 9 }}>
+              <Text style={{ flex: 1, fontSize: 12, color: T.ink }}>Selling rate (₹/m)</Text>
+              <View style={{ width: 110 }}>
+                <NumInput value={f.salesSellingRate} placeholder="0" editable={!f.readOnly}
+                  onChangeText={(v) => f.setSalesSellingRate(decimalOnly(v))} />
+              </View>
+            </View>
             <ExecPick f={f} hint="Owner of this PO in the design's monthly pool — sale lines follow their own SO's executive; the stock portion is tracked against the owner." />
           </Card>
 
@@ -204,6 +211,11 @@ function SelfSection({ f, narrow }: { f: Row; narrow: boolean }) {
           onChangeText={(v) => (f.selfFabricType === 'Greige' ? f.setBaseQtyInput : f.setSelfGreigeQtyInput)(digitsOnly(v))} />)}
         {!f.selfDesign.dsncode && f.selfFabricType === 'Finish' ? row('Finished costing (₹/m)', <NumInput value={f.selfFinishedCost} editable={!f.readOnly} onChangeText={(v) => f.setSelfFinishedCost(decimalOnly(v))} />) : null}
         {!f.selfDesign.dsncode && f.selfFabricType === 'Greige' ? row('Greige costing (₹/m)', <NumInput value={f.selfGreigeCost} editable={!f.readOnly} onChangeText={(v) => f.setSelfGreigeCost(decimalOnly(v))} />) : null}
+        {row('Selling rate (₹/m)', <NumInput
+          value={f.selfFabricType === 'Greige' ? f.selfGreigeSellingRate : f.selfFinishedSellingRate}
+          placeholder="0" editable={!f.readOnly}
+          onChangeText={(v) => (f.selfFabricType === 'Greige' ? f.setSelfGreigeSellingRate : f.setSelfFinishedSellingRate)(decimalOnly(v))}
+        />)}
         {f.selfDesign.dsncode && f.selfFabricType === 'Finish' ? <Muted>Auto greige (from {Number(p.selfGf).toFixed(2)}% shrink): {fmt(p.selfAutoGreigeQty)} m — override above if needed.</Muted> : null}
         {!f.selfDesign.dsncode && f.selfFabricType === 'Finish' ? <Muted>Finished fabric — only finished costing is needed. Greige cost is derived internally.</Muted> : null}
         <ExecPick f={f} hint="Stock PO — tracked in the design's monthly pool against this executive; a sale later needs an SO, a job outward needs this PO." />

@@ -20,6 +20,7 @@ type Envelope = { success: boolean; response?: { data?: ExpenseDashboardData } |
 export async function fetchExpenseDashboardCard(args: {
     token: string; prptype?: string; yearno: number | string; monthno: number | string;
     date?: string; refresh?: boolean; prpcodes?: string[] | string;
+    demo?: boolean; // Expense report "Dummy test mode" (server: ExpenseMonthCloseService::DEMO_ENABLED)
 }): Promise<ExpenseDashboardData> {
     if (!String(args.token || '').trim()) throw new Error('Authentication token is missing.');
     try {
@@ -44,6 +45,7 @@ export async function fetchExpenseDashboardCard(args: {
                 date: args.date || undefined,
                 refresh: args.refresh ? 1 : 0,
                 prpcodes: args.prpcodes || [],
+                ...(args.demo ? { demo: 1 } : {}),
             },
             timeout: 30000,
         });

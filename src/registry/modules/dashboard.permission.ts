@@ -37,6 +37,9 @@ registerPermissionArea({
         { key: 'monthly_report', name: 'Monthly Report', type: 'report', displayOrder: 10, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
         { key: 'sales_analysis', name: 'Sales Analysis', type: 'report', displayOrder: 20, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
         { key: 'collection_analysis', name: 'Collection Analysis', type: 'report', displayOrder: 30, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
+        // Reports → Expense & Production (ExpenseScreen). Freeze = lock a finished month after its
+        // actuals are applied (Monthly adjustment & freeze). Unfreeze / delete is only for user id 1.
+        { key: 'expense', name: 'Expense & Production', type: 'report', displayOrder: 35, actions: [{ key: 'freeze', name: 'Freeze month' }] },
         {
           key: 'production_report', name: 'Production Report', type: 'report', displayOrder: 40,
           actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }],

@@ -394,9 +394,74 @@ export function legacyMonth(mEntry, d) {
   };
 }
 
-/** A/B month that is not the ongoing one (closed / earlier A/B months) */
+/* ------------------------------------------------------------------ */
+/*  Monthly adjustment & freeze (artifact xScaleToTotal / xRecorded /  */
+/*  xAdjCalc / xEffective) — Section A + B only, no Finish department  */
+/* ------------------------------------------------------------------ */
+/** scale a column to an exact total (largest remainder — the parts add up exactly) */
+export const xScaleToTotal = (vals, target) => {
+  const tot = vals.reduce((s, v) => s + (+v || 0), 0);
+  if (!(tot > 0) || !(target >= 0)) return vals.map((v) => +v || 0);
+  const raw = vals.map((v) => ((+v || 0) * target) / tot), fl = raw.map(Math.floor);
+  let rem = Math.round(target) - fl.reduce((s, v) => s + v, 0);
+  raw.map((r, i) => [r - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rem > 0) { fl[i]++; rem--; } });
+  return fl;
+};
+/** what the ERP recorded for the month: kWh, electricity ₹ (day kWh × day rate), salary A + B */
+export function xRecorded(exp) {
+  const u = xSumUnits(exp.dailyUnits);
+  const units = XUKEYS.reduce((s, k) => s + u[k], 0);
+  let elec = 0;
+  (exp.dailyUnits || []).forEach((r) => { const el = xDayElec(r, exp); XUKEYS.forEach((k) => (elec += el.e(k))); });
+  const fromDays = (exp.dailySalary || []).length > 0;
+  const S = fromDays ? xSumSal(exp.dailySalary) : { A: num(exp.salaryErp && exp.salaryErp.A), B: num(exp.salaryErp && exp.salaryErp.B) };
+  return { units, elec, salary: S.A + S.B, salA: S.A, salB: S.B, rate: units > 0 ? elec / units : num(exp.rate), byMeter: u, salaryFromDays: fromDays };
+}
+/** the reconciliation: the rate follows the actual bill, the salary follows the actual total */
+export function xAdjCalc(exp, a) {
+  const rec = xRecorded(exp);
+  const units = rec.units;
+  const hasElec = +(a && a.elec) > 0, hasSal = +(a && a.salary) > 0;
+  const elec = hasElec ? +a.elec : rec.elec;
+  const salary = hasSal ? Math.round(+a.salary) : rec.salary;
+  const rate = hasElec && units > 0 ? elec / units : rec.rate;
+  return { units, elec, salary, rate, hasElec, hasSal, unitF: 1, salF: rec.salary > 0 ? salary / rec.salary : 1, rec };
+}
+/** the month as every reader sees it: day rows re-rated / scaled to the adjustment, adding up exactly */
+export function xEffective(exp, adj) {
+  if (!exp || !adj) return exp;
+  const out = { ...exp };
+  if (adj.hasElec) { out.rate = adj.rate; out.rateEdited = true; }
+  if (adj.hasSal) {
+    const rec = adj.rec;
+    const tA = rec.salary > 0 ? Math.round((adj.salary * rec.salA) / rec.salary) : Math.round(adj.salary / 2), tB = adj.salary - tA;
+    if (rec.salaryFromDays) {
+      const colA = xScaleToTotal(exp.dailySalary.map((r) => +r.A || 0), tA);
+      const colB = xScaleToTotal(exp.dailySalary.map((r) => +r.B || 0), tB);
+      out.dailySalary = exp.dailySalary.map((r, i) => ({ ...r, A: colA[i], B: colB[i] }));
+    } else {
+      out.salaryErp = { A: tA, B: tB };
+    }
+  }
+  return out;
+}
+/** month_close (Sudamo ExpMonthClose) -> the adjustment of that month, or null */
+export function xCloseAdj(exp, mc) {
+  if (!mc || !mc.actuals) return null;
+  const a = { elec: mc.actuals.elec, salary: mc.actuals.salary };
+  if (!(+a.elec > 0) && !(+a.salary > 0)) return null;
+  return xAdjCalc(exp, a);
+}
+
+/** A/B month that is not the ongoing one (closed / earlier A/B months) — with its adjustment / freeze */
 export function abMonth(mEntry, d) {
-  return xCurrent(buildExp(mEntry, d, null));
+  const exp = buildExp(mEntry, d, null);
+  const mc = d && d.month_close;
+  const adj = xCloseAdj(exp, mc);
+  const mo = xCurrent(adj ? xEffective(exp, adj) : exp);
+  mo.adjusted = !!adj;
+  mo.frozen = mc && mc.status === 'frozen' ? (mc.frozen || { at: null, by: '' }) : null;
+  return mo;
 }
 
 /* ------------------------------------------------------------------ */

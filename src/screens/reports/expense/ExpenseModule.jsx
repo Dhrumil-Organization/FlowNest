@@ -8,6 +8,7 @@ import { Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from '
 import {
   T, XC, makeXSEC, makeXU_CARDS, makeXU_METERS, xClosedRates, xCr, xCurrent, xDailySeries, xDayKwhAB, xK0, xM, xPc,
   xR2, xR3, xR4, xSectionMTD, xUtilDaily, xUtilMeters, XUKEYS, xGroupHeads,
+  xAdjCalc, xDayElec, xEffective, xRecorded,
 } from './xCalc';
 import { card, DefaultTip, Grid, hbuzz, MONO, PremiumTip, Sheet, XChart, XDonut, XKPI, XSection, XSecTag, XStat } from './xUi';
 
@@ -574,9 +575,265 @@ function DailyRWCModule({ title, note, color, rows, counts, setCell, addDay, clo
 }
 
 /* ------------------------------------------------------------------ */
+/*  Monthly adjustment & freeze (artifact XAdjustSection)              */
+/*  Section A + B only. Saved on the server (Sudamo ExpMonthClose).    */
+/*  Freeze: Expense · Freeze right. Unfreeze / delete: user id 1 only. */
+/* ------------------------------------------------------------------ */
+const fmtD = (d) => {
+  if (!d) return '—';
+  const s = String(d);
+  const t = new Date(s.length === 10 ? `${s}T00:00:00` : s.replace(' ', 'T'));
+  return Number.isNaN(t.getTime()) ? s : t.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+const ACT_TXT = { apply: 'Actuals applied', clear: 'Actuals cleared', freeze: 'Frozen', unfreeze: 'Unfrozen', delete: 'Version deleted' };
+
+function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
+  const fz = mc.status === 'frozen', has = !!mc.actuals;
+  const actE = has && mc.actuals.elec ? String(mc.actuals.elec) : '';
+  const actS = has && mc.actuals.salary ? String(mc.actuals.salary) : '';
+  const [ae, setAe] = useState(actE);
+  const [as, setAs] = useState(actS);
+  useEffect(() => { setAe(actE); setAs(actS); }, [mc.version, actE, actS]);
+  const [arm, setArm] = useState(null);
+  const armT = useRef(null);
+  useEffect(() => () => clearTimeout(armT.current), []);
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState('');
+  const [reason, setReason] = useState('');
+  const [rows, setRows] = useState(false);
+  const [hist, setHist] = useState(null);
+  const [histOpen, setHistOpen] = useState(false);
+
+  const rec = useMemo(() => xRecorded(md), [md]);
+  const prev = useMemo(() => xAdjCalc(md, { elec: ae, salary: as }), [md, ae, as]);
+  const eff = useMemo(() => xEffective(md, prev), [md, prev]);
+  const dirty = !fz && (ae !== '' || as !== '') && (!has || +ae !== +(mc.actuals.elec || 0) || +as !== +(mc.actuals.salary || 0));
+
+  const run = async (action, body) => {
+    hbuzz(9);
+    setBusy(action); setErr(''); setArm(null);
+    try {
+      await onAct(action, body || {});
+      if (action === 'unfreeze' || action === 'delete') setReason('');
+      if (histOpen) setHist(null);
+    } catch (e) {
+      setErr((e && e.message) || 'Could not save.');
+    } finally {
+      setBusy(null);
+    }
+  };
+  const twoTap = (key, fn) => {
+    hbuzz(9);
+    if (arm === key) { clearTimeout(armT.current); fn(); return; }
+    setArm(key);
+    clearTimeout(armT.current);
+    armT.current = setTimeout(() => setArm(null), 5000);
+  };
+  const apply = () => run('apply', {
+    elec: +ae > 0 ? +ae : null, salary: +as > 0 ? +as : null,
+    rec_units: rec.units, rec_elec: Math.round(rec.elec * 100) / 100, rec_salary: Math.round(rec.salary * 100) / 100,
+    rec_salary_a: Math.round(rec.salA * 100) / 100, rec_salary_b: Math.round(rec.salB * 100) / 100, rec_rate: rec.rate,
+  });
+  const loadHist = async () => {
+    const next = !histOpen;
+    setHistOpen(next);
+    if (!next || hist) return;
+    try {
+      const r = await onAct('state', {});
+      setHist((r && r.history) || { versions: [], log: [] });
+    } catch (e) {
+      setHist({ versions: [], log: [], error: (e && e.message) || 'Could not load the history.' });
+    }
+  };
+
+  const lab = { fontSize: 8.5, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: '800' };
+  const inpS = { width: '100%', paddingVertical: 8, paddingHorizontal: 9, fontSize: 13, fontFamily: MONO, textAlign: 'right', borderWidth: 1, borderColor: T.border, borderRadius: 8, backgroundColor: fz ? T.alt : '#fff', color: T.ink };
+  const fmtU = (n) => `${xK0(n)} kWh`;
+  const kcol = (title, recTxt, recV, val, setVal, actTxt, unit, hint) => (
+    <View style={[card, { paddingVertical: 10, paddingHorizontal: 12, flex: 1, minWidth: 170 }]}>
+      <Text style={lab}>{title}</Text>
+      {hint ? <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 2, lineHeight: 12.5 }}>{hint}</Text> : null}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
+        <Text style={{ fontSize: 10.5, color: T.muted }}>Recorded</Text>
+        <Text style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: '800', color: T.ink }}>{recTxt}</Text>
+      </View>
+      <Text style={{ fontSize: 9, color: T.muted, marginTop: 8, marginBottom: 3, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 }}>Actual{unit ? ` · ${unit}` : ''}</Text>
+      {fz
+        ? <Text style={{ fontFamily: MONO, fontSize: 14, fontWeight: '800', color: T.ink }}>{actTxt}</Text>
+        : <TextInput value={val} onChangeText={(t) => setVal(t.replace(/[^0-9.]/g, ''))} placeholder={String(Math.round(+recV || 0))} placeholderTextColor={T.muted} keyboardType="decimal-pad" inputMode="decimal" editable={!busy} style={inpS} />}
+    </View>
+  );
+  const btn = (txt, on, primary, disabled, danger) => (
+    <Pressable key={txt} onPress={disabled ? undefined : on} disabled={!!disabled}
+      style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 9, borderWidth: primary ? 0 : 1, borderColor: danger ? T.red + '66' : T.border, backgroundColor: disabled ? T.alt : primary ? (danger ? T.red : T.nav) : T.surface }}>
+      <Text style={{ fontSize: 12, fontWeight: '800', color: disabled ? T.muted : primary ? '#fff' : danger ? T.red : T.copper }}>{txt}</Text>
+    </Pressable>
+  );
+  const factor = (f) => `×${(+f || 1).toFixed(3)}`;
+  const B = (t, c) => <Text style={{ fontFamily: MONO, fontWeight: '800', color: c || T.ink }}>{t}</Text>;
+  const prevTxt = mc.previous
+    ? `v${mc.previous.version}${mc.previous.status === 'frozen' ? ` · frozen ${fmtD(mc.previous.frozen_at)}` : ''}`
+    : 'the recorded figures';
+
+  /* day-wise rows: recorded -> adjusted */
+  const dayRows = useMemo(() => {
+    const by = {};
+    const put = (d, ymd) => { if (!by[d]) by[d] = { d, ymd: ymd || 0 }; return by[d]; };
+    (md.dailyUnits || []).forEach((r, i) => {
+      const x = put(r.d, r.ymd);
+      const e0 = xDayElec(r, md), e1 = xDayElec(eff.dailyUnits[i] || r, eff);
+      x.u = XUKEYS.reduce((s, k) => s + (+r[k] || 0), 0);
+      x.e0 = XUKEYS.reduce((s, k) => s + e0.e(k), 0);
+      x.e1 = XUKEYS.reduce((s, k) => s + e1.e(k), 0);
+    });
+    const s1 = Object.fromEntries((eff.dailySalary || []).map((r) => [r.d, r]));
+    (md.dailySalary || []).forEach((r) => {
+      const x = put(r.d, r.ymd);
+      x.s0 = (+r.A || 0) + (+r.B || 0);
+      x.s1 = (+(s1[r.d] || {}).A || 0) + (+(s1[r.d] || {}).B || 0);
+    });
+    return Object.values(by).sort((a, b) => a.ymd - b.ymd);
+  }, [md, eff]);
+  const effRec = useMemo(() => xRecorded(eff), [eff]);
+  const cellW = 104;
+  const cell = (a, b, f, bold) => (
+    <Text style={{ width: cellW, textAlign: 'right', fontFamily: MONO, fontSize: 10.5, color: T.ink, fontWeight: bold ? '800' : '400' }} numberOfLines={1}>
+      {a === undefined ? '—' : Math.round(a) === Math.round(b) ? f(a) : <><Text style={{ color: T.muted }}>{f(a)}</Text>{' → '}<Text style={{ fontWeight: '800' }}>{f(b)}</Text></>}
+    </Text>
+  );
+  const rs = (n) => `₹${xK0(n)}`;
+
+  const status = fz ? 'FROZEN' : has ? 'ADJUSTED' : 'OPEN';
+  const sc = fz ? T.green : has ? T.amber : T.muted;
+  const sub = fz
+    ? `frozen on ${fmtD(mc.frozen && mc.frozen.at)}${mc.frozen && mc.frozen.by ? ` · ${mc.frozen.by}` : ''} · locked`
+    : has ? 'actuals applied · awaiting freeze' : 'enter the month’s actual bills, reconcile, then freeze';
+
+  return (
+    <View onLayout={onLayout}>
+      <XSection title={`Monthly adjustment & freeze · ${label}`} sub={sub} icon="🔒" accent={T.nav} open={open} onToggle={onToggle}
+        right={<View style={{ flexDirection: 'row', gap: 4 }}>
+          {mc.demo ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: T.red + '18' }}><Text style={{ fontSize: 9, fontWeight: '800', color: T.red }}>DUMMY</Text></View> : null}
+          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: sc + '18' }}><Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', color: sc }}>{status}</Text></View>
+        </View>}>
+        <Text style={{ fontSize: 10.5, color: T.muted, lineHeight: 15.75, marginBottom: 10 }}>
+          Enter totals, not per-pick figures: the electricity bill amount and the salary actually disbursed — Sections A + B together. Units are not entered: the bill is spread over the kWh consumed as recorded, which re-derives the unit rate, and every unit-based figure (per meter, per section, per metre, per pick, per machine-day) follows it; the A and B salary columns are scaled to the total. Stores and maintenance need no entry — they stay as recorded. Freezing locks the entries, the actuals and the adjustment — only the admin can reopen a frozen month.
+        </Text>
+
+        {mc.unfrozen_from && !fz ? (
+          <View style={{ backgroundColor: T.amber + '14', borderWidth: 1, borderColor: T.amber + '44', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 10, marginBottom: 10 }}>
+            <Text style={{ fontSize: 10, color: T.amber, lineHeight: 14.5 }}>
+              Unfrozen on {fmtD(mc.unfrozen_from.unfrozen_at)}{mc.unfrozen_from.unfrozen_by ? ` by ${mc.unfrozen_from.unfrozen_by}` : ''}{mc.unfrozen_from.reason ? ` · “${mc.unfrozen_from.reason}”` : ''}. Correct the figures, apply, and freeze again. “Discard changes” brings back v{mc.unfrozen_from.version} (frozen {fmtD(mc.unfrozen_from.frozen_at)}) exactly as it was.
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {kcol('Electricity bill', xCr(rec.elec), rec.elec, ae, setAe, xCr(prev.elec), '₹ total bill', `spread over ${fmtU(rec.units)} consumed · re-derives the unit rate`)}
+          {kcol('Salary · Sections A + B', xCr(rec.salary), rec.salary, as, setAs, xCr(prev.salary), '₹ total disbursed', 'scales the A and B day-wise entries')}
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 4, paddingTop: 10, paddingHorizontal: 2 }}>
+          <Text style={{ fontSize: 10.5, color: T.muted }}>Rate {B(`₹${(+rec.rate || 0).toFixed(2)}`)} → {B(`₹${(+prev.rate || 0).toFixed(3)}`, T.copper)}/kWh</Text>
+          <Text style={{ fontSize: 10.5, color: T.muted }}>Units {B(fmtU(rec.units))} as recorded</Text>
+          <Text style={{ fontSize: 10.5, color: T.muted }}>Salary A + B {B(factor(prev.salF))}</Text>
+          <Text style={{ fontSize: 10.5, color: T.muted }}>Electricity cost after adjustment {B(xCr(prev.elec))}</Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
+          {!fz ? btn(busy === 'apply' ? 'Saving…' : has && !dirty ? 'Adjustment applied ✓' : has ? 'Re-apply adjustment' : 'Apply adjustment', apply, true, !!busy || !(ae !== '' || as !== '') || (has && !dirty)) : null}
+          {!fz && has ? (mc.previous
+            ? btn(busy === 'clear' ? 'Saving…' : arm === 'clear' ? 'Tap again to confirm' : `Discard changes · back to ${prevTxt}`, () => twoTap('clear', () => run('clear')), false, !!busy)
+            : btn(busy === 'clear' ? 'Saving…' : 'Clear actuals', () => { setAe(''); setAs(''); run('clear'); }, false, !!busy)) : null}
+          {!fz && has && !dirty ? (mc.can_freeze
+            ? btn(busy === 'freeze' ? 'Freezing…' : arm === 'freeze' ? 'Tap again to confirm — the month gets locked' : `Freeze ${label} · lock`, () => twoTap('freeze', () => run('freeze')), true, !!busy)
+            : <Text style={{ fontSize: 9.5, color: T.muted }}>Freezing needs the Expense · Freeze right.</Text>) : null}
+          {fz ? <Text style={{ fontSize: 10.5, color: T.green, fontWeight: '700', flexShrink: 1 }}>🔒 Locked on {fmtD(mc.frozen && mc.frozen.at)}{mc.frozen && mc.frozen.by ? ` by ${mc.frozen.by}` : ''} · entries, actuals and adjustment cannot be changed.</Text> : null}
+        </View>
+
+        {fz && mc.can_admin ? (
+          <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.border }}>
+            <Text style={lab}>Admin · reopen or delete this freeze</Text>
+            <TextInput value={reason} onChangeText={setReason} placeholder="Reason (required)" placeholderTextColor={T.muted} editable={!busy}
+              style={{ marginTop: 6, paddingVertical: 8, paddingHorizontal: 9, fontSize: 12, borderWidth: 1, borderColor: T.border, borderRadius: 8, backgroundColor: '#fff', color: T.ink }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {btn(busy === 'unfreeze' ? 'Saving…' : arm === 'unfreeze' ? 'Tap again to unfreeze' : `Unfreeze ${label}`, () => twoTap('unfreeze', () => run('unfreeze', { reason: reason.trim() })), true, !!busy || !reason.trim())}
+              {btn(busy === 'delete' ? 'Saving…' : arm === 'delete' ? 'Tap again to delete' : `Delete v${mc.version} · back to ${prevTxt}`, () => twoTap('delete', () => run('delete', { reason: reason.trim() })), false, !!busy || !reason.trim(), true)}
+            </View>
+            <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 6, lineHeight: 13.5 }}>
+              Unfreeze keeps this frozen version in the history and opens a copy to correct. Delete removes this version and the month goes back to {prevTxt}.
+            </Text>
+          </View>
+        ) : null}
+
+        {err ? <Text style={{ fontSize: 10.5, color: T.red, marginTop: 8, fontWeight: '700' }}>{err}</Text> : null}
+
+        <Pressable onPress={() => setRows((v) => !v)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 9, paddingBottom: 2, borderTopWidth: 1, borderTopColor: T.border, marginTop: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: T.copper }}>{rows ? 'Hide day-wise rows' : 'Day-wise · recorded → adjusted'}</Text>
+          <Text style={{ color: T.muted, transform: [{ rotate: rows ? '180deg' : '0deg' }] }}>▾</Text>
+        </Pressable>
+        {rows ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 6 }}>
+            <View style={{ minWidth: 56 + cellW * 3 + 18 }}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: T.border }}>
+                <Text style={[lab, { width: 56 }]}>Day</Text>
+                <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Units kWh</Text>
+                <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Electricity ₹</Text>
+                <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Salary A+B ₹</Text>
+              </View>
+              {dayRows.map((r) => (
+                <View key={r.d} style={{ flexDirection: 'row', gap: 6, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: T.alt }}>
+                  <Text style={{ width: 56, fontFamily: MONO, fontSize: 10.5, color: T.ink }}>{r.d}</Text>
+                  {cell(r.u, r.u, xK0)}
+                  {cell(r.e0, r.e1, rs)}
+                  {cell(r.s0, r.s1, rs)}
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 5 }}>
+                <Text style={{ width: 56, fontSize: 10.5, fontWeight: '800', color: T.ink }}>Total</Text>
+                {cell(rec.units, effRec.units, xK0, true)}
+                {cell(rec.elec, effRec.elec, rs, true)}
+                {cell(rec.salary, effRec.salary, rs, true)}
+              </View>
+              {!rec.salaryFromDays && rec.salary > 0 ? <Text style={{ fontSize: 9.5, color: T.muted }}>Salary of this month is a month total in the ERP (no day-wise rows) — it is scaled as a whole.</Text> : null}
+            </View>
+          </ScrollView>
+        ) : null}
+
+        <Pressable onPress={loadHist} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 9, paddingBottom: 2, borderTopWidth: 1, borderTopColor: T.border, marginTop: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: T.copper }}>{histOpen ? 'Hide history' : `History · ${mc.versions || 0} version${mc.versions === 1 ? '' : 's'}`}</Text>
+          <Text style={{ color: T.muted, transform: [{ rotate: histOpen ? '180deg' : '0deg' }] }}>▾</Text>
+        </Pressable>
+        {histOpen ? (
+          <View style={{ marginTop: 6 }}>
+            {!hist ? <Text style={{ fontSize: 10.5, color: T.muted }}>Loading…</Text> : null}
+            {hist && hist.error ? <Text style={{ fontSize: 10.5, color: T.red }}>{hist.error}</Text> : null}
+            {hist && !hist.error && !(hist.log || []).length ? <Text style={{ fontSize: 10.5, color: T.muted }}>No changes yet.</Text> : null}
+            {hist && (hist.log || []).map((l) => {
+              const d = l.detail || {};
+              const fig = l.action === 'apply'
+                ? [d.ActualElec ? `bill ${xCr(d.ActualElec)}` : null, d.ActualSalary ? `salary ${xCr(d.ActualSalary)}` : null].filter(Boolean).join(' · ')
+                : d.reason ? `“${d.reason}”` : '';
+              return (
+                <View key={l.id} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: T.alt }}>
+                  <Text style={{ width: 84, fontFamily: MONO, fontSize: 10, color: T.muted }}>{fmtD(l.at)}</Text>
+                  <Text style={{ flex: 1, fontSize: 10.5, color: T.ink }}>
+                    <Text style={{ fontWeight: '800' }}>{ACT_TXT[l.action] || l.action}</Text> · v{l.version} · {l.user}{fig ? ` · ${fig}` : ''}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+      </XSection>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Dashboard                                                          */
 /* ------------------------------------------------------------------ */
-export default function ExpenseModule({ exp, months, setSetting, rwc, renderLegacy, onLegacyChange }) {
+export default function ExpenseModule({ exp, months, setSetting, rwc, renderLegacy, onLegacyChange, close, scrollTo }) {
   const [view, setView] = useState('dash');
   const cur = useMemo(() => xCurrent(exp), [exp]);
   const allMonths = useMemo(() => months.map((x) => (x.key === exp.cur ? cur : x)), [months, cur, exp.cur]);
@@ -588,9 +845,18 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
   const [draft, setDraft] = useState({});
   const chips = useRef(null);
   useEffect(() => { setDraft({}); }, [exp.cur]);
+  /* Monthly adjustment & freeze (artifact): the latest finished month not frozen yet */
+  const adjY = useRef(0);
+  const [jump, setJump] = useState(0);
+  const pendingAdj = close && close.pending ? close.pending : null;
+  const pendingState = pendingAdj && close ? close.stateOf(pendingAdj) : null;
+  const goAdjust = () => { if (!pendingAdj) return; hbuzz(7); setSel(pendingAdj); setOp((o) => ({ ...o, adj: true })); setJump((j) => j + 1); };
+  useEffect(() => { if (jump && scrollTo) { const t = setTimeout(() => scrollTo(adjY.current), 60); return () => clearTimeout(t); } return undefined; }, [jump]); // eslint-disable-line react-hooks/exhaustive-deps
   const m = byKey[sel] || allMonths[allMonths.length - 1];
   const idx = allMonths.findIndex((x) => x.key === sel), prev = idx > 0 ? allMonths[idx - 1] : null;
   const isCur = sel === exp.cur;
+  const selClose = !isCur && close ? close.stateOf(sel) : null;
+  const selExp = selClose && selClose.eligible && close ? close.expOf(sel) : null;
   const XSEC = makeXSEC(m.counts || exp.counts);
   const utilPP = useMemo(() => xUtilMeters(m), [m]);
   const gh = useMemo(() => xGroupHeads(m), [m]);
@@ -709,7 +975,7 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
         const a = x.key === sel, c = x.key === exp.cur;
         return (
           <Pressable key={x.key} onPress={() => setSel(x.key)} style={{ flexShrink: 0, paddingVertical: 7, paddingHorizontal: 13, borderRadius: 20, backgroundColor: a ? T.copper : T.surface, borderWidth: a ? 0 : 1, borderColor: T.border }}>
-            <Text style={{ fontWeight: '700', fontSize: 11.5, color: a ? '#fff' : T.muted }}>{x.label}{c ? ' •' : ''}</Text>
+            <Text style={{ fontWeight: '700', fontSize: 11.5, color: a ? '#fff' : T.muted }}>{x.label}{c ? ' •' : x.frozen ? ' 🔒' : x.adjusted ? ' ≈' : ''}</Text>
           </Pressable>
         );
       })}
@@ -729,9 +995,29 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
   return (
     <View style={{ paddingTop: 12, paddingHorizontal: 12, paddingBottom: 28 }}>
       {chipsEl}
-      {isCur ? (
-        <View style={{ alignSelf: 'flex-start', backgroundColor: T.green + '15', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 20, marginBottom: 10 }}>
-          <Text style={{ fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', color: T.green }}>● Ongoing month</Text>
+      {isCur || selClose ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          {isCur ? (
+            <View style={{ backgroundColor: T.green + '15', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 20 }}>
+              <Text style={{ fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', color: T.green }}>● Ongoing month</Text>
+            </View>
+          ) : null}
+          {isCur && pendingAdj ? (
+            <Pressable onPress={goAdjust} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, borderWidth: 1, borderColor: T.amber + '66', backgroundColor: T.amber + '14' }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: T.amber }}>🔒 {pendingState && pendingState.actuals ? 'Freeze ' : 'Adjust & freeze '}{(byKey[pendingAdj] && byKey[pendingAdj].label) || pendingAdj} ›</Text>
+            </Pressable>
+          ) : null}
+          {!isCur && selClose && selClose.eligible ? (() => {
+            const fzS = selClose.status === 'frozen', adS = !!selClose.actuals;
+            const col = fzS ? T.green : adS ? T.amber : T.muted;
+            return (
+              <View style={{ backgroundColor: col + '15', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 20 }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', color: col }}>
+                  {fzS ? `🔒 Frozen · ${fmtD(selClose.frozen && selClose.frozen.at)}` : adS ? '≈ Adjusted · awaiting freeze' : 'Awaiting actuals · open for adjustment'}
+                </Text>
+              </View>
+            );
+          })() : null}
         </View>
       ) : null}
       {!ab ? (
@@ -787,6 +1073,20 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
           </View>
         </View>
       </View>
+
+      {/* monthly adjustment & freeze (finished months) */}
+      {selExp ? (
+        <XAdjustSection
+          key={sel}
+          md={selExp}
+          label={m.label}
+          mc={selClose}
+          open={op.adj !== false}
+          onToggle={() => tog('adj')}
+          onAct={(action, body) => close.act(sel, action, body)}
+          onLayout={(e) => { adjY.current = e.nativeEvent.layout.y; }}
+        />
+      ) : null}
 
       {/* inputs (always the ongoing month) */}
       {heading(`Inputs ${isCur ? '' : '· ongoing month'}`)}

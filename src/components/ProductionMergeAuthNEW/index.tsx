@@ -20,8 +20,8 @@
 //     Approve (isauth 1), no confirmation (as legacy). On success: message + list reload.
 //   - History cards: remark (aremark), Auth By / Date / Time; no actions.
 //   - Card border green when authstatus "authorised", red when "rejected".
-import { TruncText } from '@/src/components/ui/TruncText';
 import AppAlert from '@/common/utils/appAlert';
+import { TruncText } from '@/src/components/ui/TruncText';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -283,12 +283,21 @@ function MergeCard({ item, history, remark, onRemark, busy, locked, onReject, on
           <KV k="Main Merge Code" v={item.mainmercode} strong />
           <KV k="Main Merge Name" v={item.mainmername} align="right" strong />
         </View>
-        <View style={s.kvRow}>
+        {/* <View style={s.kvRow}>
           <KV k="Reason" v={item.rsnname} />
-        </View>
+        </View> */}
         <View style={s.kvRow}>
           <KV k="Prod. No." v={item.prodno} />
           <KV k="Prod. Date" v={item.proddate} align="right" />
+        </View>
+        <View style={s.remarkBox}>
+          <Text style={s.kvK}>ITEM NAME</Text>
+          <Text
+            style={[s.remarkText, { textAlign: 'left' }]}
+            numberOfLines={2}
+          >
+            {dash(item.itmname)}
+          </Text>
         </View>
         <View style={s.kvRow}>
           <KV k="Created By" v={item.createdby} />
@@ -298,9 +307,15 @@ function MergeCard({ item, history, remark, onRemark, busy, locked, onReject, on
         {history ? (
           <>
             <View style={s.remarkBox}>
+              <Text style={s.kvK}>Reason</Text>
+              <Text style={s.remarkText}>{dash(item.rsnname)}</Text>
+            </View>
+
+            <View style={s.remarkBox}>
               <Text style={s.kvK}>Remark</Text>
               <Text style={s.remarkText}>{dash(item.aremark)}</Text>
             </View>
+
             <View style={[s.kvRow, s.divTop]}>
               <KV k="Auth By" v={item.authby} />
               <KV k="Auth Date" v={item.authdate} align="center" />
@@ -308,17 +323,24 @@ function MergeCard({ item, history, remark, onRemark, busy, locked, onReject, on
             </View>
           </>
         ) : (
-          <View>
-            <Text style={s.label}>Remark</Text>
-            <TextInput
-              placeholder="Enter Remark"
-              placeholderTextColor={T.muted}
-              value={remark}
-              onChangeText={onRemark}
-              style={s.input}
-              multiline
-            />
-          </View>
+          <>
+            <View style={s.remarkBox}>
+              <Text style={s.kvK}>Reason</Text>
+              <Text style={s.remarkText}>{dash(item.rsnname)}</Text>
+            </View>
+
+            <View>
+              <Text style={s.label}>Remark</Text>
+              <TextInput
+                placeholder="Enter Remark"
+                placeholderTextColor={T.muted}
+                value={remark}
+                onChangeText={onRemark}
+                style={s.input}
+                multiline
+              />
+            </View>
+          </>
         )}
       </View>
 

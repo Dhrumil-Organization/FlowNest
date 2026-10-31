@@ -9,23 +9,37 @@
 //     month on this device
 //   - saves Daily maintenance / Daily other expenses to the ERP
 //     (Daily Section Expense API) and refreshes the month afterwards.
+//   - Monthly adjustment & freeze of finished months (artifact): actuals,
+//     freeze, admin unfreeze / delete — saved on the server
+//     (/api/mobile-dashboard/expense-close, Sudamo ExpMonthClose).
 // The previous report is in Expense_Artifact_Clone/original_backup.
 
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
 import { useExpenseData } from '../../hooks/useExpenseData';
 import ExpenseModule from './expense/ExpenseModule';
-import { LegacyMonthReport } from './ExpenseScreenLegacy';
 import { abMonth, buildExp, dayLabel, legacyMonth, nextYmd, T } from './expense/xCalc';
+import { LegacyMonthReport } from './ExpenseScreenLegacy';
 
 const SETTINGS_KEY = 'expense_month_settings_v1';
+const DEMO_KEY = 'expense_demo_mode'; // Dummy test mode on this device ('1' = on)
 const RWC_KINDS = ['maintenance', 'other'];
 
 export default function ExpenseScreen({ token, apiBase }) {
-  const { months, states, refresh, refreshMonth, retryMonth, saveDailySectionExpense, deleteDailySectionExpense } = useExpenseData({ token, apiBase });
+  /* Dummy test mode (Monthly adjustment & freeze testing) — per device, off = live */
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(DEMO_KEY).then((v) => { if (v === '1') setDemo(true); }).catch(() => {});
+  }, []);
+  const switchDemo = useCallback((on) => {
+    setDemo(on);
+    AsyncStorage.setItem(DEMO_KEY, on ? '1' : '0').catch(() => {});
+  }, []);
+  const { months, states, refresh, refreshMonth, retryMonth, saveDailySectionExpense, deleteDailySectionExpense, monthClose } = useExpenseData({ token, apiBase, demo });
+  const scrollRef = useRef(null);
 
   /* header refresh button (app shell — unchanged) */
   const setHeaderExtras = useHeaderExtrasStore((s) => s.setHeaderExtras);
@@ -96,6 +110,61 @@ export default function ExpenseScreen({ token, apiBase }) {
     return out;
   }, [months, states]);
 
+  /* Monthly adjustment & freeze — finished months, keyed 'YYYY-MM' like the artifact */
+  const close = useMemo(() => {
+    const ymOf = (e) => `${e.calYear}-${String(e.calMonth + 1).padStart(2, '0')}`;
+    const entryOf = (ym) => months.find((e) => ymOf(e) === ym) || null;
+    const dataOf = (ym) => { const e = entryOf(ym); return e && states[e.key] ? states[e.key].data : null; };
+    const stateOf = (ym) => { const d = dataOf(ym); return d && d.section_ab_active === true && d.month_close ? d.month_close : null; };
+    const past = months.slice(1).map(ymOf).sort();
+    const open = past.filter((ym) => { const mc = stateOf(ym); return mc && mc.eligible && mc.status !== 'frozen'; });
+    return {
+      demo,
+      pending: open.length ? open[open.length - 1] : null,
+      stateOf,
+      expOf: (ym) => { const e = entryOf(ym), d = dataOf(ym); return e && d ? buildExp(e, d, null) : null; },
+      act: (ym, action, body) => { const e = entryOf(ym); if (!e) return Promise.reject(new Error('Unknown month.')); return monthClose(e.key, action, body); },
+    };
+  }, [months, states, monthClose, demo]);
+
+  /* dummy test mode switch / banner */
+  const closeStates = Object.values(states).map((x) => x && x.data && x.data.month_close).filter(Boolean);
+  const demoAvailable = closeStates.some((mc) => mc.demo_available === true);
+  const isAdmin = closeStates.some((mc) => mc.can_admin === true);
+  const [resetArm, setResetArm] = useState(false);
+  const [demoMsg, setDemoMsg] = useState('');
+  const demoReset = useCallback(async () => {
+    if (!resetArm) { setResetArm(true); setTimeout(() => setResetArm(false), 5000); return; }
+    setResetArm(false); setDemoMsg('Clearing…');
+    try {
+      const r = await monthClose(months[0].key, 'demo-reset', {});
+      setDemoMsg(`Dummy data cleared (${(r && r.deleted) || 0} rows).`);
+    } catch (e) {
+      setDemoMsg((e && e.message) || 'Could not clear.');
+    }
+  }, [resetArm, monthClose, months]);
+  // const demoBar = demo ? (
+  //   <View style={dm.banner}>
+  //     <Text style={dm.title}>🧪 DUMMY TEST MODE — not live data</Text>
+  //     <Text style={dm.text}>
+  //       Today is treated as 15 Jan 2027. Oct '26 and earlier are the real ERP months; Nov '26, Dec '26 and Jan '27 are copies of October with the dates moved.
+  //       Adjust, freeze, unfreeze and delete are saved separately as dummy rows — the live report and live entries are not touched. Daily maintenance / other entry is off in this mode.
+  //     </Text>
+  //     <View style={dm.row}>
+  //       <TouchableOpacity onPress={() => switchDemo(false)} style={dm.live}><Text style={dm.liveText}>Back to live</Text></TouchableOpacity>
+  //       {isAdmin ? (
+  //         <TouchableOpacity onPress={demoReset} style={dm.reset}><Text style={dm.resetText}>{resetArm ? 'Tap again to clear all dummy data' : 'Clear dummy data'}</Text></TouchableOpacity>
+  //       ) : null}
+  //     </View>
+  //     {demoMsg ? <Text style={dm.text}>{demoMsg}</Text> : null}
+  //   </View>
+  // ) : demoAvailable ? (
+  //   <TouchableOpacity onPress={() => { setDemoMsg(''); switchDemo(true); }} style={dm.off}>
+  //     <Text style={dm.offText}>🧪 Dummy test mode · off — tap to test adjust & freeze with dummy Nov / Dec / Jan</Text>
+  //   </TouchableOpacity>
+  // ) : null;
+  const scrollTo = useCallback((y) => { if (scrollRef.current && scrollRef.current.scrollTo) scrollRef.current.scrollTo({ y: Math.max(0, y - 8), animated: true }); }, []);
+
   /* months before 1 Oct 2026 -> the previous Rapier / Waterjet report */
   const [legacyWide, setLegacyWide] = useState(false);
   const renderLegacy = useCallback((yyyymm) => {
@@ -132,6 +201,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   const rwc = useMemo(() => ({
     status: rwcStatus,
     setCell: (kind, i, k, v) => {
+      if (demo) return; // dummy test mode: no live daily entries
       const rows = rowsOf(kind).map((r, j) => (j === i ? { ...r, [k]: v === '' ? 0 : +v } : r));
       setRwcRows((p) => ({ ...p, [kind]: rows }));
       const row = rows[i];
@@ -139,7 +209,7 @@ export default function ExpenseScreen({ token, apiBase }) {
       clearTimeout(timers.current[tk]);
       timers.current[tk] = setTimeout(() => saveRow(kind, row), 900);
     },
-    canAdd: (kind) => !!(exp && nextYmd(rowsOf(kind), exp)),
+    canAdd: (kind) => !demo && !!(exp && nextYmd(rowsOf(kind), exp)),
     addDay: (kind) => {
       const rows = rowsOf(kind);
       const ymd = exp ? nextYmd(rows, exp) : null;
@@ -161,7 +231,7 @@ export default function ExpenseScreen({ token, apiBase }) {
         setTimeout(() => { if (curEntry) refreshMonth(curEntry.key, true); }, pending.length ? 1500 : 0);
       }
     },
-  }), [rwcStatus, rowsOf, saveRow, exp, curEntry, refreshMonth]);
+  }), [rwcStatus, rowsOf, saveRow, exp, curEntry, refreshMonth, demo]);
   useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
 
   /* ---------------- render ---------------- */
@@ -189,13 +259,16 @@ export default function ExpenseScreen({ token, apiBase }) {
       </View>
     );
   } else {
-    body = <ExpenseModule key={exp.cur} exp={exp} months={monthFigures} setSetting={setSetting} rwc={rwc} renderLegacy={renderLegacy} onLegacyChange={setLegacyWide} />;
+    body = <ExpenseModule key={exp.cur} exp={exp} months={monthFigures} setSetting={setSetting} rwc={rwc} renderLegacy={renderLegacy} onLegacyChange={setLegacyWide} close={close} scrollTo={scrollTo} />;
   }
 
   return (
     <View style={st.safe}>
-      <ScrollView style={st.body} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
-        <View style={[st.wrap, legacyWide && { maxWidth: 1360 }]}>{body}</View>
+      <ScrollView ref={scrollRef} style={st.body} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+        <View style={[st.wrap, legacyWide && { maxWidth: 1360 }]}>
+          {/* {demoBar ? <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>{demoBar}</View> : null} */}
+          {body}
+        </View>
       </ScrollView>
     </View>
   );
@@ -210,6 +283,19 @@ const st = StyleSheet.create({
   err: { fontSize: 13, fontWeight: '800', color: T.red },
   retry: { marginTop: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 9, backgroundColor: T.nav },
   retryText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+});
+
+const dm = StyleSheet.create({
+  banner: { backgroundColor: '#FDECEA', borderWidth: 2, borderColor: T.red, borderRadius: 12, padding: 12, gap: 6 },
+  title: { fontSize: 13, fontWeight: '900', color: T.red, letterSpacing: 0.4 },
+  text: { fontSize: 11, color: T.ink, lineHeight: 16 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  live: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 9, backgroundColor: T.nav },
+  liveText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  reset: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, borderColor: T.red + '66', backgroundColor: '#fff' },
+  resetText: { color: T.red, fontSize: 12, fontWeight: '800' },
+  off: { alignSelf: 'flex-start', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  offText: { fontSize: 10, fontWeight: '700', color: T.muted },
 });
 
 const hdr = StyleSheet.create({

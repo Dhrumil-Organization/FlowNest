@@ -132,7 +132,7 @@
       if (typeof __M.post !== "function") { resolve({ success: false, message: "Not inside Flownest." }); return; }
       var id = ++__seq; __pend[id] = resolve;
       __post({ type: "api", id: id, action: action, body: body || {} });
-      setTimeout(function () { if (__pend[id]) { delete __pend[id]; resolve({ success: false, message: "Mills did not answer in time." }); } }, 150000);
+      setTimeout(function () { if (__pend[id]) { delete __pend[id]; resolve({ success: false, message: "Mills did not answer in time." }); } }, 200000);
     });
   }
   window.__millReply = function (m) { var f = m && __pend[m.id]; if (f) { delete __pend[m.id]; f(m.result); } };
@@ -366,6 +366,7 @@
      data from  expense/coal  (coal issues by main item + make, FBC vs Thermopack by machine / department,
      amount = qty × rate ÷ 1.18, steam entries, dyeing production FAMMR → DAPProcess 1 / 16). */
   var __h = React.createElement;
+  var __COALRX = /COAL|LIGNITE|HUSK|BRIQUET|FIRE ?WOOD|PET ?COKE/i;
   var __QC = ["#f59e0b", "#b45309", "#78716c", "#0d9488", "#7c3aed", "#be123c", "#4f46e5", "#0891b2", "#65a30d", "#db2777"];
   var __MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function __dates(f, t) { var out = []; if (!f || !t) return out; var d = new Date(f + "T00:00:00"), e = new Date(t + "T00:00:00"); var g = 0; while (d <= e && g++ < 400) { out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")); d.setDate(d.getDate() + 1); } return out; }
@@ -425,15 +426,25 @@
     const [page, setPage] = useState("sum");
     const [d, setD] = useState(null);
     const [tick, setTick] = useState(0);
+    const [dy, setDy] = useState(null);
     useEffect(() => {
       let alive = true; setD(null);
-      __api("expense/coal", { month: ym, history: 60 }).then(function (r) { if (alive) setD(r); });
+      __api("expense/coal", { month: ym, with: "coal" }).then(function (r) { if (alive) setD(r); });
       return () => { alive = false; };
     }, [ym, tick]);
+    useEffect(() => {   // dyeing production (FAMMR) on its own call — a slow FAMMR never blocks the coal figures
+      let alive = true; setDy(null);
+      const b = __monthBounds(ym);
+      __api("expense/dyeing", { fromdate: b[0], todate: b[1] }).then(function (r) { if (alive) setDy(r); });
+      return () => { alive = false; };
+    }, [ym]);
     const back = React.createElement("div", { style: { marginBottom: 2 } }, React.createElement(ExpBack, { onBack }));
     if (!d) return React.createElement("div", null, back, __title("Coal — Boiler + Thermopack", mobile), __loadingBox());
     if (!d.success || !d.data) return React.createElement("div", null, back, __title("Coal — Boiler + Thermopack", mobile), __errBox("Coal could not be read from Mills — " + (d.message || "") + (d.data && d.data.errors ? " · " + d.data.errors.join(" | ") : "")));
-    const data = d.data;
+    const data = Object.assign({}, d.data);
+    data.production = Object.assign({}, data.production || {});
+    if (dy && dy.success && dy.data) { data.production.dye = dy.data.days || {}; data.production.dye_basis = dy.data.basis || null; }
+    else if (dy) data.errors = (data.errors || []).concat(["Dyeing production: " + (dy.message || "not read") + (dy.data && dy.data.errors ? " · " + dy.data.errors.join(" | ") : "")]);
     const M = __coalModel(data);
     const billAmt = data.billing ? __n(data.billing.amount) : (bill || 0);
     const patchSteam = (dt, entry) => { const nd = JSON.parse(JSON.stringify(d)); if (!nd.data.steam || Array.isArray(nd.data.steam)) nd.data.steam = {}; if (entry) nd.data.steam[dt] = entry; else delete nd.data.steam[dt]; setD(nd); };
@@ -471,6 +482,15 @@
         if (r && r.success) reload(); else setMsg({ ok: false, text: (r && r.message) || "Could not save." });
       });
     };
+    const markItem = (c) => {
+      setBusy("i:" + c.itmcode); setMsg(null);
+      __api("expense/coal/split/save", { split: {}, items: { [c.itmcode]: !c.marked } }).then(function (r) {
+        setBusy(null);
+        if (r && r.success) reload(); else setMsg({ ok: false, text: (r && r.message) || "Could not save." });
+      });
+    };
+    const info = data.match || null;
+    const errBox = (data.errors || []).length ? __gap(__errBox("Notes from Mills: " + data.errors.join(" | "))) : null;
     const qrows = M.qs.map((q) => { let kg = 0, c = 0, fk = 0, tk = 0; days.forEach((dt) => { ["fbc", "tpk"].forEach((s) => M.side(dt, s).forEach((m) => { if (m.q === q.id) { kg += __n(m.kg); c += __n(m.amount); if (s === "fbc") fk += __n(m.kg); else tk += __n(m.kg); } })); }); return { q, kg, c, fk, tk }; }).filter((x) => x.kg > 0);
     return React.createElement("div", null, React.createElement(ExpBack, { onBack }),
       __title("Coal — Boiler + Thermopack", mobile, React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, React.createElement(Chip, { text: data.month + " · " + data.days + " DAYS" }), React.createElement(Chip, { text: pct(tot), bg: C.amberSoft, fg: C.amber }))),
@@ -493,6 +513,19 @@
       React.createElement("div", { onClick: () => { if (__can("expense.coal_optimiser")) go("opt"); else __post({ type: "toast", text: "No rights for Coal Mix Optimiser" }); }, style: { marginTop: 12, background: C.tealSoft, border: "1px solid #99f6e4", borderRadius: 14, padding: "12px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } },
         React.createElement("div", null, React.createElement("div", { style: { fontFamily: "DM Serif Display, serif", fontSize: 15.5, color: C.teal } }, "Coal Mix Optimiser"), React.createElement("div", { style: { fontSize: 11.5, color: C.slate, marginTop: 2 } }, "Lowest-cost mixes from day-wise offers, ranked on measured steam per ton — not price per ton")),
         React.createElement("span", { style: { color: C.teal, fontSize: 18 } }, "›")),
+      errBox,
+      info ? __gap(React.createElement(Section, { title: "Which store items are coal?", right: React.createElement(Chip, { text: info.coal_items ? info.coal_items + " COAL ITEMS" : "NOTHING MATCHED", bg: info.coal_items ? C.greenSoft : C.roseSoft, fg: info.coal_items ? C.green : C.rose }), pad: false },
+        React.createElement("div", { style: { padding: "10px 14px", fontSize: 12, color: C.slate, lineHeight: 1.6 } },
+          "Read " + info.issued_items + " issued items this month · " + (info.coal_items || 0) + " counted as coal. Coal picked by: " + info.match + ". " +
+          (info.coal_items ? "" : "None of the names matched — ") + (canSplit ? "tap an item below to mark it as coal (or unmark it); it is remembered." : "an admin with the steam-entry edit right can mark the coal items here.")),
+        (info.coal_items && info.coal_lines ? (info.candidates || []).filter((c) => c.marked || __COALRX.test([c.itmname, c.group, c.subgroup, c.make].join(" "))) : (info.candidates || [])).slice(0, 60).map((c) =>
+          React.createElement("div", { key: c.itmcode, onClick: canSplit ? () => markItem(c) : undefined, style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 14px", borderTop: "1px solid " + C.line, cursor: canSplit ? "pointer" : "default" } },
+            React.createElement("div", { style: { minWidth: 0 } },
+              React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.itmname || c.itmcode),
+              React.createElement("div", { style: { fontSize: 11, color: C.mut, marginTop: 2 } }, [c.itmcode, c.group, c.subgroup, c.make].filter(Boolean).join(" · ") + " · " + fm(Math.round(c.kg)) + " kg · " + inr(c.value))),
+            React.createElement(Chip, { text: busy === "i:" + c.itmcode ? "…" : c.marked ? "COAL ✓" : "MARK AS COAL", bg: c.marked ? C.greenSoft : C.indigoSoft, fg: c.marked ? C.green : C.indigoDark }))),
+        info.coal_items && info.coal_lines ? React.createElement("div", { style: { padding: "8px 14px", borderTop: "1px solid " + C.line, fontSize: 11.5, color: C.mut } }, "Only the coal items are listed. Tap one to stop counting it as coal.") : null,
+        msg ? React.createElement("div", { style: { padding: "0 14px 10px" } }, __msg(msg)) : null)) : null,
       __gap(React.createElement(Section, { title: "By main item + make", right: React.createElement(Chip, { text: qrows.length + " COALS" }), pad: false },
         qrows.length ? qrows.map((x) => __rowBtn(x.q.id, null, x.q.label, inr(x.c) + "  " + (x.kg / 1000).toFixed(1) + " t",
           "FBC " + (x.fk / 1000).toFixed(1) + " t · Thermopack " + (x.tk / 1000).toFixed(1) + " t · avg ₹" + fm(Math.round(x.kg ? x.c / (x.kg / 1000) : 0)) + "/t ex-GST" + (x.q.gar ? " · " + x.q.gar + " GAR" : ""), tot ? x.c / tot * 100 : null, x.q.c))
@@ -505,7 +538,7 @@
             React.createElement(Chip, { text: busy === s.key ? "…" : s.side === "tpk" ? "THERMOPACK" : "FBC BOILER", bg: s.side === "tpk" ? "#fff7ed" : C.amberSoft, fg: s.side === "tpk" ? "#c2410c" : C.amber }));
         }) : React.createElement("div", { style: { padding: 14, fontSize: 12.5, color: C.mut } }, "No coal issues in this month."),
         msg ? React.createElement("div", { style: { padding: "0 14px 10px" } }, __msg(msg)) : null)),
-      __note("Source: " + (data.source || "store issues") + ". " + (data.rule || "") + (data.billing ? " · Billing " + inr(__n(data.billing.amount)) + " from " + (data.billing.source || "DAPOutI") : "") + "."));
+      __note("Source: " + (data.source || "store issues") + ". " + (data.rule || "") + (data.ms ? " · read in " + Object.keys(data.ms).map((k) => k + " " + (data.ms[k] / 1000).toFixed(1) + " s").join(", ") : "") + (data.billing ? " · Billing " + inr(__n(data.billing.amount)) + " from " + (data.billing.source || "DAPOutI") : "") + "."));
   }
 
   function LiveFbc({ mobile, data, M, bill, go, onBack, patchSteam }) {
@@ -676,7 +709,15 @@
   }
 
   /* ───────── Coal Mix Optimiser — measured performance from steam entries + live offers ───────── */
-  function LiveOptimiser({ mobile, data, M, onBack }) {
+  function LiveOptimiser({ mobile, data, M: M0, onBack }) {
+    // the optimiser needs 60 days of coal + steam for measured performance → its own call, only when opened
+    const [hist, setHist] = useState(null);
+    useEffect(() => {
+      let alive = true;
+      __api("expense/coal", { month: (data.month_from || "").slice(0, 7), history: 60, with: "coal" }).then(function (r) { if (alive) setHist(r); });
+      return () => { alive = false; };
+    }, []);
+    const M = hist && hist.success && hist.data ? __coalModel(hist.data) : M0;
     const days = M.mdays;
     const defDay = days.indexOf(M.today) >= 0 ? M.today : days[days.length - 1];
     const [day, setDay] = useState(defDay);
@@ -801,6 +842,7 @@
         React.createElement(Kpi, { key: "b", mobile, label: "Actual This Day", value: actualPerKg != null ? "₹" + actualPerKg.toFixed(2) + "/kg" : "—", sub: actualKg != null ? (actualKg / 1e3).toFixed(0) + " t steam entered" : "steam pending for this day", accent: C.ink }),
         React.createElement(Kpi, { key: "c", mobile, label: "Possible Saving", value: saveDay != null && saveDay >= 0 ? inr(saveDay) : "—", sub: saveDay != null && saveDay >= 0 ? "per day at " + tgt + " t steam" : actualPerKg == null ? "enter steam to compare" : "actual already at par", accent: C.green }),
         React.createElement(Kpi, { key: "d", mobile, label: "Offers Today", value: o ? String(offers.length) : "…", sub: offers.length ? "only entered offers count" : "add offers below", accent: C.amber })]),
+      !hist ? __gap(React.createElement("div", { style: { fontSize: 11.5, color: C.mut } }, "Loading 60 days of coal + steam for measured performance…")) : null,
       o && !o.success ? __gap(__errBox("Offers could not be read — " + (o.message || ""))) : null,
       __gap(React.createElement(Section, { title: "Supplier offers — " + __dl(day), right: React.createElement(Chip, { text: "RATE PER DATE · PER SUPPLIER", bg: C.amberSoft, fg: C.amber }), pad: false },
         !o ? __loadingBox("Loading offers…") : offers.length ? offers.map((x) => { const p = perfOf(x.q); const q = qOf(x.q);
@@ -911,15 +953,24 @@
     const [d, setD] = useState(null);
     const [tick, setTick] = useState(0);
     const [tab, setTab] = useState("month");
+    const [dy, setDy] = useState(null);
     useEffect(() => {
       let alive = true; setD(null);
-      __api("expense/electricity", { month: ym }).then(function (r) { if (alive) setD(r); });
+      __api("expense/electricity", { month: ym, with: "power" }).then(function (r) { if (alive) setD(r); });
       return () => { alive = false; };
     }, [ym, tick]);
+    useEffect(() => {
+      let alive = true; setDy(null);
+      const b = __monthBounds(ym);
+      __api("expense/dyeing", { fromdate: b[0], todate: b[1] }).then(function (r) { if (alive) setDy(r); });
+      return () => { alive = false; };
+    }, [ym]);
     const head = (right) => React.createElement("div", null, React.createElement(ExpBack, { onBack }), __title("Electricity — Utilities", mobile, right));
     if (!d) return React.createElement("div", null, head(), __loadingBox());
     if (!d.success || !d.data) return React.createElement("div", null, head(), __errBox("Electricity could not be read from Mills — " + (d.message || "") + (d.data && d.data.errors ? " · " + d.data.errors.join(" | ") : "")));
-    const data = d.data;
+    const data = Object.assign({}, d.data);
+    if (dy && dy.success && dy.data) { data.dye = dy.data.days || {}; data.dye_basis = dy.data.basis || null; }
+    else if (dy) data.errors = (data.errors || []).concat(["Dyeing production: " + (dy.message || "not read")]);
     const P = __powerModel(data);
     const canEdit = __can("expense.electricity:edit");
     const billAmt = data.billing ? __n(data.billing.amount) : (bill || 0);
@@ -1009,7 +1060,7 @@
     useEffect(() => {
       if (!__can("expense.coal")) return;
       let alive = true;
-      __api("expense/coal", { month: ym }).then(function (r) { if (alive) setCoal(r); });
+      __api("expense/coal", { month: ym, with: "coal" }).then(function (r) { if (alive) setCoal(r); });
       return () => { alive = false; };
     }, [ym]);
     const prevDt = P.days[P.days.indexOf(dt) - 1] || null;

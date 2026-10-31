@@ -458,8 +458,12 @@ const dailyEndpoint = (kind) => {
   throw new Error('Unsupported daily expense type.');
 };
 
-export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt' }) {
-  const MONTHS = buildSixMonths();
+// Expense report "Dummy test mode": the app pretends today is this date (same as the
+// server's ExpenseMonthCloseService::DEMO_TODAY) so Oct, Nov, Dec 2026 are finished months.
+export const EXPENSE_DEMO_TODAY = new Date(2027, 0, 15);
+
+export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt', demo = false }) {
+  const MONTHS = buildSixMonths(demo ? EXPENSE_DEMO_TODAY : new Date());
 
   // Per-month state keyed by monthno+yearno (e.g. "0627")
   const initialStates = Object.fromEntries(
@@ -467,6 +471,9 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
   );
   const [states, setStates] = useState(initialStates);
   const hasFetched = useRef(false);
+  // bumped on every full reload (and on the dummy-mode switch) so a late answer of
+  // the previous list can never overwrite the new one
+  const loadGen = useRef(0);
 
   // Count how many are done (for progress bar)
   const loadedCount = Object.values(states).filter((s) => s.status === 'done').length;
@@ -475,6 +482,7 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
   // ── Fire single month request ──
   const fetchMonth = useCallback(
     async ({ yearno, monthno, key }, force = false) => {
+      const myGen = loadGen.current;
       try {
         const userPtype = (await AsyncStorage.getItem('user_prptype')) || 'S';
         const payload = await fetchExpenseDashboardCard({
@@ -483,6 +491,7 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           yearno,
           monthno,
           refresh: force,
+          demo,
         });
 
         const r = payload.division?.rapier || {};
@@ -905,7 +914,8 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
           coverage_daily: daily,
           expense_daily_trend: expenseDaily,
           utility_daily_trend: utilityDaily,
-          electricity_daily: electricityDaily,
+          electricity_daily: electricityDaily,
+
           // Day-wise checking production by machine group (Expense report daily cost / pick).
           production_daily: prodDaily,
           trend_meta: payload.trends || {},
@@ -988,15 +998,22 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
             });
         }
 
+        // Monthly adjustment & freeze state of this month (Sudamo ExpMonthClose).
+        // A frozen month's payload is the snapshot taken when it was frozen.
+        data.month_close = payload.month_close || null;
+        data.demo_copy_of = payload.demo_copy_of || null;
+
+        if (myGen !== loadGen.current) return null;
         setStates(prev => ({ ...prev, [key]: { status: 'done', data, error: null } }));
         return data;
       } catch (err) {
         const msg = err?.message || 'Network error';
+        if (myGen !== loadGen.current) return null;
         setStates(prev => ({ ...prev, [key]: { status: 'error', data: null, error: msg } }));
         return null;
       }
     },
-    [token]
+    [token, demo]
   );
 
   const getRequestToken = useCallback(async () => {
@@ -1073,8 +1090,46 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
     return response.data?.response?.data || null;
   }, [apiBase, getRequestToken]);
 
+  // ── Monthly adjustment & freeze (ERP Designing artifact) ──
+  //   action: 'state' (GET, with history) | 'apply' | 'clear' | 'freeze' | 'unfreeze' | 'delete'
+  // Every change reloads that month, so all figures come back from the server.
+  const monthClose = useCallback(async (key, action, body = {}) => {
+    const month = MONTHS.find((m) => m.key === key);
+    if (!month) throw new Error('Unknown month.');
+    const root = normalizeApiRoot(apiBase);
+    const authToken = await getRequestToken();
+    if (!authToken) throw new Error('Unauthenticated.');
+    const prptype = String((await AsyncStorage.getItem('user_prptype')) || 'S').toUpperCase();
+    const params = { prptype, yearno: String(month.yearno), monthno: String(month.monthno).padStart(2, '0'), ...(demo ? { demo: '1' } : {}) };
+    const config = {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'x-platform': 'mob',
+      },
+      timeout: 60000,
+    };
+    let response;
+    try {
+      response = action === 'state'
+        ? await axios.get(`${root}/mobile-dashboard/expense-close`, { ...config, params })
+        : await axios.post(`${root}/mobile-dashboard/expense-close/${action}`, { ...params, ...body }, config);
+    } catch (error) {
+      const msg = error?.response?.data?.message;
+      throw new Error(msg || error?.message || 'Request failed.');
+    }
+    if (response?.data?.success !== true) {
+      throw new Error(response?.data?.message || 'Request failed.');
+    }
+    if (action === 'demo-reset') MONTHS.forEach((m) => { fetchMonth(m, true).catch(() => {}); });
+    else if (action !== 'state') await fetchMonth(month, true);
+    return response.data?.response?.data || null;
+  }, [apiBase, getRequestToken, fetchMonth, demo]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Fire all 6 in parallel ──
   const fetchAll = useCallback((force = false) => {
+    loadGen.current += 1;
     // Instantly show all as loading (user sees skeletons immediately)
     setStates(
       Object.fromEntries(
@@ -1095,6 +1150,14 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
       fetchAll(false);
     }
   }, [fetchAll, token, apiBase]);
+
+  // ── Dummy test mode switched on / off: a different month list, load it again ──
+  const lastDemo = useRef(demo);
+  useEffect(() => {
+    if (lastDemo.current === demo) return;
+    lastDemo.current = demo;
+    if (hasFetched.current) fetchAll(false);
+  }, [demo, fetchAll]);
 
   const refreshMonth = useCallback(
     async (key, force = true) => {
@@ -1129,5 +1192,6 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
     retryMonth,
     saveDailySectionExpense,
     deleteDailySectionExpense,
+    monthClose,
   };
 }

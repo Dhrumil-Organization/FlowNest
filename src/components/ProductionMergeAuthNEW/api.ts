@@ -119,11 +119,52 @@ export async function authoriseMerge(api: Api, item: Row, isauthValue: 1 | 2, re
         Accept: 'application/json',
       },
     });
-    // eslint-disable-next-line eqeqeq
-    if (response?.data?.response?.error == true) return { kind: 'error', message: 'Please Try Again' };
-    // eslint-disable-next-line eqeqeq
-    if (response?.data?.success == true) return { kind: 'success', message: response?.data.response?.message };
-    return { kind: 'none' };
+    // // eslint-disable-next-line eqeqeq
+    // if (response?.data?.response?.error == true) return { kind: 'error', message: 'Please Try Again' };
+    // // eslint-disable-next-line eqeqeq
+    // if (response?.data?.success == true) return { kind: 'success', message: response?.data.response?.message };
+    // return { kind: 'none' };
+
+    const data = response?.data;
+
+    // Backend error check
+    if (
+      data?.response?.error === true ||
+      data?.error === true
+    ) {
+      return {
+        kind: 'error',
+        message:
+          data?.response?.message ||
+          data?.message ||
+          'Authorization failed. Please try again.',
+      };
+    }
+
+    // Backend success check
+    if (
+      data?.success === true ||
+      data?.response?.success === true ||
+      data?.response?.error === false
+    ) {
+      return {
+        kind: 'success',
+        message:
+          data?.response?.message ||
+          data?.message ||
+          'Authorization successful.',
+      };
+    }
+
+    // Unexpected response
+    return {
+      kind: 'error',
+      message:
+        data?.response?.message ||
+        data?.message ||
+        'Authorization response was not successful.',
+    };
+
   } catch (error: any) {
     console.log('PRODUCTION MERGE AUTH ERROR:', error?.response?.data || error?.message);
     return { kind: 'error', message: error?.response?.data?.message || error?.message || 'Failed.' };

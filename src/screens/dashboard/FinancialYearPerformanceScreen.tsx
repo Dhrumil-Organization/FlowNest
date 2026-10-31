@@ -1150,7 +1150,8 @@ function SalesFinancialYearPerformanceScreen() {
     // Detail-loaded years can still supply the overview locally.
     return focus.report?.details_loaded ? groupLines(focusRangeLines, 'executive', []) : [];
   }, [focus, focusRangeLines, executiveOverview]);
-  const topExecutives = executiveRows.slice(0, 5);
+  // Show EVERY executive in scope (owner: all; My View: all assigned), not a top 5.
+  const topExecutives = executiveRows;
 
   const topPreviousExecutives = useMemo(() => {
     if (!previous) return new Map<string, GroupRow>();
@@ -1445,7 +1446,7 @@ function SalesFinancialYearPerformanceScreen() {
   const detailMonthLabel = detailMonth != null ? monthDate(focus.startYear, detailMonth).label : null;
   const selectedMonthValue = selectedMonth != null ? monthMetric(focus.report, selectedMonth, 'amount') : 0;
   // Claude computes row share/concentration against ALL executive billing,
-  // while only rendering the first five rows.
+  // across every rendered executive row.
   const topTotal = executiveRows.reduce((sum, row) => sum + row.amount, 0);
   const topScaleMax = Math.max(
     1,
@@ -1694,7 +1695,7 @@ function SalesFinancialYearPerformanceScreen() {
               ) : null}
             </View>
 
-            <SectionLabel right={previous ? `grey = ${fyLabel(previous.startYear)}${focus.isCurrent ? ' at this stage' : ''}` : undefined}>TOP EXECUTIVES · {fyLabel(focus.startYear)}{focus.isCurrent ? ' TO DATE' : ''}</SectionLabel>
+            <SectionLabel right={previous ? `grey = ${fyLabel(previous.startYear)}${focus.isCurrent ? ' at this stage' : ''}` : undefined}>ALL EXECUTIVES ({topExecutives.length}) · {fyLabel(focus.startYear)}{focus.isCurrent ? ' TO DATE' : ''}</SectionLabel>
             <View style={styles.topCard}>
               {topExecutives.map((row, i) => {
                 const v = row.amount;

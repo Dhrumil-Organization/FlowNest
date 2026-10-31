@@ -282,6 +282,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   // Responsive layout (UI only): columns from the dashboard's CONTENT width,
   // so the desktop sidebar is already excluded — same as the ERP dashboard.
   const [contentWidth, setContentWidth] = useState(0);
+  const columns: DashCols = columnsForWidth(contentWidth);
 
   // RESPONSIVE: Yes (default) = layout follows the screen width (as before).
   //             No            = the phone layout, also on web / tablet (content drawn at the mobile width).
@@ -299,8 +300,6 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   };
   const showResponsiveSwitch = windowWidth > DASHBOARD_MOBILE_WIDTH + 140;
   const forceMobile = !responsive && showResponsiveSwitch;
-  // No = full width, every card one under the other (one column), phone card styles
-  const columns: DashCols = forceMobile ? 1 : columnsForWidth(contentWidth);
 
   const now = new Date();
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
@@ -308,6 +307,8 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const monthno = now.getMonth() + 1;
   const targetFY = targetFyNavigation(yearno, now);
   // Backend scope flags cannot override explicit per-card grants.
+  // For a non-Director user with assigned Sales Executives, Laravel scopes
+  // the Owner cards to those executives; the tab itself stays permission based.
   const ownerAllowed = hasOwnerCardPermission;
 
   // My View scope differs by authority:
@@ -330,9 +331,14 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   // Production card grant must be able to open My View even without a Sales
   // Executive mapping. The Production card still checks the same permission
   // locally and again on the Laravel dashboard/report endpoints.
+  // A user assigned only through BaseController::DASHBOARD_MY_VIEW_SEXES has
+  // no users.saleexeid, so any dashboard card grant also enables My View.
+  // Laravel remains the scope authority (it returns "not configured" when
+  // nothing is assigned).
   const myViewAllowed = isManagementUser
     || !saleExecKnown
     || (saleExecCode !== '' && saleExecCode !== '0')
+    || hasOwnerCardPermission
     || canAccess('dashboard.production_detail');
 
   // Permissions arrive asynchronously after login, so the initial useState
@@ -495,7 +501,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
       >
        <DashboardForceMobileContext.Provider value={forceMobile}>
        <View
-         style={styles.inner}
+         style={[styles.inner, forceMobile && styles.innerMobile]}
          onLayout={(e) => {
            const w = Math.round(e.nativeEvent.layout.width);
            if (Math.abs(w - contentWidth) > 1) setContentWidth(w);
@@ -706,6 +712,8 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: '#fff' },
   amountModeRow: { marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  // "Responsive: No" — the phone layout, centred
+  innerMobile: { maxWidth: DASHBOARD_MOBILE_WIDTH },
   respWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 'auto' },
   respToggle: { flexDirection: 'row', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 9, overflow: 'hidden' },
   respBtn: { paddingHorizontal: 12, paddingVertical: 6 },

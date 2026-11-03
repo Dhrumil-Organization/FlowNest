@@ -6,10 +6,6 @@
 //   common/useFaults.ts  (imported by index.tsx; only `setFaultsData([])` is used — no calls)
 //   (CheckingScanner.tsx = older variant, FaultsModal.tsx = unused → not ported)
 //
-// CHANGE (weight calc):
-//   Kgs = (nwpwfwt * Meter) / 100        (nwpwfwt = warp+weft wt per 100 mtr, from the design API)
-//   Earlier it was Kgs = Meter × QltWt.  AvgWt = Kgs × 100 / Meter (unchanged).
-//
 // Flow (same as legacy):
 //   QR Scanner tab
 //     Scan QR (JSON {prpcode, beamno, takano, beamuid, UId, yearno, isfirsttaka, islasttaka, ...})
@@ -19,7 +15,7 @@
 //       Invalid JSON → "Invalid QR / QR format not valid".
 //     Checker default: cached 'qr_checker' → response.user_id → none.
 //     Design pick → POST get_auto_checking_help (+dsncode) → Designdata, WarpLen.
-//     Meter (≤3 int / 3 dec) → Kgs = (Meter × nwpwfwt) / 100, AvgWt = Kgs×100/Meter; Kgs edit → AvgWt.
+//     Meter (≤3 int / 3 dec) → Kgs = Meter × QltWt, AvgWt = Kgs×100/Meter; Kgs edit → AvgWt.
 //     Save: validations (beam, taka, design, meter>0, meter ≤ WarpLen, kgs>0, grade, checker,
 //       shift, Designdata) → POST add_auto_checking_detail (EMode 'S', SrNo '0',
 //       islasttaka = checkbox, IsLastTaka/IsFirstTaka from QR, ismending, OprCode '', d2 []).
@@ -29,8 +25,8 @@
 //     prpcode '') ; also POST get_auto_checking_help beam help (unique BeamNo list)).
 //     Beam pick → copies beam fields, POST get_auto_checking_help (maxtakano → TakaNo, data[0],
 //       design list) + get_criterion shift (beam PrpCode).
-//     Design pick → POST get_auto_checking_help (+dsncode) → nwpwfwt / WarpLen / UId / order / plan.
-//     Checker pick → cached in 'manual_checker'. Meter → Kgs / AvgWt from nwpwfwt.
+//     Design pick → POST get_auto_checking_help (+dsncode) → QltWt / WarpLen / UId / order / plan.
+//     Checker pick → cached in 'manual_checker'. Meter → Kgs / AvgWt from QltWt.
 //     Save: validateForm (same messages) → POST add_auto_checking_detail (EMode 'M', yearno FY,
 //       d2 []) → "Data Saved Successfully ✅" → OK: clear (checker kept), beam help, manual detail.
 //     Clear: keeps ChkCode/ChkName, resets form, reloads beam help.
@@ -87,15 +83,6 @@ type Pick_ = null | 'design' | 'grade' | 'checker' | 'beam' | 'mdesign' | 'mgrad
 const METER_RE = /^\d{0,3}(?:\.\d{0,3})?$/;
 const errMsg = (e: any, fb: string) => e?.response?.data?.message || e?.response?.data?.error || e?.message || fb;
 const listOk = (r: any) => (r?.success && Array.isArray(r?.response?.data) && r.response.data.length > 0 ? r.response.data : null);
-
-// Kgs = (nwpwfwt * meter) / 100   → returns '0.00' if either value is missing / 0
-const calcKgs = (meterVal: number, nwpwfwt: any) => {
-  const pwf = parseFloat(nwpwfwt) || 0;
-  return meterVal > 0 && pwf > 0 ? ((meterVal * pwf) / 100).toFixed(2) : '0.00';
-};
-// AvgWt = Kgs * 100 / meter
-const calcAvg = (meterVal: number, kgsVal: number) =>
-  meterVal > 0 && kgsVal > 0 ? ((kgsVal * 100) / meterVal).toFixed(2) : '0.00';
 
 export default function CheckingScannerModule({ token, API }: Props) {
   const api = useMemo(() => createCheckingScannerApi(API, token), [API, token]);
@@ -306,17 +293,8 @@ export default function CheckingScannerModule({ token, API }: Props) {
       const r = await api.autoCheckingHelp({ txntype: TXN_SCAN, referrer: 'dashboard', scannedString: temp, prpcode: temp.prpcode, dsncode, yearno: getCurrentFinancialYear() });
       const arr = r?.response?.data || [];
       if (r?.success) {
-        if (arr.length > 0) {
-          setDesignData(arr);
-          setWarpLen(arr[0].WarpLen || '0');
-          // design change hone par, agar meter pehle se bhara hai to Kgs / AvgWt dobara calculate
-          const qty = parseFloat(meter) || 0;
-          if (qty > 0) {
-            const wt = calcKgs(qty, arr[0].nwpwfwt);
-            setKgs(wt);
-            setAvgWt(calcAvg(qty, parseFloat(wt) || 0));
-          }
-        } else { setDesignData([]); setWarpLen('0'); AppAlert.alert('No Data Found'); }
+        if (arr.length > 0) { setDesignData(arr); setWarpLen(arr[0].WarpLen || '0'); }
+        else { setDesignData([]); setWarpLen('0'); AppAlert.alert('No Data Found'); }
       } else AppAlert.alert('Error', `${r?.message || 'Unexpected response'}`);
     } catch (e) {
       console.log('API sendScannedValue1 error:', e);
@@ -346,15 +324,14 @@ export default function CheckingScannerModule({ token, API }: Props) {
     setScanOpen(false);
   };
 
-  // QR tab: Kgs = (nwpwfwt * meter) / 100
   const handleMeterChange = (raw: string) => {
     const value = raw.replace(',', '.');
     if (value === '' || METER_RE.test(value)) {
       setMeter(value);
       const qty = value === '' ? 0 : parseFloat(value);
-      const pwf = designData.length > 0 ? designData[0].nwpwfwt : 0;
-      const wt = calcKgs(qty, pwf);
-      const avg = calcAvg(qty, parseFloat(wt) || 0);
+      const qltWt = designData.length > 0 && designData[0].QltWt ? parseFloat(designData[0].QltWt) : 0;
+      const wt = qty > 0 && qltWt > 0 ? (qty * qltWt).toFixed(2) : '0.00';
+      const avg = qty > 0 && parseFloat(wt) > 0 ? ((parseFloat(wt) * 100) / qty).toFixed(2) : '0.00';
       setKgs(wt);
       setAvgWt(avg);
     }
@@ -402,7 +379,6 @@ export default function CheckingScannerModule({ token, API }: Props) {
         OrderDsnCode: d.OrderDsnCode, OrderDsnName: d.OrderDsnName, OrderLastDate: d.OrderLastDate,
         UId: d.UId, PlanUId: d.PlanUId, PlanNo: d.PlanNo, BeamUId: d.BeamUId, MacCode: d.MacCode,
         MacName: d.MacName, DsnCode: d.DsnCode, DsnName: d.DsnName, WarpLen: d.WarpLen, QltWt: d.QltWt,
-        nwarpwt: d.nwarpwt, nweftwt: d.nweftwt, nwpwfwt: d.nwpwfwt, // NEW (agar backend ko chahiye)
         islasttakatrack: d.islasttakatrack, bstatus: d.bstatus, Status: d.Status, IsAuth: d.IsAuth,
         PrpCode: d.PrpCode, EMode: 'S', OprCode: '', d2: [],
       };
@@ -560,7 +536,6 @@ export default function CheckingScannerModule({ token, API }: Props) {
           setFv((p) => ({
             ...p, QltWt: row.QltWt, WarpLen: row.WarpLen, UId: row.UId, AuthStatus: row.AuthStatus, BeamNo: row.BeamNo,
             BeamUId: row.BeamUId, DsnCode: row.DsnCode, DsnName: row.DsnName,
-            nwarpwt: row.nwarpwt, nweftwt: row.nweftwt, nwpwfwt: row.nwpwfwt, // NEW
           }));
         }
         const des = r?.response?.design;
@@ -592,18 +567,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
             ...p, QltWt: d.QltWt, WarpLen: d.WarpLen, UId: d.UId, AuthStatus: d.AuthStatus, BeamNo: d.BeamNo, BeamUId: d.BeamUId,
             DsnCode: d.DsnCode, DsnName: d.DsnName, OrderNo: d.OrderNo, OrderUId: d.OrderUId, OrderDsnCode: d.OrderDsnCode,
             OrderDsnName: d.OrderDsnName, OrderLastDate: d.OrderLastDate, PlanNo: d.PlanNo, PlanUId: d.PlanUId, Status: d.Status, IsAuth: d.IsAuth,
-            nwarpwt: d.nwarpwt, nweftwt: d.nweftwt, nwpwfwt: d.nwpwfwt, // NEW
           }));
-
-          // design change hone par, agar meter pehle se bhara hai to Kgs / AvgWt dobara calculate
-          const qty = parseFloat(meter) || 0;
-          if (qty > 0) {
-            const wt = calcKgs(qty, d.nwpwfwt);
-            const avg = calcAvg(qty, parseFloat(wt) || 0);
-            setKgs(wt);
-            setAvgWt(avg);
-            setFv((p) => ({ ...p, Wt: wt, AvgWt: avg }));
-          }
         }
       }
     } catch (e) {
@@ -613,14 +577,14 @@ export default function CheckingScannerModule({ token, API }: Props) {
     }
   };
 
-  // Manual tab: Kgs = (nwpwfwt * meter) / 100
   const handleManualMeterChange = (raw: string) => {
     const value = raw.replace(',', '.');
     if (value === '' || METER_RE.test(value)) {
       setMeter(value);
       const qty = value === '' ? 0 : parseFloat(value);
-      const wt = calcKgs(qty, fv.nwpwfwt);
-      const avg = calcAvg(qty, parseFloat(wt) || 0);
+      const qltWt = parseFloat(fv.QltWt || 0);
+      const wt = qty > 0 && qltWt > 0 ? (qty * qltWt).toFixed(2) : '0.00';
+      const avg = qty > 0 && parseFloat(wt) > 0 ? ((parseFloat(wt) * 100) / qty).toFixed(2) : '0.00';
       setKgs(wt);
       setAvgWt(avg);
       setFv((p) => ({ ...p, Qty: value, Wt: wt, AvgWt: avg }));
@@ -987,11 +951,6 @@ export default function CheckingScannerModule({ token, API }: Props) {
               label="Design" required value={selectedDesign ? str(selectedDesign.dsnname) : ''} sub={selectedDesign ? `Code ${str(selectedDesign.dsncode)}` : null}
               placeholder="Choose design..." onPress={() => setPick('design')} icon="expand-more"
             />
-            {designData.length > 0 && (
-              <View style={{ marginTop: 2 }}>
-                <KV k="Wt / 100 Mtr" v={str(designData[0].nwpwfwt) || '-'} last />
-              </View>
-            )}
           </Card>
           <Card title="Production Details">
             {measure(handleMeterChange, handleKgsChange, `Meter${parseFloat(warpLen) > 0 ? ` [${warpLen}]` : ''}`)}
@@ -1101,7 +1060,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
             <View style={{ marginTop: 2 }}>
               <KV k="Machine" v={str(fv.MacName || fv.MacCode) || '-'} />
               <KV k="Warp Len" v={str(fv.WarpLen) || '-'} />
-              <KV k="Wt / 100 Mtr" v={str(fv.nwpwfwt) || '-'} last />
+              <KV k="Qlt Wt" v={str(fv.QltWt) || '-'} last />
             </View>
           )}
         </Card>
@@ -1162,7 +1121,6 @@ export default function CheckingScannerModule({ token, API }: Props) {
           islasttakatrack: item.islasttakatrack, OrderDsnCode: item.OrderDsnCode, OrderDsnName: item.OrderDsnName, OrderLastDate: item.OrderLastDate,
           OrderNo: item.OrderNo, OrderUId: item.OrderUId, PlanNo: item.PlanNo, PlanUId: item.PlanUId, QltWt: item.QltWt, Status: item.Status,
           WarpLen: item.WarpLen, UId: item.UId,
-          nwarpwt: item.nwarpwt, nweftwt: item.nweftwt, nwpwfwt: item.nwpwfwt, // NEW
         }));
         void fetchDesignHelp(item);
         void fetchManualShift(item.PrpCode);
@@ -1170,7 +1128,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
     },
     mdesign: {
       title: 'Select Design', list: manualDesigns, t: (x) => str(x.dsnname), sub: (x) => `Code ${str(x.dsncode)}`,
-      on: (x) => { setSelectedDesign(x); setFv((p) => ({ ...p, DsnCode: x.dsncode, DsnName: x.dsnname })); void manualDesignSelect(x, fv.TakaNo); },
+      on: (x) => { setSelectedDesign(x); setFv((p) => ({ ...p, DsnCode: x.dsncode, DsnName: x.dsnname })); void manualDesignSelect(x); },
     },
     mgrade: {
       title: 'Select Grade', list: manualGrades, t: (x) => str(x.GrdName), sub: (x) => `Code ${str(x.GrdCode)}`,
@@ -1315,6 +1273,12 @@ function ScannerList(p: {
                     <Text style={s.rowTitle} numberOfLines={1}>{str(item.DsnName) || '-'}</Text>
                     {!!item.GrdName && <Pill label={str(item.GrdName)} fg={T.green} bg={`${T.green}14`} />}
                   </View>
+                  {/* <View style={s.metaRow}>
+                    <Meta k="BEAM NO" v={str(item.BeamNo)} />
+                    <Meta k="TAKA" v={str(item.TakaNo)} />
+                    <Meta k="METER" v={`${str(item.Qty)} m`} />
+                  </View> */}
+
 
                   {/* Taka No - Full Width */}
                   <View style={s.takaCard}>
@@ -1537,3 +1501,4 @@ const s = StyleSheet.create({
   },
 
 });
+

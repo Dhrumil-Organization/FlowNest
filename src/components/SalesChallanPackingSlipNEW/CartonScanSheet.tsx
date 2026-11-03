@@ -34,7 +34,7 @@ import { confirmAsync } from '../ProductionOrderNEW/ui';
 import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
 import { apiErrorText } from './api';
 import type { Row } from './api';
-import { cartonLimit, cartonsIssue, cartonsOf, cartonView, matchCarton, n3, orderQtyOf, pickCarton, qty, sum } from './rules';
+import { cartonsIssue, cartonsOf, cartonView, matchCarton, n3, pickCarton, qty, sum } from './rules';
 import type { ScanResult } from './rules';
 import { CameraScanner, HardwareScanner } from './ScanDevices';
 import type { ScanDevice } from './ScanDevices';
@@ -60,8 +60,8 @@ const locOf = (r: { location: string; savedOnly?: boolean }) => r.location || (r
 const rank = (x: string) => (x === SAVED ? 2 : x === NO_LOC ? 1 : 0);
 const byLoc = (a: string, b: string) => rank(a) - rank(b) || a.localeCompare(b, undefined, { numeric: true });
 
-export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, device: startDevice, loadCartons, onDone, onClose }: {
-  open: boolean; row: Row | null; d1?: Row[]; extraPer?: number; d2: Row[]; uid: any; device: ScanDevice;
+export default function CartonScanSheet({ open, row, d2, uid, device: startDevice, loadCartons, onDone, onClose }: {
+  open: boolean; row: Row | null; d2: Row[]; uid: any; device: ScanDevice;
   loadCartons: (row: Row) => Promise<Row[]>; onDone: (srNo: any, cartons: Row[]) => void; onClose: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -178,29 +178,9 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
 
   if (!row) return null;
 
-  // Allowed qty = balance + order qty × extraqtyper % (getsetchallan) — same as the web ItemDetail / CartonSelect.
-  const orderQty = orderQtyOf(row, d1);
-  const target = cartonLimit(row, orderQty, extraPer);
-  const targetNote = extraPer > 0 ? `of ${qty(target)} allowed (bal. + ${extraPer}%)` : `of ${qty(target)} bal.`;
+  const target = n3(row.BQty);
   const sQty = sum(scanned, 'QtyWt');
   const over = n3(sQty) > target;
-
-  // ---- TEMP DEBUG (remove after testing): api qty, actual qty, allowed total, selected total, allowed true/false ----
-  const dbg = (tag: string, extra: Record<string, any> = {}) => console.log(`[CARTON-CHECK] ${tag}`, {
-    extraqtyper_api: extraPer,                       // getsetchallan → extraqtyper (%)
-    SOQty_order: orderQty,                           // order qty
-    BQty_balance: n3(row.BQty),                      // balance qty
-    extraQty: n3((orderQty * extraPer) / 100),       // SOQty × extraqtyper / 100
-    allowedTotal: target,                            // BQty + extraQty  (validation limit)
-    selectedTotal: n3(sQty),                         // cartons selected so far on this line
-    ...extra,
-  });
-  const dbgRes = (tag: string, res: ScanResult, raw?: string) => {
-    const cq = n3(res.source?.qty ?? res.carton?.QtyWt);
-    const after = n3(sQty + cq);
-    dbg(tag, { carton: raw ?? res.source?.cartno ?? res.carton?.CartNo, cartonQty: cq, selectedAfterAdd: after,
-      withinLimit: after <= target, status: res.status, allowed: res.status === 'added' });
-  };
   const dirty = scanned.length !== initial.length || scanned.some((c, i) => c !== initial[i]);
   const ready = !busy && list.length > 0;
   const selRows = rows.filter((r) => r.selected);
@@ -217,8 +197,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
   const read = (raw: string) => {
     const code = String(raw || '').trim();
     if (!code || busy) return;
-    const res = matchCarton(code, { list, scanned, others, srNo, uid, limit: target });
-    dbgRes('scan', res, code);
+    const res = matchCarton(code, { list, scanned, others, srNo, uid });
     setText('');
     if (res.status === 'added' && res.carton) {
       setScanned((s) => [...s, res.carton as Row]);
@@ -232,8 +211,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
     if (busy) return;
     const src = list.find((r) => String(r.cartno) === no);
     if (!src) return;
-    const res = pickCarton(src, { scanned, others, srNo, uid, limit: target });
-    dbgRes('pick', res, no);
+    const res = pickCarton(src, { scanned, others, srNo, uid });
     if (res.status === 'added' && res.carton) {
       setScanned((s) => [...s, res.carton as Row]);
       setManual((m) => new Set(m).add(no));
@@ -270,20 +248,17 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
     });
     const addQty = free.reduce((a, r) => a + n3(cartonView(r).qty), 0);
     if (n3(sQty + addQty) > target
-      && !(await confirmAsync(`Select ${l.name}?`, `${free.length} carton(s), ${qty(addQty)}. That would take the selection to ${qty(sQty + addQty)}, over the allowed qty ${qty(target)}. Cartons are added only until the allowed qty is reached.`, 'Select'))) return;
+      && !(await confirmAsync(`Select all of ${l.name}?`, `${free.length} carton(s), ${qty(addQty)}. That takes the selection to ${qty(sQty + addQty)}, over the balance ${qty(target)} — Done stays blocked until you take some off.`, 'Select all'))) return;
     let acc = scanned.slice();
-    let stop: ScanResult | null = null;
     const added: string[] = [];
-    for (const src of free) {
-      const res = pickCarton(src, { scanned: acc, others, srNo, uid, limit: target });
+    free.forEach((src) => {
+      const res = pickCarton(src, { scanned: acc, others, srNo, uid });
       if (res.status === 'added' && res.carton) { acc = [...acc, res.carton]; added.push(String(src.cartno)); }
-      else if (res.status === 'overqty') { stop = res; break; } // limit reached — stop here, like the web select-all
-    }
-    dbg('select-all', { location: l.name, tried: free.length, added: added.length, selectedAfter: n3(sum(acc, 'QtyWt')), stoppedByLimit: !!stop, allowed: !stop });
-    if (!added.length) { if (stop) fail(stop); return; }
+    });
+    if (!added.length) return;
     setScanned(acc);
     setManual((m) => { const n = new Set(m); added.forEach((x) => n.add(x)); return n; });
-    if (stop) fail(stop); else good({ status: 'added', message: `${added.length} carton(s) from ${l.name} selected by hand · ${qty(addQty)}` });
+    good({ status: 'added', message: `${added.length} carton(s) from ${l.name} selected by hand · ${qty(addQty)}` });
   };
 
   /* ---------- navigation ---------- */
@@ -303,8 +278,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
     onClose();
   };
   const done = () => {
-    const issue = cartonsIssue(row, scanned, others, target);
-    dbg('done', { issue: issue || 'none', allowed: !issue });
+    const issue = cartonsIssue(row, scanned, others);
     if (issue) { setDoneErr(issue); Vibration.vibrate([0, 120, 80, 120]); return; }
     onDone(srNo, scanned);
   };
@@ -347,7 +321,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
           <Icon name={miss.status === 'locked' ? 'lock' : miss.status === 'notfound' ? 'cancel' : 'error-outline'} size={22} color="#fff" />
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
-              {miss.status === 'duplicate' ? 'Already selected' : miss.status === 'locked' ? 'Locked carton' : miss.status === 'overqty' ? 'Qty exceeded' : 'Not found'}
+              {miss.status === 'duplicate' ? 'Already selected' : miss.status === 'locked' ? 'Locked carton' : 'Not found'}
             </Text>
             <Text style={[{ color: 'rgba(255,255,255,0.92)', fontSize: 13, marginTop: 1 }, tab]}>{miss.message}</Text>
           </View>
@@ -401,7 +375,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: 12 }}>
                     <Tile icon="inventory-2" color={T.copper} label="No. of cartons" value={String(scanned.length)} sub={`of ${parseInt(row.TotCarton, 10) || rows.length} (selected)`} wide={wide} phone={phone} />
-                    <Tile icon="scale" color={T.blue} label="Net weight" value={qty(sQty)} sub={targetNote} warn={over} wide={wide} phone={phone} />
+                    <Tile icon="scale" color={T.blue} label="Net weight" value={qty(sQty)} sub={`of ${qty(target)} bal.`} warn={over} wide={wide} phone={phone} />
                     <Tile icon="place" color={T.green} label="Locations" value={String(locations.length || '—')} sub={selLocs ? `${selLocs} with selected` : 'in stock'} wide={wide} phone={phone} />
                     <Tile icon="settings-suggest" color="#8B5CF6" label="Production type" value={types.join(', ') || '—'} sub={types.length > 1 ? 'mixed' : ' '} wide={wide} phone={phone} last />
                   </View>
@@ -413,7 +387,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
                   </View>
                   <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
                     <Bar value={target ? sQty / target : 0} tone={over ? 'red' : 'green'} height={8} />
-                    {over ? <Text style={{ color: T.red, fontSize: 12.5, fontWeight: '700', marginTop: 6 }}>Selected {qty(sQty)} is more than the allowed qty {qty(target)} — take a carton off.</Text> : null}
+                    {over ? <Text style={{ color: T.red, fontSize: 12.5, fontWeight: '700', marginTop: 6 }}>Selected {qty(sQty)} is more than the balance {qty(target)} — take a carton off.</Text> : null}
                   </View>
                 </View>
 
@@ -563,7 +537,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
                     <Icon name={miss.status === 'locked' ? 'lock' : miss.status === 'notfound' ? 'cancel' : 'error-outline'} size={22} color="#fff" />
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>
-                        {miss.status === 'duplicate' ? 'Already selected' : miss.status === 'locked' ? 'Locked carton' : miss.status === 'overqty' ? 'Qty exceeded' : 'Not found'}
+                        {miss.status === 'duplicate' ? 'Already selected' : miss.status === 'locked' ? 'Locked carton' : 'Not found'}
                       </Text>
                       <Text style={[{ color: 'rgba(255,255,255,0.92)', fontSize: 13, marginTop: 1 }, tab]}>{miss.message} Scan again.</Text>
                     </View>

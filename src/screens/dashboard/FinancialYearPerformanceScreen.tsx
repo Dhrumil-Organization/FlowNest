@@ -1135,28 +1135,13 @@ function SalesFinancialYearPerformanceScreen() {
     () => previous ? linesForRange(previous.report, previous.startYear, focus?.isCurrent ? currentMonthIndex : null) : [],
     [previous, focus?.isCurrent, currentMonthIndex],
   );
-  // An executive who has left can have no master name in the newer FY database
-  // while older FYs still carry it. Resolve blank names from any loaded FY.
-  const executiveNameByCode = useMemo(() => {
-    const names = new Map<string, string>();
-    Object.values(executiveOverview).forEach(rows => (rows || []).forEach(row => {
-      const code = String(row.executive_code || '').trim();
-      const name = String(row.executive_name || '').trim();
-      if (code && name && !names.has(code)) names.set(code, name);
-    }));
-    return names;
-  }, [executiveOverview]);
-  const executiveLabel = useCallback((code: string, name: string) =>
-    name || executiveNameByCode.get(code) || (code ? `Executive ${code}` : 'Unassigned'),
-  [executiveNameByCode]);
-
   const executiveRows = useMemo<GroupRow[]>(() => {
     if (!focus) return [];
     const preview = executiveOverview[focus.id] || [];
     if (preview.length) {
       return preview.map(row => ({
         code: String(row.executive_code || '').trim(),
-        name: executiveLabel(String(row.executive_code || '').trim(), String(row.executive_name || '').trim()),
+        name: String(row.executive_name || '').trim() || 'Unassigned',
         amount: n(row.amount),
         qty: 0,
         count: 0,
@@ -1164,7 +1149,7 @@ function SalesFinancialYearPerformanceScreen() {
     }
     // Detail-loaded years can still supply the overview locally.
     return focus.report?.details_loaded ? groupLines(focusRangeLines, 'executive', []) : [];
-  }, [focus, focusRangeLines, executiveOverview, executiveLabel]);
+  }, [focus, focusRangeLines, executiveOverview]);
   // Show EVERY executive in scope (owner: all; My View: all assigned), not a top 5.
   const topExecutives = executiveRows;
 
@@ -1174,12 +1159,12 @@ function SalesFinancialYearPerformanceScreen() {
     const rows: GroupRow[] = preview.length
       ? preview.map(row => ({
           code: String(row.executive_code || '').trim(),
-          name: executiveLabel(String(row.executive_code || '').trim(), String(row.executive_name || '').trim()),
+          name: String(row.executive_name || '').trim() || 'Unassigned',
           amount: n(row.amount), qty: 0, count: 0,
         }))
       : (previous.report?.details_loaded ? groupLines(previousRangeLines, 'executive', []) : []);
     return new Map(rows.map(row => [row.code || row.name, row]));
-  }, [previous, previousRangeLines, executiveOverview, executiveLabel]);
+  }, [previous, previousRangeLines, executiveOverview]);
 
   const selectYear = async (index: number) => {
     const spec = specs[index];

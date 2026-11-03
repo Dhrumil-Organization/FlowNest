@@ -104,8 +104,14 @@ end = html.find("\n  ];", start)
 html = html[:start] + "  const NAV = [\n" + html[start + len("  const NAV = [\n"):end] + "\n  ].filter((n) => __can(n.k));" + html[end + len("\n  ];"):]
 html = once(
     html,
+    '{ k: "expense", label: "Monthly Expense", sl: "Exp", g: "\\u20B9" },',
+    '{ k: "expense", label: "Monthly Expense", sl: "Exp", g: "\u20B9" },\n    { k: "coal_offers", label: "Coal Supplier Offers", sl: "Offers", g: "\u25A4" },',
+    "coal offers navigation",
+)
+html = once(
+    html,
     'const MOBILE_NAV = ["dash", "lots", "machines", "lab", "expense", "dispatch"];',
-    'const MOBILE_NAV = ["dash", "lots", "machines", "lab", "expense", "dispatch", "inward", "recipe", "reports"].filter((k) => NAV.some((n) => n.k === k)).slice(0, 6);',
+    'const MOBILE_NAV = ["dash", "lots", "machines", "lab", "expense", "coal_offers", "dispatch", "inward", "recipe", "reports"].filter((k) => NAV.some((n) => n.k === k)).slice(0, 7);',
     "MOBILE_NAV",
 )
 html = once(html, 'const initState = { user: null, screen: "dash",', 'const __HOME = (NAV[0] || { k: "dash" }).k;\n  const initState = { user: __M.user || null, screen: __HOME,', "initState")
@@ -196,6 +202,7 @@ html = once(
     ' : state.screen === "dispatch" ? React.createElement(LiveDispatch, { mobile })'
     ' : state.screen === "lab" ? React.createElement(LiveShades, { mobile })'
     ' : state.screen === "expense" ? (__M.strict ? React.createElement(LiveExpense, { mobile }) : React.createElement(ExpenseScreen, { mobile }))'
+    ' : state.screen === "coal_offers" ? (__M.strict ? React.createElement(LiveCoalOffers, { mobile }) : React.createElement(Stub, { item: NAV.find((n) => n.k === state.screen) }))'
     ' : state.screen === "reports" ? (__M.strict ? React.createElement(LiveReports, { mobile }) : React.createElement(ReportsScreen, { mobile }))'
     ' : React.createElement(Stub, { item: NAV.find((n) => n.k === state.screen) });',
     "body",

@@ -22,6 +22,8 @@ export const MILL_RIGHTS: Record<string, string> = {
   recipe: 'mill.recipes',
   dispatch: 'mill.dispatch',
   expense: 'mill.expense',
+  coal_offers: 'mill.expense.coal_offers',
+  steam_entry: 'mill.expense.coal_steam_entry',
   reports: 'mill.reports',
   'expense.coal': 'mill.expense.coal',
   'expense.coal_steam_entry': 'mill.expense.coal_steam_entry',
@@ -38,6 +40,7 @@ export const MILL_RIGHTS: Record<string, string> = {
 export const MILL_ACTION_RIGHTS: Record<string, [string, string]> = {
   'expense.coal_steam_entry:edit': ['mill.expense.coal_steam_entry', 'edit'],
   'expense.coal_optimiser:edit': ['mill.expense.coal_optimiser', 'edit'],
+  'coal_offers:edit': ['mill.expense.coal_offers', 'edit'],
   'expense.electricity:edit': ['mill.expense.electricity', 'edit'],
 };
 

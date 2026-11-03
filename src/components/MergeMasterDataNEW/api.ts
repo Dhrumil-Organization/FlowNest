@@ -1,18 +1,16 @@
 // FILE: src/components/MergeMasterDataNEW/api.ts
 // Merge Master Data — network layer (single place for URLs, payload keys and error handling).
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
+import AsyncStorage from '../../../common/utils/compatibleStorage';
 import {
+  MasterTable,
   MergePayload,
-  COMPANY_PRP_CODES,
-  GROUP_PRP_CODES,
   PropertyOpt,
   TXN_TYPE,
   extractList,
   findYearNo,
   toMasterTable,
-  MasterTable,
-  toPropertyOptions,
+  toPropertyOptions
 } from './model';
 
 /**

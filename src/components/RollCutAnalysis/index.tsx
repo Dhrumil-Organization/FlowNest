@@ -13,12 +13,12 @@
 //
 // Phone: one column.  Tablet / web: KPIs in 3–6 columns, Beams and Takas side by side (≥ 1100 px).
 // Same building blocks and look as the Roll Cut Scanner (DateField, cards, chips).
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { useBusinessContext } from '@/src/core/business';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import AsyncStorage from '@/common/utils/compatibleStorage';
-import { useBusinessContext } from '@/src/core/business';
 import { errMsg, fmtShowDate } from '../RollCutScanner/api';
 import DateField from '../RollCutScanner/DateField';
 import SelectField from '../RollCutScanner/SelectField';
@@ -129,6 +129,29 @@ export default function RollCutAnalysis({ token, API }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
+  const normalizeBeamNo = (item: any): string => {
+    if (item === null || item === undefined) return '';
+
+    if (typeof item !== 'object') {
+      return String(item).trim();
+    }
+
+    const value =
+      item.beamno ??
+      item.BeamNo ??
+      item.BeamNO ??
+      item.beam_no ??
+      item.Beam_No ??
+      item.Beam ??
+      item.value ??
+      item.label ??
+      item.name ??
+      item.Name ??
+      '';
+
+    return String(value ?? '').trim();
+  };
+
   const load = useCallback(async () => {
     const seq = ++reqSeq.current;
     abortRef.current?.abort();
@@ -143,7 +166,25 @@ export default function RollCutAnalysis({ token, API }: Props) {
       if (seq !== reqSeq.current) return;           // a newer selection is already loading
       setRep(r);
       setLoadedAt(new Date());
-      setBeamList((prev) => (Array.isArray(r.beam_list) ? r.beam_list : beam === '' ? r.beams.map((b) => b.beamno).filter(Boolean) : prev));
+      // setBeamList((prev) => (Array.isArray(r.beam_list) ? r.beam_list : beam === '' ? r.beams.map((b) => b.beamno).filter(Boolean) : prev));
+      const rawBeamList =
+        Array.isArray(r.beam_list) && r.beam_list.length > 0
+          ? r.beam_list
+          : beam === ''
+            ? (Array.isArray(r.beams) ? r.beams.map((b) => b.beamno) : [])
+            : null;
+
+      if (rawBeamList !== null) {
+        const normalizedBeams = Array.from(
+          new Set(
+            rawBeamList
+              .map(normalizeBeamNo)
+              .filter((value) => value.length > 0)
+          )
+        );
+
+        setBeamList(normalizedBeams);
+      }
       // keep the user's view (tab, search, status); drop a beam pick that is not in the new data
       setBeamPick((p) => (p && r.beams.some((b) => b.beamno === p) ? p : null));
     } catch (e: any) {
@@ -164,9 +205,19 @@ export default function RollCutAnalysis({ token, API }: Props) {
   }, [load, prptype, prptypeMissing]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // const beamOptions = useMemo(
+  //   () => [{ label: 'All beams', value: '' }, ...beamList.map((b) => ({ label: b, value: b }))],
+  //   [beamList],
+  // );
   const beamOptions = useMemo(
-    () => [{ label: 'All beams', value: '' }, ...beamList.map((b) => ({ label: b, value: b }))],
-    [beamList],
+    () => [
+      { label: 'All beams', value: '' },
+      ...beamList.map((b) => ({
+        label: String(b),
+        value: String(b),
+      })),
+    ],
+    [beamList]
   );
 
   /* search debounce + paging */
@@ -404,29 +455,29 @@ export default function RollCutAnalysis({ token, API }: Props) {
         <ScrollView contentContainerStyle={st.wrap}>
           {filterCard}
           <View style={loading ? st.stale : null} pointerEvents={loading ? 'none' : 'auto'}>
-          {kpis}
-          <View style={st.split}>
-            <View style={st.colL}>
-              {bucketCard}
-              <Text style={st.colTitle}>Beams</Text>
-              {beamsList}
-            </View>
-            <View style={st.colR}>
-              <View style={st.tabs}>
-                {([['takas', 'Takas', 'list-alt', takas.length], ['days', 'Day-wise', 'event-note', rep.daily.length]] as const).map(([k, l, ic, n]) => {
-                  const on = tab === k || (tab === 'beams' && k === 'takas');
-                  return (
-                    <TouchableOpacity key={k} style={[st.tab, on && st.tabOn]} onPress={() => setTab(k)} activeOpacity={0.8}>
-                      <Icon name={ic} size={17} color={on ? '#fff' : T.nav} />
-                      <Text style={[st.tabText, on && { color: '#fff' }]}>{l}</Text>
-                      <View style={[st.tabBadge, on && { backgroundColor: '#ffffff33' }]}><Text style={[st.tabBadgeText, on && { color: '#fff' }]}>{n}</Text></View>
-                    </TouchableOpacity>
-                  );
-                })}
+            {kpis}
+            <View style={st.split}>
+              <View style={st.colL}>
+                {bucketCard}
+                <Text style={st.colTitle}>Beams</Text>
+                {beamsList}
               </View>
-              {tab === 'days' ? daysList : takasList}
+              <View style={st.colR}>
+                <View style={st.tabs}>
+                  {([['takas', 'Takas', 'list-alt', takas.length], ['days', 'Day-wise', 'event-note', rep.daily.length]] as const).map(([k, l, ic, n]) => {
+                    const on = tab === k || (tab === 'beams' && k === 'takas');
+                    return (
+                      <TouchableOpacity key={k} style={[st.tab, on && st.tabOn]} onPress={() => setTab(k)} activeOpacity={0.8}>
+                        <Icon name={ic} size={17} color={on ? '#fff' : T.nav} />
+                        <Text style={[st.tabText, on && { color: '#fff' }]}>{l}</Text>
+                        <View style={[st.tabBadge, on && { backgroundColor: '#ffffff33' }]}><Text style={[st.tabBadgeText, on && { color: '#fff' }]}>{n}</Text></View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {tab === 'days' ? daysList : takasList}
+              </View>
             </View>
-          </View>
           </View>
         </ScrollView>
       </View>

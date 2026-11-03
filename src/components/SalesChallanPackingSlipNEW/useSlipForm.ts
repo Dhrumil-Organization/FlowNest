@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as A from './api';
 import type { Api, Ctx, Mode, PartyScope, Row } from './api';
 import {
-  PARTY_CLEAR, assignQtyIssue, blank, d1Key, maxSr, n3, orderToD1, partyFields, saveIssue, splitTypes, sum, today,
+  PARTY_CLEAR, assignQtyIssue, blank, d1Key, filterPartyRows, indexPartyRows, maxSr, n3, orderToD1, partyFields, saveIssue, splitTypes, sum, today,
 } from './rules';
 
 type Busy = Partial<Record<'load' | 'party' | 'stock' | 'save' | 'remove' | 'voucher', boolean>>;
@@ -21,6 +21,7 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   const [f, setF] = useState<Row>({ ChalDate: today(), d1: [], d2: [] });
   const [stock, setStock] = useState<Row[]>([]);
   const [meta, setMeta] = useState<Meta>({ prpType: '', strDesc: '', storeName: '' });
+  const [extraPer, setExtraPer] = useState(0); // getsetchallan extraqtyper — extra qty % allowed on cartons
   const [busy, setBusy] = useState<Busy>({});
   const [problem, setProblem] = useState<Problems>({});
   const fRef = useRef(f);
@@ -45,13 +46,15 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
     const id = ++seq.current.load;
     flag('load', true); fail('load');
     try {
-      const [r, prpType, store] = await Promise.all([
+      const [r, prpType, store, setting] = await Promise.all([
         A.showPackSlip(api, ctx, uid, mode),
         A.fetchPropertyType(api, ctx.prpcode).catch(() => ''),
         A.fetchStore(api, ctx).catch(() => undefined),
+        A.fetchSetChallan(api, ctx).catch(() => ({ extraqtyper: 0 })),
       ]);
       if (id !== seq.current.load) return;
       if (store === null) throw new Error('Store is not assigned to you. Kindly contact the administrator.');
+      setExtraPer(setting.extraqtyper);
       setMeta({ prpType, strDesc: String(store?.SDesc ?? ''), storeName: String(store?.StrName ?? store?.SName ?? store?.StrDesc ?? '') });
       setF((prev) => ({
         ...r.main,
@@ -94,10 +97,46 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
 
   /* ------------------------------ party (AllPartyDataSCPS) ------------------------------ */
 
-  /** Party help list, 20 a page like the web PartySelect (ServerPicker shows "Load more"). */
+  // Keep the full help list within this form and context only. The active request is
+  // shared by concurrent picker loads, so typing never starts another HTTP request.
+  // The property/store, session and party visibility scope are part of the cache key.
+  const partyListCache = useRef<{
+    key: string;
+    promise: Promise<ReturnType<typeof indexPartyRows>>;
+  } | null>(null);
+
+  /** Return locally filtered parties; page 0 exposes the complete cached list. */
   const searchParties = useCallback(async (search: string, page = 1) => {
-    const rows = await A.searchParties(api, ctx, { search, page, scope: opts.scope });
-    return { rows, more: rows.length >= A.PARTY_PAGE };
+    const cacheKey = JSON.stringify([
+      api.API, api.token, ctx.prpcode, ctx.yearno, ctx.strcode,
+      opts.scope?.isceo ?? '', opts.scope?.partype ?? '',
+    ]);
+
+    if (!partyListCache.current || partyListCache.current.key !== cacheKey) {
+      // accountbasic currently returns the complete accessible party list when
+      // limit is blank. Preserve the original server-side visibility filters.
+      const entry = {
+        key: cacheKey,
+        promise: A.searchParties(api, ctx, {
+          search: '', page: 1, limit: '', scope: opts.scope,
+        }).then(indexPartyRows),
+      };
+      partyListCache.current = entry;
+      // A failed initial load must be retried next time the picker is opened.
+      entry.promise.catch(() => {
+        if (partyListCache.current === entry) partyListCache.current = null;
+      });
+    }
+
+    const all = await partyListCache.current.promise;
+    const matches = filterPartyRows(all, search);
+    // Page 0 is the dedicated Party modal's full local dataset (not an API page).
+    // The API itself is still requested only once for this form/context.
+    if (page === 0) return { rows: matches.map((entry) => entry.row), more: false };
+    const pageNumber = Math.max(1, Math.floor(Number(page) || 1));
+    const offset = (pageNumber - 1) * A.PARTY_PAGE;
+    const rows = matches.slice(offset, offset + A.PARTY_PAGE).map((entry) => entry.row);
+    return { rows, more: offset + A.PARTY_PAGE < matches.length };
   }, [api, ctx, opts.scope]);
 
   /**
@@ -271,7 +310,7 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   };
 
   return {
-    f, stock, meta, busy, problem, totals, ready,
+    f, stock, meta, extraPer, busy, problem, totals, ready,
     actions: {
       reload: load, set, checkVoucher, clearProblem: (k: keyof Problems) => fail(k),
       searchParties, chooseParty, clearParty,

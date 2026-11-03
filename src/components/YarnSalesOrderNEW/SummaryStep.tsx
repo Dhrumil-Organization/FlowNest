@@ -79,7 +79,7 @@ import {
   yy,
 } from './model';
 import { Nav, PickFlow } from './nav';
-import { CONTENT, Dialog, FooterBar, InfoRow, ListSkeleton, PickerSheet, SearchInput, useCols } from './ui';
+import { CONTENT, Dialog, FooterBar, InfoRow, ListSkeleton, PickerSheet, PropertyChip, SearchInput, useCols } from './ui';
 
 export type SummaryParams = {
   ctx: OrderCtx;
@@ -588,6 +588,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
               prpcode: r.PrpCode || ctx.prpcode,
               yearno: r.YearNo || ctx.yearno,
               strcode: r.StrCode || ctx.strcode,
+              prpname: ctx.prpname,
             },
             dateTime: saveTimestamp(),
           },
@@ -812,6 +813,7 @@ export default function SummaryStep({ token, API, nav, params }: Props) {
         subtitle={`SO No : ${soNo || '-'}   ·   SO Date : ${soDate || '-'}`}
         right={
           <View style={st.headRight}>
+            <PropertyChip name={ctx.prpname} />
             <View style={st.modeBadge}>
               <Text style={st.modeText}>{badge}</Text>
             </View>

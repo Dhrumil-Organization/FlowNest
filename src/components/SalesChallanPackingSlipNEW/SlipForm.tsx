@@ -56,7 +56,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
   const [saved, setSaved] = useState(false); // tell the list to reload on Back
 
   const mode = nav.mode;
-  const { f, stock, meta, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
+  const { f, stock, meta, extraPer, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
 
   const go = (m: Mode, id?: string, msg?: { tone: 'ok' | 'err' | 'info'; text: string }) => {
     const next = allowed(m, id);
@@ -256,7 +256,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
         onAdd={(rows) => { actions.addOrders(rows); setSheet(''); }} />
       <ProdTypeSheet open={sheet === 'types'} onClose={() => setSheet('')} value={splitTypes(f.ProdTtype)} prpType={meta.prpType}
         load={actions.loadProdTypes} onApply={(codes) => { actions.set('ProdTtype', codes); setSheet(''); }} />
-      <CartonScanSheet open={!!scanRow} row={scanRow} d2={f.d2 || []} uid={f.UId} device={scanDevice} loadCartons={actions.loadCartons}
+      <CartonScanSheet open={!!scanRow} row={scanRow} d1={f.d1 || []} extraPer={extraPer} d2={f.d2 || []} uid={f.UId} device={scanDevice} loadCartons={actions.loadCartons}
         onClose={() => setScanRow(null)}
         onDone={(sr, cartons) => {
           actions.applyCartons(sr, cartons);

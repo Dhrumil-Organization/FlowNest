@@ -25,6 +25,33 @@ export function useCols() {
   return { width, isPhone, cols };
 }
 
+/** Property chip shown beside the header title (Select Party / New Sales Order). */
+export function PropertyChip({ name }: { name?: string }) {
+  if (!name) return null;
+  return (
+    <View style={pcSt.chip} accessibilityLabel={`Property ${name}`}>
+      <Icon name="apartment" size={14} color={T.copper} />
+      <Text style={pcSt.text} numberOfLines={1}>{name}</Text>
+    </View>
+  );
+}
+
+const pcSt = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: 240,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: `${T.copper}14`,
+    borderWidth: 1,
+    borderColor: `${T.copper}40`,
+  },
+  text: { flexShrink: 1, fontSize: 11.5, fontWeight: '800', color: T.copper },
+});
+
 /** Centred, max-width wrapper used by every step body. */
 export const CONTENT: any = { maxWidth: 1200, alignSelf: 'center', width: '100%' };
 

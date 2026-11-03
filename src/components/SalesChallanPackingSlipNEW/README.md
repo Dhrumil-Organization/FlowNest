@@ -11,7 +11,7 @@ Drop the folder into `src/components/`.
 | `@/src/theme` | `T`, `S` |
 | `../PackingAutomationNEW/ui` | `Section`, `PickerField`, `TextField`, `Btn`, `LinkBtn`, `Notice`, `ErrorText`, `Hint`, `FieldLabel`, `u`, `tab` |
 | `../PackingAutomationNEW/RouteStep` | `FacilitySheet` (property / year / store) |
-| `../ProductionOrderNEW/ui` | `ServerPicker` (party), `confirmAsync` |
+| `../ProductionOrderNEW/ui` | `confirmAsync` (the Party selector uses its own local `FlatList`) |
 | `../StockVerificationNEW/ui` | `Sheet`, `Btn` (pending orders, production type) |
 | `@/src/core/business` · `@/src/core/permissions` | `useBusinessContext`, `usePermission().canDo` |
 | `@/common/utils/compatibleStorage` | last facility used |
@@ -59,7 +59,7 @@ The screen never checks `view` itself, because the route guard already did. It r
 
 ## Party = AllPartyDataSCPS (`PartyField.tsx`)
 
-1. The help list calls `accountbasic`. It is searched on the server, 20 at a time. Each row shows code, city, GSTIN, MH and SH.
+1. The help list loads the full accessible list from `accountbasic` once per form/context (`limit: ''`). Typing filters the cached list locally with no API hit; a virtualized `FlatList` shows every match without accumulating stale result pages. Duplicate `acccode` rows are removed before display. Search covers only party name, code, city and GSTIN (not shared ledger-head text). A context/permission scope change invalidates the cache. Each row shows code, city, GSTIN, MH and SH.
 2. On pick, `accountget` fills the form: `ParCode`, `ParName`, `BADDRESS`, broker, D-address, `DueDay`, `GSTIN`, `PanNo`, `DlvAcc` and the rest, the same as the web's hasDueDay branch.
 3. If GSTIN is blank, it shows "Party GSTIN cannot be blank." and clears the party.
 4. `getlimit` merges `crlimit[0]` into the form.

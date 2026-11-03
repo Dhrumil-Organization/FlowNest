@@ -52,6 +52,8 @@ registerPermissionArea({
         },
         // Reports → Real Costing Chain (RealCostChainController): assumed vs actual cost per metre, design → beam
         { key: 'real_costing', name: 'Real Costing Chain', type: 'report', displayOrder: 45, actions: [] },
+        // Reports → Assign Report: the web ERP's "Reports" (get_user_saved_report_settings + rpt_gateway) on FlowNest
+        { key: 'assign_report', name: 'Assign Report', type: 'report', displayOrder: 50, actions: [{ key: 'export', name: 'Export' }] },
       ],
     },
   ],

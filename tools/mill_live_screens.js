@@ -166,7 +166,7 @@
     const [itm, setItm] = useState(null);
     const [iss, setIss] = useState(null);
     const [design, setDesign] = useState(false);
-    const [page, setPage] = useState(null);       // null | 'coal' | 'elec'  (live coal / steam / optimiser, electricity)
+    const [page, setPage] = useState(null);       // null | 'coal' | 'elec' | 'chem'  (live coal / steam / optimiser, electricity)
     useEffect(() => {
       let alive = true; setBusy(true); setCat(null); setItm(null);
       __api("expense/summary", { month: ym, trend: 6 }).then(function (r) { if (alive) { setD(r); setBusy(false); } });
@@ -180,6 +180,7 @@
     }, [itm, ym]);
 
     if (page === "coal") return React.createElement(LiveCoalHub, { mobile, ym, onBack: () => setPage(null), bill: d && d.success && d.data && d.data.billing ? d.data.billing.amount : 0 });
+    if (page === "chem") return React.createElement(LiveChemicals, { mobile, ym, onBack: () => setPage(null), bill: d && d.success && d.data && d.data.billing ? d.data.billing.amount : 0 });
     if (page === "elec") return React.createElement(LiveElectricity, { mobile, ym, onBack: () => setPage(null), bill: d && d.success && d.data && d.data.billing ? d.data.billing.amount : 0 });
     if (design) return React.createElement("div", null, React.createElement("div", { style: { marginBottom: 10 } }, React.createElement(ExpBack, { onBack: () => setDesign(false), label: "LIVE EXPENSE" })), __demoBanner("This coal / FBC / electricity detail"), React.createElement(ExpenseScreen, { mobile }));
 
@@ -227,11 +228,13 @@
     const openCat = function (c) {
       if (c.key === "coal" && __can("expense.coal")) setPage("coal");
       else if (c.key === "elec" && __can("expense.electricity")) setPage("elec");
+      else if (c.key === "chem" && __can("expense.chemicals")) setPage("chem");
       else setCat(c);
     };
     const catSub = function (c) {
       if (c.key === "coal" && __can("expense.coal")) return c.items.length + " coal / fuel items · ex-GST · FBC steam, thermopack, optimiser ›";
       if (c.key === "elec" && __can("expense.electricity")) return data.power && data.power.kwh ? fm(Math.round(data.power.kwh)) + " kWh (" + data.power.basis + ") × ₹" + data.power.rate + " · meter entry ›" : "no meter readings yet — tap to enter";
+      if (c.key === "chem" && __can("expense.chemicals")) return c.items.length + " items · by sub group, daily issue value ›";
       return c.items.length + " items";
     };
     const trend = data.trend || [];
@@ -709,6 +712,168 @@
   }
 
   /* ───────── Coal Mix Optimiser — measured performance from steam entries + live offers ───────── */
+
+  /* ───────── COAL SUPPLIER OFFERS — dedicated entry module ───────── */
+  function LiveCoalOffers({ mobile }) {
+    const today = (__M.today || TODAY);
+    const [day, setDay] = useState(today);
+    const [offerResult, setOfferResult] = useState(null);
+    const [coalResult, setCoalResult] = useState(null);
+    const [form, setForm] = useState({ q: "", s: "", rate: "", avail: "", remark: "", id: null });
+    const [newSupplier, setNewSupplier] = useState("");
+    const [showSupplier, setShowSupplier] = useState(false);
+    const [busy, setBusy] = useState("");
+    const [message, setMessage] = useState(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
+    const canEdit = __can("coal_offers:edit");
+
+    useEffect(() => {
+      let alive = true;
+      setOfferResult(null);
+      __api("expense/coal/offers", { date: day }).then(function (r) {
+        if (alive) setOfferResult(r);
+      });
+      return () => { alive = false; };
+    }, [day, reloadKey]);
+
+    useEffect(() => {
+      let alive = true;
+      __api("expense/coal", { month: day.slice(0, 7), history: 60, with: "coal" }).then(function (r) {
+        if (alive) setCoalResult(r);
+      });
+      return () => { alive = false; };
+    }, []);
+
+    const offers = offerResult && offerResult.success && offerResult.data
+      ? (offerResult.data.offers || []).filter((x) => x.date === day) : [];
+    const model = coalResult && coalResult.success && coalResult.data ? __coalModel(coalResult.data) : null;
+    const qualities = (model ? model.qs.slice() : []);
+    offers.forEach((x) => {
+      if (!qualities.some((q) => q.id === x.q)) qualities.push(model ? model.q(x.q) : { id: x.q, label: String(x.q), c: "#94a3b8" });
+    });
+    const suppliers = (offerResult && offerResult.data && Array.isArray(offerResult.data.suppliers))
+      ? offerResult.data.suppliers.slice() : [];
+    offers.forEach((x) => { if (x.s && !suppliers.includes(x.s)) suppliers.push(x.s); });
+
+    const change = (key, value) => setForm((old) => Object.assign({}, old, { [key]: value }));
+    const resetForm = () => setForm({ q: qualities[0] ? qualities[0].id : "", s: suppliers[0] || "", rate: "", avail: "", remark: "", id: null });
+
+    const saveOffer = () => {
+      const rate = Number(form.rate), avail = Number(form.avail);
+      const q = form.q || (qualities[0] && qualities[0].id);
+      const supplier = String(form.s || suppliers[0] || "").trim();
+      if (!q || !supplier || !(rate > 0) || !(avail > 0)) {
+        setMessage({ ok: false, text: "Select coal quality and supplier, then enter a valid rate and available quantity." });
+        return;
+      }
+      setBusy("save"); setMessage(null);
+      const payload = { date: day, q, s: supplier, rate, a: avail, remark: String(form.remark || "").trim() };
+      if (form.id) payload.id = form.id;
+      __api("expense/coal/offers/save", payload).then(function (r) {
+        setBusy("");
+        if (r && r.success) {
+          setMessage({ ok: true, text: r.message || "Supplier offer saved successfully." });
+          resetForm();
+          setReloadKey((x) => x + 1);
+        } else setMessage({ ok: false, text: (r && r.message) || "Offer could not be saved." });
+      });
+    };
+
+    const editOffer = (x) => {
+      setForm({ q: x.q, s: x.s, rate: String(x.rate), avail: String(x.a), remark: x.remark || "", id: x.id });
+      setMessage(null);
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const deleteOffer = (x) => {
+      if (confirmDeleteId !== x.id) {
+        setConfirmDeleteId(x.id);
+        setMessage({ ok: false, text: "Click CONFIRM DELETE to remove this offer." });
+        return;
+      }
+      setConfirmDeleteId(null);
+      setBusy("delete-" + x.id); setMessage(null);
+      __api("expense/coal/offers/delete", { id: x.id, date: day }).then(function (r) {
+        setBusy("");
+        if (r && r.success) {
+          setMessage({ ok: true, text: "Supplier offer removed." });
+          setReloadKey((v) => v + 1);
+          if (form.id === x.id) resetForm();
+        } else setMessage({ ok: false, text: (r && r.message) || "Offer could not be deleted." });
+      });
+    };
+
+    const addSupplier = () => {
+      const name = newSupplier.trim();
+      if (!name) { setMessage({ ok: false, text: "Enter a supplier name." }); return; }
+      if (suppliers.some((x) => x.toLowerCase() === name.toLowerCase())) {
+        change("s", suppliers.find((x) => x.toLowerCase() === name.toLowerCase()));
+        setNewSupplier(""); setShowSupplier(false); return;
+      }
+      const list = suppliers.concat([name]);
+      setBusy("supplier"); setMessage(null);
+      __api("expense/coal/suppliers/save", { suppliers: list }).then(function (r) {
+        setBusy("");
+        if (r && r.success) {
+          change("s", name); setNewSupplier(""); setShowSupplier(false);
+          setMessage({ ok: true, text: "Supplier added to the master list." });
+          setReloadKey((v) => v + 1);
+        } else setMessage({ ok: false, text: (r && r.message) || "Supplier could not be saved." });
+      });
+    };
+
+    const inputStyle = { width: "100%", boxSizing: "border-box", padding: "9px 10px", border: "1px solid " + C.line, borderRadius: 9, fontSize: 12.5, color: C.ink, background: "#fff", fontFamily: "inherit" };
+    const field = (label, control) => React.createElement("label", { style: { display: "grid", gap: 5, minWidth: 0, fontSize: 11, fontWeight: 800, color: C.slate } }, label, control);
+    const right = React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+      React.createElement(Chip, { text: day, bg: C.indigoSoft, fg: C.indigoDark }),
+      React.createElement(Chip, { text: offers.length + " OFFERS", bg: C.tealSoft, fg: C.teal }));
+    return React.createElement("div", null,
+      __liveHead("Coal Supplier Offers", "Daily purchase offers · supplier-wise rates · linked directly to Coal Mix Optimiser", mobile, right),
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14, padding: 12, background: C.card, border: "1px solid " + C.line, borderRadius: 12 } },
+        React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: C.slate } }, "ENTRY DATE"),
+        React.createElement("input", { type: "date", value: day, onChange: (e) => { setDay(e.target.value); setMessage(null); setForm({ q: "", s: "", rate: "", avail: "", remark: "", id: null }); }, style: Object.assign({}, inputStyle, { width: 165 }) }),
+        React.createElement("span", { style: { fontSize: 11.5, color: C.mut } }, "Offers are saved against this date only.")),
+      !offerResult ? __loadingBox("Loading supplier offers…") : !offerResult.success
+        ? __errBox("Supplier offers could not be loaded — " + (offerResult.message || "Please try again."))
+        : React.createElement(Section, { title: "Offers for " + __dl(day), right: React.createElement(Chip, { text: "RATE PER DATE · PER SUPPLIER", bg: C.amberSoft, fg: C.amber }), pad: false },
+          offers.length ? offers.map((x) => {
+            const q = qualities.find((v) => v.id === x.q) || { label: x.q, c: "#94a3b8" };
+            return React.createElement("div", { key: x.id, style: { display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1.3fr 1fr auto auto auto", gap: 10, alignItems: "center", padding: "11px 14px", borderTop: "1px solid " + C.line } },
+              React.createElement("div", { style: { minWidth: 0 } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 800, color: C.ink } },
+                  React.createElement("span", { style: { width: 8, height: 8, borderRadius: 2, background: q.c, flexShrink: 0 } }), q.label),
+                React.createElement("div", { style: { fontSize: 11.5, color: C.mut, marginTop: 3 } }, x.s)),
+              !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, "Supplier: " + x.s) : null,
+              React.createElement("span", { style: { fontSize: 12.5, fontWeight: 800, color: C.ink, whiteSpace: "nowrap" } }, "₹" + fm(x.rate) + " / ton"),
+              React.createElement("span", { style: { fontSize: 12, color: C.slate, whiteSpace: "nowrap" } }, fm(x.a) + " ton"),
+              canEdit ? React.createElement("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+                React.createElement("button", { onClick: () => editOffer(x), style: { border: "1px solid " + C.line, background: "#fff", borderRadius: 8, padding: "6px 9px", color: C.indigoDark, fontSize: 11, fontWeight: 800, cursor: "pointer" } }, "EDIT"),
+                React.createElement("button", { onClick: () => deleteOffer(x), disabled: busy === "delete-" + x.id, style: { border: "1px solid #fecdd3", background: confirmDeleteId === x.id ? C.roseSoft : "#fff", borderRadius: 8, padding: "6px 9px", color: C.rose, fontSize: 11, fontWeight: 800, cursor: "pointer" } }, busy === "delete-" + x.id ? "…" : confirmDeleteId === x.id ? "CONFIRM DELETE" : "DELETE"))
+                : null);
+          }) : React.createElement("div", { style: { padding: 16, fontSize: 12.5, color: C.mut } }, "No supplier offers entered for this date. Add an offer using the entry form below."),
+          message ? React.createElement("div", { style: { padding: "0 14px 12px" } }, __msg(message)) : null),
+      canEdit ? __gap(React.createElement(Section, { title: form.id ? "Edit supplier offer" : "New supplier offer", right: React.createElement(Chip, { text: "ENTRY FORM", bg: C.tealSoft, fg: C.teal }) },
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 12 } },
+          field("COAL QUALITY", React.createElement("select", { value: form.q || (qualities[0] && qualities[0].id) || "", onChange: (e) => change("q", e.target.value), style: inputStyle },
+            qualities.length ? qualities.map((q) => React.createElement("option", { key: q.id, value: q.id }, q.label)) : React.createElement("option", { value: "" }, "No coal quality available"))),
+          field("SUPPLIER", React.createElement("select", { value: form.s || suppliers[0] || "", onChange: (e) => change("s", e.target.value), style: inputStyle },
+            suppliers.length ? suppliers.map((s) => React.createElement("option", { key: s, value: s }, s)) : React.createElement("option", { value: "" }, "Add a supplier first"))),
+          field("RATE (₹ / TON)", React.createElement("input", { type: "number", min: "0.01", step: "0.01", value: form.rate, onChange: (e) => change("rate", e.target.value), placeholder: "Enter rate per ton", style: inputStyle })),
+          field("AVAILABLE QUANTITY (TON)", React.createElement("input", { type: "number", min: "0.001", step: "0.001", value: form.avail, onChange: (e) => change("avail", e.target.value), placeholder: "Enter available tons", style: inputStyle })),
+          field("REMARK (OPTIONAL)", React.createElement("input", { type: "text", maxLength: 200, value: form.remark, onChange: (e) => change("remark", e.target.value), placeholder: "Transport, validity or quality notes", style: inputStyle }))),
+        React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 14 } },
+          __btn(form.id ? "UPDATE OFFER" : "SAVE OFFER", saveOffer, null, busy === "save"),
+          form.id ? __btn("CANCEL EDIT", resetForm, "line") : null,
+          __btn(showSupplier ? "CLOSE SUPPLIER" : "+ NEW SUPPLIER", () => setShowSupplier((v) => !v), "line")),
+        showSupplier ? React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12, padding: 12, background: "#f0fdfa", borderRadius: 10 } },
+          React.createElement("input", { value: newSupplier, onChange: (e) => setNewSupplier(e.target.value), placeholder: "Enter new supplier name", style: Object.assign({}, inputStyle, { flex: 1, minWidth: 180 }) }),
+          __btn("SAVE SUPPLIER", addSupplier, null, busy === "supplier")) : null,
+        message ? React.createElement("div", { style: { marginTop: 10 } }, __msg(message)) : null))
+        : __gap(React.createElement("div", { style: { background: C.amberSoft, border: "1px solid #fcd34d", borderRadius: 10, padding: 12, fontSize: 12, color: C.amber, fontWeight: 700 } }, "You have view-only access. Contact your Mill Hub administrator to get the Coal Supplier Offers edit permission.")),
+      __note("Source: Mills MHCoalOffer and coal supplier settings. Entries made here are used by the Coal Mix Optimiser for the matching date."));
+  }
+
   function LiveOptimiser({ mobile, data, M: M0, onBack }) {
     // the optimiser needs 60 days of coal + steam for measured performance → its own call, only when opened
     const [hist, setHist] = useState(null);
@@ -784,7 +949,7 @@
       const missing = Q.filter((q) => consOf(q.id).min > 0 && offers.every((x) => x.q !== q.id));
       if (missing.length) return { list: [], reason: "No offer entered for " + missing.map((q) => q.label).join(", ") + " on this date — its minimum is above 0%. Add an offer or set the minimum to 0." };
       const QS = Q.filter((q) => offers.some((x) => x.q === q.id));
-      if (!QS.length) return { list: [], reason: "No offers entered for this date — add supplier offers below." };
+      if (!QS.length) return { list: [], reason: "No offers entered for this date — add them in the Coal Supplier Offers module." };
       const ladder = {};
       QS.forEach((q) => { ladder[q.id] = offers.filter((x) => x.q === q.id).map((x) => { const p = perfOf(q.id); return { o: x, eff: p.eff, hist: p.hist, perKgSteam: x.rate / (p.eff * 1e3), steamCap: x.a * p.eff }; }).sort((a, b) => a.perKgSteam - b.perKgSteam); });
       const step = QS.length > 5 ? 10 : 5;
@@ -852,18 +1017,19 @@
             React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.ink, whiteSpace: "nowrap" } }, "₹" + fm(x.rate) + "/t"),
             React.createElement("span", { style: { fontSize: 12, color: C.slate, whiteSpace: "nowrap" } }, x.a + " t"),
             !mobile ? React.createElement("span", { style: { fontSize: 11.5, fontWeight: 800, color: p.hist ? C.teal : C.mut, whiteSpace: "nowrap" } }, "₹" + (x.rate / (p.eff * 1e3)).toFixed(2) + "/kg stm") : null,
-            canEdit ? React.createElement("button", { onClick: () => delOffer(x), style: { border: "none", background: "transparent", color: C.rose, fontSize: 14, cursor: "pointer", padding: 2 } }, busy === "del" + x.id ? "…" : "✕") : React.createElement("span", null));
+            React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "VIEW"));
         }) : React.createElement("div", { style: { padding: "12px 14px", fontSize: 12, color: C.mut } }, "No offers entered for this date — only entered offers are used, nothing is assumed."),
-        canEdit ? React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "10px 14px", borderTop: "1px solid " + C.line, background: "#fbfcff" } },
+        false && canEdit ? React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "10px 14px", borderTop: "1px solid " + C.line, background: "#fbfcff" } },
           React.createElement("select", { value: form.q || (Q[0] && Q[0].id) || "", onChange: (e) => setForm(Object.assign({}, form, { q: e.target.value })), style: Object.assign({}, selStyle, { maxWidth: mobile ? 170 : 240 }) }, Q.map((q) => React.createElement("option", { key: q.id, value: q.id }, q.label))),
           React.createElement("select", { value: form.s || suppliers[0] || "", onChange: (e) => setForm(Object.assign({}, form, { s: e.target.value })), style: Object.assign({}, selStyle, { maxWidth: mobile ? 150 : 210 }) }, suppliers.map((s) => React.createElement("option", { key: s, value: s }, s))),
           React.createElement("button", { onClick: () => setAddingSup(!addingSup), style: { border: "1px solid " + C.teal, background: "#fff", color: C.teal, borderRadius: 999, padding: "6px 12px", fontSize: 11, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" } }, "+ SUPPLIER"),
           React.createElement(OptInput, { v: form.r, set: (v) => setForm(Object.assign({}, form, { r: v })), ph: "₹ / ton", w: 78 }),
           React.createElement(OptInput, { v: form.a, set: (v) => setForm(Object.assign({}, form, { a: v })), ph: "Avail t", w: 64 }),
           __btn("ADD", addOffer, null, busy === "add")) : null,
-        canEdit && addingSup ? React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", padding: "10px 14px", borderTop: "1px dashed " + C.line, background: "#f0fdfa" } },
+        false && canEdit && addingSup ? React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", padding: "10px 14px", borderTop: "1px dashed " + C.line, background: "#f0fdfa" } },
           React.createElement("input", { value: newSup, placeholder: "New supplier name", onChange: (e) => setNewSup(e.target.value), style: { flex: 1, minWidth: 140, padding: "6px 8px", border: "1px solid " + C.line, borderRadius: 8, fontSize: 12, fontFamily: "inherit", color: C.ink } }),
           __btn("SAVE", saveSupplier, null, busy === "sup")) : null,
+        React.createElement("div", { style: { padding: "10px 14px", borderTop: "1px solid " + C.line, background: "#fbfcff", fontSize: 11.5, color: C.slate } }, "Supplier offer entry and editing are now managed from the Coal Supplier Offers module in the Mill Hub sidebar."),
         msg ? React.createElement("div", { style: { padding: "0 14px 10px" } }, __msg(msg)) : null)),
       __gap(React.createElement(Section, { title: "Boiler constraints", right: React.createElement(Chip, { text: canEdit ? "EDITABLE" : "READ ONLY", bg: C.indigoSoft, fg: C.indigoDark }) },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 8, borderBottom: "1px dashed " + C.line } },
@@ -922,6 +1088,7 @@
   var __PG = [
     { k: "jet", t: "DYEING — JET MACHINES", c: "#4f46e5" }, { k: "stn", t: "STENTER MACHINES", c: "#0d9488" }, { k: "blr", t: "BOILER HOUSE — ELECTRICAL", c: "#d97706" },
     { k: "wtr", t: "WATER & UTILITIES", c: "#0891b2" }, { k: "util", t: "COMPRESSORS", c: "#64748b" }, { k: "digi", t: "DIGITAL PRINT (SEPARATE)", c: "#db2777" }, { k: "other", t: "OTHER METERS", c: "#94a3b8" }];
+  function __gName(k) { return ({ jet: "Dyeing — jet machines", stn: "Stenter machines", blr: "Boiler house — electrical", wtr: "Water & utilities", util: "Compressors", digi: "Digital print", other: "Other meters" })[k] || k; }
   var __GRP_OPTS = [["jet", "Jet"], ["stn", "Stenter"], ["blr", "Boiler house"], ["wtr", "Water & utilities"], ["util", "Compressor / utility"], ["digi", "Digital"], ["main", "Main supply (Torrent)"], ["other", "Other"]];
   var __PROD_OPTS = [["dye", "dyeing prod."], ["stn", "stenter prod."], ["own", "own prod. (entered)"], ["all", "dye + stenter + digital"], ["none", "no ₹/m"]];
 
@@ -935,7 +1102,14 @@
     P.p = function (dt, code) { var r = reads[dt] && reads[dt][code]; return r && r.p != null ? __n(r.p) : null; };
     P.dye = function (dt) { var x = P.dyeP[dt]; return x ? __n(x.mtr) : 0; };
     P.grpProd = function (dt, g) { return meters.filter(function (m) { return m.grp === g; }).reduce(function (a, m) { return a + __n(P.p(dt, m.code)); }, 0); };
+    var macKey = function (x) { return String(x || "").toUpperCase().replace(/[^A-Z0-9_\-]/g, ""); };
+    var dyeMac = {};
+    Object.keys(d.dye_mac || {}).forEach(function (dt) { var o = {}; Object.keys(d.dye_mac[dt] || {}).forEach(function (k) { o[macKey(k)] = __n(d.dye_mac[dt][k]); }); dyeMac[dt] = o; });
+    P.hasMac = Object.keys(dyeMac).length > 0;
     P.prodOf = function (m, dt) {
+      // a machine's own meter (code M-<MacCode>) → that machine's dyeing metres when FAMMR carries the machine
+      var mac = m.mac || (String(m.code).indexOf("M-") === 0 ? String(m.code).slice(2) : "");
+      if (m.prod === "dye" && mac && P.hasMac) return __n((dyeMac[dt] || {})[macKey(mac)]);
       if (m.prod === "dye") return P.dye(dt);
       if (m.prod === "stn") return P.grpProd(dt, "stn");
       if (m.prod === "own") return __n(P.p(dt, m.code));
@@ -969,7 +1143,7 @@
     if (!d) return React.createElement("div", null, head(), __loadingBox());
     if (!d.success || !d.data) return React.createElement("div", null, head(), __errBox("Electricity could not be read from Mills — " + (d.message || "") + (d.data && d.data.errors ? " · " + d.data.errors.join(" | ") : "")));
     const data = Object.assign({}, d.data);
-    if (dy && dy.success && dy.data) { data.dye = dy.data.days || {}; data.dye_basis = dy.data.basis || null; }
+    if (dy && dy.success && dy.data) { data.dye = dy.data.days || {}; data.dye_basis = dy.data.basis || null; data.dye_mac = dy.data.by_mac || {}; }
     else if (dy) data.errors = (data.errors || []).concat(["Dyeing production: " + (dy.message || "not read")]);
     const P = __powerModel(data);
     const canEdit = __can("expense.electricity:edit");
@@ -980,7 +1154,7 @@
       React.createElement(ExpTab, { text: "MONTHLY", act: tab === "month", onClick: () => setTab("month") }),
       React.createElement(ExpTab, { text: "DAILY REPORT", act: tab === "day", onClick: () => setTab("day") }),
       React.createElement(ExpTab, { text: canEdit ? "DAILY ENTRY" : "READINGS", act: tab === "entry", onClick: () => setTab("entry") }),
-      canEdit ? React.createElement(ExpTab, { text: "METERS", act: tab === "meters", onClick: () => setTab("meters") }) : null);
+      canEdit ? React.createElement(ExpTab, { text: "METER SETUP", act: tab === "meters", onClick: () => setTab("meters") }) : null);
     const right = React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
       React.createElement(Chip, { text: data.month }),
       billAmt && cost ? React.createElement(Chip, { text: (cost / billAmt * 100).toFixed(1) + "% OF BILLING", bg: C.amberSoft, fg: C.amber }) : null,
@@ -998,6 +1172,7 @@
     const [sel, setSel] = useState(null);
     const [mode, setMode] = useState("kwh");
     const [open, setOpen] = useState(null);
+    const [openG, setOpenG] = useState(null);
     const days = P.days, n = P.entered.length;
     if (!n) return __gap(React.createElement(Section, { title: "No meter entries yet" }, React.createElement("div", { style: { fontSize: 12.5, color: C.slate, lineHeight: 1.6 } }, "No electricity readings are entered for " + data.month + ". Open DAILY ENTRY and enter the day's meter readings (or kWh) — the month, the daily report and the Monthly Expense pick them up on their own.")));
     const mainM = days.reduce((a, dt) => a + __n(P.mainKwh(dt)), 0);
@@ -1025,26 +1200,40 @@
         sel != null ? React.createElement("div", { style: { fontSize: 11.5, fontWeight: 700, color: C.slate, marginBottom: 6 } }, __dl(days[sel]) + " — " + (mode === "kwh" ? fm(Math.round(vals[sel])) + " kWh" : vals[sel] ? "₹" + vals[sel].toFixed(2) + " / m" : "production not found")) : null,
         React.createElement(ExpBars, { vals, sel, onPick: (i) => setSel(sel === i ? null : i), color: C.indigo, h: 110, mobile, labels: __ticks(days) }),
         React.createElement("div", { style: { fontSize: 11, color: C.mut, marginTop: 8 } }, "Daily ₹/m works on machine production of that day (dyeing + stenter + digital), exactly like the daily power sheet."))),
-      groups.map((G) => { const tk = G.rows.reduce((a, r) => a + r.kwh, 0);
-        return __gap(React.createElement(Section, { key: G.g.k, title: G.g.t, right: React.createElement(Chip, { text: fm(Math.round(tk)) + " kWh · " + inr(tk * P.rate) }), pad: false },
-          G.rows.map((r) => { const op = open === r.m.code; const perM = r.prod ? r.cost / r.prod : null;
-            return React.createElement("div", { key: r.m.code, style: { borderTop: "1px solid " + C.line } },
-              React.createElement("div", { onClick: () => setOpen(op ? null : r.m.code), style: { display: "grid", gridTemplateColumns: mobile ? "1fr auto 14px" : "1.4fr auto auto auto 14px", gap: 10, alignItems: "baseline", padding: "10px 14px", cursor: "pointer", background: op ? "#fbfcff" : "transparent" } },
-                React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, React.createElement("span", { style: { width: 8, height: 8, borderRadius: 99, background: G.g.c, flexShrink: 0 } }), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, r.m.name)),
-                !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, fm(Math.round(r.kwh)) + " kWh") : null,
-                !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, perM != null ? "₹" + perM.toFixed(3) + "/m" : "—") : null,
-                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 800, color: C.ink } }, inr(r.cost)),
-                React.createElement("span", { style: { color: C.mut } }, op ? "▾" : "▸")),
-              op ? React.createElement("div", { style: { padding: "2px 14px 12px", background: "#fbfcff", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", columnGap: 26 } },
-                React.createElement(ExpKV, { k: "Units", v: fm(Math.round(r.kwh)) + " kWh" }), React.createElement(ExpKV, { k: "Cost", v: inr(r.cost), strong: true }),
-                React.createElement(ExpKV, { k: "Avg units / day", v: r.dn ? fm(Math.round(r.kwh / r.dn)) + " kWh · " + (r.kwh / r.dn / 24).toFixed(1) + " kW" : "—" }),
-                React.createElement(ExpKV, { k: "Machines on meter", v: r.m.machines ? String(r.m.machines) : "—" }),
-                React.createElement(ExpKV, { k: "Production (" + (__PROD_OPTS.find((x) => x[0] === r.m.prod) || ["", "—"])[1] + ")", v: r.prod ? fm(Math.round(r.prod)) + " m" : "—" }),
-                React.createElement(ExpKV, { k: "Units per m", v: r.prod ? (r.kwh / r.prod).toFixed(4) : "—" }),
-                React.createElement(ExpKV, { k: "₹ per m", v: perM != null ? "₹" + perM.toFixed(3) : "—", strong: true, accent: C.teal }),
-                React.createElement(ExpKV, { k: "Days entered", v: r.dn + " of " + days.length })) : null);
-          })));
-      }),
+      __gap(React.createElement(Section, { title: "Machine groups — " + data.month, right: React.createElement(Chip, { text: "TAP A GROUP", bg: C.indigoSoft, fg: C.indigoDark }), pad: false },
+        groups.map((G) => { const tk = G.rows.reduce((a, r) => a + r.kwh, 0), tc = tk * P.rate, isOpen = openG === G.g.k;
+          const gp = G.g.k === "jet" ? (P.hasMac ? G.rows.reduce((a, r) => a + r.prod, 0) : days.reduce((a, dt) => a + P.dye(dt), 0)) : G.g.k === "stn" ? days.reduce((a, dt) => a + P.grpProd(dt, "stn"), 0) : G.g.k === "digi" ? days.reduce((a, dt) => a + P.grpProd(dt, "digi"), 0) : 0;
+          const share = subM ? tk / subM * 100 : 0;
+          return React.createElement("div", { key: G.g.k, style: { borderTop: "1px solid " + C.line } },
+            React.createElement("div", { onClick: () => { setOpenG(isOpen ? null : G.g.k); setOpen(null); }, style: { padding: "10px 14px", cursor: "pointer", background: isOpen ? "#f6f8fd" : "transparent" } },
+              React.createElement("div", { style: { display: "grid", gridTemplateColumns: mobile ? "1fr auto 14px" : "1.4fr auto auto auto 14px", gap: 10, alignItems: "baseline" } },
+                React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, React.createElement("span", { style: { width: 9, height: 9, borderRadius: 99, background: G.g.c, flexShrink: 0 } }),
+                  React.createElement("span", { style: { fontSize: 12.5, fontWeight: 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, __gName(G.g.k) + " · " + G.rows.length)),
+                !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, fm(Math.round(tk)) + " kWh") : null,
+                !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, gp ? "₹" + (tc / gp).toFixed(3) + "/m" : "—") : null,
+                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 800, color: C.ink } }, inr(tc)),
+                React.createElement("span", { style: { color: C.mut } }, isOpen ? "▾" : "▸")),
+              React.createElement("div", { style: { fontSize: 11, color: C.mut, marginTop: 2 } }, share.toFixed(1) + "% of sub-meters" + (gp ? " · " + fm(Math.round(gp)) + " m production" : "") + (mobile ? " · " + fm(Math.round(tk)) + " kWh" : "")),
+              React.createElement("div", { style: { height: 5, background: "#eef1f8", borderRadius: 99, overflow: "hidden", marginTop: 6 } }, React.createElement("div", { style: { width: Math.max(1, share) + "%", height: "100%", background: G.g.c } }))),
+            isOpen ? React.createElement("div", { style: { background: "#fbfcff", borderTop: "1px dashed " + C.line } },
+              G.rows.slice().sort((a, b) => b.kwh - a.kwh).map((r) => { const op = open === r.m.code; const perM = r.prod ? r.cost / r.prod : null;
+                return React.createElement("div", { key: r.m.code, style: { borderTop: "1px solid #eef1f8" } },
+                  React.createElement("div", { onClick: () => setOpen(op ? null : r.m.code), style: { display: "grid", gridTemplateColumns: mobile ? "1fr auto 14px" : "1.4fr auto auto auto 14px", gap: 10, alignItems: "baseline", padding: "9px 14px 9px 31px", cursor: "pointer" } },
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, r.m.name),
+                    !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, fm(Math.round(r.kwh)) + " kWh") : null,
+                    !mobile ? React.createElement("span", { style: { fontSize: 12, color: C.slate } }, perM != null ? "₹" + perM.toFixed(3) + "/m" : "—") : null,
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 800, color: C.ink } }, inr(r.cost)),
+                    React.createElement("span", { style: { color: C.mut, fontSize: 11 } }, op ? "▾" : "▸")),
+                  op ? React.createElement("div", { style: { padding: "2px 14px 12px 31px", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", columnGap: 26 } },
+                    React.createElement(ExpKV, { k: "Units", v: fm(Math.round(r.kwh)) + " kWh" }), React.createElement(ExpKV, { k: "Cost", v: inr(r.cost), strong: true }),
+                    React.createElement(ExpKV, { k: "Avg units / day", v: r.dn ? fm(Math.round(r.kwh / r.dn)) + " kWh · " + (r.kwh / r.dn / 24).toFixed(1) + " kW" : "—" }),
+                    React.createElement(ExpKV, { k: "Share of the group", v: tk ? (r.kwh / tk * 100).toFixed(1) + "%" : "—" }),
+                    React.createElement(ExpKV, { k: "Production (" + (__PROD_OPTS.find((x) => x[0] === r.m.prod) || ["", "—"])[1] + ")", v: r.prod ? fm(Math.round(r.prod)) + " m" : "—" }),
+                    React.createElement(ExpKV, { k: "Units per m", v: r.prod ? (r.kwh / r.prod).toFixed(4) : "—" }),
+                    React.createElement(ExpKV, { k: "₹ per m", v: perM != null ? "₹" + perM.toFixed(3) : "—", strong: true, accent: C.teal }),
+                    React.createElement(ExpKV, { k: "Days entered", v: r.dn + " of " + days.length })) : null);
+              })) : null);
+        }))),
       mainM > 0 ? __gap(React.createElement(Section, { title: "Torrent supply vs sub-meters" },
         React.createElement(ExpKV, { k: "Torrent supply", v: fm(Math.round(mainM)) + " kWh · " + inr(mainM * P.rate), strong: true }),
         React.createElement(ExpKV, { k: "Σ sub-meters", v: fm(Math.round(subM)) + " kWh · " + inr(subM * P.rate) }),
@@ -1057,6 +1246,8 @@
     const def = P.entered.length ? P.entered[P.entered.length - 1] : (ds[ds.length - 1] || P.days[0]);
     const [dt, setDt] = useState(def);
     const [coal, setCoal] = useState(null);
+    const [openG, setOpenG] = useState(null);
+    const [openM, setOpenM] = useState(null);
     useEffect(() => {
       if (!__can("expense.coal")) return;
       let alive = true;
@@ -1071,6 +1262,8 @@
       !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "PRODUCTION") : null, !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "₹ / M") : null, !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "PREV DAY") : null);
     const groups = __PG.map((g) => ({ g, ms: P.subs.filter((m) => (__PG.some((x) => x.k === m.grp) ? m.grp : "other") === g.k) })).filter((x) => x.ms.length);
     const sup = P.supply(dt), supPrev = prevDt ? P.supply(prevDt) : null;
+    const cols = mobile ? "1.3fr 70px 64px 14px" : "1.6fr 90px 70px 90px 80px 90px 14px";
+    const grpProdOf = (G, day) => G.g.k === "jet" ? (P.hasMac ? G.ms.reduce((a, m) => a + P.prodOf(m, day), 0) : P.dye(day)) : G.g.k === "stn" ? P.grpProd(day, "stn") : G.g.k === "digi" ? P.grpProd(day, "digi") : 0;
     const prodAll = P.dye(dt) + P.grpProd(dt, "stn") + P.grpProd(dt, "digi");
     // coal & steam block of the daily report (needs the Coal right)
     let coalBlock = null;
@@ -1100,20 +1293,55 @@
         React.createElement(Kpi, { key: "b", mobile, label: "Cost", value: inr(sup * P.rate), sub: "@ ₹" + P.rate + " / kWh", accent: C.ink }),
         React.createElement(Kpi, { key: "c", mobile, label: "Production", value: fm(Math.round(prodAll)) + " m", sub: "dye " + fm(Math.round(P.dye(dt))) + " · stenter " + fm(Math.round(P.grpProd(dt, "stn"))) + " · digital " + fm(Math.round(P.grpProd(dt, "digi"))), accent: C.teal }),
         React.createElement(Kpi, { key: "d", mobile, label: "₹ per Metre", value: prodAll && sup ? "₹" + (sup * P.rate / prodAll).toFixed(3) : "—", sub: "Torrent on machine production", accent: C.amber })]),
-      groups.map((G) => { const tot = G.ms.reduce((a, m) => a + __n(row(m, dt).k), 0), totP = prevDt ? G.ms.reduce((a, m) => a + __n(row(m, prevDt).k), 0) : null;
-        const gp = G.ms.length ? (G.g.k === "jet" || G.g.k === "blr" ? P.dye(dt) : G.g.k === "stn" ? P.grpProd(dt, "stn") : G.g.k === "digi" ? P.grpProd(dt, "digi") : 0) : 0;
-        return __gap(React.createElement(Section, { key: G.g.k, title: G.g.t, right: React.createElement(Chip, { text: fm(Math.round(tot)) + " kWh" + (gp && G.g.k !== "blr" ? " · ₹" + (tot * P.rate / gp).toFixed(3) + "/m" : "") }), pad: false }, head,
-          G.ms.map((m) => { const r = row(m, dt), rp = prevDt ? row(m, prevDt) : null;
-            return React.createElement("div", { key: m.code, style: { display: "grid", gridTemplateColumns: mobile ? "1.3fr 70px 64px" : "1.6fr 90px 70px 90px 80px 90px", gap: 8, padding: "8px 14px", borderTop: "1px solid " + C.line, alignItems: "baseline" } },
-              React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, m.name),
-              cell(r.k != null ? fm(Math.round(r.k * 10) / 10) : "—", true),
-              mobile ? cell(r.perM != null ? r.perM.toFixed(3) : "—") : cell(r.kw != null ? r.kw.toFixed(1) : "—"),
-              !mobile ? cell(r.pr ? fm(Math.round(r.pr)) : "—") : null, !mobile ? cell(r.perM != null ? "₹" + r.perM.toFixed(3) : "—") : null,
-              !mobile ? cell(rp && rp.k != null ? fm(Math.round(rp.k * 10) / 10) : "—") : null);
-          }),
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", padding: "8px 14px", borderTop: "2px solid " + C.ink, fontSize: 12, fontWeight: 800, color: C.ink, flexWrap: "wrap", gap: 8 } },
-            React.createElement("span", null, "Total kWh and units"), React.createElement("span", null, fm(Math.round(tot)) + " kWh · " + (tot / 24).toFixed(1) + " kW" + (totP != null ? " · prev " + fm(Math.round(totP)) : "")))));
-      }),
+      __gap(React.createElement(Section, { title: "Machine groups — " + __dl(dt), right: React.createElement(Chip, { text: "TAP A GROUP", bg: C.indigoSoft, fg: C.indigoDark }), pad: false },
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: cols, gap: 8, padding: "6px 14px", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.5, color: C.mut } },
+          React.createElement("span", null, "GROUP / MACHINE"), React.createElement("span", { style: { textAlign: "right" } }, "KWH"), React.createElement("span", { style: { textAlign: "right" } }, mobile ? "₹/M" : "AVG KW"),
+          !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "PRODUCTION") : null, !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "₹ / M") : null, !mobile ? React.createElement("span", { style: { textAlign: "right" } }, "PREV DAY") : null, React.createElement("span", null)),
+        groups.map((G) => {
+          const tot = G.ms.reduce((a, m) => a + __n(row(m, dt).k), 0), totP = prevDt ? G.ms.reduce((a, m) => a + __n(row(m, prevDt).k), 0) : null;
+          const gp = grpProdOf(G, dt), gperM = gp && tot ? tot * P.rate / gp : null, isOpen = openG === G.g.k;
+          const entered = G.ms.filter((m) => row(m, dt).k != null).length;
+          return React.createElement("div", { key: G.g.k, style: { borderTop: "1px solid " + C.line } },
+            React.createElement("div", { onClick: () => { setOpenG(isOpen ? null : G.g.k); setOpenM(null); }, style: { display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 14px", alignItems: "center", cursor: "pointer", background: isOpen ? "#f6f8fd" : "transparent" } },
+              React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
+                React.createElement("span", { style: { width: 9, height: 9, borderRadius: 99, background: G.g.c, flexShrink: 0 } }),
+                React.createElement("span", { style: { minWidth: 0 } },
+                  React.createElement("span", { style: { display: "block", fontSize: 12.5, fontWeight: 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, __gName(G.g.k)),
+                  React.createElement("span", { style: { display: "block", fontSize: 10.5, color: C.mut } }, G.ms.length + " machine" + (G.ms.length > 1 ? "s" : "") + " · " + entered + " entered" + (sup ? " · " + (tot / sup * 100).toFixed(1) + "% of supply" : "")))),
+              cell(fm(Math.round(tot)), true),
+              mobile ? cell(gperM != null ? gperM.toFixed(3) : "—") : cell((tot / 24).toFixed(1)),
+              !mobile ? cell(gp ? fm(Math.round(gp)) : "—") : null, !mobile ? cell(gperM != null ? "₹" + gperM.toFixed(3) : "—") : null,
+              !mobile ? cell(totP != null ? fm(Math.round(totP)) : "—") : null,
+              React.createElement("span", { style: { color: C.mut, fontSize: 12, textAlign: "right" } }, isOpen ? "▾" : "▸")),
+            isOpen ? React.createElement("div", { style: { background: "#fbfcff", borderTop: "1px dashed " + C.line } },
+              G.ms.map((m) => { const r = row(m, dt), rp = prevDt ? row(m, prevDt) : null, mo = openM === m.code, rd = (P.reads[dt] || {})[m.code] || {};
+                const chg = r.k != null && rp && rp.k ? (r.k - rp.k) / rp.k * 100 : null;
+                const mtdDays = P.days.filter((x) => x <= dt && P.k(x, m.code) != null), mtd = mtdDays.reduce((a, x) => a + __n(P.k(x, m.code)), 0);
+                return React.createElement("div", { key: m.code, style: { borderTop: "1px solid #eef1f8" } },
+                  React.createElement("div", { onClick: () => setOpenM(mo ? null : m.code), style: { display: "grid", gridTemplateColumns: cols, gap: 8, padding: "8px 14px 8px 31px", alignItems: "baseline", cursor: "pointer" } },
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, m.name),
+                    cell(r.k != null ? fm(Math.round(r.k * 10) / 10) : "—", true),
+                    mobile ? cell(r.perM != null ? r.perM.toFixed(3) : "—") : cell(r.kw != null ? r.kw.toFixed(1) : "—"),
+                    !mobile ? cell(r.pr ? fm(Math.round(r.pr)) : "—") : null, !mobile ? cell(r.perM != null ? "₹" + r.perM.toFixed(3) : "—") : null,
+                    !mobile ? cell(rp && rp.k != null ? fm(Math.round(rp.k * 10) / 10) : "—") : null,
+                    React.createElement("span", { style: { color: C.mut, fontSize: 11, textAlign: "right" } }, mo ? "▾" : "▸")),
+                  mo ? React.createElement("div", { style: { padding: "2px 14px 12px 31px", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", columnGap: 26 } },
+                    React.createElement(ExpKV, { k: "Meter", v: m.code + (m.mf && m.mf !== 1 ? " · MF " + m.mf : "") }),
+                    React.createElement(ExpKV, { k: "Closing reading", v: rd.r != null ? fm(rd.r) : "— (kWh typed)" }),
+                    React.createElement(ExpKV, { k: "Units (kWh)", v: r.k != null ? fm(Math.round(r.k * 10) / 10) + " kWh" : "not entered", strong: true }),
+                    React.createElement(ExpKV, { k: "Cost", v: r.k != null ? inr(r.k * P.rate) : "—" }),
+                    React.createElement(ExpKV, { k: "Running hours · avg load", v: (rd.h != null ? rd.h + " h" : "24 h (not entered)") + (r.kw != null ? " · " + r.kw.toFixed(1) + " kW" : "") }),
+                    React.createElement(ExpKV, { k: "Production (" + (__PROD_OPTS.find((x) => x[0] === m.prod) || ["", "—"])[1] + ")", v: r.pr ? fm(Math.round(r.pr)) + " m" : "—" }),
+                    React.createElement(ExpKV, { k: "Units per m · ₹ per m", v: r.pr && r.k != null ? (r.k / r.pr).toFixed(4) + " · ₹" + r.perM.toFixed(3) : "—", strong: true, accent: C.teal }),
+                    React.createElement(ExpKV, { k: "Previous day", v: rp && rp.k != null ? fm(Math.round(rp.k * 10) / 10) + " kWh" + (chg != null ? " · " + (chg >= 0 ? "+" : "") + chg.toFixed(1) + "%" : "") : "—", accent: chg != null && Math.abs(chg) >= 15 ? C.rose : null }),
+                    React.createElement(ExpKV, { k: "Month to date", v: fm(Math.round(mtd)) + " kWh · " + inr(mtd * P.rate) + " · " + mtdDays.length + " days" }),
+                    rd.rm ? React.createElement(ExpKV, { k: "Remark", v: rd.rm }) : null) : null);
+              })) : null);
+        }),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: cols, gap: 8, padding: "9px 14px", borderTop: "2px solid " + C.ink, alignItems: "baseline" } },
+          React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: C.ink } }, "All sub-meters"),
+          cell(fm(Math.round(P.subKwh(dt))), true), mobile ? cell("") : cell((P.subKwh(dt) / 24).toFixed(1)),
+          !mobile ? cell("") : null, !mobile ? cell("") : null, !mobile ? cell(prevDt ? fm(Math.round(P.subKwh(prevDt))) : "—") : null, React.createElement("span", null)))),
       coalBlock,
       down.length ? __gap(React.createElement(Section, { title: "Remarks — machine down time", pad: false }, down.map((x) => __rowBtn(x.id, null, (x.machine || "—") + (x.shift ? " · " + x.shift + " shift" : ""), x.mins != null ? fm(x.mins) + " min" : "", x.remark, null, C.rose)))) : null,
       __note("Avg kW = kWh ÷ 24 h (or the hours entered). ₹/m = kWh × ₹" + P.rate + " ÷ production of that day — jets and FBC on dyeing, thermopack on stenter, stenters and Pengda on their own production, Torrent on dyeing + stenter + digital."));
@@ -1123,18 +1351,29 @@
     const ds = P.days.filter((dt) => dt <= (data.today || TODAY));
     const firstOpen = ds.slice().reverse().find((dt) => P.entered.indexOf(dt) < 0);
     const [dt, setDt] = useState(firstOpen || ds[ds.length - 1] || P.days[0]);
-    const init = (day) => { const o = {}; P.meters.forEach((m) => { const r = (P.reads[day] || {})[m.code] || {}; o[m.code] = { reading: r.r != null ? String(r.r) : "", kwh: r.k != null ? String(r.k) : "", prod: r.p != null ? String(r.p) : "", hrs: r.h != null ? String(r.h) : "", remark: r.rm || "", auto: r.k != null && r.r != null }; }); return o; };
+    const init = (day) => { const o = {}; P.meters.forEach((m) => { const r = (P.reads[day] || {})[m.code] || {}; o[m.code] = { reading: r.r != null ? String(r.r) : "", hr: r.hr != null ? String(r.hr) : "", kwh: r.k != null ? String(r.k) : "", prod: r.p != null ? String(r.p) : "", hrs: r.h != null ? String(r.h) : "", remark: r.rm || "", auto: r.k != null && r.r != null, autoH: r.h != null && r.hr != null }; }); return o; };
     const [rows, setRows] = useState(() => init(dt));
     const [down, setDown] = useState(() => (data.downtime || []).filter((x) => x.date === dt).map((x) => ({ machine: x.machine, shift: x.shift, mins: x.mins == null ? "" : String(x.mins), remark: x.remark })));
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState(null);
     const pick = (day) => { setDt(day); setRows(init(day)); setDown((data.downtime || []).filter((x) => x.date === day).map((x) => ({ machine: x.machine, shift: x.shift, mins: x.mins == null ? "" : String(x.mins), remark: x.remark }))); setMsg(null); };
     // last reading before the day (this month's entries, else the reading before the month)
-    const lastBefore = (code) => { for (let i = P.days.indexOf(dt) - 1; i >= 0; i--) { const r = (P.reads[P.days[i]] || {})[code]; if (r && r.r != null) return { r: r.r, dt: P.days[i] }; } const pv = (data.prev || {})[code]; return pv ? { r: pv.reading, dt: pv.date } : null; };
-    const set = (code, k, v) => { const cur = Object.assign({}, rows[code], { [k]: v }); if (k === "reading") { const lb = lastBefore(code); const m = P.meters.find((x) => x.code === code); if (lb && v !== "" && (cur.auto || cur.kwh === "")) { const kw = (Number(v) - lb.r) * __n(m.mf || 1); cur.kwh = kw >= 0 ? String(Math.round(kw * 1000) / 1000) : ""; cur.auto = true; } } if (k === "kwh") cur.auto = false; setRows(Object.assign({}, rows, { [code]: cur })); };
+    const lastBefore = (code) => { for (let i = P.days.indexOf(dt) - 1; i >= 0; i--) { const r = (P.reads[P.days[i]] || {})[code]; if (r && r.r != null) return { r: r.r, hr: r.hr, dt: P.days[i] }; } const pv = (data.prev || {})[code]; return pv ? { r: pv.reading, hr: pv.hr, dt: pv.date } : null; };
+    const set = (code, k, v) => {
+      const cur = Object.assign({}, rows[code], { [k]: v });
+      const lb = lastBefore(code); const m = P.meters.find((x) => x.code === code) || {};
+      if (k === "reading" && lb && v !== "" && (cur.auto || cur.kwh === "")) {
+        let diff = Number(v) - lb.r; if (diff < 0 && __n(m.roll) > 0) diff += __n(m.roll);   // meter turned over (e.g. at 1000)
+        const kw = diff * __n(m.mf || 1); cur.kwh = kw >= 0 ? String(Math.round(kw * 1000) / 1000) : ""; cur.auto = true;
+      }
+      if (k === "hr" && lb && lb.hr != null && v !== "" && (cur.autoH || cur.hrs === "")) { const hd = Number(v) - lb.hr; cur.hrs = hd >= 0 && hd <= 48 ? String(Math.round(hd * 100) / 100) : ""; cur.autoH = true; }
+      if (k === "kwh") cur.auto = false;
+      if (k === "hrs") cur.autoH = false;
+      setRows(Object.assign({}, rows, { [code]: cur }));
+    };
     const save = () => {
       setBusy(true); setMsg(null);
-      const body = { date: dt, rows: P.meters.map((m) => { const r = rows[m.code] || {}; return { code: m.code, reading: r.reading === "" ? null : Number(r.reading), kwh: r.kwh === "" ? null : Number(r.kwh), prod: r.prod === "" ? null : Number(r.prod), hrs: r.hrs === "" ? null : Number(r.hrs), remark: r.remark || "" }; }),
+      const body = { date: dt, rows: P.meters.map((m) => { const r = rows[m.code] || {}; return { code: m.code, reading: r.reading === "" ? null : Number(r.reading), hr: !r.hr ? null : Number(r.hr), kwh: r.kwh === "" ? null : Number(r.kwh), prod: r.prod === "" ? null : Number(r.prod), hrs: r.hrs === "" ? null : Number(r.hrs), remark: r.remark || "" }; }),
         downtime: down.filter((x) => (x.machine || "").trim() || (x.remark || "").trim()).map((x) => ({ machine: x.machine, shift: x.shift, mins: x.mins === "" ? null : Number(x.mins), remark: x.remark })) };
       __api("expense/electricity/save", body).then(function (r) { setBusy(false); if (r && r.success) { setMsg({ ok: true, text: r.message || "Saved." }); onSaved(); } else setMsg({ ok: false, text: (r && r.message) || "Could not save." }); });
     };
@@ -1146,17 +1385,17 @@
         React.createElement("span", { style: { fontSize: 11.5, color: C.mut } }, ro ? "Read only — you have no right to enter meter readings." : "Enter the closing reading — kWh = (reading − last reading) × MF is filled in; or type the kWh directly.")),
       groups.map((G) => __gap(React.createElement(Section, { key: G.g.k, title: G.g.t, pad: false },
         G.ms.map((m) => { const r = rows[m.code] || {}; const lb = lastBefore(m.code); const needProd = m.prod === "own";
-          return React.createElement("div", { key: m.code, style: { padding: "9px 14px", borderTop: "1px solid " + C.line } },
-            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "baseline" } },
-              React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: C.ink } }, m.name, React.createElement("span", { style: { fontSize: 10.5, color: C.mut, fontWeight: 600 } }, "  " + m.code + (m.mf && m.mf !== 1 ? " · MF " + m.mf : ""))),
-              React.createElement("span", { style: { fontSize: 11, color: C.mut } }, lb ? "last " + fm(lb.r) + " on " + __dl(lb.dt) : "no earlier reading")),
-            ro ? React.createElement("div", { style: { fontSize: 12, color: C.slate, marginTop: 4 } }, [r.reading ? "reading " + r.reading : "", r.kwh ? r.kwh + " kWh" : "", r.prod ? r.prod + " m" : "", r.remark].filter(Boolean).join(" · ") || "—")
-              : React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 } },
-                __inp(r.reading, (v) => set(m.code, "reading", v), "Reading", 104), __inp(r.kwh, (v) => set(m.code, "kwh", v), "kWh", 84),
+          return React.createElement("div", { key: m.code, style: { display: mobile ? "block" : "grid", gridTemplateColumns: "minmax(200px, 1fr) auto", gap: 12, alignItems: "center", padding: "8px 14px", borderTop: "1px solid " + C.line } },
+            React.createElement("div", { style: { minWidth: 0 } },
+              React.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, m.name),
+              React.createElement("div", { style: { fontSize: 10.5, color: C.mut, marginTop: 2 } }, m.code + (m.mf && m.mf !== 1 ? " · MF " + m.mf : "") + (m.roll ? " · rolls at " + fm(m.roll) : "") + " · " + (lb ? "last " + fm(lb.r) + (lb.hr != null ? " / " + fm(lb.hr) + " h" : "") + " on " + __dl(lb.dt) : "no earlier reading"))),
+            ro ? React.createElement("div", { style: { fontSize: 12, color: C.slate, marginTop: mobile ? 4 : 0 } }, [r.reading ? "reading " + r.reading : "", r.kwh ? r.kwh + " kWh" : "", r.prod ? r.prod + " m" : "", r.remark].filter(Boolean).join(" · ") || "—")
+              : React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: mobile ? "flex-start" : "flex-end", marginTop: mobile ? 6 : 0 } },
+                __inp(r.hr, (v) => set(m.code, "hr", v), "Hr meter", 84), __inp(r.reading, (v) => set(m.code, "reading", v), "kWh reading", 104), __inp(r.kwh, (v) => set(m.code, "kwh", v), "kWh", 84),
                 r.auto && r.kwh !== "" ? React.createElement("span", { style: { fontSize: 10, fontWeight: 800, color: C.teal } }, "AUTO") : null,
                 needProd ? __inp(r.prod, (v) => set(m.code, "prod", v), "Prod. m", 84) : null,
                 __inp(r.hrs, (v) => set(m.code, "hrs", v), "Hrs", 56),
-                __inp(r.remark, (v) => set(m.code, "remark", v), "Remark", mobile ? 120 : 160, "text")));
+                __inp(r.remark, (v) => set(m.code, "remark", v), "Remark", mobile ? 120 : 150, "text")));
         })))),
       __gap(React.createElement(Section, { title: "Remarks — machine down time", pad: false },
         down.map((x, i) => React.createElement("div", { key: i, style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", padding: "8px 14px", borderTop: "1px solid " + C.line } },
@@ -1172,26 +1411,117 @@
   }
 
   function LivePowerMeters({ mobile, data, onSaved }) {
-    const [list, setList] = useState(() => (data.meters || []).map((m) => Object.assign({}, m, { mf: String(m.mf), machines: String(m.machines), sort: String(m.sort) })));
+    const [list, setList] = useState(() => (data.meters || []).map((m) => Object.assign({}, m, { mf: String(m.mf), machines: String(m.machines), sort: String(m.sort), mac: m.mac || "", roll: m.roll != null ? String(m.roll) : "" })));
     const [rate, setRate] = useState(String(data.rate || 9.57));
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState(null);
     const upd = (i, k, v) => setList(list.map((m, j) => (j === i ? Object.assign({}, m, { [k]: v }) : m)));
     const save = () => { setBusy(true); setMsg(null);
-      __api("expense/electricity/meters/save", { rate: Number(rate), meters: list.map((m) => ({ code: m.code, name: m.name, grp: m.grp, mf: Number(m.mf) || 1, machines: Number(m.machines) || 0, prod: m.prod, sort: Number(m.sort) || 99, active: m.active !== false })) })
+      __api("expense/electricity/meters/save", { rate: Number(rate), meters: list.map((m) => ({ code: m.code, name: m.name, grp: m.grp, mf: Number(m.mf) || 1, machines: Number(m.machines) || 0, prod: m.prod, sort: Number(m.sort) || 99, active: m.active !== false, mac: m.mac || "", roll: m.roll === "" ? null : Number(m.roll) })) })
         .then(function (r) { setBusy(false); if (r && r.success) { setMsg({ ok: true, text: "Meters saved." }); onSaved(); } else setMsg({ ok: false, text: (r && r.message) || "Could not save." }); }); };
     return React.createElement("div", null,
-      !data.meters_saved ? __gap(React.createElement("div", { style: { background: C.indigoSoft, color: C.indigoDark, borderRadius: 12, padding: "10px 13px", fontSize: 12, fontWeight: 700, lineHeight: 1.5 } }, "These meter groups are the default list from the daily power report (jets, stenters, borings, R.O., FBC, thermopack, compressors, Pengda, Torrent). Check them and SAVE once — then they are yours.")) : null,
+      !data.meters_saved ? __gap(React.createElement("div", { style: { background: C.indigoSoft, color: C.indigoDark, borderRadius: 12, padding: "10px 13px", fontSize: 12, fontWeight: 700, lineHeight: 1.5 } }, "One meter per machine, taken from the Machine Master (" + (data.machine_meters || []).length + " machines), plus the utility meters (borings, R.O., feed pump, Torrent supply …). Check the group and production basis of each, switch off what has no meter, add what is missing, and SAVE once — then the list is yours.")) : null,
+      (() => { const have = {}; list.forEach((m) => { have[String(m.code).toUpperCase()] = 1; if (m.mac) have["M-" + String(m.mac).toUpperCase()] = 1; }); const add = (data.machine_meters || []).filter((m) => !have[String(m.code).toUpperCase()]);
+        return add.length ? __gap(React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" } },
+          __btn("+ " + add.length + " MACHINE" + (add.length > 1 ? "S" : "") + " FROM MACHINE MASTER", () => setList(list.concat(add.map((m) => Object.assign({}, m, { mf: String(m.mf), machines: String(m.machines), sort: String(m.sort) })))), "line"),
+          React.createElement("span", { style: { fontSize: 11.5, color: C.mut } }, "machines in DAPMach that have no meter in this list yet"))) : null; })(),
       __gap(React.createElement(Section, { title: "Unit rate", pad: true }, React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, __inp(rate, setRate, "₹/kWh", 80), React.createElement("span", { style: { fontSize: 12, color: C.mut } }, "₹ per kWh (Torrent unit charge)")))),
-      __gap(React.createElement(Section, { title: list.length + " meter groups", pad: false },
+      __gap(React.createElement(Section, { title: list.length + " meters", pad: false },
         list.map((m, i) => React.createElement("div", { key: i, style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", padding: "8px 14px", borderTop: "1px solid " + C.line, opacity: m.active === false ? 0.5 : 1 } },
           __inp(m.code, (v) => upd(i, "code", v.toUpperCase()), "Code", 72, "text"), __inp(m.name, (v) => upd(i, "name", v), "Name", mobile ? 150 : 190, "text"),
           __sel(m.grp, (v) => upd(i, "grp", v), __GRP_OPTS), __sel(m.prod, (v) => upd(i, "prod", v), __PROD_OPTS),
           React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "MF"), __inp(m.mf, (v) => upd(i, "mf", v), "MF", 58),
           React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "M/C"), __inp(m.machines, (v) => upd(i, "machines", v), "#", 48),
-          React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "ORDER"), __inp(m.sort, (v) => upd(i, "sort", v), "#", 52),
+          React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "ORDER"), __inp(m.sort, (v) => upd(i, "sort", v), "#", 64),
+          React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "MACCODE"), __inp(m.mac, (v) => upd(i, "mac", v), "DAPMach", 76, "text"),
+          React.createElement("span", { style: { fontSize: 10.5, color: C.mut } }, "ROLLS AT"), __inp(m.roll, (v) => upd(i, "roll", v), "e.g. 1000", 76),
           React.createElement("label", { style: { fontSize: 11, color: C.slate, display: "inline-flex", alignItems: "center", gap: 4 } }, React.createElement("input", { type: "checkbox", checked: m.active !== false, onChange: (e) => upd(i, "active", e.target.checked) }), "active"))),
         React.createElement("div", { style: { padding: "8px 14px", borderTop: "1px solid " + C.line } }, __btn("+ METER", () => setList(list.concat([{ code: "", name: "", grp: "other", prod: "none", mf: "1", machines: "0", sort: "99", active: true }])), "line")))),
       React.createElement("div", { style: { marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" } }, __btn("SAVE METERS", save, "indigo", busy), __msg(msg)),
-      __note("MF = multiplying factor of the meter (kWh = reading difference × MF). Production basis decides the ₹/m of the meter. Switch a meter off instead of deleting it — its old readings stay."));
+      __note("One meter per machine: code M-<machine code>. MF = multiplying factor of the meter (kWh = reading difference × MF). Production basis decides the ₹/m: a jet machine on \"dyeing prod.\" uses its own dyeing metres when FAMMR carries the machine code, else the plant's dyeing metres; stenters and Pengda on their own production entered daily. Switch a meter off instead of deleting it — its old readings stay."));
+  }
+
+  /* ═════════ CHEMICALS & DYES — live (store issues; category = item sub group FAMISGrp) ═════════ */
+  var __CHC = ["#0d9488", "#4f46e5", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d", "#be123c", "#64748b", "#b45309"];
+  function LiveChemicals({ mobile, ym, onBack, bill }) {
+    const [d, setD] = useState(null);
+    const [sel, setSel] = useState(null);
+    const [cat, setCat] = useState(null);
+    const [itm, setItm] = useState(null);
+    const [iss, setIss] = useState(null);
+    useEffect(() => {
+      let alive = true; setD(null); setCat(null); setItm(null);
+      __api("expense/chemicals", { month: ym }).then(function (r) { if (alive) setD(r); });
+      return () => { alive = false; };
+    }, [ym]);
+    useEffect(() => {
+      if (!itm) { setIss(null); return; }
+      let alive = true; setIss({ loading: true });
+      __api("expense/issues", { month: ym, itmcode: itm.itmcode }).then(function (r) { if (alive) setIss(r); });
+      return () => { alive = false; };
+    }, [itm, ym]);
+    if (!d) return React.createElement("div", null, React.createElement(ExpBack, { onBack }), __title("Chemicals & Dyes", mobile), __loadingBox());
+    if (!d.success || !d.data) return React.createElement("div", null, React.createElement(ExpBack, { onBack }), __title("Chemicals & Dyes", mobile), __errBox("Chemicals could not be read from Mills — " + (d.message || "") + (d.data && d.data.errors ? " · " + d.data.errors.join(" | ") : "")));
+    const data = d.data;
+    const billAmt = data.billing ? __n(data.billing.amount) : (bill || 0);
+    const billMtr = data.billing && data.billing.mtr ? __n(data.billing.mtr) : 0;
+    const days = __dates(data.from, data.to);
+    const total = __n(data.total), nd = days.length || 1;
+    const cats = (data.categories || []).map((c, i) => Object.assign({}, c, { c: __CHC[i % __CHC.length] }));
+    const dyes = cats.filter((c) => /DYE/i.test(c.label + " " + (c.group || ""))).reduce((a, c) => a + __n(c.amount), 0);
+    const qty = (x, u) => (Math.round(__n(x) * 100) / 100).toLocaleString("en-IN") + (u ? " " + u : "");
+    const errs = (data.errors || []).length ? __gap(__errBox("Notes from Mills: " + data.errors.join(" | "))) : null;
+    const bars = (series, color) => {
+      const vals = days.map((dt) => __n(series[dt]));
+      return React.createElement("div", null,
+        sel != null ? React.createElement("div", { style: { fontSize: 11.5, fontWeight: 700, color: C.slate, marginBottom: 6 } }, __dl(days[sel]) + " — " + inr(vals[sel])) : null,
+        React.createElement(ExpBars, { vals, sel, onPick: (i) => setSel(sel === i ? null : i), color, h: 110, mobile, labels: __ticks(days) }));
+    };
+
+    // ── issue entries of one item
+    if (cat && itm) {
+      const rows = iss && iss.success && iss.data ? (iss.data.rows || []) : null;
+      return React.createElement("div", null, React.createElement(ExpBack, { onBack: () => setItm(null), label: cat.label.toUpperCase() }),
+        __title(itm.itmname, mobile, React.createElement(Chip, { text: data.month })),
+        __grid4(mobile, [
+          React.createElement(Kpi, { key: "a", mobile, label: "Issued", value: inr(itm.amount), sub: qty(itm.qty, itm.uom), accent: cat.c }),
+          React.createElement(Kpi, { key: "b", mobile, label: "Avg rate", value: "₹" + __n(itm.rate).toFixed(2), sub: "per " + (itm.uom || "unit"), accent: C.ink }),
+          React.createElement(Kpi, { key: "c", mobile, label: "Share of " + cat.label, value: cat.amount ? (itm.amount / cat.amount * 100).toFixed(1) + "%" : "—", sub: total ? (itm.amount / total * 100).toFixed(1) + "% of chemicals" : "", accent: C.teal }),
+          React.createElement(Kpi, { key: "d", mobile, label: "Issues", value: String(itm.issues), sub: itm.days + " days · " + (itm.make || itm.itmcode), accent: C.amber })]),
+        __gap(!iss || iss.loading ? __loadingBox() : !rows ? __errBox("Issue entries could not be read — " + (iss.message || "")) :
+          React.createElement(Section, { title: rows.length + " issue entries", pad: false },
+            rows.map(function (r, i) {
+              const sub = [r.maccode ? "machine " + r.maccode : "", r.issto ? "to " + r.issto : "", r.dptcode ? "dept " + r.dptcode : "", r.batchno ? "batch " + r.batchno : "", r.remark || ""].filter(Boolean).join(" · ");
+              return __rowBtn(i, null, (r.issdate || "") + "  No. " + (r.issno || r.uid) + "  ·  " + qty(r.qty, itm.uom), inr(__n(r.amount)), sub, null, null);
+            }))));
+    }
+    // ── items of one sub group
+    if (cat) {
+      return React.createElement("div", null, React.createElement(ExpBack, { onBack: () => { setCat(null); setSel(null); }, label: "CHEMICALS & DYES" }),
+        __title(cat.label, mobile, React.createElement(Chip, { text: total ? (cat.amount / total * 100).toFixed(1) + "% OF CHEMICALS" : "", bg: C.tealSoft, fg: C.teal })),
+        __grid4(mobile, [
+          React.createElement(Kpi, { key: "a", mobile, label: "Month issue", value: inr(cat.amount), sub: (billAmt ? (cat.amount / billAmt * 100).toFixed(1) + "% of billing" : "") + (cat.group ? " · " + cat.group : ""), accent: cat.c }),
+          React.createElement(Kpi, { key: "b", mobile, label: "Cost per meter", value: billMtr ? "₹" + (cat.amount / billMtr).toFixed(2) : "—", sub: "on process billing meters", accent: C.ink }),
+          React.createElement(Kpi, { key: "c", mobile, label: "Items", value: String(cat.items.length), sub: "issued this month", accent: C.indigo }),
+          React.createElement(Kpi, { key: "d", mobile, label: "Avg per day", value: inr(cat.amount / nd), sub: "issue value across " + nd + " days", accent: C.amber })]),
+        __gap(React.createElement(Section, { title: "Daily issue value" }, bars(cat.daily || {}, cat.c))),
+        __gap(React.createElement(Section, { title: "Item-wise", right: React.createElement(Chip, { text: "TAP FOR ISSUES", bg: C.indigoSoft, fg: C.indigoDark }), pad: false },
+          cat.items.map((it) => __rowBtn(it.itmcode, () => setItm(it), it.itmname, inr(it.amount) + "  " + (cat.amount ? (it.amount / cat.amount * 100).toFixed(0) + "%" : ""),
+            qty(it.qty, it.uom) + " · avg ₹" + __n(it.rate).toFixed(2) + (it.make ? " · " + it.make : "") + " · " + it.issues + " issues", cat.amount ? it.amount / cat.amount * 100 : null, cat.c)))));
+    }
+    // ── general
+    return React.createElement("div", null, React.createElement(ExpBack, { onBack }),
+      __title("Chemicals & Dyes", mobile, React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, React.createElement(Chip, { text: data.month + " · " + data.days + " DAYS" }), billAmt ? React.createElement(Chip, { text: (total / billAmt * 100).toFixed(1) + "% OF BILLING", bg: C.amberSoft, fg: C.amber }) : null)),
+      __grid4(mobile, [
+        React.createElement(Kpi, { key: "a", mobile, label: "Month issue", value: inr(total), sub: "store issues · " + data.item_count + " items", accent: C.teal }),
+        React.createElement(Kpi, { key: "b", mobile, label: "Cost per meter", value: billMtr ? "₹" + (total / billMtr).toFixed(2) : "—", sub: billMtr ? "on " + fm(Math.round(billMtr)) + " process billing meters" : "billed metres not found", accent: C.ink }),
+        React.createElement(Kpi, { key: "c", mobile, label: "Dyes share", value: total ? (dyes / total * 100).toFixed(0) + "%" : "—", sub: inr(dyes) + " in sub groups named DYE", accent: C.indigo }),
+        React.createElement(Kpi, { key: "d", mobile, label: "Avg per day", value: inr(total / nd), sub: "issue value across " + nd + " days", accent: C.amber })]),
+      errs,
+      __gap(React.createElement(Section, { title: "Daily issue value" }, total ? bars(data.daily || {}, C.teal) : React.createElement("div", { style: { fontSize: 12, color: C.mut } }, "No chemical issues in this month."))),
+      __gap(React.createElement(Section, { title: "Category-wise — item sub group", right: React.createElement(Chip, { text: "TAP FOR ITEMS", bg: C.indigoSoft, fg: C.indigoDark }), pad: false },
+        cats.length ? cats.map((c) => __rowBtn(c.key, () => { setCat(c); setSel(null); }, c.label, inr(c.amount) + "  " + (total ? (c.amount / total * 100).toFixed(0) + "%" : ""),
+          c.items.length + " items" + (c.group ? " · " + c.group : "") + (billMtr ? " · ₹" + (c.amount / billMtr).toFixed(2) + "/m" : ""), total ? c.amount / total * 100 : null, c.c))
+          : React.createElement("div", { style: { padding: 14, fontSize: 12.5, color: C.mut } }, "No chemical items issued."))),
+      __note("Source: " + (data.source || "") + ". Items picked by: " + (data.basis || "") + ". Value = issued qty × issue rate (same as Monthly Expense)."));
   }

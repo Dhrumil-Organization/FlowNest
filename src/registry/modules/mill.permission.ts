@@ -47,8 +47,9 @@ registerPermissionArea({
           actions: [view],
           children: [
             { key: 'coal', name: 'Coal — Boiler + Thermopack', type: 'screen', displayOrder: 10, actions: [view] },
-            { key: 'coal_steam_entry', name: 'FBC Steam Entry', type: 'section', displayOrder: 15, actions: [view, { key: 'edit', name: 'Enter steam' }] },
-            { key: 'coal_optimiser', name: 'Coal Mix Optimiser', type: 'screen', displayOrder: 20, actions: [view, { key: 'edit', name: 'Edit offers / constraints' }] },
+            { key: 'coal_steam_entry', name: 'Daily Steam Entry', type: 'screen', displayOrder: 26, actions: [view, { key: 'edit', name: 'Enter steam' }] },
+                        { key: 'coal_optimiser', name: 'Coal Mix Optimiser', type: 'screen', displayOrder: 20, actions: [view, { key: 'edit', name: 'Edit constraints' }] },
+            { key: 'coal_offers', name: 'Coal Supplier Offers', type: 'screen', displayOrder: 25, actions: [view, { key: 'edit', name: 'Add / edit / delete offers' }] },
             { key: 'electricity', name: 'Electricity — Torrent', type: 'screen', displayOrder: 30, actions: [view, { key: 'edit', name: 'Enter meter readings / meters' }] },
             { key: 'chemicals', name: 'Chemicals & Dyes', type: 'screen', displayOrder: 40, actions: [view] },
             { key: 'labour', name: 'Labour & Wages', type: 'screen', displayOrder: 50, actions: [view] },

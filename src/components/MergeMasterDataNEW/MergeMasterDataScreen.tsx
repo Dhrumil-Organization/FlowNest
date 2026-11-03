@@ -10,18 +10,22 @@
 //   • same record can never be both MAIN and MERGE · Delete needs an extra acknowledgement
 //   • permission `production.merge_master_data` → action `merge` is required to submit
 //   • server messages are shown exactly as received · state resets after success and the lists reload
-import { fetchPropertyGroupDataDCR } from '../../common/API/FunctionsNEW'; // same Property Group API as Daily Collection Report
-import { usePermission } from '@/src/core/permissions';
-import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { ApiError, detailsOf, fetchProperties, fetchRecords, isCancelled, messageOf, postMerge, readLoginPrpType, readLoginYearNo } from './api';
+import { usePermission } from '../../../src/core/permissions';
+import { T } from '../../../src/theme';
+import { fetchPropertyGroupDataDCR } from '../../common/API/FunctionsNEW'; // same Property Group API as Daily Collection Report
+import {
+  ApiError, detailsOf, fetchProperties, fetchRecords, isCancelled, messageOf, postMerge,
+  readLoginPrpType, readLoginYearNo
+} from '../../components/MergeMasterDataNEW/api';
+// import { ApiError } from '../../components/MergeMasterDataNEW/api';
 import { MasterPanel } from './MasterPanel';
 import {
   ACTION_OPTIONS,
-  CONTENT_MAX,
   Column,
+  CONTENT_MAX,
   extractList,
   MasterRow,
   MergeAction,
@@ -262,10 +266,10 @@ export default function MergeMasterDataScreen({ token, API, username }: Props) {
 
   const missing = !property ? 'Select a property'
     : !fromRow ? 'Select a record in MAIN'
-    : !toRow ? 'Select a record in MERGE'
-    : same ? 'MAIN and MERGE cannot be the same record'
-    : !actionOpt ? 'Select an action (Passive / Delete)'
-    : '';
+      : !toRow ? 'Select a record in MERGE'
+        : same ? 'MAIN and MERGE cannot be the same record'
+          : !actionOpt ? 'Select an action (Passive / Delete)'
+            : '';
 
   /* ------------------------------ submit --------------------------------- */
   const askMerge = () => {

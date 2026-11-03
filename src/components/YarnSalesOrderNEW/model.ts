@@ -19,8 +19,6 @@ export type OrderCtx = {
   strcode: any;
   /** As legacy passes it on: '2026-2027' or '27' — always reduced with yy() before an API call. */
   yearno: any;
-  /** Property display name (LngName) - shown beside the header title on Party / Summary. Optional. */
-  prpname?: string;
 };
 
 export type OrderMode = 'ADD' | 'EDIT' | 'VIEW';

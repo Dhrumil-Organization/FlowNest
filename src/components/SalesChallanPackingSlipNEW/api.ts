@@ -3,7 +3,7 @@
 // endpoints, params and headers as the React Web ERP:
 //   SalesChallanPackingSlip.js      showpackslip · checkvoucherno · get_pack_current_stock · savepackslip
 //                                   savepackslipcarton · packslipdelete · getproperty · getstore
-//   AllPartyDataSCPS (+ PartySelect) accountbasic (load all once; client-side search)
+//   AllPartyDataSCPS (+ PartySelect) accountbasic (party help, searched on the server, 20 a page)
 //                                   accountget    (full party record on pick)
 //                                   getlimit      (credit limit → crlimit[0] merged into the form)
 //   PendingOrderSelect / Single     showpendingso
@@ -104,18 +104,17 @@ export async function checkVoucherNo(a: Api, c: Ctx, p: { vouno: string; suffix:
 /* ------------------------------ party (AllPartyDataSCPS) ------------------------------ */
 
 /**
- * Party master from GET accountbasic. The Party modal requests the full list once
- * (limit: '') and filters it in memory; no HTTP request is made while typing.
+ * Web PartySelect (the "?" help dialog) → GET accountbasic. Searched on the server.
  * Rows: acccode, accountname, Address, City, Cnty, GSTIN, MHName, SHName, GrpCode, PanNo, Balance.
  */
-export async function searchParties(a: Api, c: Ctx, p: { search: string; page?: number; limit?: number | ''; scope?: PartyScope; parcode?: string }) {
+export async function searchParties(a: Api, c: Ctx, p: { search: string; page?: number; scope?: PartyScope; parcode?: string }) {
   const r = resp(await get(a, 'accountbasic', {
     ...base(c),
     txntype: TXNTYPE,
     partytype: 'p',
     type: '',
     page: p.page ?? 1,
-    limit: p.limit ?? PARTY_PAGE,
+    limit: PARTY_PAGE,
     search: p.search,
     isceo: p.scope?.isceo ?? '',
     partype: p.scope?.partype ?? '',
@@ -211,17 +210,6 @@ export async function fetchCartons(a: Api, c: Ctx, row: Row, p: { date: string; 
     ttype: ['8', '3', '30', '2', '34', '32', '83', '994', '992'],
   });
   return arr(resp(body, 'Cartons could not be loaded.').data);
-}
-
-/**
- * Web ItemDetail.getSetChallan → GET getsetchallan (prpcode, yearno).
- * data: { extraqtyper (e.g. 25 = 25 %), ratedisable, calculatedisconrate }.
- * extraqtyper = extra qty allowed over the order balance, as % of the order qty (SOQty).
- */
-export async function fetchSetChallan(a: Api, c: Ctx): Promise<{ extraqtyper: number }> {
-  const r = resp(await get(a, 'getsetchallan', { prpcode: c.prpcode, yearno: c.yearno }), 'Challan settings could not be loaded.');
-  const x = parseFloat(String(r?.data?.extraqtyper ?? '').replace(',', '.'));
-  return { extraqtyper: Number.isFinite(x) && x > 0 ? x : 0 };
 }
 
 /* ------------------------------ browse ------------------------------ */

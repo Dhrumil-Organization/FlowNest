@@ -195,6 +195,7 @@ export default function BrowseStep({ token, API, nav, signal }: Props) {
       prpcode: filters.prpcode || selectedProperty?.PrpCode || '',
       strcode: filters.strcode || '002',
       yearno: filters.yearno || selectedYear?.slice(-2) || '',
+      prpname: selectedProperty?.LngName || '',
     };
     nav.push('party', { ctx, purpose: 'new' });
   };
@@ -204,6 +205,10 @@ export default function BrowseStep({ token, API, nav, signal }: Props) {
       prpcode: order.PrpCode,
       strcode: order.StrCode || filters.strcode || '002',
       yearno: selectedYear?.slice(-2),
+      prpname:
+        propertyData.find((p) => String(p.PrpCode) === String(order.PrpCode))?.LngName ||
+        (String(selectedProperty?.PrpCode) === String(order.PrpCode) ? selectedProperty?.LngName : '') ||
+        '',
     };
     nav.push('summary', {
       ctx,

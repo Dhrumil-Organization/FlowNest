@@ -49,6 +49,8 @@ class MillHubController extends BaseController
         'discover'                   => ['millhub/discover', 120, '#admin'],
         'expense/coal'               => ['millhub/expense/coal', 30, 'mill.expense.coal'],
         'expense/coal/steam'         => ['millhub/expense/coal/steam', 30, 'mill.expense.coal_steam_entry'],
+        'expense/coal/steam/save'    => ['millhub/expense/coal/steam/save', 30, 'mill.expense.coal_steam_entry:edit'],
+        'expense/coal/steam/delete'  => ['millhub/expense/coal/steam/delete', 30, 'mill.expense.coal_steam_entry:edit'],
         'expense/coal/offers'        => ['millhub/expense/coal/offers', 30, 'mill.expense.coal_optimiser'],
         'expense/coal/offers/save'   => ['millhub/expense/coal/offers/save', 30, 'mill.expense.coal_optimiser:edit'],
         'expense/coal/offers/delete' => ['millhub/expense/coal/offers/delete', 30, 'mill.expense.coal_optimiser:edit'],

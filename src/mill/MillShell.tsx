@@ -73,7 +73,7 @@ export function MillShell() {
     for (const [k, [path, action]] of Object.entries(MILL_ACTION_RIGHTS)) r[k] = millCan(millSession?.permissions, path, action);
     return r;
   }, [millSession]);
-  const anyScreen = ['dash', 'inward', 'lots', 'machines', 'lab', 'recipe', 'dispatch', 'expense', 'reports'].some((k) => rights[k]);
+  const anyScreen = ['dash', 'inward', 'lots', 'machines', 'lab', 'recipe', 'dispatch', 'expense', 'coal_offers', 'steam_entry', 'reports'].some((k) => rights[k]);
 
   const user = useMemo(() => {
     const mu: any = millSession?.millUser;
@@ -141,7 +141,7 @@ export function MillShell() {
         const allowed = ['expense/summary', 'expense/ledger', 'expense/issues', 'reports/summary', 'reports/party', 'discover', 'schema', 'lots', 'inward', 'machines', 'dispatch', 'lab', 'ping',
           'expense/coal', 'expense/coal/split/save', 'expense/coal/steam', 'expense/coal/steam/save', 'expense/coal/steam/delete',
           'expense/coal/offers', 'expense/coal/offers/save', 'expense/coal/offers/delete', 'expense/coal/constraints/save', 'expense/coal/suppliers/save',
-          'expense/dyeing', 'expense/electricity', 'expense/electricity/save', 'expense/electricity/meters/save'];
+          'expense/dyeing', 'expense/chemicals', 'expense/electricity', 'expense/electricity/save', 'expense/electricity/meters/save'];
         if (!allowed.includes(m.action)) {
           frameRef.current?.reply(m.id, { success: false, message: 'Not allowed: ' + m.action });
           return;

@@ -1,28 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Text,
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  TextInput,
-  FlatList,
-  Switch,
-  Alert,
-  Dimensions
-} from 'react-native';
+import HeaderBarwithBack from '@/components/Header';
+import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import axios from 'axios';
+import React, { useEffect, useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { API } from '../../common/API/dynamicAPI';
 import {
   fetchAllPropertyData,
-  fetchAllYeardata,
   fetchAllStoredata,
+  fetchAllYeardata,
 } from '../../common/API/Functions';
-import axios from 'axios';
-import { API } from '../../common/API/dynamicAPI';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import theme from '@/components/theme';
-import HeaderBarwithBack from '@/components/Header';
 // import { set } from 'lodash';
 
 const DoffEntry = ({ token, username }) => {
@@ -127,6 +126,8 @@ const DoffEntry = ({ token, username }) => {
     width >= 1200 ? 3 : width >= 600 ? 2 : 1
   );
   const [firstIncompleteDoff, setFirstIncompleteDoff] = useState(null);
+  // 
+  const [isLastDoffFilter, setIsLastDoffFilter] = useState(false);
 
   const parseProductionDate = (proddate) => {
     if (!proddate || proddate.length !== 8) return null;
@@ -430,6 +431,12 @@ const DoffEntry = ({ token, username }) => {
 
   }, [selectedYear, selectProperty, selectedProperty, selectedStore, selectedMer, selectedItm, token]);
 
+  useEffect(() => {
+    if (token && selectedProperty && selectedYear && selectedStore && selectedMer && selectedItm) {
+      getMachineData();
+    }
+  }, [isLastDoffFilter, selectedProperty, selectedYear, selectedStore, selectedMer, selectedItm, token]);
+
   // Display date from YYYYMMDD string as DD/MM/YYYY
   const getDisplayDateFromYYYYMMDD = (dateStr) => {
     if (!dateStr || dateStr.length !== 8) return '-';
@@ -665,6 +672,7 @@ const DoffEntry = ({ token, username }) => {
         mercode: finalmerCode,
         itmcode: finalitmCode,
         limit: '',
+        islastdoff: isLastDoffFilter ? '1' : '0', // 👈 NEW
       };
       const respo = await axios.get(`${API}/api/get_criterion`, {
         headers: {
@@ -2567,6 +2575,23 @@ const DoffEntry = ({ token, username }) => {
                         </Text>
                         <Icon name="keyboard-arrow-down" size={20} />
                       </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Last Doff Switch */}
+                  <View style={styles.fieldContainer}>
+                    <View style={styles.switchRow}>
+                      <Text style={styles.label}>Last Doff</Text>
+                      <Switch
+                        value={isLastDoffFilter}
+                        onValueChange={(val) => {
+                          setIsLastDoffFilter(val);
+                          // Optionally reset selected machine if needed
+                          setSelectedMachines(null);
+                        }}
+                        trackColor={{ false: '#ccc', true: '#0F6C7B' }}
+                        thumbColor="#fff"
+                      />
                     </View>
                   </View>
 

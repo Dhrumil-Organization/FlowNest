@@ -1,18 +1,28 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import AppAlert from '@/common/utils/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
-import {
-    View, Text, StyleSheet, TextInput,
-    TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
-    ScrollView, Modal, StatusBar
-} from 'react-native';
 import axios from 'axios';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { fetchPropertyData } from '../../common/API/Functions';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+// import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from "../../common/API/dynamicAPI";
+import { fetchPropertyData } from '../../common/API/Functions';
 import { useSalesOrder } from './SalesOrderContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
@@ -464,11 +474,11 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                 setDeleteSuccessVisible(true);
 
             } else {
-                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+                AppAlert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -883,7 +893,7 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                     onPress={() => {
 
                         if (!selectedProperty?.PrpCode) {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Required',
                                 'Please select property first'
                             );

@@ -8,9 +8,9 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 // import FullScreenLoader from '../Loader/Loader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 const { height } = Dimensions.get('window');
@@ -24,8 +24,10 @@ const CustomDrawer = (props) => {
         FormState,
         setFormState,
         getAllYearData,
+        setAllYearData,
         onLoadPress,
-        token
+        token,
+        fetchAllYeardata
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -98,6 +100,17 @@ const CustomDrawer = (props) => {
     const getToken = () => token
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
+
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+
+        const financialYear =
+            currentMonth >= 4 ? currentYear + 1 : currentYear;
+
+        return financialYear.toString().substring(2);
+    };
 
     return (
         <>
@@ -307,16 +320,58 @@ const CustomDrawer = (props) => {
                                 placeholder="Choose property..."
                                 pageSize={10}
                                 initialValue={selectedProperty}
-                                onSelect={(item) => {
-                                    setFormState(FormState => ({
-                                        ...FormState,
-                                        values: {
-                                            ...FormState.values,
-                                            PrpCode: item?.PrpCode || '',
-                                            LngName: item?.LngName || ''
+                                // onSelect={(item) => {
+                                //     setFormState(FormState => ({
+                                //         ...FormState,
+                                //         values: {
+                                //             ...FormState.values,
+                                //             PrpCode: item?.PrpCode || '',
+                                //             LngName: item?.LngName || ''
 
+                                //         }
+                                //     }));
+                                // }}
+                                onSelect={async (item) => {
+                                    const prpCode = item?.PrpCode || "";
+
+                                    // Property set karo
+                                    setFormState(prev => ({
+                                        ...prev,
+                                        values: {
+                                            ...prev.values,
+                                            PrpCode: prpCode,
+                                            LngName: item?.LngName || "",
+                                            YearNo: "",
+                                            YearName: "",
                                         }
                                     }));
+
+                                    // Property ke according year fetch karo
+                                    const years = await fetchAllYeardata(token, prpCode);
+
+                                    // Parent me year list bhi update karo
+                                    props.setAllYearData(years);
+
+                                    if (years?.length) {
+                                        const currentFY = getCurrentFinancialYear();
+
+                                        const currentYear =
+                                            years.find(
+                                                y => String(y.YearNo) === String(currentFY)
+                                            ) || years[0];
+
+                                        // Turant FormState me current year set
+                                        setFormState(prev => ({
+                                            ...prev,
+                                            values: {
+                                                ...prev.values,
+                                                PrpCode: prpCode,
+                                                LngName: item?.LngName || "",
+                                                YearNo: currentYear.YearNo,
+                                                YearName: currentYear.YearName,
+                                            }
+                                        }));
+                                    }
                                 }}
                                 multiple={false}
                                 emptyMessage="No properties available" />

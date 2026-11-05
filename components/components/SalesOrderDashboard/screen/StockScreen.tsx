@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // StockScreen.tsx — Madhusudhan Fabrics (React Native)
 // Yarn / Fabric / Flow tabs — mockup design wired to the real
 // GET /api/appgreyinstockdata logic (dptcode 'PR' = greige split,
@@ -200,7 +201,7 @@ export default function StockScreen({ token }: any) {
         setFabricRows(fRes.data?.response?.data || []);
       } else {
         setFabricRows([]);
-        Alert.alert(`${fRes.data?.message || 'No stock data'}`);
+        AppAlert.alert(`${fRes.data?.message || 'No stock data'}`);
       }
 
       // YARN — TODO: confirm the txntype for yarn stock with the ERP.
@@ -219,7 +220,7 @@ export default function StockScreen({ token }: any) {
       } catch { setYarnRows([]); }
     } catch (e: any) {
       console.log('appgreyinstockdata err =>', e?.message);
-      Alert.alert('Server Error', e?.message || 'Could not load stock');
+      AppAlert.alert('Server Error', e?.message || 'Could not load stock');
       setFabricRows([]);
     } finally {
       setLoading(false);

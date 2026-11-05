@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -28,7 +29,7 @@ import { API } from '@/common/API/dynamicAPI';
 import theme from '@/components/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 // import CriteriaForm from './CriteriaForm';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchAllStoredata } from '../../common/API/Functions';
 // import { useNavigation } from '@react-navigation/native';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
@@ -501,10 +502,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             marginTop: 4
         },
 
-        itemLabel: {
-            fontSize: 12,
-            color: '#888'
-        },
 
         itemValue: {
             fontSize: 13,
@@ -586,6 +583,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             textAlign: 'center',
             letterSpacing: 1,
         },
+        pendingIconCenter: {
+            position: 'absolute',
+            left: '50%',
+            // transform: [{ translateX: -15 }],
+        },
     });
 
     useEffect(() => {
@@ -649,7 +651,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             );
             console.log('🔵 fetchData request tab api response', response);
             if (response.data.success == false) {
-                Alert.alert(response.data.message)
+                AppAlert.alert(response.data.message)
             }
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => {
@@ -667,7 +669,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -736,7 +738,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -781,7 +783,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -827,7 +829,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -870,7 +872,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -922,7 +924,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -967,7 +969,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -1019,7 +1021,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -1071,39 +1073,209 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
         }
     };
 
+    // const filteredDataSPO = useMemo(() => {
+    //     if (!searchQueryYPO) return data;
+    //     return data.filter((item) =>
+    //         filterKeyYPO === 'all'
+    //             ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchQueryYPO.toLowerCase()))
+    //             : String(item[filterKeyYPO]).toLowerCase().includes(searchQueryYPO.toLowerCase())
+    //     );
+    // }, [data, searchQueryYPO, filterKeyYPO]);
+
+
     const filteredDataSPO = useMemo(() => {
         if (!searchQueryYPO) return data;
-        return data.filter((item) =>
-            filterKeyYPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchQueryYPO.toLowerCase()))
-                : String(item[filterKeyYPO]).toLowerCase().includes(searchQueryYPO.toLowerCase())
-        );
+
+        const searchText = searchQueryYPO.toLowerCase();
+
+        return data
+            .map((item) => {
+                // Main level match
+                const mainMatch =
+                    filterKeyYPO === 'all'
+                        ? Object.entries(item).some(([key, val]) => {
+                            if (key === 'd1') return false;
+
+                            return String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText);
+                        })
+                        : String(item[filterKeyYPO] ?? '')
+                            .toLowerCase()
+                            .includes(searchText);
+
+                // d1 ke andar matching items
+                const filteredD1 = Array.isArray(item.d1)
+                    ? item.d1.filter((d1Item) =>
+                        Object.values(d1Item).some((val) =>
+                            String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText)
+                        )
+                    )
+                    : [];
+
+                // Main match hai to main ko rakho
+                // d1 match hai to sirf matching d1 rakho
+                if (mainMatch) {
+                    return {
+                        ...item,
+                        d1: Array.isArray(item.d1) ? item.d1 : [],
+                    };
+                }
+
+                if (filteredD1.length > 0) {
+                    return {
+                        ...item,
+                        d1: filteredD1,
+                    };
+                }
+
+                return null;
+            })
+            .filter(Boolean);
     }, [data, searchQueryYPO, filterKeyYPO]);
+
+
+
+    // const filteredhistoryDataSPO = useMemo(() => {
+    //     if (!searchhistoryQueryYPO) return allhistoryDataYPO;
+    //     return allhistoryDataYPO.filter((item) =>
+    //         filterKeyYPO === 'all'
+    //             ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchhistoryQueryYPO.toLowerCase()))
+    //             : String(item[filterKeyYPO]).toLowerCase().includes(searchhistoryQueryYPO.toLowerCase())
+    //     );
+    // }, [allhistoryDataYPO, searchhistoryQueryYPO, filterKeyYPO]);
+
 
     const filteredhistoryDataSPO = useMemo(() => {
         if (!searchhistoryQueryYPO) return allhistoryDataYPO;
-        return allhistoryDataYPO.filter((item) =>
-            filterKeyYPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchhistoryQueryYPO.toLowerCase()))
-                : String(item[filterKeyYPO]).toLowerCase().includes(searchhistoryQueryYPO.toLowerCase())
-        );
-    }, [allhistoryDataYPO, searchhistoryQueryYPO, filterKeyYPO]);
+
+        const searchText = searchhistoryQueryYPO.toLowerCase().trim();
+
+        return allhistoryDataYPO
+            .map((item) => {
+                const d1List = Array.isArray(item.d1) ? item.d1 : [];
+
+                // Main level par search
+                const mainMatch =
+                    filterKeyYPO === 'all'
+                        ? Object.entries(item).some(([key, val]) => {
+                            if (key === 'd1') return false;
+
+                            return String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText);
+                        })
+                        : String(item[filterKeyYPO] ?? '')
+                            .toLowerCase()
+                            .includes(searchText);
+
+                // d1 ke andar sirf matching records
+                const filteredD1 = d1List.filter((d1Item) => {
+                    if (filterKeyYPO === 'all') {
+                        return Object.values(d1Item).some((val) =>
+                            String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText)
+                        );
+                    }
+
+                    return String(d1Item[filterKeyYPO] ?? '')
+                        .toLowerCase()
+                        .includes(searchText);
+                });
+
+                if (mainMatch || filteredD1.length > 0) {
+                    return {
+                        ...item,
+                        d1: filteredD1,
+                    };
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+    }, [
+        allhistoryDataYPO,
+        searchhistoryQueryYPO,
+        filterKeyYPO
+    ]);
+
+
+
+
+    // const filteredverifyDataSPO = useMemo(() => {
+    //     if (!searchverifyQueryYPO) return allverifyDataYPO;
+    //     return allverifyDataYPO.filter((item) =>
+    //         filterKeyYPO === 'all'
+    //             ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchverifyQueryYPO.toLowerCase()))
+    //             : String(item[filterKeyYPO]).toLowerCase().includes(searchverifyQueryYPO.toLowerCase())
+    //     );
+    // }, [allverifyDataYPO, searchverifyQueryYPO, filterKeyYPO]);
+
+
 
     const filteredverifyDataSPO = useMemo(() => {
         if (!searchverifyQueryYPO) return allverifyDataYPO;
-        return allverifyDataYPO.filter((item) =>
-            filterKeyYPO === 'all'
-                ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchverifyQueryYPO.toLowerCase()))
-                : String(item[filterKeyYPO]).toLowerCase().includes(searchverifyQueryYPO.toLowerCase())
-        );
-    }, [allverifyDataYPO, searchverifyQueryYPO, filterKeyYPO]);
+
+        const searchText = searchverifyQueryYPO.toLowerCase().trim();
+
+        return allverifyDataYPO
+            .map((item) => {
+                const d1List = Array.isArray(item.d1) ? item.d1 : [];
+
+                // Main level par search
+                const mainMatch =
+                    filterKeyYPO === 'all'
+                        ? Object.entries(item).some(([key, val]) => {
+                            if (key === 'd1') return false;
+
+                            return String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText);
+                        })
+                        : String(item[filterKeyYPO] ?? '')
+                            .toLowerCase()
+                            .includes(searchText);
+
+                // d1 ke andar sirf matching records
+                const filteredD1 = d1List.filter((d1Item) => {
+                    if (filterKeyYPO === 'all') {
+                        return Object.values(d1Item).some((val) =>
+                            String(val ?? '')
+                                .toLowerCase()
+                                .includes(searchText)
+                        );
+                    }
+
+                    return String(d1Item[filterKeyYPO] ?? '')
+                        .toLowerCase()
+                        .includes(searchText);
+                });
+
+                if (mainMatch || filteredD1.length > 0) {
+                    return {
+                        ...item,
+                        d1: filteredD1,
+                    };
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+    }, [
+        allverifyDataYPO,
+        searchverifyQueryYPO,
+        filterKeyYPO
+    ]);
 
 
     const formatToIndianCurrency = (value: string | number) => {
@@ -1170,6 +1342,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
 
     const handleValidation = (updatedItem: any) => {
+        const isHistoryTab =
+            String(activeTab1YPO).trim().toLowerCase() === 'history';
+
+        console.log('Current Tab:', activeTab1YPO);
+        console.log('Is History Tab:', isHistoryTab);
+        console.log('Selected Action:', selectedActionYPO);
+
         if (selectedActionYPO === 'accept') {
 
             // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
@@ -1179,37 +1358,42 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // }
         }
-        if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        if (
+            !isHistoryTab &&
+            (selectedActionYPO === 'pending' ||
+                selectedActionYPO === 'verifyreject')
+        ) {
 
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
                 )
@@ -1285,7 +1469,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -1443,12 +1627,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 setMailLogData(response.data.data);
                 setMailLogModal(true);
             } else {
-                Alert.alert('Info', 'No Data Found');
+                AppAlert.alert('Info', 'No Data Found');
             }
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -1484,12 +1668,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 params: { pdfUrl, title: 'Purchase Order' },
             });
             // if (!pdfUrlFromApi) {
-            //     Alert.alert('Error', 'PDF URL not found in server response');
+            //     AppAlert.alert('Error', 'PDF URL not found in server response');
             //     return;
             // }
             // const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
             // if (!pdfResp || !pdfResp.data) {
-            //     Alert.alert('Error', 'Failed to download PDF bytes');
+            //     AppAlert.alert('Error', 'Failed to download PDF bytes');
             //     return;
             // }
             // const buffer = Buffer.from(new Uint8Array(pdfResp.data));
@@ -1502,7 +1686,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             // setShowPdfModal(true);
         } catch (err: any) {
             console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
+            AppAlert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
         } finally {
             setLocationLoading(false);
             setPdfLoading(false);
@@ -1523,7 +1707,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
     //     const handleDownload = async () => {
     //         try {
-    //             if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //             if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
     //             if (Platform.OS === 'ios') {
     //                 await shareLocalFile(pdfUrl);
     //                 return;
@@ -1537,11 +1721,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     //                 if (ToastAndroid) {
     //                     ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
     //                 } else {
-    //                     Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //                     AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
     //                 }
     //             } catch (copyErr: any) {
     //                 console.error('copyFile failed', copyErr);
-    //                 Alert.alert(
+    //                 AppAlert.alert(
     //                     'Save failed',
     //                     'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
     //                     [
@@ -1553,7 +1737,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     //             }
     //         } catch (err) {
     //             console.error('handleDownload error', err);
-    //             Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //             AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
     //         }
     //     };
 
@@ -1589,7 +1773,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     //                                     style={{ flex: 1 }}
     //                                     onError={(e) => {
     //                                         console.error('react-native-pdf error', e);
-    //                                         Alert.alert('Error', 'Failed to render PDF');
+    //                                         AppAlert.alert('Error', 'Failed to render PDF');
     //                                     }}
     //                                 />
     //                             )
@@ -1689,6 +1873,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <View style={styles.row}>
                     <Text style={styles.label}>Auth By</Text>
                     <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth Status</Text>
+                    <Text style={styles.value}>{item.AuthStatus || '-'}</Text>
                 </View>
 
                 {/* ACTION ROW */}
@@ -1850,6 +2039,44 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         ))
                         }
                     </View >
+                )}
+
+                {/* {String(item.isauthedit) === '1' && (
+                    <View style={styles.actionRow}>
+                        <View style={styles.pendingIconCenter}>
+
+                        </View>
+                    </View>
+                )} */}
+
+
+                {String(item.isauthedit) === '1' && (
+                    <View style={crlimtreq_styles.cardActions}>
+
+                        <TouchableOpacity
+                            onPress={() =>
+                                handleIconPress(
+                                    {
+                                        ...item,
+                                        itemNameArray:
+                                            item.d1?.map(x => x.ItmName).join(', ') || '',
+                                    } as unknown as CardData,
+                                    'pending'
+                                )
+                            }
+                            disabled={!isConnected || item.isProcessed}
+                        >
+                            <Icon
+                                name="check-circle"
+                                size={30}
+                                color={
+                                    !isConnected || item.isProcessed
+                                        ? "#ccc"
+                                        : "#F44336"
+                                }
+                            />
+                        </TouchableOpacity>
+                    </View>
                 )}
 
             </View >

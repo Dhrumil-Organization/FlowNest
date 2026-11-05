@@ -1,21 +1,32 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-    View, Text, FlatList, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, LayoutAnimation, ScrollView, ToastAndroid, Share, StyleSheet
-} from 'react-native';
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    LayoutAnimation,
+    Modal,
+    TextInput as RNTextInput,
+    ScrollView,
+    Share, StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 // import RNFS from 'react-native-fs';
 // import Pdf from 'react-native-pdf';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { crlimtreq_styles } from '@/common/Style';
-import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
-import { LinearGradient } from 'expo-linear-gradient';
 import theme from '@/components/theme';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { API } from '../../common/API/dynamicAPI';
-import CriteriaForm from './CriteriaForm';
 import { fetchAllStoredata } from '../../common/API/Functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import CriteriaForm from './CriteriaForm';
+import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 
 interface CardData {
     [key: string]: string;
@@ -317,7 +328,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         if (didFetchStore.current) return;
         didFetchStore.current = true;
         const loadProperty = async () => {
@@ -327,6 +338,23 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
         };
         loadProperty();
     }, [token]);
+
+
+    useEffect(() => {
+        if (!token) return;
+        // if (!didInitialFetch.current) {
+        //     didInitialFetch.current = true;
+        //     return;
+        // }
+        if (activeTab1YPO === 'requests') {
+            fetchData();
+        }
+        else if (activeTab1YPO === 'history') {
+            fetchAllHistoryData();
+        } else if (activeTab1YPO === 'verify') {
+            fetchAllVerifyData();
+        }
+    }, [activeTab1YPO, token]);
 
     const getCurrentFinancialYear = () => {
         const currentDate = new Date();
@@ -351,21 +379,23 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
     });
 
     const fetchData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.cancel();
-        }
-        cancelTokenRef.current = axios.CancelToken.source();
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (cancelTokenRef.current) {
+        //     cancelTokenRef.current.cancel();
+        // }
+        // cancelTokenRef.current = axios.CancelToken.source();
+        console.log("ddd FormState.values.StrCode:", FormState.values.StrCode);
         setIsLoadingYPO(true);
         let strtypeFromApi = '';
-        getAllStoreData && getAllStoreData.filter((el, ind) => {
-            if (el.StrCode == FormState.values.StrCode) {
-                strtypeFromApi = el.StrType;
-            }
-        })
+        // getAllStoreData && getAllStoreData.filter((el, ind) => {
+        //     if (el.StrCode == FormState.values.StrCode) {
+        //         strtypeFromApi = el.StrType;
+        //     }
+        // })
         const userPtype = await AsyncStorage.getItem('user_prptype');
         let yno = await AsyncStorage.getItem('yno');
         try {
+            console.log("ddd1 FormState.values.StrCode:", FormState.values.StrCode);
             const payload = {
                 // txntype: 'poy_yarn_item_master',
                 txntype: 'app_item_master_auth',
@@ -379,6 +409,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 //strtype: 'Y',
                 // strtype: strtypeFromApi
             };
+            console.log("ddd2 FormState.values.StrCode:", FormState.values.StrCode);
             const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -386,7 +417,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                     Accept: 'application/json',
                 },
                 params: payload,
-                cancelToken: cancelTokenRef.current.token
+                // cancelToken: cancelTokenRef.current.token
             });
             console.log("response hereeeee", response)
             if (response.data.success && response.data.response.data.length > 0) {
@@ -403,7 +434,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -414,20 +445,20 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
 
 
     const fetchAllHistoryData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.cancel();
-        }
-        cancelTokenRef.current = axios.CancelToken.source();
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (cancelTokenRef.current) {
+        //     cancelTokenRef.current.cancel();
+        // }
+        // cancelTokenRef.current = axios.CancelToken.source();
         setIsLoadingYPO(true);
         const userPtype = await AsyncStorage.getItem('user_prptype');
         let yno = await AsyncStorage.getItem('yno');
         let strtypeFromApi = '';
-        getAllStoreData && getAllStoreData.filter((el, ind) => {
-            if (el.StrCode == FormState.values.StrCode) {
-                strtypeFromApi = el.StrType;
-            }
-        })
+        // getAllStoreData && getAllStoreData.filter((el, ind) => {
+        //     if (el.StrCode == FormState.values.StrCode) {
+        //         strtypeFromApi = el.StrType;
+        //     }
+        // })
         try {
             const payload = {
                 txntype: 'app_item_master_auth',
@@ -435,7 +466,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 // prptype: userPtype,
                 prptype: 'R',
                 // yearno: yno,
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 strcode: FormState.values.StrCode || '',
                 atype: 'h',
                 //strtype: 'Y',
@@ -444,7 +475,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,
-                cancelToken: cancelTokenRef.current.token
+                // cancelToken: cancelTokenRef.current.token
             });
             console.log("payload", payload)
             console.log("response", response)
@@ -462,7 +493,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
         }
         catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -471,20 +502,20 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
 
 
     const fetchAllVerifyData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.cancel();
-        }
-        cancelTokenRef.current = axios.CancelToken.source();
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (cancelTokenRef.current) {
+        //     cancelTokenRef.current.cancel();
+        // }
+        // cancelTokenRef.current = axios.CancelToken.source();
         setIsLoadingYPO(true);
         const userPtype = await AsyncStorage.getItem('user_prptype');
         let yno = await AsyncStorage.getItem('yno');
         let strtypeFromApi = '';
-        getAllStoreData && getAllStoreData.filter((el, ind) => {
-            if (el.StrCode == FormState.values.StrCode) {
-                strtypeFromApi = el.StrType;
-            }
-        })
+        // getAllStoreData && getAllStoreData.filter((el, ind) => {
+        //     if (el.StrCode == FormState.values.StrCode) {
+        //         strtypeFromApi = el.StrType;
+        //     }
+        // })
         try {
             const payload = {
                 txntype: 'app_item_master_auth',
@@ -492,14 +523,14 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 // prptype: userPtype,
                 prptype: 'R',
                 // yearno: yno,
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 strcode: FormState.values.StrCode || '',
                 atype: 'A',
             };
             const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,
-                cancelToken: cancelTokenRef.current.token
+                // cancelToken: cancelTokenRef.current.token
             });
             console.log("verify data", payload)
             if (response.data.success && response.data.response.data.length > 0) {
@@ -516,7 +547,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -554,26 +585,14 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
         }
     }, [FormState.values.StrCode]);
-    useEffect(() => {
-        if(!token) return;
-        if (!didInitialFetch.current) {
-            didInitialFetch.current = true;
-            return;
-        }
-        if (activeTab1YPO === 'history') {
-            fetchAllHistoryData();
-        } else if (activeTab1YPO === 'requests') {
-            fetchData();
-        } else if (activeTab1YPO === 'verify') {
-            fetchAllVerifyData();
-        }
-    }, [activeTab1YPO, token]);
+
+  
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
         setActiveTabYPO('party');
@@ -606,7 +625,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -710,7 +729,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
         }
         if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
             if (!remark) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Item.: ' + updatedItem.ItmCode
                 )
@@ -851,7 +870,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             await Share.share({ url: urlToShare } as any);
         } catch (err) {
             console.warn('shareLocalFile error', err);
-            Alert.alert('Share failed', err?.message || String(err));
+            AppAlert.alert('Share failed', err?.message || String(err));
         }
     };
 
@@ -867,7 +886,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
 
     //     const handleDownload = async () => {
     //         try {
-    //             if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //             if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
     //             if (Platform.OS === 'ios') {
     //                 await shareLocalFile(pdfUrl);
     //                 return;
@@ -881,11 +900,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
     //                 if (ToastAndroid) {
     //                     ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
     //                 } else {
-    //                     Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //                     AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
     //                 }
     //             } catch (copyErr: any) {
     //                 console.error('copyFile failed', copyErr);
-    //                 Alert.alert(
+    //                 AppAlert.alert(
     //                     'Save failed',
     //                     'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
     //                     [
@@ -897,7 +916,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
     //             }
     //         } catch (err) {
     //             console.error('handleDownload error', err);
-    //             Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //             AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
     //         }
     //     };
 
@@ -929,7 +948,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
     //                                     style={{ flex: 1 }}
     //                                     onError={(e) => {
     //                                         console.error('react-native-pdf error', e);
-    //                                         Alert.alert('Error', 'Failed to render PDF');
+    //                                         AppAlert.alert('Error', 'Failed to render PDF');
     //                                     }}
     //                                 />
     //                             )
@@ -983,6 +1002,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 </View>
 
                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Store</Text>
+                    <Text style={newStyles.value}>{item.StrName || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Sub Group</Text>
                     <Text style={newStyles.value}>{item.IsgName || '-'}</Text>
                 </View>
@@ -990,6 +1014,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Group</Text>
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+
+                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
                 </View>
 
                 <View style={newStyles.row}>
@@ -1093,6 +1122,12 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 </View>
 
                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Store</Text>
+                    <Text style={newStyles.value}>{item.StrName || '-'}</Text>
+                </View>
+
+
+                <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Code</Text>
                     <Text style={newStyles.value}>{item.ItmCode || '-'}</Text>
                 </View>
@@ -1110,6 +1145,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Group</Text>
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+
+                  <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
                 </View>
 
                 <View style={newStyles.row}>
@@ -1147,6 +1187,12 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                     <Text style={newStyles.label}>Item Name</Text>
                     <Text style={newStyles.value}>{item.ItmName || '-'}</Text>
                 </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Store</Text>
+                    <Text style={newStyles.value}>{item.StrName || '-'}</Text>
+                </View>
+
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Sub Group</Text>
                     <Text style={newStyles.value}>{item.IsgName || '-'}</Text>
@@ -1154,6 +1200,10 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Group</Text>
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
                 </View>
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Status</Text>
@@ -1247,9 +1297,9 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
             <View style={crlimtreq_styles.container}>
                 {isLoadingYPO && <FullScreenLoader message={'Loading...'} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                {/* <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
                     <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // import React from 'react';
 // import {
 //   View,
@@ -123,28 +124,28 @@
 // });
 
 // screens/ContactScreen.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/src/core/theme/themeMode';
 import {
-    View,
+    Animated,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Linking,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    Dimensions,
-    Image,
-    StatusBar,
-    Animated,
-    Alert,
-    Linking,
-    KeyboardAvoidingView,
-    Platform,
+    View
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Haptics from 'expo-haptics';
-import theme from '@/components/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -218,40 +219,44 @@ const DEPARTMENTS = [
 
 const CONTACT_PERSONS: ContactPerson[] = [
     {
-        name: 'Mr. Ramesh Agarwal',
-        designation: 'Chairman & MD',
-        department: 'Leadership',
-        phone: '+91 9876500001',
-        email: 'ramesh@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200',
-    },
-    {
-        name: 'Mr. Suresh Agarwal',
-        designation: 'Joint MD',
-        department: 'Operations',
-        phone: '+91 9876500002',
-        email: 'suresh@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200',
-    },
-    {
-        name: 'Ms. Priya Sharma',
-        designation: 'Head - International Sales',
-        department: 'Export',
-        phone: '+91 9876500003',
-        email: 'priya@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200',
-    },
-    {
-        name: 'Mr. Anil Kumar',
-        designation: 'Customer Relations',
+        name: 'Mr. Yatiraj Mundra',
+        designation: 'Director',
         department: 'Support',
-        phone: '+91 9876500004',
-        email: 'anil@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.03.30_REC-removebg-preview-300x292.png',
+    },
+    {
+        name: 'Mr. Sudarshan Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.02.35_REC-removebg-preview-300x293.png',
+    },
+    {
+        name: 'Mr. Nikunj Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/05/16.05.2023_18.20.36_REC-removebg-preview-300x298.png',
+    },
+    {
+        name: 'Mr. Saulabhya Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.05.06_REC-removebg-preview-300x295.png',
     },
 ];
 
 export default function ContactScreen() {
+    // Theme: this page is outside the NEW ERP navigator, so it listens to the
+    // theme itself — on a change the whole page is drawn again in the new
+    // colours (nothing typed on the page is lost).
+    useTheme();
     const router = useRouter();
 
     // Form State
@@ -291,7 +296,7 @@ export default function ContactScreen() {
                 if (supported) {
                     Linking.openURL(phoneUrl);
                 } else {
-                    Alert.alert('Error', 'Phone calls not supported on this device');
+                    AppAlert.alert('Error', 'Phone calls not supported on this device');
                 }
             })
             .catch((err) => console.error(err));
@@ -300,7 +305,7 @@ export default function ContactScreen() {
     const handleEmail = (email: string) => {
         const emailUrl = `mailto:${email}`;
         Linking.openURL(emailUrl).catch(() => {
-            Alert.alert('Error', 'Email not configured on this device');
+            AppAlert.alert('Error', 'Email not configured on this device');
         });
     };
 
@@ -308,14 +313,14 @@ export default function ContactScreen() {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         const whatsappUrl = `whatsapp://send?phone=91${cleanPhone.slice(-10)}`;
         Linking.openURL(whatsappUrl).catch(() => {
-            Alert.alert('Error', 'WhatsApp not installed');
+            AppAlert.alert('Error', 'WhatsApp not installed');
         });
     };
 
     const handleMap = (address: string) => {
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
         Linking.openURL(mapUrl).catch(() => {
-            Alert.alert('Error', 'Cannot open maps');
+            AppAlert.alert('Error', 'Cannot open maps');
         });
     };
 
@@ -332,19 +337,19 @@ export default function ContactScreen() {
 
     const validateForm = (): boolean => {
         if (!formData.name.trim()) {
-            Alert.alert('Required', 'Please enter your name');
+            AppAlert.alert('Required', 'Please enter your name');
             return false;
         }
         if (!formData.email.trim() || !formData.email.includes('@')) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address');
+            AppAlert.alert('Invalid Email', 'Please enter a valid email address');
             return false;
         }
         if (!formData.subject.trim()) {
-            Alert.alert('Required', 'Please enter a subject');
+            AppAlert.alert('Required', 'Please enter a subject');
             return false;
         }
         if (!formData.message.trim() || formData.message.length < 10) {
-            Alert.alert('Too Short', 'Please enter at least 10 characters in your message');
+            AppAlert.alert('Too Short', 'Please enter at least 10 characters in your message');
             return false;
         }
         return true;
@@ -360,7 +365,7 @@ export default function ContactScreen() {
             if (Platform.OS !== 'web') {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
-            Alert.alert(
+            AppAlert.alert(
                 '✅ Message Sent!',
                 `Thank you ${formData.name}!\n\nWe've received your inquiry and our team will get back to you within 24 hours.`,
                 [

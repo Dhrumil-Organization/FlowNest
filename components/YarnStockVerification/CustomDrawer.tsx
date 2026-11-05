@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert, BackHandler } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -8,7 +9,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
 
@@ -180,17 +181,17 @@ const CustomDrawer = (props) => {
                 const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
                 console.log("get_verify_manual_stock API response :", response)
                 if (response.data.success === true && response.data.response.data.length === 0) {
-                    Alert.alert('No Data Found');
+                    AppAlert.alert('No Data Found');
                 } else if (response.data.success === true && response.data.response.data.length > 0) {
                     setAllStockData(response.data.response.data);
                     onClose()
                 } else if (response.data.success === false) {
-                    Alert.alert(`${response.data.message}`);
+                    AppAlert.alert(`${response.data.message}`);
                 } else {
-                    Alert.alert(`${response.data.message}`);
+                    AppAlert.alert(`${response.data.message}`);
                 }
             } catch (error) {
-                Alert.alert('Server Error :' + error)
+                AppAlert.alert('Server Error :' + error)
             } finally {
                 setIsLoadingMore(false)
             }

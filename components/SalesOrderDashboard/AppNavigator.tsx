@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import {
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
+  View,
 } from 'react-native';
 
 // import HomeScreen from './screen/HomeScreen';
-import DesignsScreen from './screen/DesignsScreen';
 import CostingScreen from './screen/CostingScreen';
+import DesignsScreen from './screen/DesignsScreen';
 // import OrdersScreen from './screen/OrdersScreen';
-import StockScreen from './screen/StockScreen';
 import ExpenseScreen from './screen/ExpenseScreen';
-import ManufacturingControlTower from './screen/ManufacturingControlTower';
-import RealCostingReferenceDashboard from './screen/RealCostingReferenceDashboard';
+import MonthlySalesTargetScreen from './screen/MonthlySalesTarget';
+import StockScreen from './screen/StockScreen';
 // import ProdScreen from './screen//ProdScreen';
 
 const TABS = [
@@ -25,6 +24,7 @@ const TABS = [
   // { id: 'orders', label: 'Orders', Screen: OrdersScreen },
   { id: 'stock', label: 'Stock', Screen: StockScreen },
   { id: 'expense', label: 'Expense', Screen: ExpenseScreen },
+  { id: 'monthlysalestarget', label: 'MonthlySalesTarget', Screen: MonthlySalesTargetScreen },
   // { id: 'prod', label: 'Prod', Screen: ProdScreen },
 ];
 
@@ -43,7 +43,7 @@ function TabIcon({ label, active }) {
 }
 
 export default function AppNavigator({ token, apiBase }) {
-  const [activeTab, setActiveTab] = useState('expense');
+  const [activeTab, setActiveTab] = useState('designs');
 
   const ActiveScreen =
     TABS.find(t => t.id === activeTab)?.Screen || ExpenseScreen;

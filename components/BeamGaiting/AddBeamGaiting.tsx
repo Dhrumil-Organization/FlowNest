@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
@@ -20,17 +21,23 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 // import SearchableDropdown from '../Shared/SearchableDropdown';
 import axios from 'axios';
 import { API } from '@/common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 // import FullScreenLoader from '../Loader/Loader';
 // import { values } from 'lodash';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PartyDropdown from '@/Shared/PartyDropdown';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { Colors } from 'react-native/Libraries/NewAppScreen';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 const CartonAddDrawer = (props) => {
+
+    const insets = useSafeAreaInsets();
+
     const { beamdetailvisible, onClose, setIsLoading, isLoading, token, selectedYear, FormState, setFormState, fatchAllBeamDetailData } = props;
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [machinedata, setMachineData] = useState([]);
@@ -470,7 +477,7 @@ const CartonAddDrawer = (props) => {
     //                 }
     //             }));
     //         } else if (res?.validate === 'false') {
-    //             Alert.alert(
+    //             AppAlert.alert(
     //                 'Oops!!!',
     //                 res?.message || 'Something went wrong!'
     //             ).then(() => {
@@ -541,7 +548,7 @@ const CartonAddDrawer = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                Alert.alert(
+                AppAlert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -572,7 +579,7 @@ const CartonAddDrawer = (props) => {
 
     const showAlert = (message) => {
         return new Promise((resolve) => {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation Error',
                 message,
                 [
@@ -718,7 +725,7 @@ const CartonAddDrawer = (props) => {
 
             if (response.data.success === true) {
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     "Data Saved Successfully ✅",
                     [
@@ -758,7 +765,7 @@ const CartonAddDrawer = (props) => {
                 //     textColor: '#fff',
                 //     action: { text: 'OK', textColor: 'red' },
                 // });
-                Alert.alert(`${response.data.message}`)
+                AppAlert.alert(`${response.data.message}`)
 
             }
         } catch (error) {
@@ -897,6 +904,8 @@ const CartonAddDrawer = (props) => {
                 animationType="slide"
                 onRequestClose={onClose}
             >
+
+
                 <View style={castyles.modalOverlay}>
                     <Animated.View
                         style={[
@@ -904,8 +913,31 @@ const CartonAddDrawer = (props) => {
                             { transform: [{ translateY: slideAnim }] }
                         ]}
                     >
-                        {/* HEADER */}
-                        <View style={castyles.header}>
+                        {/* <SafeAreaView
+                            edges={['top']}
+                            style={{ backgroundColor: '#0a7ea4' }}
+                        />
+                            <StatusBar
+                                style="light"
+                                translucent={false}
+                            />
+                            <View style={castyles.header}> */}
+                        <StatusBar
+                            style="light"
+                            backgroundColor="#0a7ea4"
+                        />
+
+                        <View
+                            style={[
+                                castyles.header,
+                                {
+                                    // paddingTop: insets.top + 10,
+                                    paddingTop: Platform.OS === "android"
+                                        ? insets.top + 12
+                                        : insets.top + 4,
+                                },
+                            ]}
+                        >
                             <View>
                                 <Text style={castyles.headerTitle}>Beam Gaiting</Text>
                             </View>
@@ -922,8 +954,16 @@ const CartonAddDrawer = (props) => {
 
                         {/* FORM */}
                         <ScrollView
+                            // style={castyles.container}
+                            // contentContainerStyle={{ paddingBottom: 120 }}
                             style={castyles.container}
-                            contentContainerStyle={{ paddingBottom: 120 }}
+                            contentContainerStyle={{
+                                paddingHorizontal: 16,
+                                paddingTop: 16,
+                                paddingBottom: 170,
+                            }}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
                         >
                             <View style={castyles.field}>
                                 <Text style={castyles.label}>
@@ -1117,6 +1157,10 @@ const CartonAddDrawer = (props) => {
                                             ...prev,
                                             values: updatedValues
                                         }));
+                                        await fetchshift({
+                                            PrpCode: item?.PrpCode || ""
+                                        });
+
                                         const uidFromShow = await Soshow(updatedValues);
                                         setUID(uidFromShow);
                                         await checkvoucher({
@@ -1217,11 +1261,11 @@ const CartonAddDrawer = (props) => {
                                         placeholder="Suffix"
                                         onChangeText={(text) => {
                                             if (!FormState.values.VouDate) {
-                                                Alert.alert("Please select Voucher Date first");
+                                                AppAlert.alert("Please select Voucher Date first");
                                                 return;
                                             }
                                             if (!FormState.values.VouNo) {
-                                                Alert.alert("Please enter Voucher No");
+                                                AppAlert.alert("Please enter Voucher No");
                                                 return;
                                             }
 
@@ -1587,6 +1631,11 @@ const CartonAddDrawer = (props) => {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                <SafeAreaView
+                    style={{ flex: 0, backgroundColor: "#fff" }}
+                    edges={["bottom"]}
+                />
             </Modal>
 
             <Modal transparent visible={showSuccess} animationType="fade">
@@ -1771,18 +1820,28 @@ const castyles = StyleSheet.create({
     drawerContainer: {
         height: "100%",
         backgroundColor: "#fff",
-        borderTopLeftRadius: 25,
+        borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
         overflow: "hidden"
     },
 
+    // header: {
+    //     backgroundColor: "#0a7ea4",
+    //     padding: 15,
+    //     flexDirection: "row",
+    //     alignItems: "center",
+    //     justifyContent: "space-between",
+    //     // marginTop: 55
+    // },
+
     header: {
         backgroundColor: "#0a7ea4",
-        padding: 15,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: 10,   // 👈 ye increase/decrease kar sakte ho
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        marginTop: 55
     },
 
     headerTitle: {
@@ -1898,24 +1957,47 @@ const castyles = StyleSheet.create({
         shadowRadius: 2,
         elevation: 2,
     },
+    // bottomButtonContainer: {
+    //     position: "absolute",
+    //     bottom: 20,
+    //     left: 15,
+    //     right: 15,
+    //     flexDirection: "row",
+    //     justifyContent: "space-between"
+    // },
     bottomButtonContainer: {
         position: "absolute",
-        bottom: 20,
-        left: 15,
-        right: 15,
+        left: 0,
+        right: 0,
+        bottom: 0,
         flexDirection: "row",
-        justifyContent: "space-between"
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        paddingBottom: 20,
+        backgroundColor: "#fff",
+        borderTopWidth: 1,
+        borderTopColor: "#E5E7EB",
     },
+    // cancelButton: {
+    //     flex: 1,
+    //     flexDirection: "row",
+    //     alignItems: "center",
+    //     justifyContent: "center",
+    //     backgroundColor: "#d9534f",
+    //     paddingVertical: 12,
+    //     borderRadius: 8,
+    //     marginRight: 10,
+    //     elevation: 3
+    // },
     cancelButton: {
         flex: 1,
-        flexDirection: "row",
+        height: 52,
+        borderRadius: 12,
+        backgroundColor: "#e74c3c",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#d9534f",
-        paddingVertical: 12,
-        borderRadius: 8,
+        flexDirection: "row",
         marginRight: 10,
-        elevation: 3
     },
     bottomBtnText: {
         color: "#fff",
@@ -1923,15 +2005,58 @@ const castyles = StyleSheet.create({
         fontSize: 14,
         marginLeft: 6
     },
+    // loadButtonNew: {
+    //     flex: 1,
+    //     flexDirection: "row",
+    //     alignItems: "center",
+    //     justifyContent: "center",
+    //     backgroundColor: "#17b85a",
+    //     paddingVertical: 12,
+    //     borderRadius: 8,
+    //     elevation: 3
+    // },
     loadButtonNew: {
         flex: 1,
-        flexDirection: "row",
+        height: 52,
+        borderRadius: 12,
+        backgroundColor: "#22c55e",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#17b85a",
-        paddingVertical: 12,
-        borderRadius: 8,
-        elevation: 3
+        flexDirection: "row",
+    },
+    modalMessage: {
+        fontSize: 16,
+        marginVertical: 10,
+        textAlign: 'center'
+    },
+    modalBox: {
+        width: 300,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+        elevation: 10
+    },
+
+    successIcon: {
+        fontSize: 50,
+        marginBottom: 10
+    },
+
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold'
+    },
+    okButton: {
+        backgroundColor: '#2e7d32',
+        paddingHorizontal: 25,
+        paddingVertical: 10,
+        borderRadius: 6
+    },
+
+    okText: {
+        color: '#fff',
+        fontWeight: 'bold'
     },
 });
 

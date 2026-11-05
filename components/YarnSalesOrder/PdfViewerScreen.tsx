@@ -1,18 +1,20 @@
+import AppAlert from '@/common/utils/appAlert';
 import React from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
-    // Share,
+    Share,
     Alert,
     Platform,
     ActivityIndicator,
     ToastAndroid,
 } from 'react-native';
 import Pdf from 'react-native-pdf';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import Share from 'react-native-share';
+import Icon from '@expo/vector-icons/MaterialIcons';
+// import Share from 'react-native-share';
+
 import ReactNativeBlobUtil from 'react-native-blob-util';
 // import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +28,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
     const handleShare = async () => {
         try {
             if (!pdfUrl) {
-                Alert.alert('Error', 'PDF URL not found');
+                AppAlert.alert('Error', 'PDF URL not found');
                 return;
             }
 
@@ -60,7 +62,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
     //     try {
 
     //         if (!pdfUrl) {
-    //             Alert.alert(
+    //             AppAlert.alert(
     //                 'Error',
     //                 'PDF URL not found'
     //             );
@@ -89,7 +91,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
     //             response.uri
     //         );
 
-    //         Alert.alert(
+    //         AppAlert.alert(
     //             'Success',
     //             'PDF downloaded successfully'
     //         );
@@ -103,7 +105,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
     //             error
     //         );
 
-    //         Alert.alert(
+    //         AppAlert.alert(
     //             'Error',
     //             'Unable to download PDF'
     //         );
@@ -133,7 +135,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
                 err
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Share Failed',
                 err?.message || 'Unable to share PDF'
             );
@@ -145,7 +147,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
 
             if (!pdfUrl) {
 
-                Alert.alert(
+                AppAlert.alert(
                     'Error',
                     'PDF URL not found'
                 );
@@ -184,7 +186,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
 
             } else {
 
-                Alert.alert(
+                AppAlert.alert(
                     'Error',
                     'Download failed'
                 );
@@ -199,7 +201,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
                 err
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 err?.message ||
                 'Unable to download PDF'

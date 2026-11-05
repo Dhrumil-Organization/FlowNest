@@ -1,0 +1,63 @@
+FABRIC STOCK VERIFICATION - REACT NATIVE PRODUCTION-SAFE MODULE
+===============================================================
+
+Business behavior preserved
+---------------------------
+1. Existing system stock is NOT quantity-adjusted during verification.
+2. Scanning an existing taka finds the loaded GRYMStk row and opens confirmation.
+3. Confirming uses the existing /api/update_verify_manual_fabric_stock endpoint.
+4. A QR scan never saves automatically.
+5. If scanned taka is not found in loaded system stock, user may open Manual Entry.
+6. Manual Entry continues to use /api/insert_verify_manual_fabric_stock.
+7. Manual stock remains GRYMStk + GRYMStkD1 behavior from the existing backend.
+
+UX changes
+----------
+- Added primary Scan Taka action on Fabric Stock Verification screen.
+- Added full-screen QR scanner with camera permission handling and explicit restart.
+- Changed mobile actions from floating icon-only buttons to labeled touch actions.
+- Verification confirmation now says Mark Verified and clearly states system meter is unchanged.
+- Stock card labels use Taka / Roll No. and System Meter.
+- Manual entry renamed Physical Stock Not in System.
+- Removed mandatory Chees from fabric manual entry.
+- Removed separate Gross/Net fields from visible manual form.
+- Added one required Physical Meter field; existing API receives that value in both GrsWt and NetWt for compatibility.
+- Design and Shade are shown as optional in the manual form.
+
+New files
+---------
+FabricQrScannerModal.tsx
+fabricQr.ts
+
+Copy-replace files changed
+--------------------------
+index.tsx
+CartonAddDrawer.tsx
+YarnStockCard.tsx
+
+QR formats
+----------
+Supports JSON payloads, plain taka numbers, and the existing ERP reference format:
+UID~SrNo~SubSr~TranType~TakaNo~ItmCode~DsnCode~Qty~
+
+Example:
+370001939~1~10~31~166~23576~513~100.000~
+
+Dependency
+----------
+The uploaded CartonAddDrawer.tsx already imported expo-camera:
+  import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+Therefore this package does not change package.json.
+If the deployed app does not actually have expo-camera installed, install the Expo-compatible expo-camera version for that app before building.
+
+Validation performed
+--------------------
+TypeScript syntax/transpile validation passed for:
+- index.tsx
+- CartonAddDrawer.tsx
+- YarnStockCard.tsx
+- FabricQrScannerModal.tsx
+- fabricQr.ts
+- CustomDrawer.tsx
+
+No backend/table changes are included in this package.

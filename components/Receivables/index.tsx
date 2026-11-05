@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
 import Ticker from '@/common/Ticker';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import {
     format,
@@ -23,7 +24,7 @@ interface Props {
     duration?: number;
 }
 
-const Receivables: React.FC<Props> = ({ token, username }) => {
+const ReceivablesNew: React.FC<Props> = ({ token, username }) => {
     console.log("Token received in Receivables:", token);
     const [isLoading, setIsLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
@@ -332,7 +333,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
     const chacheData = async () => {
         if (!token) {
             console.error("Token is missing!");
-            Alert.alert("Error", "User not authenticated. Please log in again.");
+            AppAlert.alert("Error", "User not authenticated. Please log in again.");
             return;
         }
 
@@ -485,7 +486,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
             const response = await axios.post(`${API}/api/get_dashoutshead`, payload, { headers });
             if (response.data.success === true) {
                 setdashSubHeadLoading(false);
-                // Alert.alert('No Data Found');
+                // AppAlert.alert('No Data Found');
                 console.log('🔵 dashSubHead API Response:', payload, response);
                 const maindata = response.data.data.data;
                 setdashSubHead(maindata);
@@ -494,7 +495,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             setdashSubHeadLoading(false);
             // setIsLoading(false);
-            // Alert.alert('Server Error');
+            // AppAlert.alert('Server Error');
 
         }
 
@@ -715,7 +716,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -766,7 +767,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -828,7 +829,7 @@ const Receivables: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -2908,4 +2909,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default Receivables;
+export default ReceivablesNew;

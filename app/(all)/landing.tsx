@@ -9,11 +9,11 @@
 //     Image,
 // } from 'react-native';
 // import { LinearGradient } from 'expo-linear-gradient';
-// import { useRouter } from 'expo-router';
+// import { useLocalSearchParams, useRouter } from 'expo-router';
 // import Icon from '@expo/vector-icons/MaterialIcons';
 // import theme from '@/components/theme';
 // import logo from '../../assets/images/logo.png';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 
 // const { width } = Dimensions.get('window');
 
@@ -395,39 +395,63 @@
 //         textAlign: 'center',
 //     },
 // });
-import React, { useEffect, useRef } from 'react';
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { ensureSingleErp } from '@/src/core/singleErp';
+import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
+import { useTheme } from '@/src/core/theme/themeMode';
+import { AuthButton, BrandMark, NAVY, useAuthResponsive } from '@/src/components/auth/AuthUI';
+import { S, T } from '@/src/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+    Animated,
     ScrollView,
-    View,
+    StatusBar,
+    StyleSheet,
     Text,
     TouchableOpacity,
-    StyleSheet,
-    Dimensions,
-    Image,
-    Animated,
+    View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import theme from '@/components/theme';
-import logo from '../../assets/images/logo.png';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.72;
 const CARD_SPACING = 14;
-
 export default function LandingPage() {
+    // Theme: this page is outside the NEW ERP navigator, so it listens to the
+    // theme itself — on a change the whole page is drawn again in the new
+    // colours (nothing typed on the page is lost).
+    useTheme();
     const router = useRouter();
+    const params = useLocalSearchParams<{ notificationLoginRequired?: string }>();
+    const [notificationLoginRequired, setNotificationLoginRequired] = useState(false);
     const scrollX = useRef(new Animated.Value(0)).current;
+    const { width, isWide, isTablet, isDesktop, gutter } = useAuthResponsive();
+    // Carousel geometry (mobile only). Kept in a ref so the auto-scroll
+    // interval below always uses the current card width after rotation /
+    // browser resize.
+    const CARD_WIDTH = Math.min(Math.round(width * 0.76), 340);
+    const cardStepRef = useRef(CARD_WIDTH + CARD_SPACING);
+    cardStepRef.current = CARD_WIDTH + CARD_SPACING;
     const scrollRef = useRef(null);
     const currentIndex = useRef(0);
+    const [lookupPlatform, setLookupPlatform] = useState<null>(null);
+
+    useEffect(() => {
+        console.log('Notification Login Required:', params.notificationLoginRequired);
+        setNotificationLoginRequired(params.notificationLoginRequired === '1');
+        if (params.notificationLoginRequired === '1') {
+            AppAlert.alert('Please log in to open this notification', 'You are currently logged out. Please log in first, then open the notification again to access its screen.');
+        }
+    }, [params.notificationLoginRequired]);
 
     useEffect(() => {
         const check = async () => {
+            // One ERP: an old-platform session is cleared here (sign in again).
+            await ensureSingleErp();
             const token = await AsyncStorage.getItem('access_token');
             if (token) {
-                router.replace('/');
+                router.replace('/new');
             }
         };
         check();
@@ -440,7 +464,7 @@ export default function LandingPage() {
                 currentIndex.current =
                     (currentIndex.current + 1) % features.length;
                 scrollRef.current.scrollTo({
-                    x: currentIndex.current * (CARD_WIDTH + CARD_SPACING),
+                    x: currentIndex.current * cardStepRef.current,
                     animated: true,
                 });
             }
@@ -501,488 +525,606 @@ export default function LandingPage() {
         },
     ];
 
+    // Straight to the ERP sign-in (the Legacy / New selection step is removed).
+    const goLogin = async () => {
+        await ensureSingleErp();
+        router.replace('/new/property-select');
+    };
+    const goSignup = () => router.push('/signup');
+
+    const stats = [
+        { value: 'ERP', label: 'Business Automation', icon: 'hub' },
+        { value: '24/7', label: 'Mobile Access', icon: 'devices' },
+    ];
+
+    const explore = [
+        { icon: 'info-outline', title: 'About Us', desc: 'Our story, businesses and values.', onPress: () => router.push('/about') },
+        { icon: 'support-agent', title: 'Contact Us', desc: 'Talk to our team about FlowNest.', onPress: () => router.push('/contact') },
+        { icon: 'person-add-alt', title: 'Create Account', desc: 'Register and start in minutes.', onPress: () => router.push('/signup') },
+    ];
+
+    const gridColumns = isDesktop ? 4 : isWide ? 3 : 2;
+    const inner = { width: '100%' as const, maxWidth: 1200, alignSelf: 'center' as const, paddingHorizontal: gutter };
+    const showGrid = isWide || isTablet;
+
     return (
         <ScrollView
             style={styles.container}
             showsVerticalScrollIndicator={false}
         >
+            <StatusBar barStyle="light-content" backgroundColor={T.nav} />
+
             {/* ============== HERO SECTION ============== */}
-            <LinearGradient
-                colors={[
-                    theme.BRAND_GRADIENT_START,
-                    theme.BRAND_GRADIENT_END,
-                ]}
-                style={styles.hero}
-            >
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                        Textile ERP Platform
-                    </Text>
-                </View>
+            <View style={styles.hero}>
+                                <SafeAreaView edges={['top']}>
+                    <View style={[inner, styles.nav]}>
+                        <BrandMark size={isWide ? 38 : 32} caption="MADHUSUDAN GROUP" />
 
-                <View style={styles.logoRow}>
-                    <Image
-                        source={logo}
-                        style={styles.logo}
-                    />
-                    <Text style={styles.title}>
-                        FlowNest
-                    </Text>
-                </View>
-
-                <Text style={styles.subtitle}>
-                    Smart ERP for Textile &
-                    Manufacturing Businesses
-                </Text>
-
-                <Text style={styles.description}>
-                    Manage production, collections,
-                    receivables, sales analysis and
-                    operational workflows from a
-                    single platform.
-                </Text>
-
-                <TouchableOpacity
-                    style={styles.primaryBtn}
-                    onPress={() => router.replace('/(auth)/login')}
-                >
-                    <Text style={styles.primaryText}>
-                        Login
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.guestBtn}
-                    onPress={() => router.push('/signup')}
-                >
-                    <Text style={styles.guestText}>
-                        Sign Up
-                    </Text>
-                </TouchableOpacity>
-            </LinearGradient>
-
-            {/* ============== STATS SECTION ============== */}
-            <View style={styles.statsContainer}>
-                <View style={styles.statCard}>
-                    <Text style={styles.statValue}>ERP</Text>
-                    <Text style={styles.statLabel}>
-                        Business Automation
-                    </Text>
-                </View>
-
-                <View style={styles.statCard}>
-                    <Text style={styles.statValue}>24/7</Text>
-                    <Text style={styles.statLabel}>
-                        Mobile Access
-                    </Text>
-                </View>
-            </View>
-
-            {/* ============== WHY US? CAROUSEL ============== */}
-            <View style={styles.section}>
-                <View style={styles.headerRow}>
-                    <Text style={styles.sectionTitle}>
-                        Why Us?
-                    </Text>
-                    <Text style={styles.sectionSubtitle}>
-                        Highlights
-                    </Text>
-                </View>
-
-                <Text style={styles.heroText}>
-                    Facts about Madhusudan Group
-                </Text>
-
-                {/* Auto-scrolling horizontal carousel */}
-                <Animated.ScrollView
-                    ref={scrollRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    snapToInterval={CARD_WIDTH + CARD_SPACING}
-                    decelerationRate="fast"
-                    contentContainerStyle={styles.carouselContainer}
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                        { useNativeDriver: false }
-                    )}
-                    scrollEventThrottle={16}
-                >
-                    {features.map((item, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            activeOpacity={0.85}
-                            style={styles.featureCard}
-                            // onPress={() => router.replace('/(auth)/login')}
-                        >
-                            <View style={styles.cardHeader}>
-                                <View style={styles.iconBox}>
-                                    <Icon
-                                        name={item.icon}
-                                        size={28}
-                                        color={theme.BRAND_GRADIENT_END}
-                                    />
+                        {isWide || isTablet ? (
+                            <View style={styles.navLinks}>
+                                <TouchableOpacity onPress={() => router.push('/about')} style={styles.navLink}>
+                                    <Text style={styles.navLinkText}>About Us</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => router.push('/contact')} style={styles.navLink}>
+                                    <Text style={styles.navLinkText}>Contact Us</Text>
+                                </TouchableOpacity>
+                                <AuthButton label="Sign Up" variant="outlineLight" onPress={goSignup} style={styles.navBtn} />
+                                <AuthButton label="Login" onPress={goLogin} style={[styles.navBtn, { marginLeft: 10 }]} />
+                                {/* Light <-> Dark */}
+                                <View style={{ marginLeft: 10 }}>
+                                    <ThemeToggleButton onDark size={40} />
                                 </View>
-                                <Text style={styles.featureTitle}>
-                                    {item.title}
-                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.navMobileRight}>
+                                {/* Light <-> Dark */}
+                                <ThemeToggleButton onDark size={34} />
+                                <TouchableOpacity onPress={goLogin} style={styles.navLoginPill} accessibilityRole="button">
+                                    <Text style={styles.navLoginText}>Login</Text>
+                                    <Icon name="arrow-forward" size={15} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+
+                    {notificationLoginRequired && (
+                        <View style={inner}>
+                            <View style={styles.notificationLoginBanner}>
+                                <View style={styles.notificationLoginIcon}>
+                                    <Icon name="notifications-none" size={22} color="#fff" />
+                                </View>
+                                <View style={styles.notificationLoginContent}>
+                                    <Text style={styles.notificationLoginTitle}>Please log in to open this notification</Text>
+                                    <Text style={styles.notificationLoginMessage}>
+                                        You are currently logged out. Please log in first, then open the notification again to access its screen.
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    accessibilityRole="button"
+                                    onPress={() => setNotificationLoginRequired(false)}
+                                    style={styles.notificationLoginClose}
+                                >
+                                    <Text style={styles.notificationLoginCloseText}>×</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    <View style={[inner, styles.heroBody, isWide && styles.heroBodyWide]}>
+                        <View style={[styles.heroCopy, isWide && { flex: 1.15, paddingRight: 48 }]}>
+                            <View style={styles.badge}>
+                                <View style={styles.badgeDot} />
+                                <Text style={styles.badgeText}>Textile ERP Platform</Text>
                             </View>
 
-                            <View style={styles.divider} />
-
-                            <View style={styles.valueBox}>
-                                <Text style={styles.featureValue}>
-                                    {item.value}
-                                </Text>
-                                <Text style={styles.featureUnit}>
-                                    {item.unit}
-                                </Text>
-                            </View>
-
-                            <Text style={styles.featureDesc}>
-                                {item.desc}
+                            <Text style={[styles.title, isTablet && styles.titleTablet, isWide && styles.titleWide]}>
+                                Smart ERP for Textile & Manufacturing Businesses
                             </Text>
 
-                            {/* <View style={styles.tapHint}>
-                                <Text style={styles.tapText}>
-                                    Tap to explore →
-                                </Text>
-                            </View> */}
-                        </TouchableOpacity>
-                    ))}
-                </Animated.ScrollView>
+                            <Text style={[styles.description, isWide && { fontSize: 17, lineHeight: 28 }]}>
+                                Manage production, collections, receivables, sales analysis and
+                                operational workflows from a single platform.
+                            </Text>
 
-                {/* Pagination dots */}
-                <View style={styles.pagination}>
-                    {features.map((_, index) => {
-                        const inputRange = [
-                            (index - 1) * (CARD_WIDTH + CARD_SPACING),
-                            index * (CARD_WIDTH + CARD_SPACING),
-                            (index + 1) * (CARD_WIDTH + CARD_SPACING),
-                        ];
-                        const dotWidth = scrollX.interpolate({
-                            inputRange,
-                            outputRange: [8, 24, 8],
-                            extrapolate: 'clamp',
-                        });
-                        const opacity = scrollX.interpolate({
-                            inputRange,
-                            outputRange: [0.4, 1, 0.4],
-                            extrapolate: 'clamp',
-                        });
-                        return (
-                            <Animated.View
-                                key={index}
-                                style={[
-                                    styles.dot,
-                                    {
-                                        width: dotWidth,
-                                        opacity,
-                                    },
-                                ]}
-                            />
-                        );
-                    })}
+                            <View style={[styles.ctaRow, !(isWide || isTablet) && styles.ctaColumn]}>
+                                <AuthButton
+                                    label="Login"
+                                    icon="arrow-forward"
+                                    onPress={goLogin}
+                                    style={[styles.cta, (isWide || isTablet) && { marginRight: 12 }]}
+                                />
+                                <AuthButton
+                                    label="Sign Up"
+                                    variant="outlineLight"
+                                    onPress={goSignup}
+                                    style={[styles.cta, !(isWide || isTablet) && { marginTop: 12 }]}
+                                />
+                            </View>
+                        </View>
+
+                        {isWide ? (
+                            <View style={styles.heroPanel}>
+                                <Text style={styles.heroPanelEyebrow}>MADHUSUDAN GROUP AT A GLANCE</Text>
+                                {stats.map((st) => (
+                                    <View key={st.label} style={styles.heroPanelRow}>
+                                        <View style={styles.heroPanelIcon}>
+                                            <Icon name={st.icon as any} size={20} color={T.copper} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.heroPanelValue}>{st.value}</Text>
+                                            <Text style={styles.heroPanelLabel}>{st.label}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                                <View style={styles.heroPanelDivider} />
+                                <View style={styles.chipWrap}>
+                                    {features.map((f) => (
+                                        <View key={f.title} style={styles.chip}>
+                                            <Icon name={f.icon as any} size={13} color={NAVY.sub} />
+                                            <Text style={styles.chipText}>{f.title}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : null}
+                    </View>
+                </SafeAreaView>
+            </View>
+
+            {/* ============== STATS SECTION (mobile / tablet) ============== */}
+            {!isWide ? (
+                <View style={[inner, styles.statsContainer]}>
+                    {stats.map((st, i) => (
+                        <View key={st.label} style={[styles.statCard, i === 0 && { marginRight: 12 }]}>
+                            <View style={styles.statIcon}>
+                                <Icon name={st.icon as any} size={18} color={T.copper} />
+                            </View>
+                            <Text style={styles.statValue}>{st.value}</Text>
+                            <Text style={styles.statLabel}>{st.label}</Text>
+                        </View>
+                    ))}
                 </View>
+            ) : null}
+
+            {/* ============== WHY US? ============== */}
+            <View style={[styles.section, isWide && { paddingTop: 64 }]}>
+                <View style={inner}>
+                    <View style={styles.headerRow}>
+                        <Text style={styles.sectionEyebrow}>WHY US? · HIGHLIGHTS</Text>
+                    </View>
+                    <Text style={[styles.heroText, isWide && { fontSize: 32, lineHeight: 40 }]}>
+                        Facts about Madhusudan Group
+                    </Text>
+                    <Text style={styles.sectionSub}>
+                        An integrated textile value chain — from yarn to garment.
+                    </Text>
+                </View>
+
+                {showGrid ? (
+                    <View style={inner}>
+                        <View style={styles.grid}>
+                            {features.map((item, index) => {
+                                // On a 2-column tablet grid an odd last card spans the full row.
+                                const spanFull = gridColumns === 2 && features.length % 2 === 1 && index === features.length - 1;
+                                return (
+                                    <View key={item.title} style={[styles.gridCell, { width: (spanFull ? '100%' : `${100 / gridColumns}%`) as any }]}>
+                                        <FeatureCard item={item} />
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
+                ) : (
+                    <>
+                        {/* Auto-scrolling horizontal carousel */}
+                        <Animated.ScrollView
+                            ref={scrollRef}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={CARD_WIDTH + CARD_SPACING}
+                            decelerationRate="fast"
+                            contentContainerStyle={[styles.carouselContainer, { paddingHorizontal: gutter }]}
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                                { useNativeDriver: false }
+                            )}
+                            scrollEventThrottle={16}
+                        >
+                            {features.map((item, index) => (
+                                <View key={index} style={{ width: CARD_WIDTH, marginRight: CARD_SPACING }}>
+                                    <FeatureCard item={item} />
+                                </View>
+                            ))}
+                        </Animated.ScrollView>
+
+                        {/* Pagination dots */}
+                        <View style={styles.pagination}>
+                            {features.map((_, index) => {
+                                const step = CARD_WIDTH + CARD_SPACING;
+                                const inputRange = [(index - 1) * step, index * step, (index + 1) * step];
+                                const dotWidth = scrollX.interpolate({
+                                    inputRange,
+                                    outputRange: [8, 24, 8],
+                                    extrapolate: 'clamp',
+                                });
+                                const opacity = scrollX.interpolate({
+                                    inputRange,
+                                    outputRange: [0.35, 1, 0.35],
+                                    extrapolate: 'clamp',
+                                });
+                                return (
+                                    <Animated.View
+                                        key={index}
+                                        style={[styles.dot, { width: dotWidth, opacity }]}
+                                    />
+                                );
+                            })}
+                        </View>
+                    </>
+                )}
             </View>
 
             {/* ============== EXPLORE SECTION ============== */}
             <View style={styles.section}>
+                <View style={inner}>
+                    <Text style={styles.sectionEyebrow}>EXPLORE</Text>
+                    <Text style={[styles.heroText, { marginBottom: 16 }]}>Get to know FlowNest</Text>
 
-                <View style={styles.headerRow}>
-                    <Text style={styles.sectionTitle}>
-                        Explore
-                    </Text>
-
+                    <View style={[styles.exploreWrap, isWide && styles.exploreRow]}>
+                        {explore.map((item) => (
+                            <View key={item.title} style={isWide ? styles.exploreCell : undefined}>
+                                <TouchableOpacity
+                                    style={styles.menuCard}
+                                    onPress={item.onPress}
+                                    activeOpacity={0.85}
+                                    accessibilityRole="link"
+                                >
+                                    <View style={styles.menuIcon}>
+                                        <Icon name={item.icon as any} size={20} color={T.copper} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.menuText}>{item.title}</Text>
+                                        <Text style={styles.menuDesc}>{item.desc}</Text>
+                                    </View>
+                                    <Icon name="chevron-right" size={22} color={T.muted} />
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                    </View>
                 </View>
+            </View>
 
-                <TouchableOpacity
-                    style={styles.menuCard}
-                    onPress={() => router.push('/about')}
-                >
-                    <Text style={styles.menuText}>
-                        About Us
-                    </Text>
-                </TouchableOpacity>
-
-                {/* <TouchableOpacity
-                    style={styles.menuCard}
-                    onPress={() => router.push('/pricing')}
-                >
-                    <Text style={styles.menuText}>
-                        Pricing
-                    </Text>
-                </TouchableOpacity> */}
-
-                <TouchableOpacity
-                    style={styles.menuCard}
-                    onPress={() => router.push('/contact')}
-                >
-                    <Text style={styles.menuText}>
-                        Contact Us
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.menuCard}
-                    onPress={() => router.push('/signup')}
-                >
-                    <Text style={styles.menuText}>
-                        Create Account
-                    </Text>
-                </TouchableOpacity>
+            {/* ============== CTA BAND ============== */}
+            <View style={inner}>
+                <View style={[styles.ctaBand, (isWide || isTablet) && styles.ctaBandRow]}>
+                    <View style={{ flex: (isWide || isTablet) ? 1 : undefined }}>
+                        <Text style={styles.ctaBandTitle}>Ready to get started?</Text>
+                        <Text style={styles.ctaBandSub}>Sign in to your ERP or create a new account.</Text>
+                    </View>
+                    <View style={[styles.ctaBandActions, !(isWide || isTablet) && { marginTop: 16 }]}>
+                        <AuthButton label="Create Account" variant="outlineLight" onPress={goSignup} style={styles.ctaBandBtn} />
+                        <AuthButton label="Login" icon="arrow-forward" onPress={goLogin} style={[styles.ctaBandBtn, { marginLeft: 10 }]} />
+                    </View>
+                </View>
             </View>
 
             {/* ============== FOOTER ============== */}
             <View style={styles.footer}>
-                <Text style={styles.footerTitle}>
-                    Developed by Madhusudan Group
-                </Text>
-
-                <Text style={styles.footerSub}>
-                    Textile Innovation • Manufacturing Excellence
-                </Text>
+                <View style={[inner, styles.footerInner, (isWide || isTablet) && styles.footerInnerRow]}>
+                    <BrandMark size={28} light={false} />
+                    <View style={[{ alignItems: 'center' }, (isWide || isTablet) && { alignItems: 'flex-end' }]}>
+                        <Text style={styles.footerTitle}>
+                            Developed by Madhusudan Group
+                        </Text>
+                        <Text style={styles.footerSub}>
+                            Textile Innovation • Manufacturing Excellence
+                        </Text>
+                    </View>
+                </View>
             </View>
         </ScrollView>
+    );
+}
+
+type Feature = { icon: string; title: string; value: string; unit: string; desc: string };
+
+function FeatureCard({ item }: { item: Feature }) {
+    return (
+        <View style={styles.featureCard}>
+            <View style={styles.cardHeader}>
+                <View style={styles.iconBox}>
+                    <Icon name={item.icon as any} size={24} color={T.copper} />
+                </View>
+                <Text style={styles.featureTitle}>{item.title}</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.valueBox}>
+                <Text style={styles.featureValue}>{item.value}</Text>
+                <Text style={styles.featureUnit}>{item.unit}</Text>
+            </View>
+
+            <Text style={styles.featureDesc}>{item.desc}</Text>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.NEUTRAL_BG,
+        backgroundColor: T.bg,
     },
+    notificationLoginBanner: {
+        marginTop: 8,
+        marginBottom: 4,
+        padding: 14,
+        borderRadius: 14,
+        backgroundColor: '#7A4B00',
+        borderWidth: 1,
+        borderColor: 'rgba(201,138,26,0.6)',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    notificationLoginIcon: {
+        width: 38, height: 38, borderRadius: 19,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.18)', marginRight: 10,
+    },
+    notificationLoginContent: { flex: 1 },
+    notificationLoginTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+    notificationLoginMessage: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 19, marginTop: 4 },
+    notificationLoginClose: { paddingLeft: 8 },
+    notificationLoginCloseText: { color: '#fff', fontSize: 24, lineHeight: 24 },
 
     /* ===== HERO ===== */
     hero: {
-        paddingTop: 90,
-        paddingBottom: 50,
-        paddingHorizontal: 25,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
+        backgroundColor: T.nav,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        overflow: 'hidden',
     },
-
-    badge: {
-        alignSelf: 'flex-start',
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        marginBottom: 15,
-    },
-
-    badgeText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 12,
-    },
-
-    logoRow: {
+    nav: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 16,
+        paddingBottom: 8,
     },
-
-    logo: {
-        width: 50,
-        height: 50,
-        marginRight: 10,
-        marginBottom: 10,
+    navLinks: { flexDirection: 'row', alignItems: 'center' },
+    navMobileRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    navLink: { paddingHorizontal: 14, paddingVertical: 8 },
+    navLinkText: { color: NAVY.sub, fontSize: 14, fontWeight: '700' },
+    navBtn: { minHeight: 40, borderRadius: 11, paddingHorizontal: 18 },
+    navLoginPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.14)',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
     },
+    navLoginText: { color: '#fff', fontWeight: '800', fontSize: 13 },
 
+    heroBody: { paddingTop: 30, paddingBottom: 56 },
+    heroBodyWide: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 80 },
+    heroCopy: {},
+    badge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: NAVY.raised,
+        borderWidth: 1,
+        borderColor: NAVY.lineStrong,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+        marginBottom: 18,
+    },
+    badgeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: T.copper, marginRight: 8 },
+    badgeText: {
+        color: NAVY.text,
+        fontWeight: '800',
+        fontSize: 12,
+        letterSpacing: 0.3,
+    },
     title: {
         color: '#fff',
-        fontSize: 40,
-        fontWeight: '800',
+        fontSize: 32,
+        lineHeight: 39,
+        fontWeight: '900',
+        letterSpacing: -0.6,
     },
-
-    subtitle: {
-        color: '#fff',
-        fontSize: 20,
-        marginTop: 8,
-        fontWeight: '600',
-    },
-
+    titleTablet: { fontSize: 42, lineHeight: 50, maxWidth: 640 },
+    titleWide: { fontSize: 52, lineHeight: 60, letterSpacing: -1.2 },
     description: {
-        color: '#EAF7FA',
+        color: NAVY.sub,
         lineHeight: 24,
-        marginTop: 15,
+        marginTop: 16,
         fontSize: 15,
+        maxWidth: 560,
     },
+    ctaRow: { flexDirection: 'row', marginTop: 30 },
+    ctaColumn: { flexDirection: 'column' },
+    cta: { minWidth: 160 },
 
-    primaryBtn: {
-        marginTop: 30,
-        backgroundColor: '#fff',
-        height: 52,
-        borderRadius: 26,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    primaryText: {
-        color: theme.BRAND_GRADIENT_END,
-        fontWeight: '700',
-        fontSize: 16,
-    },
-
-    guestBtn: {
-        marginTop: 12,
+    heroPanel: {
+        flex: 0.85,
+        maxWidth: 440,
+        backgroundColor: NAVY.raised,
         borderWidth: 1,
-        borderColor: '#fff',
-        height: 52,
-        borderRadius: 26,
-        justifyContent: 'center',
+        borderColor: NAVY.line,
+        borderRadius: 20,
+        padding: 26,
+    },
+    heroPanelEyebrow: { color: NAVY.muted, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.4, marginBottom: 16 },
+    heroPanelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    heroPanelIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: T.nav,
+        borderWidth: 1,
+        borderColor: NAVY.lineStrong,
         alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
     },
-
-    guestText: {
-        color: '#fff',
-        fontWeight: '600',
+    heroPanelValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
+    heroPanelLabel: { color: NAVY.sub, fontSize: 13, marginTop: 1 },
+    heroPanelDivider: { height: 1, backgroundColor: NAVY.line, marginVertical: 6, marginBottom: 16 },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginRight: -6 },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.nav,
+        borderWidth: 1,
+        borderColor: NAVY.lineStrong,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        marginRight: 6,
+        marginBottom: 8,
     },
+    chipText: { color: NAVY.text, fontSize: 11.5, fontWeight: '700', marginLeft: 5 },
 
     /* ===== STATS ===== */
     statsContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
-        marginTop: -25,
-        justifyContent: 'space-between',
+        marginTop: -30,
     },
-
     statCard: {
-        width: width * 0.42,
-        backgroundColor: '#fff',
+        flex: 1,
+        backgroundColor: T.surface,
         borderRadius: 18,
-        padding: 18,
-        elevation: 4,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 16,
+        ...S.card,
     },
-
+    statIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: T.sub,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
     statValue: {
         fontSize: 24,
-        fontWeight: '800',
-        color: theme.BRAND_GRADIENT_END,
+        fontWeight: '900',
+        color: T.ink,
     },
-
     statLabel: {
-        marginTop: 5,
-        color: theme.TEXT_SECONDARY,
+        marginTop: 2,
+        color: T.muted,
+        fontSize: 13,
     },
 
     /* ===== SECTION ===== */
     section: {
-        paddingTop: 20,
-        paddingBottom: 10,
+        paddingTop: 36,
+        paddingBottom: 6,
     },
-
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
     },
-
-    sectionTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: theme.TEXT_PRIMARY,
+    sectionEyebrow: {
+        fontSize: 11,
+        color: T.copper,
+        fontWeight: '900',
+        letterSpacing: 1.4,
     },
-
-    sectionSubtitle: {
-        fontSize: 13,
-        color: theme.BRAND_GRADIENT_END,
-        fontWeight: '600',
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-
     heroText: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: theme.TEXT_PRIMARY,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        marginTop: 5,
+        fontSize: 24,
+        lineHeight: 31,
+        fontWeight: '900',
+        color: T.ink,
+        marginTop: 6,
+        letterSpacing: -0.4,
+    },
+    sectionSub: {
+        fontSize: 14,
+        lineHeight: 21,
+        color: T.muted,
+        marginTop: 6,
+        marginBottom: 18,
+        maxWidth: 620,
     },
 
-    /* ===== CAROUSEL ===== */
+    /* ===== GRID / CAROUSEL ===== */
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -7,
+    },
+    gridCell: {
+        padding: 7,
+    },
     carouselContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
+        paddingVertical: 6,
     },
-
     featureCard: {
-        width: CARD_WIDTH,
-        backgroundColor: '#fff',
-        borderRadius: 20,
+        flex: 1,
+        backgroundColor: T.surface,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: T.border,
         padding: 20,
-        marginRight: CARD_SPACING,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
+        ...S.card,
     },
-
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-
     iconBox: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: `${theme.BRAND_GRADIENT_END}15`,
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.hair,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
-
     featureTitle: {
         fontSize: 15,
-        fontWeight: '700',
-        color: theme.TEXT_PRIMARY,
+        fontWeight: '800',
+        color: T.ink,
         flex: 1,
     },
-
     divider: {
         height: 1,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: T.hair,
         marginVertical: 15,
     },
-
     valueBox: {
         alignItems: 'flex-start',
     },
-
     featureValue: {
-        fontSize: 42,
-        fontWeight: '800',
-        color: theme.BRAND_GRADIENT_END,
+        fontSize: 38,
+        fontWeight: '900',
+        color: T.copper,
         letterSpacing: -1,
     },
-
     featureUnit: {
-        fontSize: 13,
-        color: theme.TEXT_SECONDARY,
+        fontSize: 12.5,
+        color: T.muted,
         marginTop: 2,
+        fontWeight: '600',
     },
-
     featureDesc: {
         marginTop: 12,
-        color: '#666',
+        color: '#6E6863',
         lineHeight: 20,
         fontSize: 13,
-    },
-
-    tapHint: {
-        marginTop: 15,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-    },
-
-    tapText: {
-        fontSize: 12,
-        color: theme.BRAND_GRADIENT_END,
-        fontWeight: '600',
     },
 
     /* ===== PAGINATION DOTS ===== */
@@ -990,46 +1132,87 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 15,
-        paddingHorizontal: 20,
+        marginTop: 14,
     },
-
     dot: {
         height: 8,
         borderRadius: 4,
-        backgroundColor: theme.BRAND_GRADIENT_END,
+        backgroundColor: T.copper,
         marginHorizontal: 3,
     },
 
-    /* ===== MENU CARDS ===== */
+    /* ===== EXPLORE ===== */
+    exploreWrap: {},
+    exploreRow: { flexDirection: 'row', marginHorizontal: -7 },
+    exploreCell: { flex: 1, paddingHorizontal: 7 },
     menuCard: {
-        backgroundColor: '#fff',
-        padding: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.surface,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 16,
         borderRadius: 16,
-        marginBottom: 10,
-        marginHorizontal: 20,
-        marginTop: 20
+        marginBottom: 12,
     },
-
+    menuIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: T.sub,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
     menuText: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '800',
+        color: T.ink,
     },
+    menuDesc: {
+        fontSize: 12.5,
+        color: T.muted,
+        marginTop: 2,
+    },
+
+    /* ===== CTA BAND ===== */
+    ctaBand: {
+        marginTop: 26,
+        backgroundColor: T.nav,
+        borderRadius: 20,
+        padding: 24,
+    },
+    ctaBandRow: { flexDirection: 'row', alignItems: 'center', padding: 32 },
+    ctaBandTitle: { color: '#fff', fontSize: 22, fontWeight: '900' },
+    ctaBandSub: { color: NAVY.sub, fontSize: 14, marginTop: 4 },
+    ctaBandActions: { flexDirection: 'row' },
+    ctaBandBtn: { flexGrow: 1, minHeight: 46, paddingHorizontal: 18 },
 
     /* ===== FOOTER ===== */
     footer: {
-        padding: 25,
+        marginTop: 34,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+        backgroundColor: T.sub,
+    },
+    footerInner: {
+        paddingVertical: 24,
         alignItems: 'center',
+        gap: 12,
     },
-
+    footerInnerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
     footerTitle: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '800',
+        color: T.ink,
     },
-
     footerSub: {
-        marginTop: 5,
-        color: '#666',
+        marginTop: 3,
+        color: T.muted,
+        fontSize: 12.5,
         textAlign: 'center',
     },
 });

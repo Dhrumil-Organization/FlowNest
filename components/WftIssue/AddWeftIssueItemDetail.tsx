@@ -32,7 +32,9 @@ const AddWeftIssueDetail = (props) => {
         handleclick,
         editData,
         mainUId,
-        isEditMode
+        isEditMode,
+        hasIssueDesignAccess = false,
+        issueMode
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +62,12 @@ const AddWeftIssueDetail = (props) => {
     let cancelToken: any;
 
     // console.log("FormState.values", FormState.values)
+
+    console.log("========== ISSUE DESIGN DEBUG ==========");
+    console.log("hasIssueDesignAccess =", hasIssueDesignAccess);
+    console.log("DsnCode =", FormState.values.DsnCode);
+    console.log("IssDsnCode =", FormState.values.IssDsnCode);
+    console.log("========================================");
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -109,9 +117,11 @@ const AddWeftIssueDetail = (props) => {
     }, [
         isEditMode,
         FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.BeamUId   // 🔥 dependency add karo
+        FormState.values.BeamUId,
+        hasIssueDesignAccess
     ]);
 
     useEffect(() => {
@@ -163,10 +173,23 @@ const AddWeftIssueDetail = (props) => {
     }, [maindesigndata]);
 
     useEffect(() => {
-        if (isVisible && isEditMode && mainUId) {
-            handleclick({ UId: mainUId });   // 🔥 yaha call hogi
+        // 🔥 FIX: this used to depend on [isVisible] ONLY, while actually
+        // reading isEditMode/mainUId from the closure. If mainUId changed
+        // without isVisible changing (e.g. user tapped Edit on a different
+        // row before this component fully unmounted), this effect would
+        // either not re-run at all, or re-run with a stale mainUId — showing
+        // the previous item's data under the new item's screen.
+        //
+        // With the parent (index.tsx) now fetching the item via
+        // handleViewClick() and only opening this screen once editData is
+        // ready, this call is normally redundant. It's kept only as a
+        // fallback (e.g. if this screen is ever opened without that
+        // pre-fetch) and now depends on the actual values it uses, and skips
+        // re-fetching once editData for this mainUId is already present.
+        if (isVisible && isEditMode && mainUId && !editData) {
+            handleclick({ UId: mainUId });
         }
-    }, [isVisible]);
+    }, [isVisible, isEditMode, mainUId, editData]);
 
     useEffect(() => {
         if (
@@ -181,9 +204,11 @@ const AddWeftIssueDetail = (props) => {
     }, [
         isEditMode,
         FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.BeamUId   // 🔥 dependency add karo
+        FormState.values.BeamUId,
+        hasIssueDesignAccess
     ]);
 
     useEffect(() => {
@@ -197,7 +222,9 @@ const AddWeftIssueDetail = (props) => {
     }, [
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.DsnCode
+        FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
+        hasIssueDesignAccess
     ]);
 
     const fetchdesignwiseitem = async () => {
@@ -206,11 +233,19 @@ const AddWeftIssueDetail = (props) => {
             setIsLoading(true);
             if (cancelToken?.cancel) cancelToken.cancel();
             cancelToken = axios.CancelToken.source();
+            const issueDsnCode = FormState.values.IssDsnCode?.toString().trim();
+            const normalDsnCode = FormState.values.DsnCode?.toString().trim();
+
             const historyPayload = {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 txntype: 'weft_selvedge_issue',
-                dsncode: FormState.values.DsnCode
+                // If the current user has Issue Design access and an Issue Design
+                // is selected, use IssDsnCode. Otherwise always use DsnCode.
+                dsncode:
+                    hasIssueDesignAccess === true && issueDsnCode
+                        ? issueDsnCode
+                        : normalDsnCode
             };
             console.log("designwise_mainitem_for_weftissue_help Payload:", historyPayload);
             const response = await axios.get(

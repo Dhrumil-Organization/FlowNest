@@ -1,5 +1,5 @@
 import { registerCallback } from '@/common/utils/callbackRegistry';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';

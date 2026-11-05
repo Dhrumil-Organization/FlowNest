@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState } from 'react';
 import {
     View,
@@ -13,7 +14,7 @@ import {
 // import { API } from '../../common/API/dynamicAPI';
 // import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const AddNewItemScreen = ({ navigation, route }) => {
     const router = useRouter();
@@ -44,7 +45,7 @@ const AddNewItemScreen = ({ navigation, route }) => {
 
     const handleSaveParty = () => {
         if (!ItemName.trim()) {
-            Alert.alert('Validation', 'Please enter Item name');
+            AppAlert.alert('Validation', 'Please enter Item name');
             return;
         }
 

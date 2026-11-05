@@ -1,32 +1,27 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Modal,
-    ActivityIndicator,
-    Linking,
-} from 'react-native';
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 // import { encode as base64_encode } from 'react-native-base64';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { crlimtreq_styles } from '@/common/Style';
+import FullScreenLoader from '@/components/FullScreenLoader';
 // import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import HeaderBar from '../HeaderBar/HeaderBar';
 import HeaderBar from '@/components/Header';
-import ChequeForm from './ChequeForm';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchPropertyData, fetchCurrentYearData, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
-import CustomDrawer from './CustomDrawer';
-import CollectionCard from './CollectionCard';
 import { API } from '../../common/API/dynamicAPI';
+import { fetchCurrentYearData, fetchPropertyData, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+import CollectionCard from './CollectionCard';
+import CustomDrawer from './CustomDrawer';
 
 interface CardData {
     [key: string]: string;
@@ -423,7 +418,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setInitialLoading(false);
@@ -464,7 +459,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             if (!axios.isCancel(error)) {
                 setPartyLoading(false);
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             // setIsLoading(false);
@@ -537,7 +532,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
             if (!axios.isCancel(error)) {
                 setBankLoading(false);
                 setBranchLoading(false);
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             // setIsLoading(false);
@@ -597,25 +592,25 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
                 parseFloat(numericNewLimit2).toFixed(2) ===
                 parseFloat(numericLimit1).toFixed(2)
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (updatedItem.CrLimit === '0' || parseFloat(updatedItem.CrLimit) === 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (parseFloat(updatedItem.CrLimit) < 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (!updatedItem.CrLimit || updatedItem.CrLimit.trim() === '') {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
                 )
@@ -691,7 +686,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             if (!axios.isCancel(error)) {
                 setIsLoading(false);
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
                 setPOTData([]);
             }
         } finally {
@@ -704,7 +699,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
         // confirm already done in CollectionCard; still double-check if needed
         const uid = String(item.UId ?? item.uid ?? item.UId ?? '');
         if (!uid) {
-            Alert.alert('Delete', 'Item has no uid, cannot delete.');
+            AppAlert.alert('Delete', 'Item has no uid, cannot delete.');
             return;
         }
 
@@ -739,7 +734,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
             console.log('🔴 delete response', resp);
 
             if (resp?.data?.success) {
-                Alert.alert('Deleted', 'Record deleted successfully.');
+                AppAlert.alert('Deleted', 'Record deleted successfully.');
                 // refresh list using existing payload state (calls fetchBrowseData)
                 try {
                     // use previously saved getpayload (set by fetchBrowseData) if available, else run default load
@@ -756,12 +751,12 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
                     console.warn('reload after delete failed', err);
                 }
             } else {
-                Alert.alert('Delete failed', String(resp?.data?.message ?? 'Server error'));
+                AppAlert.alert('Delete failed', String(resp?.data?.message ?? 'Server error'));
             }
         } catch (err) {
             if (!axios.isCancel(err)) {
                 console.error('delete error', err);
-                Alert.alert('Error', 'Delete failed — server error.');
+                AppAlert.alert('Error', 'Delete failed — server error.');
             }
         } finally {
             setDeletingId(null);
@@ -796,7 +791,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
             console.log('Authorise response', res);
 
             if (res?.data?.success) {
-                Alert.alert('Success', 'Collection authorised successfully.');
+                AppAlert.alert('Success', 'Collection authorised successfully.');
                 // re-run browse with existing last payload if present
                 // getpayload state holds the last browse payload in this component
                 try {
@@ -814,11 +809,11 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
                 }
             } else {
                 const msg = res?.data?.message ?? 'Failed to authorise';
-                Alert.alert('Error', msg);
+                AppAlert.alert('Error', msg);
             }
         } catch (err) {
             console.error('authorise api error', err);
-            Alert.alert('Error', 'Server error when authorising.');
+            AppAlert.alert('Error', 'Server error when authorising.');
         } finally {
             setIsLoading(false);
         }
@@ -852,7 +847,7 @@ const CollectionList: React.FC<Props> = ({ token, username }) => {
             // @ts-ignore
             // navigation.navigate('CollectionAdd' as never);
             router.replace('/CollectionAdd')
-        } catch (e) { console.error(e); Alert.alert('Error', 'Could not open editor.'); }
+        } catch (e) { console.error(e); AppAlert.alert('Error', 'Could not open editor.'); }
     };
 
     const openDrawer = () => setIsDrawerVisible(true);

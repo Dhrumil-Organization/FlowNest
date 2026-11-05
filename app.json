@@ -2,15 +2,15 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.12",
+    "version": "1.0.63",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    // "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "12",
+      "buildNumber": "63",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
@@ -19,30 +19,28 @@
         "NSPhotoLibraryUsageDescription": "FlowNest accesses your photo library so users can upload property, collection, and cheque images as attachments in collection entries.",
         "NSPhotoLibraryAddUsageDescription": "FlowNest saves captured images to your photo library when users choose to store collection-related images.",
         "NSMicrophoneUsageDescription": "This app uses the microphone for voice input.",
-        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text."
+        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text.",
+        "NSFaceIDUsageDescription": "Use Face ID to log in quickly."
       }
     },
     "android": {
-      "versionCode": 2,
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/log_white.png",
-        "backgroundImage": "./assets/images/log_white.png",
-        "monochromeImage": "./assets/images/log_white.png"
-      },
-      "edgeToEdgeEnabled": true,
+      "versionCode": 63, 
+      "package": "com.anonymous.FlowNest",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
         "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "CAMERA"
       ],
-      "predictiveBackGestureEnabled": false,
-      "package": "com.dhrumil.FlowNest"
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
     },
     "web": {
-      "output": "static",
+      "bundler": "metro",
       "favicon": "./assets/images/logo.png"
     },
     "plugins": [
@@ -67,7 +65,8 @@
       ],
       "expo-mail-composer",
       "expo-sqlite",
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

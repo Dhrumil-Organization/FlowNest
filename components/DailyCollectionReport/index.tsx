@@ -1,21 +1,25 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-    View, Text, FlatList, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, Linking, ScrollView, StyleSheet,
-    Dimensions, useWindowDimensions
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { crlimtreq_styles } from '@/common/Style';
+import FullScreenLoader from '@/components/FullScreenLoader';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    ScrollView, StyleSheet,
+    Text,
+    TextInput, TouchableOpacity,
+    useWindowDimensions,
+    View
+} from 'react-native';
 // import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchPropertyData, fetchCurrentYearData, fetchPropertyGroupDataDCR, fetchPropertyDataDCR, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
+import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';
-import CollectionCard from './CollectionCard';
 // import Footer from '../Footer/Footer';
 import { API } from '../../common/API/dynamicAPI';
 
@@ -84,7 +88,7 @@ interface Props {
     isConnected: boolean | null;
     username: string;
     setIsLoggedIn: (value: boolean) => void;
-    rightsMenuApps: Array<string>;
+    rightsMenuApps: string[];
 }
 
 export interface InternalDropdown {
@@ -1737,12 +1741,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
                     style={{
                         position: "absolute",
-                        bottom: 0,
+                        bottom: 65,
                         left: 0,
                         right: 0,
                         padding: screenWidth <= 400 ? 10 : 12,
-                        borderTopLeftRadius: 12,
-                        borderTopRightRadius: 12,
+                        // borderTopLeftRadius: 12,
+                        // borderTopRightRadius: 12,
+                        borderRadius: 12,
                         elevation: 8,
                         shadowColor: "#000",
                         shadowOpacity: 0.2,

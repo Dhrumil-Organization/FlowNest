@@ -7,13 +7,13 @@ import {
 import { useWindowDimensions } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 // import HeaderBar from '../HeaderBar/HeaderBar';
-import theme from '@/components/theme';     
+import theme from '@/components/theme';
 import axios from 'axios';
 import { API } from '@/common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import AddBeamGaiting from './AddBeamGaiting';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { crlimtreq_styles } from '@/common/Style';
 import HeaderBarwithBack from '@/components/Header';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
@@ -133,7 +133,7 @@ const BeamGaiting: React.FC<{ token: string, username: string }> = ({ token, use
     });
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         const PRP_CODE = "SIP";
         const testFinct = async () => {
             const allyeardata = await fetchAllYeardata(token, PRP_CODE);
@@ -164,14 +164,14 @@ const BeamGaiting: React.FC<{ token: string, username: string }> = ({ token, use
     };
 
     const fatchAllBeamDetailData = async () => {
-         const userPtype = await AsyncStorage.getItem('user_prptype');
+        const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             setIsLoading(true);
             if (cancelToken?.cancel) cancelToken.cancel();
             cancelToken = axios.CancelToken.source();
             const historyPayload = {
                 prptype: userPtype,
-                yearno: FormState.values.YearNo ,
+                yearno: FormState.values.YearNo,
                 txntype: 'beam_gaiting_detail',
             };
             console.log("Payload:", historyPayload);
@@ -358,11 +358,13 @@ const BeamGaiting: React.FC<{ token: string, username: string }> = ({ token, use
 
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            {/* {isLoading && <FullScreenLoader />} */}
             <HeaderBarwithBack
                 userName={username}
                 header={'Beam Gaiting'}
-                 subHeader={'Manage Your Beam'}
+                subHeader={'Manage Your Beam'}
+                breadcrumb={"Beam Gaiting"}
+                SearchBar={false}
             />
             <RNTextInput
                 style={{

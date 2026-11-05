@@ -1,5 +1,6 @@
 import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
+import AppAlert from '@/common/utils/appAlert';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
@@ -8,10 +9,10 @@ import axios from 'axios';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     TextInput as RNTextInput,
+    ScrollView,
     Text,
     TouchableOpacity,
     View
@@ -169,24 +170,66 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
         cancelToken = axios.CancelToken.source();
         setIsLoadingSPO(true);
         try {
-            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S',  yearno: getCurrentFinancialYear(), atype: 'B' };
+            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S', yearno: getCurrentFinancialYear(), atype: 'B' };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/prodorderbrowsesudo`,
                 `${API}/api/prodorderbrowsesudo`,
                 getRequestConfig({ params: { ...payload } })
             );
             console.log('🔵 payload & response', payload, response);
-            if (response.data.success && response.data.data.length > 0) {
+            // if (response.data.success && response.data.data.length > 0) {
+            //     console.log('✅ Data:', response.data.data);
+            //     setData(response.data.data);
+            //     setAllHistoryDataSPO([])
+            //     setAllVerifyDataSPO([])
+            // }
+            if (response.data.success && response.data.data.data.length > 0) {
                 console.log('✅ Data:', response.data.data);
-                setData(response.data.data);
-                setAllHistoryDataSPO([])
-                setAllVerifyDataSPO([])
-            } else {
+                // setData(response.data.data.data);
+                // setAllHistoryDataSPO([])
+                // setAllVerifyDataSPO([])
+
+                // const mainData = response.data.data.data || [];
+                // const d1Data = response.data.data.d1 || [];
+
+                // setData(mainData);
+                // setPartyData(d1Data);
+
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+
+                // main data me d1 attach kar do
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+
+
+                console.log("finalData", finalData);
+                setData(finalData);
+
+                setAllHistoryDataSPO([]);
+                setAllVerifyDataSPO([]);
+
+            }
+            else {
                 setData([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -220,12 +263,13 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 setHistoryDataSPO(response.data.data);
                 setAllVerifyDataSPO([]);
                 setData([]);
-            } else {
+            }
+            else {
                 setHistoryDataSPO([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingSPO(false);
@@ -242,7 +286,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 atype: 'H',
             };
             const response = await axios.get(
@@ -255,20 +299,52 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 })
             );
             console.log('🔵all history payload', allhistoryPayload);
-            if (response.data.success && response.data.data.length > 0) {
-                console.log('✅All History Data:', response.data.data);
-                setAllHistoryDataSPO(response.data.data);
+            // if (response.data.success && response.data.data.length > 0) {
+            //     console.log('✅All History Data:', response.data.data);
+            //     setAllHistoryDataSPO(response.data.data);
+            //     setData([]);
+            //     setAllVerifyDataSPO([]);
+
+            // } 
+            if (response.data.success && response.data.data.data.length > 0) {
+                console.log('✅ Data:', response.data.data);
+
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+
+                // main data me d1 attach kar do
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+
+
+                console.log("finalData", finalData);
+                setAllHistoryDataSPO(finalData);
+
                 setData([]);
                 setAllVerifyDataSPO([]);
-
-            } else {
+            }
+            else {
                 setAllHistoryDataSPO([]);
                 // setPartyListSPO([]);
                 // setHistoryDataSPO([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -285,7 +361,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 atype: 'A',
             };
             const response = await axios.get(
@@ -298,21 +374,47 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 })
             );
             console.log('🔵all history payload', allhistoryPayload);
-            if (response.data.success && response.data.data.length > 0) {
-                console.log('✅All History Data:', response.data.data);
+            // if (response.data.success && response.data.data.length > 0) {
+            //     console.log('✅All History Data:', response.data.data);
 
-                setAllVerifyDataSPO(response.data.data);
+            //     setAllVerifyDataSPO(response.data.data);
+            //     setData([]);
+            //     setAllHistoryDataSPO([]);
+
+            // } 
+            if (response.data.success && response.data.data.data.length > 0) {
+                console.log('✅ Data:', response.data.data);
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+                console.log("finalData", finalData);
+                setAllVerifyDataSPO(finalData);
                 setData([]);
                 setAllHistoryDataSPO([]);
-
-            } else {
+            }
+            else {
                 setAllVerifyDataSPO([]);
                 // setPartyListSPO([]);
                 // setHistoryDataSPO([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -320,7 +422,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     };
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         if (activeTab1SPO === 'history') {
             fetchAllHistoryData();
         } else if (activeTab1SPO === 'requests') {
@@ -371,7 +473,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingSPO(false);
@@ -476,25 +578,25 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
@@ -506,7 +608,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             if (
                 updatedItem.aremark === '' || updatedItem.aremark === null || updatedItem.aremark === undefined || !updatedItem.aremark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.vouno
                 )
@@ -765,10 +867,23 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         </Text>
                     </View>
                 </View> */}
-                <View style={crlimtreq_styles.fullWidthRow}>
+
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
+                </View>
+
+                {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                </View>
+                </View> */}
+
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
@@ -850,6 +965,46 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     </View>
                 </View>
 
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                    </View>
+                )}
+
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
@@ -874,6 +1029,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 </TouchableOpacity> */}
                 <TouchableOpacity
                     onPress={() => {
+                        console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                         if (isConnected && !item.isProcessed) {
                             const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
                             setWebViewUrl(url);
@@ -976,10 +1132,22 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         </Text>
                     </View>
                 </View> */}
-                <View style={crlimtreq_styles.fullWidthRow}>
+
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
+                </View>
+
+                {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                </View>
+                </View> */}
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
@@ -1050,6 +1218,49 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                         </Text> */}
                     </View>
                 </View>
+
+
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                    </View>
+                )}
+
+
                 <View style={crlimtreq_styles.cardActions}>
                     {/* <TouchableOpacity
                     onPress={() => {
@@ -1068,6 +1279,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     <TouchableOpacity
                         onPress={() => {
                             if (isConnected && !item.isProcessed) {
+                                console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                                 const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
                                 setWebViewUrl(url);
                                 setShowWebViewModal(true);
@@ -1201,10 +1413,22 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     </View> */}
                 </View>
 
-                <View style={crlimtreq_styles.fullWidthRow}>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
+                </View>
+
+                {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
-                </View>
+                </View> */}
+
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
@@ -1289,6 +1513,45 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     </View>
                 </View>
 
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
@@ -1302,7 +1565,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     );
 
 
-    // eslint-disable-next-line react/no-unstable-nested-components
+     
     const TabBar = ({ activeTabSPO, setActiveTabSPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
             <TouchableOpacity

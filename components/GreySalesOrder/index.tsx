@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { fetchAllStoredata } from '@/common/API/Functions';
 import { crlimtreq_styles } from '@/common/Style';
@@ -5,7 +6,7 @@ import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -361,7 +362,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -404,7 +405,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -460,7 +461,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -529,7 +530,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -587,7 +588,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -692,6 +693,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
     };
 
     const handleValidation = (updatedItem: any) => {
+        const isHistoryTab =
+            String(activeTab1YPO).trim().toLowerCase() === 'history';
         if (selectedActionYPO === 'accept') {
 
             // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
@@ -701,37 +704,42 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // }
         }
-        if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        if (
+            !isHistoryTab &&
+            (selectedActionYPO === 'pending' ||
+                selectedActionYPO === 'verifyreject')
+        ) {
 
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
                 )
@@ -807,7 +815,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -975,12 +983,12 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 setMailLogData(response.data.data);
                 setMailLogModal(true);
             } else {
-                Alert.alert('Info', 'No Data Found');
+                AppAlert.alert('Info', 'No Data Found');
             }
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -1014,7 +1022,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-              <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
@@ -1118,7 +1126,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-             <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
@@ -1197,6 +1205,13 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity> */}
+
+                {String(item.isauthedit) === '1' && (
+                    <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                        <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    </TouchableOpacity>
+                )}
+
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
@@ -1265,7 +1280,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-             <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>

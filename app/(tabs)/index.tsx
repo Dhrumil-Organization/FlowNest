@@ -1,6 +1,6 @@
 import Footer from '@/components/Footer';
 import HomeScreen from '@/components/HomeScreen';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 export default function TabsIndex() {

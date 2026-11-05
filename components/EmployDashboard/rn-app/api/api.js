@@ -1,10 +1,11 @@
 // api/api.js
 // Central API service - replace BASE_URL with your server
 // import { API } from '../../common/API/dynamicAPI';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API } from '../../../../common/API/dynamicAPI';
 
-const BASE_URL = `${API}/api`; // ← CHANGE THIS
+// Resolved per call from the LIVE shared host (apig/apiy) so property switch works without refresh.
+const getBaseUrl = () => `${API}/api`;
 
 const getToday = () => new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -30,15 +31,15 @@ const fetchJSON = async url => {
 
 export const api = {
   /** Returns logged-in user with role flags */
-  getMe: () => fetchJSON(`${BASE_URL}/auth/me`),
+  getMe: () => fetchJSON(`${getBaseUrl()}/auth/me`),
 
   /**
    * Owner dashboard — all sections
    * @param {string} date  YYYY-MM-DD  (default: today)
    */
   getOwnerDashboard: (date = getToday(), getUserPrptype) =>
-    // fetchJSON(`${BASE_URL}/dashboard/owner?date=${date}`),
-    fetchJSON(`${BASE_URL}/getOwnerDashboard?date=${date}&prptype=${getUserPrptype}`),
+    // fetchJSON(`${getBaseUrl()}/dashboard/owner?date=${date}`),
+    fetchJSON(`${getBaseUrl()}/getOwnerDashboard?date=${date}&prptype=${getUserPrptype}`),
 
   /**
    * Sales exec detail dashboard
@@ -46,7 +47,7 @@ export const api = {
    * @param {string} date   YYYY-MM-DD
    */
   getExecDashboard: (execId, date = getToday(), getUserPrptype) =>
-    fetchJSON(`${BASE_URL}/getSalesExeDashboard?exec_id=${execId || 0}&date=${date}&prptype=${getUserPrptype}`),
+    fetchJSON(`${getBaseUrl()}/getSalesExeDashboard?exec_id=${execId || 0}&date=${date}&prptype=${getUserPrptype}`),
 
   /**
    * Party detail dashboard
@@ -56,7 +57,7 @@ export const api = {
    */
   getPartyDashboard: (partyId, execId, date = getToday(), getUserPrptype) =>
     fetchJSON(
-      `${BASE_URL}/getPartyDashboard?party_id=${partyId}&exec_id=${execId}&date=${date}&prptype=${getUserPrptype}`,
+      `${getBaseUrl()}/getPartyDashboard?party_id=${partyId}&exec_id=${execId}&date=${date}&prptype=${getUserPrptype}`,
     ),
 };
 

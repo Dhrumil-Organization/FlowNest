@@ -1,9 +1,12 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Modal,
     ScrollView,
@@ -13,7 +16,10 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { API } from "../../common/API/dynamicAPI";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
+import AsyncStorage from "@/common/utils/compatibleStorage";
+import { Snackbar } from '@/common/utils/snackbarCompat';
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 
 const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
@@ -34,7 +40,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
         SrNo: null,
         SubSr: null,
     });
-
+    const [PrpCode, setPrpCode] = useState("");
     const [form, setForm] = useState({
         CartNo: "",
         ItmCode: null,
@@ -73,6 +79,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
 
     const [savedResponse, setSavedResponse] = useState(null);
     const [d3Rows, setD3Rows] = useState([]);
+    const [mainRows, setmainRows] = useState([]);
     const [deleteModal, setDeleteModal] = useState(false);
     const [deleteIndex, setDeleteIndex] = useState(null);
 
@@ -88,6 +95,15 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
     const showWarning = msg => setAlertData({ visible: true, message: msg, type: "warning" });
     const showSuccess = msg => setAlertData({ visible: true, message: msg, type: "success" });
     const showError = msg => setAlertData({ visible: true, message: msg, type: "error" });
+
+    const [getPrinters, setPrinters] = useState([]);
+    const [printer, setPrinter] = useState("");
+    const [printerLoading, setPrinterLoading] = useState(false);
+    const [printerError, setPrinterError] = useState("");
+    const [printerModalVisible, setPrinterModalVisible] = useState(false);
+    const [selectedPrinterStatus, setSelectedPrinterStatus] = useState("");
+    const [printerSearch, setPrinterSearch] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
     const isDisabled = cartonType === "Single";
 
@@ -333,6 +349,24 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
             });
 
             const responseData = res?.data?.response || {};
+            const mainData = responseData?.main?.[0]?.[0];
+
+            if (mainData) {
+                // Carton Type
+
+                // setBeamNo(mainData.beamno || "");
+                setCartonType(
+                    String(mainData.IsCartonType) === "0" ? "Single" : "Mix"
+                );
+
+                // Status
+                setStatus(
+                    String(mainData.IsCartonStatus) === "0" ? "Open" : "Close"
+                );
+
+                setPrpCode(mainData.PrpCode);
+            }
+
 
             console.log("responseData ::", responseData)
 
@@ -340,6 +374,8 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
             setD1Data(Array.isArray(responseData?.d1) ? responseData.d1 : []);
             setD2Data(Array.isArray(responseData?.d2) ? responseData.d2 : []);
             setD3Rows(Array.isArray(responseData?.d3) ? responseData.d3 : []);
+            setmainRows(responseData.main[0]);
+
 
             const cartonTypeFromAPI = responseData?.main?.[0]?.IsCartonType;
 
@@ -348,6 +384,8 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
             } else if (cartonTypeFromAPI === 1) {
                 setCartonType("Mix");
             }
+
+            getAllPrinters();
 
             // const resData = res?.data;
             // if (resData?.message === false) {
@@ -480,6 +518,86 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
         setDeleteModal(false);
     };
 
+    // const handleSaveModifyData = async () => {
+    //     // if (!selectedCreel?.UId || !selectedBatchNo) {
+    //     //     showWarning("Please select Creel first.");
+    //     //     return;
+    //     // }
+
+    //     if (d3Rows.length === 0) {
+    //         showWarning("Please add at least one creel return detail.");
+    //         return;
+    //     }
+
+    //     // if (!form.TotPcs) {
+    //     //     showWarning("Please enter Cheese.");
+    //     //     return;
+    //     // }
+
+    //     // if (!form.TotQty) {
+    //     //     showWarning("Please enter Weight.");
+    //     //     return;
+    //     // }
+
+    //     setLoading(true);
+
+    //     try {
+    //         const payload = {
+    //             prpcode,
+    //             yearno,
+    //             strcode: "002",
+    //             // ...form,
+    //             txntype: "creel_issue_return",
+    //             uid: creelData?.UId,
+    //             d1: d1Data,
+    //             d2: d2Data,
+    //             d3: d3Rows.map(row => ({
+    //                 UId: row.UId,
+    //                 SrNo: row.SrNo,
+    //                 IssUId: row.IssUId,
+    //                 IssSrNo: row.IssSrNo,
+    //                 IssSubSr: row.IssSubSr || 1,
+    //                 IssQty: row.IssQty,
+    //                 IssChees: row.IssChees,
+    //                 IssRQty: row.IssRQty,
+    //                 IssRChees: row.IssRChees,
+    //                 IsCartonStatus: row.IsCartonStatus,
+    //             })),
+    //         };
+
+    //         console.log("FINAL MODIFY SAVE PAYLOAD:", payload);
+
+    //         const res = await axios.post(`${API}/api/modify_creel_issue_return`, payload, {
+    //             headers: {
+    //                 Authorization: `Bearer ${token}`,
+    //                 "Content-Type": "application/json",
+    //                 "X-Requested-with": "XMLHttpRequest",
+    //             },
+    //         });
+
+    //         const resData = res?.data;
+
+    //         console.log("resData ::", resData)
+
+    //         if (resData?.message === false) {
+    //             showWarning(resData?.response?.message);
+    //         } else if (resData?.response?.error === true) {
+    //             showWarning(resData?.response?.message);
+    //         } else if (resData?.success === true) {
+    //             showSuccess(resData?.response?.message);
+    //         } else {
+    //             showError(resData?.message);
+    //         }
+
+    //     } catch (error) {
+    //         console.log("MODIFY SAVE ERROR:", error?.response?.data || error.message);
+    //         showError(error?.response?.data?.message || error?.message || "Update failed.");
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
+
+
     const handleSaveModifyData = async () => {
         // if (!selectedCreel?.UId || !selectedBatchNo) {
         //     showWarning("Please select Creel first.");
@@ -501,6 +619,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
         //     return;
         // }
 
+
         setLoading(true);
 
         try {
@@ -508,7 +627,6 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                 prpcode,
                 yearno,
                 strcode: "002",
-                // ...form,
                 txntype: "creel_issue_return",
                 uid: creelData?.UId,
                 d1: d1Data,
@@ -529,98 +647,426 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
 
             console.log("FINAL MODIFY SAVE PAYLOAD:", payload);
 
-            const res = await axios.post(`${API}/api/modify_creel_issue_return`, payload, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "X-Requested-with": "XMLHttpRequest",
-                },
-            });
+            const res = await axios.post(
+                `${API}/api/modify_creel_issue_return`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                        "X-Requested-with": "XMLHttpRequest",
+                    },
+                }
+            );
 
             const resData = res?.data;
+            console.log("MODIFY SAVE RESPONSE ::", resData);
 
-            console.log("resData ::", resData)
+            const responseData = resData?.response || {};
+            const updatedMain = responseData?.main?.[0] || {};
 
-            if (resData?.message === false) {
-                showWarning(resData?.response?.message);
-            } else if (resData?.response?.error === true) {
-                showWarning(resData?.response?.message);
-            } else if (resData?.success === true) {
-                showSuccess(resData?.response?.message);
-            } else {
-                showError(resData?.message);
+            if (Object.keys(updatedMain).length > 0) {
+                setPrpCode(updatedMain?.PrpCode || "");
+
+                setCartonType(
+                    String(updatedMain?.IsCartonType) === "0"
+                        ? "Single"
+                        : "Mix"
+                );
+
+                setStatus(
+                    String(updatedMain?.IsCartonStatus) === "0"
+                        ? "Open"
+                        : "Close"
+                );
             }
 
+            const updatedD1 = Array.isArray(responseData?.d1)
+                ? responseData.d1
+                : [];
+
+            const updatedD2 = Array.isArray(responseData?.d2)
+                ? responseData.d2
+                : [];
+
+            const updatedD3 = Array.isArray(responseData?.d3)
+                ? responseData.d3
+                : [];
+
+            const updatedMainRows = Array.isArray(responseData?.main)
+                ? responseData.main
+                : [];
+
+            setD1Data(updatedD1);
+            setD2Data(updatedD2);
+            setD3Rows(updatedD3);
+            setmainRows(updatedMainRows);
+            setSavedResponse(responseData);
+
+            console.log("UPDATED MAIN ::", updatedMain);
+            console.log("UPDATED D1 ::", updatedD1);
+            console.log("UPDATED D2 ::", updatedD2);
+            console.log("UPDATED D3 ::", updatedD3);
+            console.log("UPDATED MAIN ROWS ::", updatedMainRows);
+
+            if (resData?.success === true) {
+                getAllPrinters();
+                if (typeof resData?.message === "string") {
+                    showSuccess(resData.message);
+                } else if (typeof responseData?.message === "string") {
+                    showSuccess(responseData.message);
+                } else {
+                    showSuccess("Creel issue return updated successfully.");
+                }
+            } else if (resData?.message === false) {
+                if (typeof responseData?.message === "string") {
+                    showWarning(responseData.message);
+                } else {
+                    showWarning("Unable to update creel issue return.");
+                }
+            } else if (responseData?.error === true) {
+                if (typeof responseData?.message === "string") {
+                    showError(responseData.message);
+                } else {
+                    showError("Unable to update creel issue return.");
+                }
+            } else {
+                showError(
+                    typeof resData?.message === "string"
+                        ? resData.message
+                        : "Something went wrong while updating."
+                );
+            }
         } catch (error) {
-            console.log("MODIFY SAVE ERROR:", error?.response?.data || error.message);
-            showError(error?.response?.data?.message || error?.message || "Update failed.");
+            console.log(
+                "MODIFY SAVE ERROR:",
+                error?.response?.data || error?.message
+            );
+
+            const errorData = error?.response?.data;
+
+            showError(
+                errorData?.response?.message ||
+                errorData?.message ||
+                error?.message ||
+                "Update failed."
+            );
         } finally {
             setLoading(false);
         }
     };
+
+    const printSticker = () => {
+        if (typeof printer == 'undefined' || printer == null || printer == '') {
+            AppAlert.alert('Please select printer first.');
+            return false;
+        }
+        else {
+            setIsLoading(true);
+
+            const d1 = d1Data?.[0] || {};
+            const d2 = d2Data?.[0] || {};
+            const d3 = d3Rows?.[0] || {};
+            const main = mainRows?.[0] || {};
+
+            console.log('printsticker function :', { d1, d2, d3 });
+
+            let temppayloadObj = new Object();
+
+            if (Object.keys(d1).length > 0) {
+
+                temppayloadObj = {
+                    // uid: d1.IssUId ?? "0",
+                    // inwno: "",
+                    // inwdate: "",
+                    // srno: d1.IssSrNo ?? "0",
+                    // itmcode: d1.ItmCode ?? "0",
+                    // itmname: d1.ItmName ?? "",
+                    // dsncode: "0",
+                    // dsnname: "",
+                    // rcno: "",
+                    // amount: "",
+                    // subsr: d3.IssSubSr ?? "0",
+                    // takano: d2.CartNo ?? "",
+                    // qty: d2.Qty ?? "0",
+                    // trantype: d1.trantype ?? "",
+                    // ttype: "",
+                    // dptname: "",
+                    // shdcode: d1.ShdCode ?? "0",
+                    // shdname: d1.ShdName ?? "",
+                    // whr: "",
+                    // yarncostr: "",
+                    // yard: "",
+                    // sexecname: "",
+                    // strcode: "",
+                    // unqsrno: "",
+                    // grdcode: d1.GrdCode ?? "0",
+                    // grdname: d1.GrdName ?? "",
+                    // mercode: d1.MerCode ?? "0",
+                    // mername: d1.MerName ?? "",
+                    // denier: d1.Denier ?? "0",
+                    // prpcode: PrpCode ?? "",
+                    // chees: d2.Chees ?? "0"
+
+                    UId: main.UId ?? "0",
+                    TranDate: "0",
+                    PrpCode: PrpCode ?? "",
+                    StrCode: d1.StrCode ?? "0",
+                    ItmCode: d1.ItmCode ?? "0",
+                    MerCode: d1.MerCode ?? "0",
+                    ShdCode: d1.ShdCode ?? "0",
+                    GrdCode: d1.GrdCode ?? "0",
+                    Denier: d1.Denier ?? "0",
+                    DsnCode: "0",
+                    CartNo: d2.CartNo ?? "",
+                    Wt: d1.TotQty ?? "0",
+                    Chees: d2.Chees ?? "0",
+                    IsAuto: "0",
+                    GrossWt: "0",
+                    PUId: d1.IssUId ?? "0",
+                    PSrNo: d1.IssSrNo ?? "0",
+                    PSubSr: d3.IssSubSr ?? "0",
+                    TranType: "0",
+                    TranName: "",
+                    StkType: main.StkType ?? "",
+                    StkDate: "",
+                    SrNo: d1.IssSrNo ?? "0",
+                    UsrCode: "0",
+                    StrName: "",
+                    ItmName: d1.ItmName ?? "",
+                    MerName: d1.MerName ?? "",
+                    ShdName: d1.ShdName ?? "",
+                    GrdName: d1.GrdName ?? "",
+                    DnsName: "",
+                    Stktype: main.StkType ?? "",
+                    nStkDate: "0",
+                    yearno: "",
+                    IskgQty: "0",
+                    Rate: "0",
+                    MItmCode: "",
+                    MItmName: ""
+                };
+
+                console.log("Print Payload Object :", temppayloadObj);
+
+                const params = {
+                    data: [temppayloadObj],
+                    IskgQty: 0,
+                    printype: "Print",
+                    PrintFormat: 5,
+                    printerName: printer ? printer : '',
+                    txntype: "creel_issue_return"
+                };
+
+                console.log("Print Params :", params);
+                // return;
+                axios.post(
+                    PRINTSTICKER,
+                    params,
+                    {
+                        headers: getPrinterHeaders()
+                    }
+                )
+                    .then(response => {
+                        setIsLoading(false);
+                        const res = response.data;
+
+                        if (res.success) {
+                            Snackbar.show({
+                                text: `✅ ${res.printed} label(s) sent to printer.`,
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'green',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        } else {
+                            Snackbar.show({
+                                text: res.message || 'Operation failed',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'red',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        }
+                    }).catch(error => {
+                        setIsLoading(false);
+                        Snackbar.show({
+                            text: error?.response?.data?.error || error.message || 'Print failed',
+                            duration: Snackbar.LENGTH_LONG,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                    });
+
+            }
+            else {
+                setIsLoading(false);
+                Snackbar.show({
+                    text: 'printing sticker data is empty',
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: 'red',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: '#fff' },
+                });
+            }
+        }
+    }
+
+    const getPrinterHeaders = () => ({
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "x-api-key": "PRINT_SECRET_123",
+    });
+
+    const getPrintersUrl = () =>
+        `${String(API).replace(/\/$/, "")}/api/printers`;
+
+    const normalizePrinterList = (raw) => {
+        const list = raw?.printers || raw?.data?.printers || raw?.data || raw || [];
+
+        if (!Array.isArray(list)) return [];
+
+        return list.map(item => ({
+            ...item,
+            Name: item.Name || item.name,
+            StatusText: item.StatusText || item.status || "Idle",
+        }));
+    };
+
+    const selectPrinter = async (item) => {
+        setPrinter(item.Name);
+        setSelectedPrinterStatus(item.StatusText);
+
+        await AsyncStorage.setItem(
+            "lastSelectedPrinter",
+            item.Name
+        );
+
+        setPrinterModalVisible(false);
+    };
+
+    const getPrinterStatusColor = (status) => {
+        if (status === "Offline") return "#DC2626";
+        return "#16A34A";
+    };
+
+    const getAllPrinters = async () => {
+
+        setPrinterLoading(true);
+
+        try {
+
+            const res = await axios.get(
+                getPrintersUrl(),
+                {
+                    headers: getPrinterHeaders()
+                }
+            );
+
+            const list = normalizePrinterList(res.data);
+
+            setPrinters(list);
+
+            const last = await AsyncStorage.getItem(
+                "lastSelectedPrinter"
+            );
+
+            if (last) {
+                const p = list.find(x => x.Name === last);
+
+                if (p) {
+                    setPrinter(p.Name);
+                    setSelectedPrinterStatus(
+                        p.StatusText
+                    );
+                }
+            }
+
+        } catch (e) {
+
+            setPrinterError("Unable to load printers");
+
+        } finally {
+
+            setPrinterLoading(false);
+
+        }
+    };
+
+
     return (
-        <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Icon name="arrow-back" size={22} color="#fff" />
-                </TouchableOpacity>
+        <>
+            <StatusBar
+                style="light"
+                backgroundColor="#007EA7"
+                translucent={false}
+            />
+            <SafeAreaView
+                edges={['top']}
+                style={{ flex: 1, backgroundColor: "#0F6C7B" }}
+            >
+                <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => router.back()}>
+                            <Icon name="arrow-back" size={22} color="#fff" />
+                        </TouchableOpacity>
 
-                <Text style={styles.headerTitle}>Modify Entry..</Text>
-                <View style={{ width: 22 }} />
-            </View>
+                        <Text style={styles.headerTitle}>Modify Entry..</Text>
+                        <View style={{ width: 22 }} />
+                    </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-                <View style={styles.card}>
-                    <View style={styles.rowBetween}>
-                        <View>
-                            <Text style={styles.sectionTitle}>Selected Creel</Text>
-                            <Text style={styles.creelText}>
-                                {selectedBatchNo || "No Creel Selected"}
-                            </Text>
+                    <ScrollView contentContainerStyle={{ padding: 16 }}>
+                        <View style={styles.card}>
+                            <View style={styles.rowBetween}>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Selected Creel</Text>
+                                    <Text style={styles.creelText}>
+                                        {selectedBatchNo || "No Creel Selected"}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.linkBtnSmall}
+                                    onPress={() => {
+                                        fetchCreelData();
+                                        setLinkModal(true);
+                                    }}
+                                >
+                                    <Icon name="link" size={16} color="#0F6C7B" />
+                                    <Text style={styles.linkBtnText}>Link Creel</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.linkBtnSmall}
-                            onPress={() => {
-                                fetchCreelData();
-                                setLinkModal(true);
-                            }}
-                        >
-                            <Icon name="link" size={16} color="#0F6C7B" />
-                            <Text style={styles.linkBtnText}>Link Creel</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                        <View style={[styles.card, { opacity: 0.6 }]}>
+                            <Text style={styles.sectionTitle}>Carton Type</Text>
 
-                <View style={[styles.card, { opacity: 0.6 }]}>
-                    <Text style={styles.sectionTitle}>Carton Type</Text>
+                            <ToggleSwitch
+                                options={["Single", "Mix"]}
+                                value={cartonType}
+                                onChange={() => { }} // disabled
+                            />
+                        </View>
 
-                    <ToggleSwitch
-                        options={["Single", "Mix"]}
-                        value={cartonType}
-                        onChange={() => { }} // disabled
-                    />
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.label}>Carton No</Text>
 
-                <View style={styles.card}>
-                    <Text style={styles.label}>Carton No</Text>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: "#E5E7EB",
+                                        color: "#000",
+                                    }
+                                ]}
+                                value={d2Data?.[0]?.CartNo ? String(d2Data?.[0]?.CartNo) : ""}
+                                editable={false}
+                                placeholder="Carton No"
+                                placeholderTextColor="#000"
+                            />
+                        </View>
 
-                    <TextInput
-                        style={[
-                            styles.input,
-                            {
-                                backgroundColor: "#E5E7EB",
-                                color: "#000",
-                            }
-                        ]}
-                        value={d2Data?.[0]?.CartNo ? String(d2Data?.[0]?.CartNo) : ""}
-                        editable={false}
-                        placeholder="Carton No"
-                        placeholderTextColor="#000"
-                    />
-                </View>
-
-                {/* <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }}>
+                        {/* <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }}>
                     <Text style={styles.label}>Select Item <Text style={{ color: "red" }}>*</Text></Text>
                     <CustomSearchableDropdown
                         data={getItemData}
@@ -698,96 +1144,96 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     />
                 </View> */}
 
-                {savedResponse?.d1?.length > 0 && (
-                    <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Saved Item Detail</Text>
+                        {savedResponse?.d1?.length > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionTitle}>Saved Item Detail</Text>
 
-                        {savedResponse.d1.map((item, index) => (
-                            <View key={index} style={styles.savedCardNew}>
+                                {savedResponse.d1.map((item, index) => (
+                                    <View key={index} style={styles.savedCardNew}>
 
-                                {/* ROW 1 */}
-                                <View style={styles.row}>
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Item</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getItemData, "ItmCode", "ItmName", item.ItmCode)}
-                                        </Text>
+                                        {/* ROW 1 */}
+                                        <View style={styles.row}>
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Item</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getItemData, "ItmCode", "ItmName", item.ItmCode)}
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Merge</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getMergeData, "MerCode", "MerName", item.MerCode)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* ROW 2 */}
+                                        <View style={styles.row}>
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Grade</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getGradeData, "GrdCode", "GrdName", item.GrdCode)}
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Shade</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getShadeData, "ShdCode", "ShdName", item.ShdCode)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
                                     </View>
-
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Merge</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getMergeData, "MerCode", "MerName", item.MerCode)}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* ROW 2 */}
-                                <View style={styles.row}>
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Grade</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getGradeData, "GrdCode", "GrdName", item.GrdCode)}
-                                        </Text>
-                                    </View>
-
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Shade</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getShadeData, "ShdCode", "ShdName", item.ShdCode)}
-                                        </Text>
-                                    </View>
-                                </View>
-
+                                ))}
                             </View>
-                        ))}
-                    </View>
-                )}
+                        )}
 
-                <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Cheese</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotPcs}
-                            onChangeText={v => setForm(prev => ({ ...prev, TotPcs: v || "" }))}
-                            placeholder="Enter Cheese"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
+                        <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Cheese</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotPcs}
+                                    onChangeText={v => setForm(prev => ({ ...prev, TotPcs: v || "" }))}
+                                    placeholder="Enter Cheese"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
 
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Weight</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotQty}
-                            onChangeText={v => setForm(prev => ({ ...prev, TotQty: v || "" }))}
-                            placeholder="Enter Weight"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Weight</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotQty}
+                                    onChangeText={v => setForm(prev => ({ ...prev, TotQty: v || "" }))}
+                                    placeholder="Enter Weight"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
 
-                </View>
+                        </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Status</Text>
-                    <ToggleSwitch
-                        options={["Open", "Close"]}
-                        value={status}
-                        onChange={setStatus}
-                    />
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.sectionTitle}>Status</Text>
+                            <ToggleSwitch
+                                options={["Open", "Close"]}
+                                value={status}
+                                onChange={setStatus}
+                            />
+                        </View>
 
-                <TouchableOpacity
-                    style={styles.addD3Btn}
-                    onPress={handleAddD3Row}
-                >
-                    <Icon name="add-circle" size={20} color="#fff" />
-                    <Text style={styles.addD3BtnText}>Add Creel Return Detail</Text>
-                </TouchableOpacity>
-                {/* {savedResponse?.d1?.length > 0 && (
+                        <TouchableOpacity
+                            style={styles.addD3Btn}
+                            onPress={handleAddD3Row}
+                        >
+                            <Icon name="add-circle" size={20} color="#fff" />
+                            <Text style={styles.addD3BtnText}>Add Creel Return Detail</Text>
+                        </TouchableOpacity>
+                        {/* {savedResponse?.d1?.length > 0 && (
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Saved Item Detail</Text>
 
@@ -810,7 +1256,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     </View>
                 )} */}
 
-                {/* {d3Rows.length > 0 && (
+                        {/* {d3Rows.length > 0 && (
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Creel Return Detail</Text>
 
@@ -868,266 +1314,551 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     </View>
                 )} */}
 
-                {d3Rows.length > 0 && (
-                    <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Creel Return Detail</Text>
+                        {d3Rows.length > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionTitle}>Creel Return Detail</Text>
 
-                        {d3Rows.map((row, index) => (
-                            <View key={index} style={styles.compactCard}>
+                                {d3Rows.map((row, index) => (
+                                    <View key={index} style={styles.compactCard}>
 
-                                {/* TOP ROW */}
-                                <View style={styles.rowBetween}>
-                                    <Text style={styles.compactTitle}>
-                                        # {index + 1}  | UId: {row.IssUId}
+                                        {/* TOP ROW */}
+                                        <View style={styles.rowBetween}>
+                                            <Text style={styles.compactTitle}>
+                                                # {index + 1}
+                                            </Text>
+
+                                            <TouchableOpacity
+                                                onPress={() => confirmDeleteD3Row(index)}
+                                            >
+                                                <Icon name="delete" size={18} color="#EF4444" />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* SMALL INFO */}
+                                        <View style={styles.compactInfoRow}>
+                                            <Text style={styles.compactLabel}>SrNo: {row.IssSrNo}</Text>
+                                            <Text style={styles.compactLabel}>Qty: {row.IssQty}</Text>
+                                            <Text style={styles.compactLabel}>Cheese: {row.IssChees}</Text>
+                                        </View>
+
+                                        {/* INPUT ROW */}
+                                        <View style={styles.compactInputRow}>
+                                            <TextInput
+                                                style={styles.compactInput}
+                                                placeholder="Return Qty"
+                                                keyboardType="numeric"
+                                                value={String(row.IssRQty ?? "")}
+                                                onChangeText={v => updateD3Value(index, "IssRQty", v)}
+                                            />
+
+                                            <TextInput
+                                                style={styles.compactInput}
+                                                placeholder="Return Cheese"
+                                                keyboardType="numeric"
+                                                value={String(row.IssRChees ?? "")}
+                                                onChangeText={v => updateD3Value(index, "IssRChees", v)}
+                                            />
+                                        </View>
+
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                            onPress={handleSaveModifyData}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={{ color: "#fff", fontWeight: "600" }}>Save Entry</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        {status === "Close" && (
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderRadius: 18,
+                                    padding: 18,
+                                    marginTop: 14,
+                                    marginBottom: 12,
+                                    elevation: 3,
+                                    shadowColor: "#000",
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 8,
+                                }}
+                            >
+
+                                <View style={{ flexDirection: "row" }}>
+
+                                    <View
+                                        style={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: 14,
+                                            backgroundColor: "#EAF7FF",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            marginRight: 14
+                                        }}>
+
+                                        <Icon
+                                            name="print"
+                                            size={30}
+                                            color="#0E83C8"
+                                        />
+
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            Sticker Printing
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#6B7280",
+                                                marginTop: 2,
+                                                fontSize: 12
+                                            }}>
+                                            Select printer and print saved sticker
+                                        </Text>
+
+                                    </View>
+
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (getPrinters.length === 0) {
+                                            getAllPrinters();
+                                        }
+                                        setPrinterModalVisible(true);
+                                    }}
+                                    style={{
+                                        marginTop: 18,
+                                        borderWidth: 1.5,
+                                        borderColor: "#8CCBFF",
+                                        borderRadius: 16,
+                                        padding: 15,
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}>
+
+                                    <View>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            {printer || "Select Printer"}
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#0F6C7B",
+                                                marginTop: 2,
+                                                fontWeight: "700"
+                                            }}>
+                                            {selectedPrinterStatus || "Idle"}
+                                        </Text>
+
+                                    </View>
+
+                                    <Icon
+                                        name="keyboard-arrow-down"
+                                        size={28}
+                                        color="#374151"
+                                    />
+
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={printSticker}
+                                    style={{
+                                        backgroundColor: "#0F6C7B",
+                                        borderRadius: 14,
+                                        height: 56,
+                                        marginTop: 16,
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexDirection: "row"
+                                    }}>
+
+                                    <Icon
+                                        name="print"
+                                        size={22}
+                                        color="#fff"
+                                    />
+
+                                    <Text
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: 18,
+                                            fontWeight: "700",
+                                            marginLeft: 10
+                                        }}>
+                                        Print Sticker
                                     </Text>
 
-                                    <TouchableOpacity
-                                        onPress={() => confirmDeleteD3Row(index)}
-                                    >
-                                        <Icon name="delete" size={18} color="#EF4444" />
+                                </TouchableOpacity>
+
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    <Modal transparent visible={linkModal} animationType="slide">
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalBox}>
+                                <View style={styles.rowBetween}>
+                                    <Text style={{ fontSize: 16, fontWeight: "600", color: "#000" }}>
+                                        Select Creel
+                                    </Text>
+
+                                    <TouchableOpacity onPress={() => setLinkModal(false)}>
+                                        <Icon name="close" size={22} />
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* SMALL INFO */}
-                                <View style={styles.compactInfoRow}>
-                                    <Text style={styles.compactLabel}>SrNo: {row.IssSrNo}</Text>
-                                    <Text style={styles.compactLabel}>Qty: {row.IssQty}</Text>
-                                    <Text style={styles.compactLabel}>Cheese: {row.IssChees}</Text>
-                                </View>
+                                <TextInput
+                                    placeholder="Search..."
+                                    placeholderTextColor="#000"
+                                    value={searchText}
+                                    onChangeText={handleSearch}
+                                    style={styles.searchInput}
+                                />
 
-                                {/* INPUT ROW */}
-                                <View style={styles.compactInputRow}>
-                                    <TextInput
-                                        style={styles.compactInput}
-                                        placeholder="Return Qty"
-                                        keyboardType="numeric"
-                                        value={String(row.IssRQty ?? "")}
-                                        onChangeText={v => updateD3Value(index, "IssRQty", v)}
-                                    />
+                                <FlatList
+                                    data={filteredCreelData}
+                                    keyboardShouldPersistTaps="handled"
+                                    keyExtractor={(item, index) => index.toString()}
+                                    contentContainerStyle={{ paddingTop: 10 }}
 
-                                    <TextInput
-                                        style={styles.compactInput}
-                                        placeholder="Return Cheese"
-                                        keyboardType="numeric"
-                                        value={String(row.IssRChees ?? "")}
-                                        onChangeText={v => updateD3Value(index, "IssRChees", v)}
-                                    />
-                                </View>
+                                    renderItem={({ item }) => (
 
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.creelCardPro,
+                                                selectedCreel?.UId === item.UId &&
+                                                selectedCreel?.SrNo === item.SrNo &&
+                                                String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
+                                                styles.selectedCardPro,
+                                            ]}
+                                            onPress={() => {
+                                                console.log("---- SELECTED CREEL:", item);
+                                                const selectedItem = getItemData.find(
+                                                    itm => String(itm.ItmCode) === String(item.ItmCode)
+                                                );
+                                                console.log("---- selectedItem", selectedItem)
+                                                setDenier(selectedItem?.Denier || "");
+                                                setSelectedCreel({
+                                                    UId: item.UId,
+                                                    SrNo: item.SrNo,
+                                                    SubSr: item.SubSr || item.IssSubSr || 1,
+                                                });
+                                                setSelectedBatchNo(item.BatchNo);
+
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    ItmCode: String(item.ItmCode),
+                                                    Denier: selectedItem?.Denier || "",
+                                                    MerCode: String(item.MerCode),
+                                                    GrdCode: String(item.GrdCode),
+                                                    ShdCode: String(item.ShdCode),
+                                                    IssUId: item.UId,
+                                                    IssSrNo: item.SrNo,
+                                                    IssSubSr: item.SubSr || item.IssSubSr || 1,
+                                                    IssChees: item.Pcs,
+                                                    IssQty: item.Qty,
+                                                    StkType: item.StkType,
+                                                }));
+
+                                                setLinkModal(false);
+                                            }}
+                                        >
+
+                                            {/* TOP ROW */}
+                                            <View style={styles.rowBetween}>
+                                                <Text style={styles.itemTitlePro} numberOfLines={1}>
+                                                    {item.ItmName}
+                                                </Text>
+
+                                                <View style={styles.batchBadgePro}>
+                                                    <Text style={styles.batchTextPro}>
+                                                        Creel No : {item.BatchNo}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* GRID */}
+                                            <View style={styles.gridRow}>
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Grade</Text>
+                                                    <Text style={styles.gridValue}>{item.GrdName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Shade</Text>
+                                                    <Text style={styles.gridValue}>{item.ShdName}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.gridRow}>
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Merge</Text>
+                                                    <Text style={styles.gridValue}>{item.MerName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>SubSr</Text>
+                                                    <Text style={styles.gridValue}>
+                                                        {item.SubSr || item.IssSubSr || 1}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* HIGHLIGHT ROW */}
+                                            <View style={styles.footerRow}>
+                                                <Text style={styles.qtyLabel}>Bal Qty</Text>
+                                                <Text style={styles.qtyValue}>{item.BalQty}</Text>
+                                            </View>
+
+                                        </TouchableOpacity>
+                                    )}
+                                />
                             </View>
-                        ))}
-                    </View>
-                )}
-
-                <TouchableOpacity
-                    style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                    onPress={handleSaveModifyData}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={{ color: "#fff", fontWeight: "600" }}>Save Entry</Text>
-                    )}
-                </TouchableOpacity>
-            </ScrollView>
-
-            <Modal transparent visible={linkModal} animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalBox}>
-                        <View style={styles.rowBetween}>
-                            <Text style={{ fontSize: 16, fontWeight: "600", color: "#000" }}>
-                                Select Creel
-                            </Text>
-
-                            <TouchableOpacity onPress={() => setLinkModal(false)}>
-                                <Icon name="close" size={22} />
-                            </TouchableOpacity>
                         </View>
+                    </Modal>
 
-                        <TextInput
-                            placeholder="Search..."
-                            placeholderTextColor="#000"
-                            value={searchText}
-                            onChangeText={handleSearch}
-                            style={styles.searchInput}
-                        />
+                    <Modal transparent visible={alertData.visible} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+                                <Icon
+                                    name={
+                                        alertData.type === "success"
+                                            ? "check-circle"
+                                            : alertData.type === "error"
+                                                ? "error"
+                                                : "warning"
+                                    }
+                                    size={40}
+                                    color={
+                                        alertData.type === "success"
+                                            ? "#4CAF50"
+                                            : alertData.type === "error"
+                                                ? "#F44336"
+                                                : "#FFA000"
+                                    }
+                                />
 
-                        <FlatList
-                            data={filteredCreelData}
-                            keyboardShouldPersistTaps="handled"
-                            keyExtractor={(item, index) => index.toString()}
-                            contentContainerStyle={{ paddingTop: 10 }}
+                                <Text style={styles.alertTitle}>
+                                    {alertData.type === "success"
+                                        ? "Success"
+                                        : alertData.type === "error"
+                                            ? "Error"
+                                            : "Warning"}
+                                </Text>
 
-                            renderItem={({ item }) => (
+                                <Text style={styles.alertMessage}>{alertData.message}</Text>
 
                                 <TouchableOpacity
-                                    style={[
-                                        styles.creelCardPro,
-                                        selectedCreel?.UId === item.UId &&
-                                        selectedCreel?.SrNo === item.SrNo &&
-                                        String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
-                                        styles.selectedCardPro,
-                                    ]}
-                                    onPress={() => {
-                                        console.log("---- SELECTED CREEL:", item);
-                                        const selectedItem = getItemData.find(
-                                            itm => String(itm.ItmCode) === String(item.ItmCode)
-                                        );
-                                        console.log("---- selectedItem", selectedItem)
-                                        setDenier(selectedItem?.Denier || "");
-                                        setSelectedCreel({
-                                            UId: item.UId,
-                                            SrNo: item.SrNo,
-                                            SubSr: item.SubSr || item.IssSubSr || 1,
-                                        });
-                                        setSelectedBatchNo(item.BatchNo);
+                                    onPress={() => setAlertData({ visible: false, message: "", type: "warning" })}
+                                    style={styles.alertBtn}
+                                >
+                                    <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
 
-                                        setForm(prev => ({
-                                            ...prev,
-                                            ItmCode: String(item.ItmCode),
-                                            Denier: selectedItem?.Denier || "",
-                                            MerCode: String(item.MerCode),
-                                            GrdCode: String(item.GrdCode),
-                                            ShdCode: String(item.ShdCode),
-                                            IssUId: item.UId,
-                                            IssSrNo: item.SrNo,
-                                            IssSubSr: item.SubSr || item.IssSubSr || 1,
-                                            IssChees: item.Pcs,
-                                            IssQty: item.Qty,
-                                            StkType: item.StkType,
-                                        }));
+                    <Modal transparent visible={deleteModal} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+                                <Icon name="delete" size={42} color="#F44336" />
 
-                                        setLinkModal(false);
+                                <Text style={styles.alertTitle}>Delete Row?</Text>
+
+                                <Text style={styles.alertMessage}>
+                                    Are you sure you want to remove this creel return detail?
+                                </Text>
+
+                                <View style={styles.confirmRow}>
+                                    <TouchableOpacity
+                                        style={[styles.confirmBtn, { backgroundColor: "#999" }]}
+                                        onPress={() => {
+                                            setDeleteModal(false);
+                                            setDeleteIndex(null);
+                                        }}
+                                    >
+                                        <Text style={styles.confirmBtnText}>No</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.confirmBtn, { backgroundColor: "#F44336" }]}
+                                        onPress={deleteD3Row}
+                                    >
+                                        <Text style={styles.confirmBtnText}>Yes</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
+
+                    <Modal
+                        visible={printerModalVisible}
+                        animationType="slide"
+                        transparent={true}
+                        onRequestClose={() => {
+                            setPrinterModalVisible(false);
+                            // setPendingPrintItem(null);
+                            setPrinterSearch("");
+                        }}>
+
+                        <View
+                            style={{
+                                flex: 1,
+                                backgroundColor: "rgba(0,0,0,.45)",
+                                justifyContent: "flex-end"
+                            }}>
+
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderTopLeftRadius: 25,
+                                    borderTopRightRadius: 25,
+                                    padding: 20,
+                                    maxHeight: "80%"
+                                }}>
+
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: 15,
                                     }}
                                 >
+                                    <Text
+                                        style={{
+                                            fontSize: 20,
+                                            fontWeight: "700",
+                                            color: "#000",
+                                        }}
+                                    >
+                                        Select Printer
+                                    </Text>
 
-                                    {/* TOP ROW */}
-                                    <View style={styles.rowBetween}>
-                                        <Text style={styles.itemTitlePro} numberOfLines={1}>
-                                            {item.ItmName}
-                                        </Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setPrinterModalVisible(false);
+                                            // setPendingPrintItem(null);
+                                            setPrinterSearch("");
+                                        }}
+                                        style={{
+                                            width: 44,
+                                            height: 44,
+                                            borderRadius: 22,
+                                            backgroundColor: "#F1F5F9",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <Icon name="close" size={20} color="#111827" />
+                                    </TouchableOpacity>
+                                </View>
 
-                                        <View style={styles.batchBadgePro}>
-                                            <Text style={styles.batchTextPro}>
-                                                Creel No : {item.BatchNo}
-                                            </Text>
-                                        </View>
-                                    </View>
 
-                                    {/* GRID */}
-                                    <View style={styles.gridRow}>
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Grade</Text>
-                                            <Text style={styles.gridValue}>{item.GrdName}</Text>
-                                        </View>
+                                <TextInput
+                                    placeholder="Search printer..."
+                                    value={printerSearch}
+                                    onChangeText={setPrinterSearch}
+                                    style={{
+                                        height: 50,
+                                        borderWidth: 1,
+                                        borderColor: "#ddd",
+                                        borderRadius: 12,
+                                        paddingHorizontal: 15,
+                                        marginBottom: 15
+                                    }}
+                                />
 
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Shade</Text>
-                                            <Text style={styles.gridValue}>{item.ShdName}</Text>
-                                        </View>
-                                    </View>
+                                <FlatList
+                                    data={getPrinters.filter(p =>
+                                        p.Name.toLowerCase().includes(
+                                            printerSearch.toLowerCase()
+                                        )
+                                    )}
+                                    keyExtractor={(i) => i.Name}
+                                    renderItem={({ item }) => (
 
-                                    <View style={styles.gridRow}>
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Merge</Text>
-                                            <Text style={styles.gridValue}>{item.MerName}</Text>
-                                        </View>
+                                        <TouchableOpacity
 
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>SubSr</Text>
-                                            <Text style={styles.gridValue}>
-                                                {item.SubSr || item.IssSubSr || 1}
-                                            </Text>
-                                        </View>
-                                    </View>
+                                            onPress={() => selectPrinter(item)}
 
-                                    {/* HIGHLIGHT ROW */}
-                                    <View style={styles.footerRow}>
-                                        <Text style={styles.qtyLabel}>Bal Qty</Text>
-                                        <Text style={styles.qtyValue}>{item.BalQty}</Text>
-                                    </View>
+                                            style={{
+                                                padding: 15,
+                                                borderBottomWidth: 1,
+                                                borderColor: "#eee",
+                                                flexDirection: "row",
+                                                justifyContent: "space-between",
+                                                alignItems: "center"
+                                            }}>
 
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </View>
-                </View>
-            </Modal>
+                                            <View>
 
-            <Modal transparent visible={alertData.visible} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-                        <Icon
-                            name={
-                                alertData.type === "success"
-                                    ? "check-circle"
-                                    : alertData.type === "error"
-                                        ? "error"
-                                        : "warning"
-                            }
-                            size={40}
-                            color={
-                                alertData.type === "success"
-                                    ? "#4CAF50"
-                                    : alertData.type === "error"
-                                        ? "#F44336"
-                                        : "#FFA000"
-                            }
-                        />
+                                                <Text
+                                                    style={{
+                                                        fontWeight: "700",
+                                                        fontSize: 15,
+                                                        color: "#000"
+                                                    }}>
+                                                    {item.Name}
+                                                </Text>
 
-                        <Text style={styles.alertTitle}>
-                            {alertData.type === "success"
-                                ? "Success"
-                                : alertData.type === "error"
-                                    ? "Error"
-                                    : "Warning"}
-                        </Text>
+                                                <Text
+                                                    style={{
+                                                        color: getPrinterStatusColor(
+                                                            item.StatusText
+                                                        )
+                                                    }}>
+                                                    {item.StatusText}
+                                                </Text>
 
-                        <Text style={styles.alertMessage}>{alertData.message}</Text>
+                                            </View>
 
-                        <TouchableOpacity
-                            onPress={() => setAlertData({ visible: false, message: "", type: "warning" })}
-                            style={styles.alertBtn}
-                        >
-                            <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-            <Modal transparent visible={deleteModal} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-                        <Icon name="delete" size={42} color="#F44336" />
+                                            {printer === item.Name &&
+                                                <Icon
+                                                    name="check-circle"
+                                                    size={24}
+                                                    color="#16A34A"
+                                                />
+                                            }
 
-                        <Text style={styles.alertTitle}>Delete Row?</Text>
+                                        </TouchableOpacity>
 
-                        <Text style={styles.alertMessage}>
-                            Are you sure you want to remove this creel return detail?
-                        </Text>
+                                    )}
+                                />
 
-                        <View style={styles.confirmRow}>
-                            <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: "#999" }]}
-                                onPress={() => {
-                                    setDeleteModal(false);
-                                    setDeleteIndex(null);
-                                }}
-                            >
-                                <Text style={styles.confirmBtnText}>No</Text>
-                            </TouchableOpacity>
+                            </View>
 
-                            <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: "#F44336" }]}
-                                onPress={deleteD3Row}
-                            >
-                                <Text style={styles.confirmBtnText}>Yes</Text>
-                            </TouchableOpacity>
                         </View>
-                    </View>
+
+                    </Modal>
                 </View>
-            </Modal>
-        </View>
+            </SafeAreaView>
+        </>
     );
 };
 

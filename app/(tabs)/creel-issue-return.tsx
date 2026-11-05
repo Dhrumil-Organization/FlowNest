@@ -1,11 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
-
-// import { AuthProvider, useAuth } from '@/hooks/AuthContext';
 import CreelIssueReturn from '@/components/CreelIssueReturn';
 
-export default function CRLimit_Request_Container() {
-    // const { token, username } = useAuth();
+export default function CreelIssueReturnContainer() {
     const [token, setToken] = useState('');
     const [username, setUsername] = useState('');
 
@@ -17,15 +14,14 @@ export default function CRLimit_Request_Container() {
             setToken(t || '');
             setUsername(u || 'User');
         };
+
         load();
     }, []);
 
     return (
-        <>
-            {/* <AuthProvider> */}
-            <CreelIssueReturn token={token || ''} username={username} />
-            {/* <Footer/> */}
-            {/* </AuthProvider> */}
-        </>
+        <CreelIssueReturn
+            token={token}
+            username={username}
+        />
     );
 }

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import CustomSearchableDropdown from '@/Shared/CustomSearchableDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from "axios";
@@ -5,8 +6,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
-// import Snackbar from 'react-native-snackbar';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Snackbar } from '@/common/utils/snackbarCompat';
+import AsyncStorage from "@/common/utils/compatibleStorage";
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const CreelIssueReturnEntry = ({ token, navigation, route }) => {
     const router = useRouter();
@@ -65,7 +68,8 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
     const [selectedPrinterStatus, setSelectedPrinterStatus] = useState("");
     const [printerSearch, setPrinterSearch] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [getSavedData, setGetSavedData] = useState({});
+    // const [getSavedData, setGetSavedData] = useState({});
+    const [getSavedData, setGetSavedData] = useState<any>({});
     const [getDataSaved, setDataSaved] = useState(false)
 
     const showWarning = (msg) => {
@@ -445,23 +449,41 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
             const resData = res?.data;
 
-            if (resData?.message === false) {
-                showWarning(resData?.response?.message);
-                setGetSavedData(payload);
-                setDataSaved(false);
-                getAllPrinters();
-            } else if (resData?.response?.error === true) {
-                showWarning(resData?.response?.message);
-                getAllPrinters();
-                setGetSavedData(payload);
-                setDataSaved(false);
-            } else if (resData?.success === true) {
+            // if (resData?.message === false) {
+            //     showWarning(resData?.response?.message);
+            //     setGetSavedData(payload);
+            //     setDataSaved(false);
+            //     getAllPrinters();
+            // } else if (resData?.response?.error === true) {
+            //     showWarning(resData?.response?.message);
+            //     getAllPrinters();
+            //     setGetSavedData(payload);
+            //     setDataSaved(false);
+            // } else if (resData?.success === true) {
+            //     showSuccess(resData?.response?.message);
+            //     getAllPrinters();
+            //     setGetSavedData(payload);
+            //     setDataSaved(true);
+            // } else {
+            //     showError(resData?.message);
+            // }
+            if (resData?.success === true) {
                 showSuccess(resData?.response?.message);
-                getAllPrinters();
+
                 setGetSavedData(payload);
                 setDataSaved(true);
+
+                getAllPrinters();
+
             } else {
-                showError(resData?.message);
+                showWarning(
+                    resData?.response?.message ||
+                    resData?.message ||
+                    "Data save failed."
+                );
+
+                setGetSavedData(payload);
+                setDataSaved(false);
             }
         } catch (error) {
             console.log("❌ SAVE ERROR:", error?.response?.data || error.message);
@@ -551,7 +573,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
     const printSticker = () => {
         if (typeof printer == 'undefined' || printer == null || printer == '') {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
         else {
@@ -561,36 +583,74 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
             if (Object.keys(getSavedData).length > 0) {
                 temppayloadObj = {
-                    uid: getSavedData.IssUId ?? "0",
-                    inwno: "",
-                    inwdate: "",
-                    srno: getSavedData.IssSrNo ?? "0",
-                    itmcode: getSavedData.ItmCode ?? "0",
-                    itmname: getSavedData.ItmName ?? "",
-                    dsncode: "0",
-                    dsnname: "",
-                    rcno: "",
-                    amount: "",
-                    subsr: getSavedData.IssSubSr ?? "0",
-                    takano: getSavedData.CartNo ?? "",
-                    qty: getSavedData.TotQty ?? "0",
-                    trantype: getSavedData.trantype ?? "",
-                    ttype: "",
-                    dptname: "",
-                    shdcode: getSavedData.ShdCode ?? "0",
-                    shdname: getSavedData.ShdName ?? "",
-                    whr: "",
-                    yarncostr: "",
-                    yard: "",
-                    sexecname: "",
-                    strcode: "",
-                    unqsrno: "",
-                    grdcode: getSavedData.GrdCode ?? "0",
-                    grdname: getSavedData.GrdName ?? "",
-                    mercode: getSavedData.MerCode ?? "0",
-                    mername: getSavedData.MerName ?? "",
-                    denier: getSavedData.Denier ?? "0",
-                    prpcode: getSavedData.PrpCode ?? ""
+                    // uid: getSavedData.IssUId ?? "0",
+                    // inwno: "",
+                    // inwdate: "",
+                    // srno: getSavedData.IssSrNo ?? "0",
+                    // itmcode: getSavedData.ItmCode ?? "0",
+                    // itmname: getSavedData.ItmName ?? "",
+                    // dsncode: "0",
+                    // dsnname: "",
+                    // rcno: "",
+                    // amount: "",
+                    // subsr: getSavedData.IssSubSr ?? "0",
+                    // takano: getSavedData.CartNo ?? "",
+                    // qty: getSavedData.TotQty ?? "0",
+                    // trantype: getSavedData.trantype ?? "",
+                    // ttype: "",
+                    // dptname: "",
+                    // shdcode: getSavedData.ShdCode ?? "0",
+                    // shdname: getSavedData.ShdName ?? "",
+                    // whr: "",
+                    // yarncostr: "",
+                    // yard: "",
+                    // sexecname: "",
+                    // strcode: "",
+                    // unqsrno: "",
+                    // grdcode: getSavedData.GrdCode ?? "0",
+                    // grdname: getSavedData.GrdName ?? "",
+                    // mercode: getSavedData.MerCode ?? "0",
+                    // mername: getSavedData.MerName ?? "",
+                    // denier: getSavedData.Denier ?? "0",
+                    // prpcode: getSavedData.PrpCode ?? "",
+                    // chees: getSavedData.Chees ?? "",
+                    UId: getSavedData.IssUId ?? "0",
+                    TranDate: "0",
+                    PrpCode: getSavedData.PrpCode ?? "",
+                    StrCode: getSavedData.StrCode ?? "0",
+                    ItmCode: getSavedData.ItmCode ?? "0",
+                    MerCode: getSavedData.MerCode ?? "0",
+                    ShdCode: getSavedData.ShdCode ?? "0",
+                    GrdCode: getSavedData.GrdCode ?? "0",
+                    Denier: getSavedData.Denier ?? "0",
+                    DsnCode: "0",
+                    CartNo: getSavedData.CartNo ?? "",
+                    Wt: getSavedData.TotQty ?? "0",
+                    Chees: getSavedData.Chees ?? "",
+                    IsAuto: "0",
+                    GrossWt: "0",
+                    PUId: getSavedData.IssUId ?? "0",
+                    PSrNo: getSavedData.IssSrNo ?? "0",
+                    PSubSr: getSavedData.IssSubSr ?? "0",
+                    TranType: getSavedData.trantype ?? "",
+                    TranName: " ",
+                    StkType: getSavedData.StkType ?? "",
+                    StkDate: "0",
+                    SrNo: getSavedData.IssSrNo ?? "0",
+                    UsrCode: "0",
+                    StrName: "",
+                    ItmName: getSavedData.ItmName ?? "",
+                    MerName: getSavedData.MerName ?? "",
+                    ShdName: getSavedData.ShdName ?? "",
+                    GrdName: getSavedData.GrdName ?? "",
+                    DnsName: "",
+                    Stktype: getSavedData.StkType ?? "",
+                    nStkDate: "",
+                    yearno: getSavedData.YearNo ?? "0",
+                    IskgQty: "0",
+                    Rate: "0",
+                    MItmCode: "0",
+                    MItmName: ""
                 }
                 console.log("getSavedData", getSavedData, temppayloadObj);
                 const params = {
@@ -603,7 +663,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                 };
 
                 // return;
-                // axios.post(`${PRINTSTICKER}`, params)
+                axios.post(`${PRINTSTICKER}`, params)
                 axios.post(
                     PRINTSTICKER,
                     params,
@@ -616,42 +676,42 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                         const res = response.data;
 
                         if (res.success) {
-                            // Snackbar.show({
-                            //     text: '✅ ${res.printed} label(s) sent to printer.',
-                            //     duration: Snackbar.LENGTH_INDEFINITE,
-                            //     backgroundColor: 'green',
-                            //     action: { text: 'OK', textColor: 'white' },
-                            // });
-                            Alert.alert('✅ ${res.printed} label(s) sent to printer.');
+                            Snackbar.show({
+                                text: '✅ ${res.printed} label(s) sent to printer.',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'green',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                            AppAlert.alert('✅ ${res.printed} label(s) sent to printer.');
                         } else {
-                            // Snackbar.show({
-                            //     text: res.message || 'Operation failed',
-                            //     duration: Snackbar.LENGTH_INDEFINITE,
-                            //     backgroundColor: 'red',
-                            //     action: { text: 'OK', textColor: 'white' },
-                            // });
-                            Alert.alert(res.message || 'Operation failed');
+                            Snackbar.show({
+                                text: res.message || 'Operation failed',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'red',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                            AppAlert.alert(res.message || 'Operation failed');
                         }
                     }).catch(error => {
                         setIsLoading(false);
-                        // Snackbar.show({
-                        //     text: error?.response?.data?.error || error.message || 'Print failed',
-                        //     duration: Snackbar.LENGTH_LONG,
-                        //     backgroundColor: 'red',
-                        //     action: { text: 'OK', textColor: 'white' },
-                        // });
-                        Alert.alert(error?.response?.data?.error || error.message || 'Print failed');
+                        Snackbar.show({
+                            text: error?.response?.data?.error || error.message || 'Print failed',
+                            duration: Snackbar.LENGTH_LONG,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                        AppAlert.alert(error?.response?.data?.error || error.message || 'Print failed');
                     });
             } else {
                 setIsLoading(false);
-                // Snackbar.show({
-                //     text: 'printing sticker data is empty',
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: 'red',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: '#fff' },
-                // });
-                Alert.alert('printing sticker data is empty');
+                Snackbar.show({
+                    text: 'printing sticker data is empty',
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: 'red',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: '#fff' },
+                });
+                AppAlert.alert('printing sticker data is empty');
             }
         }
     }
@@ -753,20 +813,30 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Icon name="arrow-back" size={22} color="#fff" />
-                </TouchableOpacity>
+        <>
+            <StatusBar
+                style="light"
+                backgroundColor="#007EA7"
+                translucent={false}
+            />
+            <SafeAreaView
+                edges={['top']}
+                style={{ flex: 1, backgroundColor: "#0F6C7B" }}
+            >
+                <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => router.back()}>
+                            <Icon name="arrow-back" size={22} color="#fff" />
+                        </TouchableOpacity>
 
-                <Text style={styles.headerTitle}>Entry</Text>
+                        <Text style={styles.headerTitle}>Add Entry..</Text>
 
-                <View style={{ width: 22 }} />
-            </View>
+                        <View style={{ width: 22 }} />
+                    </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
+                    <ScrollView contentContainerStyle={{ padding: 16 }}>
 
-                {/* <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                        {/* <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
 
                     <View style={[styles.card, { flex: 1 }]}>
                         <Text style={styles.sectionTitle}>Selected Creel</Text>
@@ -793,60 +863,60 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
                 </View> */}
 
-                {/* <View style={styles.card}>
+                        {/* <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Selected Creel</Text>
                     <Text style={styles.creelText}>
                         {selectedBatchNo || "-"}
                     </Text>
                 </View> */}
 
-                <View style={styles.card}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <View>
-                            <Text style={styles.sectionTitle}>Selected Creel</Text>
-                            <Text style={styles.creelText}>
-                                {selectedBatchNo || "No Creel Selected"}
-                            </Text>
+                        <View style={styles.card}>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Selected Creel</Text>
+                                    <Text style={styles.creelText}>
+                                        {selectedBatchNo || "No Creel Selected"}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.linkBtnSmall}
+                                    onPress={() => {
+                                        fetchCreelData();
+                                        setLinkModal(true);
+                                    }}
+                                >
+                                    <Icon name="link" size={16} color="#0F6C7B" />
+                                    <Text style={styles.linkBtnText}>Link Creel</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.linkBtnSmall}
-                            onPress={() => {
-                                fetchCreelData();
-                                setLinkModal(true);
-                            }}
-                        >
-                            <Icon name="link" size={16} color="#0F6C7B" />
-                            <Text style={styles.linkBtnText}>Link Creel</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.sectionTitle}>Carton Type</Text>
+                            <ToggleSwitch
+                                options={["Single", "Mix"]}
+                                value={cartonType}
+                                onChange={setCartonType}
+                            />
+                        </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Carton Type</Text>
-                    <ToggleSwitch
-                        options={["Single", "Mix"]}
-                        value={cartonType}
-                        onChange={setCartonType}
-                    />
-                </View>
-
-                <View style={styles.card}>
-                    <Text style={styles.label}>Carton No</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={form.CartNo}
-                        onChangeText={v => {
-                            setForm(prev => ({
-                                ...prev,
-                                CartNo: v || '',
-                            }));
-                        }}
-                        placeholder="Enter Carton No"
-                        placeholderTextColor="#000"
-                    />
-                </View>
-                {/* <TouchableOpacity
+                        <View style={styles.card}>
+                            <Text style={styles.label}>Carton No</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={form.CartNo}
+                                onChangeText={v => {
+                                    setForm(prev => ({
+                                        ...prev,
+                                        CartNo: v || '',
+                                    }));
+                                }}
+                                placeholder="Enter Carton No"
+                                placeholderTextColor="#000"
+                            />
+                        </View>
+                        {/* <TouchableOpacity
                     style={{
                         backgroundColor: "#0F6C7B",
                         padding: 12,
@@ -864,106 +934,106 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                     </Text>
                 </TouchableOpacity> */}
 
-                <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
-                    <Text style={styles.label}>
-                        Select Item <Text style={{ color: 'red' }}> * </Text>
-                    </Text>
+                        <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
+                            <Text style={styles.label}>
+                                Select Item <Text style={{ color: 'red' }}> * </Text>
+                            </Text>
 
-                    <CustomSearchableDropdown
-                        // key={form.ItmCode}   // 👈 ADD THIS BACK
-                        data={getItemData}
-                        labelKey="ItmName"
-                        valueKey="ItmCode"
-                        value={form.ItmCode}
-                        disabled={isDisabled}
-                        placeholder="Choose item..."
-                        placeholderTextColor="#000"
-                        onSelect={(itm) => {
-                            if (isDisabled) return;
-                            setForm(prev => ({
-                                ...prev,
-                                ItmCode: itm?.ItmCode || '',
-                            }));
-                            setDenier(itm?.Denier || "");
-                        }} />
+                            <CustomSearchableDropdown
+                                // key={form.ItmCode}   // 👈 ADD THIS BACK
+                                data={getItemData}
+                                labelKey="ItmName"
+                                valueKey="ItmCode"
+                                value={form.ItmCode}
+                                disabled={isDisabled}
+                                placeholder="Choose item..."
+                                placeholderTextColor="#000"
+                                onSelect={(itm) => {
+                                    if (isDisabled) return;
+                                    setForm(prev => ({
+                                        ...prev,
+                                        ItmCode: itm?.ItmCode || '',
+                                    }));
+                                    setDenier(itm?.Denier || "");
+                                }} />
 
-                    <View style={{ height: 20, justifyContent: "center" }}>
-                        <Text style={{ color: "#000", fontSize: 15 }}>
-                            {denier ? `Denier: ${denier}` : ""}
-                        </Text>
-                    </View>
-                </View>
+                            <View style={{ height: 20, justifyContent: "center" }}>
+                                <Text style={{ color: "#000", fontSize: 15 }}>
+                                    {denier ? `Denier: ${denier}` : ""}
+                                </Text>
+                            </View>
+                        </View>
 
-                <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
-                    <Text style={styles.label}>
-                        Select Merge <Text style={{ color: 'red' }}> * </Text>
-                    </Text>
+                        <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
+                            <Text style={styles.label}>
+                                Select Merge <Text style={{ color: 'red' }}> * </Text>
+                            </Text>
 
-                    <CustomSearchableDropdown
-                        // key={form.MerCode}
-                        data={getMergeData}
-                        labelKey="MerName"
-                        valueKey="MerCode"
-                        value={form.MerCode}
-                        disabled={isDisabled}
-                        placeholder="Choose merge..."
-                        onSelect={(mrg) => {
-                            if (isDisabled) return;
-                            setForm(prev => ({
-                                ...prev,
-                                MerCode: mrg?.MerCode || '',
-                            }));
-                        }}
-                    />
-                </View>
+                            <CustomSearchableDropdown
+                                // key={form.MerCode}
+                                data={getMergeData}
+                                labelKey="MerName"
+                                valueKey="MerCode"
+                                value={form.MerCode}
+                                disabled={isDisabled}
+                                placeholder="Choose merge..."
+                                onSelect={(mrg) => {
+                                    if (isDisabled) return;
+                                    setForm(prev => ({
+                                        ...prev,
+                                        MerCode: mrg?.MerCode || '',
+                                    }));
+                                }}
+                            />
+                        </View>
 
-                <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
-                    <Text style={styles.label}>
-                        Select Grade <Text style={{ color: 'red' }}> * </Text>
-                    </Text>
+                        <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
+                            <Text style={styles.label}>
+                                Select Grade <Text style={{ color: 'red' }}> * </Text>
+                            </Text>
 
-                    <CustomSearchableDropdown
-                        // key={form.GrdCode}
-                        data={getGradeData}
-                        labelKey="GrdName"
-                        valueKey="GrdCode"
-                        value={form.GrdCode}
-                        disabled={isDisabled}
-                        placeholder="Choose grade..."
-                        onSelect={(grd) => {
-                            if (isDisabled) return;
-                            setForm(prev => ({
-                                ...prev,
-                                GrdCode: grd?.GrdCode || '',
-                            }));
-                        }}
-                    />
-                </View>
+                            <CustomSearchableDropdown
+                                // key={form.GrdCode}
+                                data={getGradeData}
+                                labelKey="GrdName"
+                                valueKey="GrdCode"
+                                value={form.GrdCode}
+                                disabled={isDisabled}
+                                placeholder="Choose grade..."
+                                onSelect={(grd) => {
+                                    if (isDisabled) return;
+                                    setForm(prev => ({
+                                        ...prev,
+                                        GrdCode: grd?.GrdCode || '',
+                                    }));
+                                }}
+                            />
+                        </View>
 
-                <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
-                    <Text style={styles.label}>
-                        Select Shade <Text style={{ color: 'red' }}> * </Text>
-                    </Text>
+                        <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }} >
+                            <Text style={styles.label}>
+                                Select Shade <Text style={{ color: 'red' }}> * </Text>
+                            </Text>
 
-                    <CustomSearchableDropdown
-                        // key={form.ShdCode}
-                        data={getShadeData}
-                        labelKey="ShdName"
-                        valueKey="ShdCode"
-                        value={form.ShdCode}
-                        disabled={isDisabled}
-                        placeholder="Choose shade..."
-                        onSelect={(shd) => {
-                            if (isDisabled) return;
-                            setForm(prev => ({
-                                ...prev,
-                                ShdCode: shd?.ShdCode || '',
-                            }));
-                        }}
-                    />
-                </View>
+                            <CustomSearchableDropdown
+                                // key={form.ShdCode}
+                                data={getShadeData}
+                                labelKey="ShdName"
+                                valueKey="ShdCode"
+                                value={form.ShdCode}
+                                disabled={isDisabled}
+                                placeholder="Choose shade..."
+                                onSelect={(shd) => {
+                                    if (isDisabled) return;
+                                    setForm(prev => ({
+                                        ...prev,
+                                        ShdCode: shd?.ShdCode || '',
+                                    }));
+                                }}
+                            />
+                        </View>
 
-                {/* <View style={styles.card}>
+                        {/* <View style={styles.card}>
                     <Text style={styles.label}>Cheese</Text>
                     <TextInput
                         style={styles.input}
@@ -997,490 +1067,147 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                     />
                 </View> */}
 
-                <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Cheese</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotPcs}
-                            onChangeText={v => {
-                                setForm(prev => ({
-                                    ...prev,
-                                    TotPcs: v || '',
-                                }));
-                            }}
-                            placeholder="Enter Cheese"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
+                        <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Cheese</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotPcs}
+                                    onChangeText={v => {
+                                        setForm(prev => ({
+                                            ...prev,
+                                            TotPcs: v || '',
+                                        }));
+                                    }}
+                                    placeholder="Enter Cheese"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
 
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Weight</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotQty}
-                            onChangeText={v => {
-                                setForm(prev => ({
-                                    ...prev,
-                                    TotQty: v || '',
-                                }));
-                            }}
-                            placeholder="Enter Weight"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
-                </View>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Weight</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotQty}
+                                    onChangeText={v => {
+                                        setForm(prev => ({
+                                            ...prev,
+                                            TotQty: v || '',
+                                        }));
+                                    }}
+                                    placeholder="Enter Weight"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
+                        </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Status</Text>
-                    <ToggleSwitch
-                        options={["Open", "Close"]}
-                        value={status}
-                        onChange={setStatus}
-                    />
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.sectionTitle}>Status</Text>
+                            <ToggleSwitch
+                                options={["Open", "Close"]}
+                                value={status}
+                                onChange={setStatus}
+                            />
+                        </View>
 
-                <TouchableOpacity
-                    style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                    onPress={handleSaveData}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={{ color: "#fff", fontWeight: "600" }}>
-                            Save Entry
-                        </Text>
-                    )}
-                </TouchableOpacity>
-                {getDataSaved && status === "Close" && (
-                    // <TouchableOpacity
-                    //     style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                    //     onPress={printSticker}
-                    // // disabled={loading}
-                    // >
-                    //     <Text style={{ color: "#fff", fontWeight: "600" }}>
-                    //         Print
-                    //     </Text>
-                    // </TouchableOpacity>
-
-                    <View
-                        style={{
-                            backgroundColor: "#fff",
-                            borderRadius: 18,
-                            padding: 18,
-                            marginTop: 14,
-                            marginBottom: 12,
-                            elevation: 3,
-                            shadowColor: "#000",
-                            shadowOpacity: 0.08,
-                            shadowRadius: 8,
-                        }}
-                    >
-
-                        <View style={{ flexDirection: "row" }}>
+                        <TouchableOpacity
+                            style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                            onPress={handleSaveData}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={{ color: "#fff", fontWeight: "600" }}>
+                                    Save Entry
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                        {/* {getDataSaved && status === "Close" && (
+                            // <TouchableOpacity
+                            //     style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                            //     onPress={printSticker}
+                            // // disabled={loading}
+                            // >
+                            //     <Text style={{ color: "#fff", fontWeight: "600" }}>
+                            //         Print
+                            //     </Text>
+                            // </TouchableOpacity>
 
                             <View
                                 style={{
-                                    width: 56,
-                                    height: 56,
-                                    borderRadius: 14,
-                                    backgroundColor: "#EAF7FF",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    marginRight: 14
-                                }}>
+                                    backgroundColor: "#fff",
+                                    borderRadius: 18,
+                                    padding: 18,
+                                    marginTop: 14,
+                                    marginBottom: 12,
+                                    elevation: 3,
+                                    shadowColor: "#000",
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 8,
+                                }}
+                            >
 
-                                <Icon
-                                    name="print"
-                                    size={30}
-                                    color="#0E83C8"
-                                />
+                                <View style={{ flexDirection: "row" }}>
 
-                            </View>
+                                    <View
+                                        style={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: 14,
+                                            backgroundColor: "#EAF7FF",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            marginRight: 14
+                                        }}>
 
-                            <View style={{ flex: 1 }}>
+                                        <Icon
+                                            name="print"
+                                            size={30}
+                                            color="#0E83C8"
+                                        />
 
-                                <Text
-                                    style={{
-                                        fontSize: 18,
-                                        fontWeight: "700",
-                                        color: "#111827"
-                                    }}>
-                                    Sticker Printing
-                                </Text>
+                                    </View>
 
-                                <Text
-                                    style={{
-                                        color: "#6B7280",
-                                        marginTop: 2,
-                                        fontSize: 12
-                                    }}>
-                                    Select printer and print saved sticker
-                                </Text>
+                                    <View style={{ flex: 1 }}>
 
-                            </View>
-
-                        </View>
-
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (getPrinters.length === 0) {
-                                    getAllPrinters();
-                                }
-                                setPrinterModalVisible(true);
-                            }}
-                            style={{
-                                marginTop: 18,
-                                borderWidth: 1.5,
-                                borderColor: "#8CCBFF",
-                                borderRadius: 16,
-                                padding: 15,
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center"
-                            }}>
-
-                            <View>
-
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: "700",
-                                        color: "#111827"
-                                    }}>
-                                    {printer || "Select Printer"}
-                                </Text>
-
-                                <Text
-                                    style={{
-                                        color: "#0F6C7B",
-                                        marginTop: 2,
-                                        fontWeight: "700"
-                                    }}>
-                                    {selectedPrinterStatus || "Idle"}
-                                </Text>
-
-                            </View>
-
-                            <Icon
-                                name="keyboard-arrow-down"
-                                size={28}
-                                color="#374151"
-                            />
-
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={printSticker}
-                            style={{
-                                backgroundColor: "#0F6C7B",
-                                borderRadius: 14,
-                                height: 56,
-                                marginTop: 16,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                flexDirection: "row"
-                            }}>
-
-                            <Icon
-                                name="print"
-                                size={22}
-                                color="#fff"
-                            />
-
-                            <Text
-                                style={{
-                                    color: "#fff",
-                                    fontSize: 18,
-                                    fontWeight: "700",
-                                    marginLeft: 10
-                                }}>
-                                Print Sticker
-                            </Text>
-
-                        </TouchableOpacity>
-
-                    </View>
-                )}
-            </ScrollView>
-
-            <Modal transparent visible={linkModal} animationType="slide">
-                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-                    <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "70%" }}>
-                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <Text style={{ fontSize: 16, fontWeight: "600", color: '#000' }}>
-                                Select Creel
-                            </Text>
-
-                            <TouchableOpacity onPress={() => setLinkModal(false)}>
-                                <Icon name="close" size={22} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <TextInput
-                            placeholder="Search..."
-                            placeholderTextColor="#000"
-                            value={searchText}
-                            onChangeText={handleSearch}
-                            style={{
-                                backgroundColor: "#f3f3f3", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-                                marginTop: 12, marginBottom: 10, fontSize: 14
-                            }}
-                        />
-
-                        <FlatList
-                            // data={linkData}
-                            data={filteredCreelData}
-                            keyboardShouldPersistTaps="handled"
-                            keyExtractor={(item, index) => index.toString()}
-                            contentContainerStyle={{ paddingTop: 10 }}
-                            renderItem={({ item }) => (
-
-                                <TouchableOpacity
-                                    style={[
-                                        styles.creelCardPro,
-                                        selectedCreel?.UId === item.UId &&
-                                        selectedCreel?.SrNo === item.SrNo &&
-                                        String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
-                                        styles.selectedCardPro,
-                                    ]}
-                                    onPress={() => {
-
-                                        const selectedItem = getItemData.find(
-                                            itm => String(itm.ItmCode) === String(item.ItmCode)
-                                        );
-
-                                        setDenier(selectedItem?.Denier || "");
-
-                                        setSelectedCreel({
-                                            UId: item.UId,
-                                            SrNo: item.SrNo,
-                                            SubSr: item.SubSr || item.IssSubSr || 1,
-                                        });
-
-                                        setSelectedBatchNo(item.BatchNo);
-
-                                        setForm(prev => ({
-                                            ...prev,
-                                            ItmCode: String(item.ItmCode),
-                                            Denier: selectedItem?.Denier || "",
-                                            MerCode: String(item.MerCode),
-                                            GrdCode: String(item.GrdCode),
-                                            ShdCode: String(item.ShdCode),
-                                            IssUId: item.UId,
-                                            IssSrNo: item.SrNo,
-                                            IssSubSr: item.SubSr || item.IssSubSr || 1,
-                                            IssChees: item.Pcs,
-                                            IssQty: item.Qty,
-                                            StkType: item.StkType
-                                        }));
-
-                                        setLinkModal(false);
-                                    }}
-                                >
-
-                                    {/* TOP ROW */}
-                                    <View style={styles.rowBetween}>
-
-                                        <Text style={styles.itemTitlePro} numberOfLines={1}>
-                                            {item.ItmName}
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            Sticker Printing
                                         </Text>
 
-                                        <View style={styles.batchBadgePro}>
-                                            <Text style={styles.batchTextPro}>
-                                                Creel No : {item.BatchNo}
-                                            </Text>
-                                        </View>
+                                        <Text
+                                            style={{
+                                                color: "#6B7280",
+                                                marginTop: 2,
+                                                fontSize: 12
+                                            }}>
+                                            Select printer and print saved sticker
+                                        </Text>
 
                                     </View>
 
-                                    {/* GRID */}
-                                    <View style={styles.gridRow}>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Grade</Text>
-                                            <Text style={styles.gridValue}>{item.GrdName}</Text>
-                                        </View>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Shade</Text>
-                                            <Text style={styles.gridValue}>{item.ShdName}</Text>
-                                        </View>
-
-                                    </View>
-
-                                    <View style={styles.gridRow}>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Merge</Text>
-                                            <Text style={styles.gridValue}>{item.MerName}</Text>
-                                        </View>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>SubSr</Text>
-                                            <Text style={styles.gridValue}>
-                                                {item.SubSr || item.IssSubSr || 1}
-                                            </Text>
-                                        </View>
-
-                                    </View>
-
-                                    {/* FOOTER */}
-                                    <View style={styles.footerRow}>
-                                        <Text style={styles.qtyLabel}>Bal Qty</Text>
-                                        <Text style={styles.qtyValue}>{item.BalQty}</Text>
-                                    </View>
-
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal transparent visible={alertData.visible} animationType="fade">
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
-                    <View style={{ width: "85%", backgroundColor: "#fff", borderRadius: 15, padding: 20, alignItems: "center" }}>
-                        <Icon
-                            name={
-                                alertData.type === "success"
-                                    ? "check-circle"
-                                    : alertData.type === "error"
-                                        ? "error"
-                                        : "warning"
-                            }
-                            size={40}
-                            color={
-                                alertData.type === "success"
-                                    ? "#4CAF50"
-                                    : alertData.type === "error"
-                                        ? "#F44336"
-                                        : "#FFA000"
-                            }
-                        />
-
-                        <Text style={{ fontSize: 16, fontWeight: "600", marginTop: 10, color: "#000" }}>
-                            {alertData.type === "success"
-                                ? "Success"
-                                : alertData.type === "error"
-                                    ? "Error"
-                                    : "Warning"}
-                        </Text>
-
-                        <Text style={{ textAlign: "center", marginTop: 8, color: "#444" }}>
-                            {alertData.message}
-                        </Text>
-
-                        <TouchableOpacity
-                            onPress={() => setAlertData({ visible: false, message: "" })}
-                            style={{ marginTop: 15, backgroundColor: "#0F6C7B", paddingHorizontal: 25, paddingVertical: 10, borderRadius: 8 }}
-                        >
-                            <Text style={{ color: "#fff", fontWeight: "600" }}>
-                                OK
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal
-                visible={printerModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => {
-                    setPrinterModalVisible(false);
-                    // setPendingPrintItem(null);
-                    setPrinterSearch("");
-                }}>
-
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor: "rgba(0,0,0,.45)",
-                        justifyContent: "flex-end"
-                    }}>
-
-                    <View
-                        style={{
-                            backgroundColor: "#fff",
-                            borderTopLeftRadius: 25,
-                            borderTopRightRadius: 25,
-                            padding: 20,
-                            maxHeight: "80%"
-                        }}>
-
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 15,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    fontSize: 20,
-                                    fontWeight: "700",
-                                    color: "#000",
-                                }}
-                            >
-                                Select Printer
-                            </Text>
-
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setPrinterModalVisible(false);
-                                    // setPendingPrintItem(null);
-                                    setPrinterSearch("");
-                                }}
-                                style={{
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: 22,
-                                    backgroundColor: "#F1F5F9",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <Icon name="close" size={20} color="#111827" />
-                            </TouchableOpacity>
-                        </View>
-
-
-                        <TextInput
-                            placeholder="Search printer..."
-                            value={printerSearch}
-                            onChangeText={setPrinterSearch}
-                            style={{
-                                height: 50,
-                                borderWidth: 1,
-                                borderColor: "#ddd",
-                                borderRadius: 12,
-                                paddingHorizontal: 15,
-                                marginBottom: 15
-                            }}
-                        />
-
-                        <FlatList
-                            data={getPrinters.filter(p =>
-                                p.Name.toLowerCase().includes(
-                                    printerSearch.toLowerCase()
-                                )
-                            )}
-                            keyExtractor={(i) => i.Name}
-                            renderItem={({ item }) => (
+                                </View>
 
                                 <TouchableOpacity
-
-                                    onPress={() => selectPrinter(item)}
-
+                                    onPress={() => {
+                                        if (getPrinters.length === 0) {
+                                            getAllPrinters();
+                                        }
+                                        setPrinterModalVisible(true);
+                                    }}
                                     style={{
+                                        marginTop: 18,
+                                        borderWidth: 1.5,
+                                        borderColor: "#8CCBFF",
+                                        borderRadius: 16,
                                         padding: 15,
-                                        borderBottomWidth: 1,
-                                        borderColor: "#eee",
                                         flexDirection: "row",
                                         justifyContent: "space-between",
                                         alignItems: "center"
@@ -1490,43 +1217,529 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
                                         <Text
                                             style={{
+                                                fontSize: 14,
                                                 fontWeight: "700",
-                                                fontSize: 15,
-                                                color: "#000"
+                                                color: "#111827"
                                             }}>
-                                            {item.Name}
+                                            {printer || "Select Printer"}
                                         </Text>
 
                                         <Text
                                             style={{
-                                                color: getPrinterStatusColor(
-                                                    item.StatusText
-                                                )
+                                                color: "#0F6C7B",
+                                                marginTop: 2,
+                                                fontWeight: "700"
                                             }}>
-                                            {item.StatusText}
+                                            {selectedPrinterStatus || "Idle"}
                                         </Text>
 
                                     </View>
 
-                                    {printer === item.Name &&
-                                        <Icon
-                                            name="check-circle"
-                                            size={24}
-                                            color="#16A34A"
-                                        />
-                                    }
+                                    <Icon
+                                        name="keyboard-arrow-down"
+                                        size={28}
+                                        color="#374151"
+                                    />
 
                                 </TouchableOpacity>
 
-                            )}
-                        />
+                                <TouchableOpacity
+                                    onPress={printSticker}
+                                    style={{
+                                        backgroundColor: "#0F6C7B",
+                                        borderRadius: 14,
+                                        height: 56,
+                                        marginTop: 16,
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexDirection: "row"
+                                    }}>
 
-                    </View>
+                                    <Icon
+                                        name="print"
+                                        size={22}
+                                        color="#fff"
+                                    />
 
+                                    <Text
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: 18,
+                                            fontWeight: "700",
+                                            marginLeft: 10
+                                        }}>
+                                        Print Sticker
+                                    </Text>
+
+                                </TouchableOpacity>
+
+                            </View>
+                        )} */}
+                        {getDataSaved && status === "Close" && (
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderRadius: 18,
+                                    padding: 18,
+                                    marginTop: 14,
+                                    marginBottom: 12,
+                                    elevation: 3,
+                                    shadowColor: "#000",
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 8,
+                                }}
+                            >
+
+                                <View style={{ flexDirection: "row" }}>
+
+                                    <View
+                                        style={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: 14,
+                                            backgroundColor: "#EAF7FF",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            marginRight: 14
+                                        }}>
+
+                                        <Icon
+                                            name="print"
+                                            size={30}
+                                            color="#0E83C8"
+                                        />
+
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            Sticker Printing
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#6B7280",
+                                                marginTop: 2,
+                                                fontSize: 12
+                                            }}>
+                                            Select printer and print saved sticker
+                                        </Text>
+
+                                    </View>
+
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (getPrinters.length === 0) {
+                                            getAllPrinters();
+                                        }
+                                        setPrinterModalVisible(true);
+                                    }}
+                                    style={{
+                                        marginTop: 18,
+                                        borderWidth: 1.5,
+                                        borderColor: "#8CCBFF",
+                                        borderRadius: 16,
+                                        padding: 15,
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}>
+
+                                    <View>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            {printer || "Select Printer"}
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#0F6C7B",
+                                                marginTop: 2,
+                                                fontWeight: "700"
+                                            }}>
+                                            {selectedPrinterStatus || "Idle"}
+                                        </Text>
+
+                                    </View>
+
+                                    <Icon
+                                        name="keyboard-arrow-down"
+                                        size={28}
+                                        color="#374151"
+                                    />
+
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={printSticker}
+                                    style={{
+                                        backgroundColor: "#0F6C7B",
+                                        borderRadius: 14,
+                                        height: 56,
+                                        marginTop: 16,
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexDirection: "row"
+                                    }}>
+
+                                    <Icon
+                                        name="print"
+                                        size={22}
+                                        color="#fff"
+                                    />
+
+                                    <Text
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: 18,
+                                            fontWeight: "700",
+                                            marginLeft: 10
+                                        }}>
+                                        Print Sticker
+                                    </Text>
+
+                                </TouchableOpacity>
+
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    <Modal transparent visible={linkModal} animationType="slide">
+                        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+                            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "70%" }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                    <Text style={{ fontSize: 16, fontWeight: "600", color: '#000' }}>
+                                        Select Creel
+                                    </Text>
+
+                                    <TouchableOpacity onPress={() => setLinkModal(false)}>
+                                        <Icon name="close" size={22} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TextInput
+                                    placeholder="Search..."
+                                    placeholderTextColor="#000"
+                                    value={searchText}
+                                    onChangeText={handleSearch}
+                                    style={{
+                                        backgroundColor: "#f3f3f3", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+                                        marginTop: 12, marginBottom: 10, fontSize: 14
+                                    }}
+                                />
+
+                                <FlatList
+                                    // data={linkData}
+                                    data={filteredCreelData}
+                                    keyboardShouldPersistTaps="handled"
+                                    keyExtractor={(item, index) => index.toString()}
+                                    contentContainerStyle={{ paddingTop: 10 }}
+                                    renderItem={({ item }) => (
+
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.creelCardPro,
+                                                selectedCreel?.UId === item.UId &&
+                                                selectedCreel?.SrNo === item.SrNo &&
+                                                String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
+                                                styles.selectedCardPro,
+                                            ]}
+                                            onPress={() => {
+
+                                                const selectedItem = getItemData.find(
+                                                    itm => String(itm.ItmCode) === String(item.ItmCode)
+                                                );
+
+                                                setDenier(selectedItem?.Denier || "");
+
+                                                setSelectedCreel({
+                                                    UId: item.UId,
+                                                    SrNo: item.SrNo,
+                                                    SubSr: item.SubSr || item.IssSubSr || 1,
+                                                });
+
+                                                setSelectedBatchNo(item.BatchNo);
+
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    ItmCode: String(item.ItmCode),
+                                                    Denier: selectedItem?.Denier || "",
+                                                    MerCode: String(item.MerCode),
+                                                    GrdCode: String(item.GrdCode),
+                                                    ShdCode: String(item.ShdCode),
+                                                    IssUId: item.UId,
+                                                    IssSrNo: item.SrNo,
+                                                    IssSubSr: item.SubSr || item.IssSubSr || 1,
+                                                    IssChees: item.Pcs,
+                                                    IssQty: item.Qty,
+                                                    StkType: item.StkType
+                                                }));
+
+                                                setLinkModal(false);
+                                            }}
+                                        >
+
+                                            {/* TOP ROW */}
+                                            <View style={styles.rowBetween}>
+
+                                                <Text style={styles.itemTitlePro} numberOfLines={1}>
+                                                    {item.ItmName}
+                                                </Text>
+
+                                                <View style={styles.batchBadgePro}>
+                                                    <Text style={styles.batchTextPro}>
+                                                        Creel No : {item.BatchNo}
+                                                    </Text>
+                                                </View>
+
+                                            </View>
+
+                                            {/* GRID */}
+                                            <View style={styles.gridRow}>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Grade</Text>
+                                                    <Text style={styles.gridValue}>{item.GrdName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Shade</Text>
+                                                    <Text style={styles.gridValue}>{item.ShdName}</Text>
+                                                </View>
+
+                                            </View>
+
+                                            <View style={styles.gridRow}>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Merge</Text>
+                                                    <Text style={styles.gridValue}>{item.MerName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>SubSr</Text>
+                                                    <Text style={styles.gridValue}>
+                                                        {item.SubSr || item.IssSubSr || 1}
+                                                    </Text>
+                                                </View>
+
+                                            </View>
+
+                                            {/* FOOTER */}
+                                            <View style={styles.footerRow}>
+                                                <Text style={styles.qtyLabel}>Bal Qty</Text>
+                                                <Text style={styles.qtyValue}>{item.BalQty}</Text>
+                                            </View>
+
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        </View>
+                    </Modal>
+
+                    <Modal transparent visible={alertData.visible} animationType="fade">
+                        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
+                            <View style={{ width: "85%", backgroundColor: "#fff", borderRadius: 15, padding: 20, alignItems: "center" }}>
+                                <Icon
+                                    name={
+                                        alertData.type === "success"
+                                            ? "check-circle"
+                                            : alertData.type === "error"
+                                                ? "error"
+                                                : "warning"
+                                    }
+                                    size={40}
+                                    color={
+                                        alertData.type === "success"
+                                            ? "#4CAF50"
+                                            : alertData.type === "error"
+                                                ? "#F44336"
+                                                : "#FFA000"
+                                    }
+                                />
+
+                                <Text style={{ fontSize: 16, fontWeight: "600", marginTop: 10, color: "#000" }}>
+                                    {alertData.type === "success"
+                                        ? "Success"
+                                        : alertData.type === "error"
+                                            ? "Error"
+                                            : "Warning"}
+                                </Text>
+
+                                <Text style={{ textAlign: "center", marginTop: 8, color: "#444" }}>
+                                    {alertData.message}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() => setAlertData({ visible: false, message: "" })}
+                                    style={{ marginTop: 15, backgroundColor: "#0F6C7B", paddingHorizontal: 25, paddingVertical: 10, borderRadius: 8 }}
+                                >
+                                    <Text style={{ color: "#fff", fontWeight: "600" }}>
+                                        OK
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
+
+                    <Modal
+                        visible={printerModalVisible}
+                        animationType="slide"
+                        transparent={true}
+                        onRequestClose={() => {
+                            setPrinterModalVisible(false);
+                            // setPendingPrintItem(null);
+                            setPrinterSearch("");
+                        }}>
+
+                        <View
+                            style={{
+                                flex: 1,
+                                backgroundColor: "rgba(0,0,0,.45)",
+                                justifyContent: "flex-end"
+                            }}>
+
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderTopLeftRadius: 25,
+                                    borderTopRightRadius: 25,
+                                    padding: 20,
+                                    maxHeight: "80%"
+                                }}>
+
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: 15,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 20,
+                                            fontWeight: "700",
+                                            color: "#000",
+                                        }}
+                                    >
+                                        Select Printer
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setPrinterModalVisible(false);
+                                            // setPendingPrintItem(null);
+                                            setPrinterSearch("");
+                                        }}
+                                        style={{
+                                            width: 44,
+                                            height: 44,
+                                            borderRadius: 22,
+                                            backgroundColor: "#F1F5F9",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <Icon name="close" size={20} color="#111827" />
+                                    </TouchableOpacity>
+                                </View>
+
+
+                                <TextInput
+                                    placeholder="Search printer..."
+                                    value={printerSearch}
+                                    onChangeText={setPrinterSearch}
+                                    style={{
+                                        height: 50,
+                                        borderWidth: 1,
+                                        borderColor: "#ddd",
+                                        borderRadius: 12,
+                                        paddingHorizontal: 15,
+                                        marginBottom: 15
+                                    }}
+                                />
+
+                                <FlatList
+                                    data={getPrinters.filter(p =>
+                                        p.Name.toLowerCase().includes(
+                                            printerSearch.toLowerCase()
+                                        )
+                                    )}
+                                    keyExtractor={(i) => i.Name}
+                                    renderItem={({ item }) => (
+
+                                        <TouchableOpacity
+
+                                            onPress={() => selectPrinter(item)}
+
+                                            style={{
+                                                padding: 15,
+                                                borderBottomWidth: 1,
+                                                borderColor: "#eee",
+                                                flexDirection: "row",
+                                                justifyContent: "space-between",
+                                                alignItems: "center"
+                                            }}>
+
+                                            <View>
+
+                                                <Text
+                                                    style={{
+                                                        fontWeight: "700",
+                                                        fontSize: 15,
+                                                        color: "#000"
+                                                    }}>
+                                                    {item.Name}
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: getPrinterStatusColor(
+                                                            item.StatusText
+                                                        )
+                                                    }}>
+                                                    {item.StatusText}
+                                                </Text>
+
+                                            </View>
+
+                                            {printer === item.Name &&
+                                                <Icon
+                                                    name="check-circle"
+                                                    size={24}
+                                                    color="#16A34A"
+                                                />
+                                            }
+
+                                        </TouchableOpacity>
+
+                                    )}
+                                />
+
+                            </View>
+
+                        </View>
+
+                    </Modal>
                 </View>
+            </SafeAreaView>
 
-            </Modal>
-        </View>
+        </>
     );
 };
 

@@ -7,8 +7,8 @@
 //   npm install axios
 
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API } from '../../common/API/dynamicAPI';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { API, getApiBaseUrl } from '../../common/API/dynamicAPI';
 
 // Your Laravel API base URL
 export const BASE_URL = API;
@@ -19,6 +19,8 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async config => {
+  // Always use the LIVE host so a property switch (apig <-> apiy) applies without refresh.
+  config.baseURL = getApiBaseUrl();
   const token = await AsyncStorage.getItem('access_token'); // saved at login
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

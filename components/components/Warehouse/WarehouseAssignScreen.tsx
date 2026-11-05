@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import AppAlert from '@/common/utils/appAlert';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  TouchableWithoutFeedback,
 } from "react-native";
 
 import Icon from "@expo/vector-icons/MaterialIcons";
@@ -51,6 +51,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
 
   const [itemText, setItemText] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cartons, setCartons] = useState([]);
@@ -59,31 +60,54 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
 
   const selectedCount = Object.keys(selected).length;
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Precompute search text and stable keys only when the loaded carton data changes.
+  const indexedCartons = useMemo(() =>
+    cartons.map((item, index) => ({
+      item,
+      key: keyOf(item) || `warehouse_assign_row_${index}`,
+      search: searchable(item),
+    })),
+  [cartons]);
+
+  const selectedKeySet = useMemo(
+    () => new Set(Object.keys(selected)),
+    [selected]
+  );
+
+  const selectedOrderRank = useMemo(() => {
+    const rank = new Map();
+    selectedOrder.forEach((key, index) => rank.set(key, index));
+    return rank;
+  }, [selectedOrder]);
+
   const filteredCartons = useMemo(() => {
-    const s = searchText.trim().toLowerCase();
+    const query = debouncedSearchText.trim().toLowerCase();
+    const selectedRows = [];
+    const remainingRows = [];
 
-    const rows = s
-      ? cartons.filter(x => searchable(x).includes(s))
-      : cartons;
+    // One O(n) pass even with 10k+ cartons. Selected rows remain first.
+    indexedCartons.forEach(entry => {
+      if (query && !entry.search.includes(query)) return;
 
-    const selectedMap = new Map();
-
-    selectedOrder.forEach(key => {
-      const found = rows.find(x => keyOf(x) === key);
-
-      if (found) {
-        selectedMap.set(key, found);
-      }
+      if (selectedKeySet.has(entry.key)) selectedRows.push(entry);
+      else remainingRows.push(entry);
     });
 
-    const selectedRows = Array.from(selectedMap.values());
-
-    const remainingRows = rows.filter(
-      x => !selectedMap.has(keyOf(x))
+    selectedRows.sort((a, b) =>
+      (selectedOrderRank.get(a.key) ?? Number.MAX_SAFE_INTEGER) -
+      (selectedOrderRank.get(b.key) ?? Number.MAX_SAFE_INTEGER)
     );
 
     return [...selectedRows, ...remainingRows];
-  }, [cartons, searchText, selected, selectedOrder]);
+  }, [indexedCartons, debouncedSearchText, selectedKeySet, selectedOrderRank]);
 
   const getRequestConfig = () => ({
     headers: {
@@ -104,7 +128,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
 
   const loadData = async () => {
     if (!location?.locationCode && !location?.locationName && !location?.location) {
-      return Alert.alert("Validation", "Location is required");
+      return AppAlert.alert("Validation", "Location is required");
     }
 
     try {
@@ -134,7 +158,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
       const rows = res?.data?.response?.data || res?.data?.response?.results || [];
       setCartons(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      Alert.alert("Error", e?.response?.data?.message || "Failed to load cartons");
+      AppAlert.alert("Error", e?.response?.data?.message || "Failed to load cartons");
     } finally {
       setLoading(false);
     }
@@ -144,7 +168,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
     const key = keyOf(item);
 
     if (!key) {
-      return Alert.alert("Validation", "Carton number missing");
+      return AppAlert.alert("Validation", "Carton number missing");
     }
 
     setSelected(prev => {
@@ -173,7 +197,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
   Keyboard.dismiss();
 
   if (!cartons.length) {
-    return Alert.alert("Validation", "Please load carton data first");
+    return AppAlert.alert("Validation", "Please load carton data first");
   }
 
   navigation.navigate(
@@ -220,7 +244,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
   //   const selectedRows = Object.values(selected);
 
   //   if (!selectedRows.length) {
-  //     return Alert.alert("Validation", "Please select at least one carton");
+  //     return AppAlert.alert("Validation", "Please select at least one carton");
   //   }
 
   //   try {
@@ -235,11 +259,11 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
 
   //     const res = await warehouseApi.saveAssign(payload);
 
-  //     Alert.alert("Success", res?.data?.message || "Assign saved successfully", [
+  //     AppAlert.alert("Success", res?.data?.message || "Assign saved successfully", [
   //       { text: "OK", onPress: () => navigation.goBack() },
   //     ]);
   //   } catch (e) {
-  //     Alert.alert("Error", e?.response?.data?.message || "Failed to save assign");
+  //     AppAlert.alert("Error", e?.response?.data?.message || "Failed to save assign");
   //   } finally {
   //     setLoading(false);
   //   }
@@ -249,7 +273,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
     const selectedRows = Object.values(selected);
 
     if (!selectedRows.length) {
-      return Alert.alert("Validation", "Please select at least one carton");
+      return AppAlert.alert("Validation", "Please select at least one carton");
     }
 
     try {
@@ -278,13 +302,13 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
       console.log("response", res);
 
       if (res?.data?.success === false) {
-        return Alert.alert(
+        return AppAlert.alert(
           "Error",
           res?.data?.message || "Failed to save assign"
         );
       }
 
-      Alert.alert("Success", res?.data?.message || "Assign saved successfully", [
+      AppAlert.alert("Success", res?.data?.message || "Assign saved successfully", [
         {
           text: "OK",
           onPress: () => {
@@ -295,7 +319,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
         },
       ]);
     } catch (e) {
-      Alert.alert(
+      AppAlert.alert(
         "Error",
         e?.response?.data?.message ||
         e?.response?.data?.error ||
@@ -313,11 +337,10 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
           <WarehouseHeader title="Assign Carton" navigation={navigation} />
 
-          <View style={[styles.container, { paddingBottom: searchFocused ? 10 : 82 }]}>
+          <View style={[styles.container, { flex: 1, minHeight: 0, paddingBottom: searchFocused ? 10 : 82 }]}>
             <View style={styles.card}>
               <View style={styles.between}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -441,23 +464,25 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
             </View>
 
             <FlatList
+              style={[{ flex: 1, minHeight: 0 }, Platform.OS === "web" ? ({ overflowY: "auto" } as any) : null]}
               data={filteredCartons}
-              keyboardShouldPersistTaps="handled"
-              extraData={{ selected, searchText }}
-              keyExtractor={(item, index) =>
-                `${index}_${item?.uid || item?.UId || ""}_${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}`
-              }
-              renderItem={({ item }) => {
-                const rowKey = keyOf(item);
-
-                return (
-                  <CartonCard
-                    item={item}
-                    selected={!!selected[rowKey]}
-                    onPress={toggleSelect}
-                  />
-                );
-              }}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              extraData={selected}
+              keyExtractor={entry => entry.key}
+              initialNumToRender={16}
+              maxToRenderPerBatch={20}
+              updateCellsBatchingPeriod={50}
+              windowSize={7}
+              removeClippedSubviews={Platform.OS !== "web"}
+              renderItem={({ item: entry }) => (
+                <CartonCard
+                  item={entry.item}
+                  selected={!!selected[entry.key]}
+                  onPress={toggleSelect}
+                />
+              )}
               ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>}
             />
           </View>
@@ -481,8 +506,7 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
               </TouchableOpacity>
             </View>
           )}
-        </View>
-      </TouchableWithoutFeedback>
+      </View>
     </KeyboardAvoidingView>
   );
 }

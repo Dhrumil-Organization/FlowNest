@@ -1,13 +1,20 @@
 // ExpenseScreen.jsx — Madhusudhan Fabrics (React Native)
 // Complete rebuild matching all 14 screenshots
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { T } from '@/common/utils/theme';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Dimensions,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useExpenseData } from '../useExpenseData';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -807,7 +814,10 @@ export default function ExpenseScreen({ token, apiBase }) {
 
   // ── Main report ───────────────────────────────────────────────
   return (
-    <SafeAreaView style={S.safe} edges={['top']}>
+    <>
+      {/* <SafeAreaView style={S.safe} edges={['top']}> */}
+      <SafeAreaView style={{ flex: 0, backgroundColor: T.nav }} edges={['top']} />
+      <StatusBar style="light" backgroundColor={T.nav} />
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
         <View style={S.headerRow}>
@@ -1004,7 +1014,7 @@ export default function ExpenseScreen({ token, apiBase }) {
             </View>
 
             {/* Production block */}
-            <Text style={[S.sectionLabel, { marginTop: 8 , color:'#000'}]}>PRODUCTION · FROM PRODUCTION SYSTEM</Text>
+            <Text style={[S.sectionLabel, { marginTop: 8, color: '#000' }]}>PRODUCTION · FROM PRODUCTION SYSTEM</Text>
             <ProductionBlock d={d} />
 
             {/* Month settings */}
@@ -1055,13 +1065,16 @@ export default function ExpenseScreen({ token, apiBase }) {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      <SafeAreaView edges={['bottom']} style={{ flex: 0, backgroundColor: '#fff' }} />
+      {/* </SafeAreaView> */}
+    </>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8f7f4' },
+  safe: { flex: 1, backgroundColor: '#13879A', },
   header: { backgroundColor: '#13879A', padding: 16, paddingBottom: 18, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   eyebrow: { fontSize: 10, color: '#fff', letterSpacing: 1, marginBottom: 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

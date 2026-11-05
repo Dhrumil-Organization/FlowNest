@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 // import { AuthProvider, useAuth } from '@/hooks/AuthContext';
@@ -11,6 +11,7 @@ export default function CRLimit_Request_Container() {
     const [token, setToken] = useState('');
     const [username, setUsername] = useState('');
     const [rightsMenuApps, setrightsMenuApps] = useState([]);
+    const [userId, setUserId] = useState<string | number>('');
 
     useEffect(() => {
         const load = async () => {
@@ -18,12 +19,14 @@ export default function CRLimit_Request_Container() {
             const u = await AsyncStorage.getItem('user_details');
             // const r = await AsyncStorage.getItem('rightsMenuApps');
             const r = await AsyncStorage.getItem('rightsMenuApps');
+            const id = await AsyncStorage.getItem('user_id');
 
             const parsedData = r ? JSON.parse(r) : [];
 
             setToken(t || '');
             setUsername(u || 'User');
-            setrightsMenuApps(parsedData)
+            setrightsMenuApps(parsedData);
+            setUserId(id || 0)
         };
         load();
     }, []);
@@ -31,7 +34,7 @@ export default function CRLimit_Request_Container() {
     return (
         <>
             {/* <AuthProvider> */}
-            <CreelManagementSystem token={token || ''} username={username}/>
+            <CreelManagementSystem token={token || ''} username={username} userid={userId} />
             {/* <Footer /> */}
             {/* </AuthProvider> */}
         </>

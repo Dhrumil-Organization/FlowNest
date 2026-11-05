@@ -1,14 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 // import { AuthProvider, useAuth } from '@/hooks/AuthContext';
-import Footer from '@/components/Footer';
 // import GreyPurchaseOrder from '@/components/GreyPurchaseOrder';
 // import SalesOrderTracking from '@/components/SalesOrderTracking';
-import SalesOrderTrackingPartyDetails from '@/components/SalesOrderTracking/SOPartyDetails/SOPartyDetails';
-import CollectionList from '@/components/CollectionList';
 import CheckingScanner from '@/components/CheckingScanner';
-import CheckingScannerNew from '@/components/CheckingScannerNew';
 
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();
@@ -32,11 +28,11 @@ export default function CRLimit_Request_Container() {
     return (
         <>
             {/* <AuthProvider> */}
-            {newuser === 'true' ? (
+            {/* {newuser === 'true' ? (
                 <CheckingScannerNew token={token || ''} username={username} />
-            ) : (
+            ) : ( */}
                 <CheckingScanner token={token || ''} username={username} />
-            )}
+             {/* )} */}
 
             {/* <Footer/> */}
             {/* </AuthProvider> */}

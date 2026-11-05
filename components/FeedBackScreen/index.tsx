@@ -1,35 +1,36 @@
+import AppAlert from '@/common/utils/appAlert';
 // screens/FeedbackScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    Dimensions,
-    Animated,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StatusBar,
-    Image,
-    RefreshControl,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Haptics from 'expo-haptics';
-import theme from '@/components/theme';
-import {
-    saveFeedback,
-    getFeedbacksByUsername,
-    getOrCreateUsername,
-    getOrCreateUserId,
     deleteFeedback,
     Feedback,
     FeedbackCategory,
+    getFeedbacksByUsername,
+    getOrCreateUserId,
+    getOrCreateUsername,
+    saveFeedback,
 } from '@/common/utils/feedbackStorage';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -136,15 +137,15 @@ export default function FeedbackScreen() {
 
     const validateForm = (): boolean => {
         if (rating === 0) {
-            Alert.alert('Rating Required', 'Please select a star rating before submitting.');
+            AppAlert.alert('Rating Required', 'Please select a star rating before submitting.');
             return false;
         }
         if (title.trim().length < 5) {
-            Alert.alert('Title Too Short', 'Please enter at least 5 characters in the title.');
+            AppAlert.alert('Title Too Short', 'Please enter at least 5 characters in the title.');
             return false;
         }
         if (message.trim().length < 10) {
-            Alert.alert('Message Too Short', 'Please enter at least 10 characters in your feedback.');
+            AppAlert.alert('Message Too Short', 'Please enter at least 10 characters in your feedback.');
             return false;
         }
         return true;
@@ -175,7 +176,7 @@ export default function FeedbackScreen() {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
 
-            Alert.alert(
+            AppAlert.alert(
                 '✅ Feedback Submitted',
                 `Thank you for your valuable feedback!\n\nReference ID: ${newFeedback.id}\n\nWe'll review it and get back to you soon.`,
                 [
@@ -194,7 +195,7 @@ export default function FeedbackScreen() {
                 ]
             );
         } catch (error) {
-            Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+            AppAlert.alert('Error', 'Failed to submit feedback. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -211,7 +212,7 @@ export default function FeedbackScreen() {
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert(
+        AppAlert.alert(
             'Delete Feedback?',
             'Are you sure you want to delete this feedback? This action cannot be undone.',
             [
@@ -367,9 +368,10 @@ export default function FeedbackScreen() {
         );
     };
 
-     const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+    const goBack = () => {
+        // if (router.canGoBack()) router.back();
+        // else router.replace('/');
+        router.replace('/(tabs)');
     };
 
     return (

@@ -1,18 +1,30 @@
+import AppAlert from '@/common/utils/appAlert';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
+import { getLoginSource } from '@/src/platform/runtime';
 /////// [3] /////////
+import { initDatabase } from '@/common/API/DatabaseManager';
+import { API, initAPI } from '@/common/API/dynamicAPI';
+import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
 import { HOME_TOUR } from '@/common/TourJson';
 import TourOverlay from '@/common/TourOverlay';
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import { setCustomUsername } from '@/common/utils/feedbackStorage';
+import { buildProfileFromLogin } from '@/common/utils/profileStorage';
+import { fetchAndCacheGlobalData, initGlobalCacheDB } from '@/common/utils/sqliteCacheManager';
 import Header from '@/components/Header';
+import { getCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View
@@ -39,6 +51,85 @@ interface Props {
     online?: boolean;
 }
 
+
+async function savePropertySwitchLoginState(args: {
+    response: any;
+    token: string;
+    userDetails: string;
+    userMenuApps: any;
+    userOf: any;
+    yno: any;
+    role1: any;
+    userId: any;
+    user: any;
+    userLoginFrom: string;
+    isMasterSync: any;
+    masterSyncData: any[];
+    username: string;
+    password: string;
+}) {
+    const {
+        response,
+        token,
+        userDetails,
+        userMenuApps,
+        userOf,
+        yno,
+        role1,
+        userId,
+        user,
+        userLoginFrom,
+        isMasterSync,
+        masterSyncData,
+        username,
+        password,
+    } = args;
+
+    // Keep switch credentials in the same OS-secure store used by the
+    // New ERP property switch.
+    const { saveCredentialsForPropertySwitch } =
+        await import('@/src/lib/biometricAuth');
+
+    await saveCredentialsForPropertySwitch(
+        username.trim(),
+        password.trim()
+    );
+
+    await AsyncStorage.setItem('access_token', token);
+    await AsyncStorage.setItem('user_details', userDetails);
+    await AsyncStorage.setItem('user_menu_apps', userMenuApps);
+    await AsyncStorage.setItem('user_prptype', userOf);
+    await AsyncStorage.setItem('login_user_name', username.trim());
+    await AsyncStorage.setItem('login_user_passwd', password.trim());
+    await AsyncStorage.setItem('yno', String(yno || '').trim());
+    await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
+    await AsyncStorage.setItem('user_id', JSON.stringify(userId));
+    await AsyncStorage.setItem(
+        'mobile_raw_login_response',
+        JSON.stringify(response || {})
+    );
+
+    await buildProfileFromLogin({
+        access_token: token,
+        user,
+        role1,
+        userof: userOf,
+        usermenu: userMenuApps,
+        year: response?.year,
+        ismastersync: isMasterSync,
+        mastersyncprptypes: masterSyncData,
+    });
+
+    await AsyncStorage.setItem(
+        'master_sync_data_common',
+        JSON.stringify(masterSyncData)
+    );
+
+    if (userLoginFrom) {
+        await AsyncStorage.setItem('new_user', 'true');
+    }
+}
+
 const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
     const [search, setSearch] = useState('');
     const [apps, setApps] = useState<any[]>([]);
@@ -57,6 +148,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
 
     const [showHomeTour, setShowHomeTour] =
         useState(false);
+
+    // Property switch is available only when the successful login response
+    // explicitly contains switchuserlogin = 1.
+    const embedded = isEmbeddedWeb();
+    const [switchUserLogin, setSwitchUserLogin] = useState(false);
+    const [switchingProperty, setSwitchingProperty] = useState(false);
 
     const ENABLE_DEVICE_CHECK = true;
 
@@ -94,12 +191,23 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         const load = async () => {
             const prp = await AsyncStorage.getItem("selected_property");
             const che = await AsyncStorage.getItem("ENABLE_DEVICE_CHECK");
+            const rawLogin = await AsyncStorage.getItem("mobile_raw_login_response");
+
             setPrp(prp);
             setCheckDevice(che);
+
+            try {
+                const parsed = rawLogin ? JSON.parse(rawLogin) : null;
+                setSwitchUserLogin(
+                    !embedded && Number(parsed?.switchuserlogin ?? 0) === 1
+                );
+            } catch {
+                setSwitchUserLogin(false);
+            }
         };
         load();
         checkConnectivity();
-    }, []);
+    }, [embedded]);
 
     // Load usage counts silently from storage
     useEffect(() => {
@@ -171,6 +279,214 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
 
     }, [checkDevice]);
 
+
+    const switchProperty = async (nextProperty: 'sudamo_knits' | 'rayons') => {
+        if (switchingProperty) return;
+        if (nextProperty === prp) return;
+
+        const previousProperty = prp;
+        setSwitchingProperty(true);
+
+        try {
+            const credentials = await getCredentialsForPropertySwitch();
+
+            if (!credentials) {
+                throw new Error(
+                    'Saved login credentials are not available. Please sign in again.'
+                );
+            }
+
+            // The old login.tsx uses this exact dynamic API selection.
+            await AsyncStorage.setItem('selected_property', nextProperty);
+            await initAPI();
+
+            const notiToken =
+                (await AsyncStorage.getItem('notification_token')) ||
+                'xyz-noti-token';
+
+            const deviceId =
+                Device.osInternalBuildId || 'test-device';
+
+            console.log('🔄 PROPERTY SWITCH API:', API);
+            console.log('🔄 PROPERTY:', nextProperty);
+
+            const response = await axios.post(
+                `${API}/api/login`,
+                {
+                    name: credentials.username.trim(),
+                    password: credentials.password.trim(),
+                    noti_token: notiToken,
+                    checkdevice: deviceId,
+                },
+                {
+                    headers: { 'x-platform': 'mob' },
+                }
+            );
+
+            console.log('✅ PROPERTY SWITCH RESPONSE:', response.data);
+
+            if (!response.data?.success) {
+                throw new Error(
+                    response.data?.message ||
+                    response.data?.response?.message ||
+                    'Property switch login failed.'
+                );
+            }
+
+            const loginResponse = response.data.response || {};
+            const token = loginResponse.access_token;
+            const user = loginResponse.user;
+            const userLoginFrom = getLoginSource();
+            const userDetails = user?.first_name || 'user';
+            const userAvailable = user?.is_deleted || 'user';
+            const userMenuApps = loginResponse.usermenu || '';
+            const isMasterSync = loginResponse.ismastersync || '';
+            const masterSyncData = loginResponse.mastersyncprptypes || [];
+            const userOf = loginResponse.userof;
+            const yno = loginResponse?.year?.YearNo || '';
+            const role1 = loginResponse.role1;
+            const userId = user?.id || 0;
+
+            if (!token || !user) {
+                throw new Error('Login response is missing token or user.');
+            }
+
+            if (userAvailable === '1') {
+                throw new Error(
+                    'User not available. Please Register yourself by Create Account.'
+                );
+            }
+
+            if (!userDetails || !userMenuApps) {
+                throw new Error(
+                    loginResponse?.message || 'Invalid login response.'
+                );
+            }
+
+            // Same storage work as app/(auth)/login.tsx.
+            await savePropertySwitchLoginState({
+                response: loginResponse,
+                token,
+                userDetails,
+                userMenuApps,
+                userOf,
+                yno,
+                role1,
+                userId,
+                user,
+                userLoginFrom,
+                isMasterSync,
+                masterSyncData,
+                username: credentials.username,
+                password: credentials.password,
+            });
+
+            // IMPORTANT: property switching must finish as soon as the new
+            // login/session is successful. Do NOT wait for cache/master-sync
+            // work here. The login screen does this work in the background,
+            // and switching must behave the same way.
+            setPrp(nextProperty);
+
+            // A new response controls whether the switch remains visible.
+            setSwitchUserLogin(
+                Number(loginResponse?.switchuserlogin ?? 0) === 1
+            );
+
+            // Release the switch UI immediately after successful login.
+            // Everything below is intentionally fire-and-forget so the user
+            // can continue using the newly logged-in property without waiting
+            // for SQLite/cache/master-sync requests.
+            void (async () => {
+                try {
+                    if (userLoginFrom === 'web') {
+                        await AsyncStorage.setItem('ENABLE_DEVICE_CHECK', 'true');
+                        await initGlobalCacheDB();
+
+                        const cachePopulated = await isCachePopulated();
+                        if (!cachePopulated) {
+                            await fetchAndCacheGlobalData(token);
+                        } else {
+                            console.log('✅ Using existing cached data');
+                        }
+
+                        // Keep the same refresh behavior as login.tsx, but do
+                        // it completely in the background after the switch.
+                        await fetchAndCacheGlobalData(token);
+                        await AsyncStorage.setItem(
+                            'master_sync_data_common',
+                            JSON.stringify(masterSyncData)
+                        );
+
+                        if (
+                            isMasterSync == 1 ||
+                            isMasterSync === '1' ||
+                            isMasterSync === true
+                        ) {
+                            try {
+                                await AsyncStorage.setItem(
+                                    'master_sync_data',
+                                    JSON.stringify(masterSyncData)
+                                );
+                                await initDatabase();
+                                await fetchMasterSyncPartyDataPerPrptypeCache(
+                                    token || '',
+                                    masterSyncData
+                                );
+
+                                for (const itm of masterSyncData) {
+                                    const key = normalizePrptype(
+                                        itm.prptype ?? itm.PrpType ?? ''
+                                    );
+                                    const summary = await getPrptypeSummary(key);
+                                    console.log(
+                                        `→ summary for requested prptype "${itm.prptype}":`,
+                                        summary
+                                    );
+                                }
+                            } catch (err) {
+                                console.warn(
+                                    'Master-sync or verification failed:',
+                                    err
+                                );
+                            }
+                        }
+                    } else if (userLoginFrom === 'app') {
+                        await AsyncStorage.setItem('user_menu_apps', userMenuApps);
+                        await AsyncStorage.setItem('ENABLE_DEVICE_CHECK', 'false');
+                        await setCustomUsername(userDetails);
+                        await AsyncStorage.setItem('new_user', 'true');
+                    }
+                } catch (err) {
+                    // Background cache failure must never make an already
+                    // successful property switch look like a login failure.
+                    console.warn('Background property cache sync failed:', err);
+                }
+            })();
+
+        } catch (error: any) {
+            // Never leave selected_property pointing at a property whose
+            // login did not succeed.
+            if (
+                previousProperty === 'sudamo_knits' ||
+                previousProperty === 'rayons'
+            ) {
+                await AsyncStorage.setItem(
+                    'selected_property',
+                    previousProperty
+                );
+                await initAPI();
+            }
+
+            setPrp(previousProperty);
+            AppAlert.alert(
+                'Property switch failed',
+                error?.message || 'Unable to switch property.'
+            );
+        } finally {
+            setSwitchingProperty(false);
+        }
+    };
+
     const replayTour = () => {
 
         setShowHomeTour(true);
@@ -229,10 +545,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         // { name: 'ProcesFs complete auth.', icon: 'autorenew', route: 'process-complete-auth', color: '#dd5c98' },
         // { name: 'Febric Stock', icon: 'autorenew', route: 'febric-stock', color: '#dd5c98' },
         { name: 'Daily Payment Report', icon: 'payments', route: 'daily-payment-report', color: '#ff2ced' },
+        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#F97316' },
     ];
 
     const ALL_APPS = [
         { name: 'Credit Limit Request', route: 'credit-limit', icon: 'credit-score', color: '#4285F4', category: 'Finance' },
+        { name: 'Outstanding Days Request', route: 'outstanding-days-request', icon: 'credit-score', color: '#4285F4', category: 'Finance' },
         {
             name: 'Receivables',
             icon: 'receipt-long',
@@ -274,25 +592,29 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Yarn Manufacturing', route: 'yarn-manufacturing', icon: 'touch-app', color: '#008080', category: 'details' },
         { name: 'Profile', route: 'profile', icon: 'person-pin', color: '#000000', category: 'profile' },
         { name: 'Sales Order Entry', route: 'sales-order-entry', icon: 'shopping-cart-checkout', color: '#48cbef', category: 'Production' },
-        // { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1' },
+        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Doff Entry', route: 'doff-entry', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Yarn Sales Order', route: 'yarn-sales-order', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
         { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production' },
         { name: 'Employ Dashboard', route: 'employ-dashboard', icon: 'fact-check', color: '#5f338f', category: 'Production' },
         { name: 'Price List', route: 'price-list', icon: 'assessment', color: '#1E3A5F', category: 'Production' },
-        { name: 'Sales Order Dashborad', route: 'sales-order-dashboard', icon: 'dashboard', color: '#0B7285', category: 'Production' },
+        { name: 'Sales Order Dashboard', route: 'sales-order-dashboard', icon: 'dashboard', color: '#0B7285', category: 'Production' },
         { name: 'Sales Order Price List Auth', route: 'sales-order-price-list-auth', icon: 'receipt-long', color: '#740cea', category: 'Production' },
         // { name: 'Packing Automation', route: 'packing-automation', icon: 'table-view', color: 'rgb(194, 213, 52)', category: 'Production' },
         { name: 'Poy Rate Entry', route: 'PoyRateEntry', icon: 'price-change', color: '#6A1B9A', category: 'Production' },
-        { name: 'Purchase Auth', route: 'purchase-auth', icon: 'fact-check', color: '#5f738f', category: 'Production' },
+        { name: 'Purchase Grade Auth', route: 'purchase-grade-auth', icon: 'fact-check', color: '#5f738f', category: 'Production' },
         { name: 'Purchase Import Auth', route: 'purchase-import-auth', icon: 'task-alt', color: '#991070', category: 'Production' },
-        { name: 'Purchase Transport Auth', route: 'purchase-transport-auth', icon: 'route', color: '#7a2a49', category: 'Production' },
+        { name: 'Purchase Rate Auth', route: 'purchase-rate-auth', icon: 'route', color: '#7a2a49', category: 'Production' },
         { name: 'Warehouse', route: 'warehouse', icon: 'warehouse', color: '#991070', category: 'Production' },
         { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
-        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
+        // { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
-        // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
+        { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
+        { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Fabric Stock Verification', route: 'fabric-stock-verification', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Weft Carton Issue', icon: 'output', route: 'weft-carton-issue', color: '#5E35B1', category: 'Production'},
     ];
 
     useEffect(() => {
@@ -318,6 +640,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                     },
                     //                     {
                     //                         "title": "Credit Limit Request",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Outstanding Days Request",
                     //                         "href": "/"
                     //                     },
                     //                     {
@@ -440,8 +766,43 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                         "href": "/"
                     //                     },
                     //                     {
-
                     //                         "title": "Packing Grade Auth",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order Dashboard",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Quarter Summary",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Yarn Sales Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Creel Issue Return",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Weft Issue Return",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order Entry",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Fabric Stock Verification",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Yarn Purchase Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Weft Carton Issue",
                     //                         "href": "/"
                     //                     },
                     //                 ]
@@ -557,6 +918,46 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     onSearch={setSearch}
                     setShowHeaderTour={setShowHeaderTour}
                     onHelpPress={replayTour} />
+
+                {switchUserLogin && (
+                    <View style={styles.propertySwitchBar}>
+                        <View style={styles.propertySwitchInfo}>
+                            <Text style={styles.propertySwitchLabel}>
+                                PROPERTY
+                            </Text>
+                            <Text style={styles.propertySwitchValue}>
+                                {switchingProperty
+                                    ? 'Switching...'
+                                    : prp === 'rayons'
+                                        ? 'Rayons'
+                                        : 'Sudamo / Knits'}
+                            </Text>
+                        </View>
+
+                        <Switch
+                            value={prp === 'rayons'}
+                            onValueChange={(value) =>
+                                void switchProperty(
+                                    value ? 'rayons' : 'sudamo_knits'
+                                )
+                            }
+                            disabled={switchingProperty || !prp}
+                            trackColor={{
+                                false: '#D0D7DE',
+                                true: '#13879A',
+                            }}
+                            thumbColor="#FFFFFF"
+                        />
+
+                        {switchingProperty && (
+                            <ActivityIndicator
+                                size="small"
+                                color="#13879A"
+                                style={styles.propertySwitchLoader}
+                            />
+                        )}
+                    </View>
+                )}
 
                 {/* Horizontal Category Scroll */}
                 {categories.length > 1 && (
@@ -734,6 +1135,45 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
 };
 
 const styles = StyleSheet.create({
+    propertySwitchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginHorizontal: 12,
+        marginTop: 8,
+        marginBottom: 2,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    propertySwitchInfo: {
+        flex: 1,
+        minWidth: 0,
+    },
+    propertySwitchLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#94A3B8',
+        letterSpacing: 1,
+    },
+    propertySwitchValue: {
+        marginTop: 1,
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#111827',
+    },
+    propertySwitchLoader: {
+        marginLeft: 4,
+    },
+
     container: {
         flex: 1,
         backgroundColor: '#FFFFFF',

@@ -1,23 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
-    Platform
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 // import theme from '../../android/app/src/theme';
+import { API } from '@/common/API/dynamicAPI';
+import { yarnmanagementsystemstyle } from '@/common/Style';
+import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { yarnmanagementsystemstyle } from '@/common/Style';
-import { API, PRINTSTICKER, PRINTERSLISTAPI } from '@/common/API/dynamicAPI';
-import HeaderBarwithBack from '@/components/Header';
 // import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
 import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
+import CustomDrawer from './CustomDrawer';
 import WeftIssueItemDrawer from './WeftIssueItemDrawer';
 // import Snackbar from 'react-native-snackbar';
-import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
+import { showError } from '@/common/utils/snackbar';
+import WftIssueNew from '../WftIssueNew';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
@@ -48,7 +53,7 @@ type YarnIssueItem = {
 
 };
 
-const WftIssue: React.FC<Props> = ({ token, username }) => {
+const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     // const { hasPermission, requestPermission } = useCameraPermission();
     const [isLoading, setIsLoading] = useState(false);
     const [getDataSaved, setDataSaved] = useState(false)
@@ -57,6 +62,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
     const [isDetailVisible, setIsDetailVisible] = useState(false);
     const [isItemdetailvisible, setisItemdetailvisible] = useState(false);
+    const [hasIssueDesignAccess, setHasIssueDesignAccess] = useState(false);
     const [selectedYear, setSelectedYear] = useState(null);
     const [getAllPropertyData, setAllPropertyData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -97,13 +103,18 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     const [successMessage, setSuccessMessage] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
     const [resetFlag, setResetFlag] = useState(false);
+    // Entry mode selector: choose the original/previous screen or the independent new copy.
+    const [showIssueModeModal, setShowIssueModeModal] = useState(true);
+    // const [showIssueModeModal, setShowIssueModeModal] = useState(false);
+    const [issueMode, setIssueMode] = useState<'old' | 'new' | null>(null);
+    // const [issueMode, setIssueMode] = useState<'old' | 'new' | null>('old');
     // const [filteredData, setFilteredData] = useState([]);
     console.log("getallpropertydata", getAllPropertyData)
 
     console.log("FormState.values", FormState.values);
-    console.log("data", data);
-    console.log("FormState.values.LngName", FormState.values.LngName);
     console.log("FormState.values.PrpCode", FormState.values.PrpCode);
+
+    console.log("issueMode", issueMode);
 
     const cancelToken = useRef(null);
 
@@ -122,7 +133,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     };
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         const loadProperty = async () => {
             const allprpdata = await fetchAllPropertyData(token);
             setAllPropertyData(allprpdata);
@@ -131,7 +142,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     }, [token]);
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
             const testFinct = async () => {
                 const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
@@ -152,6 +163,51 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
 
     const openItemDrawer = () => setIsItemVisible(true);
     const closeItemDrawer = () => setIsItemVisible(false);
+
+    // 🔥 FIX: mutual-exclusion openers.
+    // Previously each screen was opened by flipping ONE boolean while the
+    // other two Modals stayed mounted with whatever visible value they had
+    // last (sometimes still true). That is what caused "sometimes carton
+    // list, sometimes scanner list, sometimes item list" — more than one
+    // Modal could be visible={true} at the same time. These wrappers force
+    // exactly one screen to be open at any moment.
+    const openDetailDrawer = () => {
+        setIsItemVisible(false);
+        setisItemdetailvisible(false);
+        setIsDetailVisible(true);
+    };
+
+    const handleDetailNext = (data?: { hasIssueDesignAccess?: boolean; StkType?: string }) => {
+        // Process House (P) does not require the intermediate item-selection screen.
+        // Go directly to the next drawer instead.
+        if (data?.StkType === 'P') {
+            if (typeof data.hasIssueDesignAccess === 'boolean') {
+                setHasIssueDesignAccess(data.hasIssueDesignAccess);
+            }
+            openScannerDrawer();
+            return;
+        }
+
+        openItemDetailDrawer(data);
+    };
+
+    const openItemDetailDrawer = (data?: { hasIssueDesignAccess?: boolean }) => {
+        // Receive Issue Design access from the first detail screen.
+        // Keep the existing edit flow unchanged when no value is supplied.
+        if (typeof data?.hasIssueDesignAccess === 'boolean') {
+            setHasIssueDesignAccess(data.hasIssueDesignAccess);
+        }
+
+        setIsDetailVisible(false);
+        setIsItemVisible(false);
+        setisItemdetailvisible(true);
+    };
+
+    const openScannerDrawer = () => {
+        setIsDetailVisible(false);
+        setisItemdetailvisible(false);
+        setIsItemVisible(true);
+    };
 
     useEffect(() => {
         if (!searchText) {
@@ -306,7 +362,8 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                 // txntype: 'creel_yarn_issue',
                 fromdate: FormState.values.fromdate,
                 todate: FormState.values.todate,
-                status: ''
+                status: '',
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("browse historyPayload:", payload);
@@ -628,9 +685,101 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
         );
     };
 
+    if (issueMode === 'new') {
+        return (
+            <WftIssueNew
+                token={token}
+                username={username}
+                userid={userid}
+                onBackToModeSelector={() => {
+                    setIssueMode(null);
+                    setShowIssueModeModal(true);
+                }}
+                issueMode={issueMode}
+            />
+        );
+    }
+
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            <Modal
+                visible={showIssueModeModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowIssueModeModal(false)}
+            >
+                <View style={styles.modeOverlay}>
+                    <View style={styles.modeCard}>
+                        <View style={styles.modeIconWrap}>
+                            <Icon name="content-copy" size={28} color="#0e7490" />
+                        </View>
+                        <Text style={styles.modeTitle}>Weft Issue</Text>
+                        {/* <Text style={styles.modeSubtitle}>
+                            Select how you want to open Weft Issue
+                        </Text> */}
+
+                        <TouchableOpacity
+                            style={styles.modeOptionPrimary}
+                            onPress={() => {
+                                setIssueMode('new');
+                                setShowIssueModeModal(false);
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <View style={styles.modeOptionIcon}>
+                                <Icon name="add-circle-outline" size={25} color="#fff" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modeOptionTitleLight}>New Weft Issue</Text>
+                                <Text style={styles.modeOptionDescLight}>
+                                    Continue with the new screen
+                                </Text>
+                            </View>
+                            <Icon name="chevron-right" size={24} color="#fff" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.modeOption}
+                            onPress={() => {
+                                setIssueMode('old');
+                                setShowIssueModeModal(false);
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <View style={styles.modeOptionIconOld}>
+                                <Icon name="history" size={25} color="#0e7490" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modeOptionTitle}>Previous Weft Issue</Text>
+                                <Text style={styles.modeOptionDesc}>
+                                    Continue with the existing screen
+                                </Text>
+                            </View>
+                            <Icon name="chevron-right" size={24} color="#64748b" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* {isLoading && <FullScreenLoader />} */}
+
+            {isLoading && (
+                <View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: "rgba(255,255,255,0.3)",
+                        zIndex: 999,
+                    }}
+                >
+                    <ActivityIndicator size="large" color="#007EA7" />
+                </View>
+            )}
 
             <HeaderBarwithBack
                 userName={username}
@@ -704,10 +853,21 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                             <Text style={styles.smallBox}>Qty: {item.CreelQty}</Text>
 
                             <TouchableOpacity style={styles.editBtn}
-                                onPress={() => {
-                                    setIsEditMode(true);
-                                    setMainUId(item.UId);
-                                    itemdetaildraweropen();
+                                onPress={async () => {
+                                    // 🔥 FIX: clear any leftover state from a
+                                    // previous add/edit session FIRST, then
+                                    // fetch THIS item's data, and only once
+                                    // it has arrived do we navigate. Previously
+                                    // isEditMode/mainUId were set and the
+                                    // screen opened immediately, while the
+                                    // actual fetch (handleViewClick) ran later
+                                    // inside a child useEffect keyed only on
+                                    // [isVisible] — a race that could show a
+                                    // stale item or land on the wrong screen.
+                                    resetAllData();
+                                    resetDrawerStates();
+                                    await handleViewClick(item);
+                                    openItemDetailDrawer();
                                 }}
                             >
                                 <Icon name="edit" size={18} color="#2563eb" />
@@ -737,9 +897,10 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 // onPress={detailopenDrawer}
                 onPress={() => {
-                    detailopenDrawer();
+
                     resetAllData();
                     resetDrawerStates();
+                    openDetailDrawer();
                 }}
             >
                 <Icon name="add" size={20} color="#fff" />
@@ -772,88 +933,186 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                 </View>
             </Modal>
 
-            <CustomDrawer
-                isVisible={isDrawerVisible}
-                onClose={closeDrawer}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
-            />
+            {isDrawerVisible && (
+                <CustomDrawer
+                    isVisible={isDrawerVisible}
+                    onClose={closeDrawer}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
+                    issueMode={issueMode}
+                />
+            )}
 
-            <AddWeftIssueDetail
-                isVisible={isDetailVisible}
-                onClose={detailcloseDrawer}
-                onNext={itemdetaildraweropen}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
+            {isDetailVisible && (
+                <AddWeftIssueDetail
+                    isVisible={isDetailVisible}
+                    onClose={detailcloseDrawer}
+                    onNext={handleDetailNext}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
+                    userid={userid}
 
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                editData={editData}
-                isItemdetailvisible={isItemdetailvisible}
-                resetFlag={resetFlag}
-            />
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    editData={editData}
+                    isItemdetailvisible={isItemdetailvisible}
+                    resetFlag={resetFlag}
+                    issueMode={issueMode}
+                />
+            )}
 
-            <AddWeftIssueItemDetail
-                isVisible={isItemdetailvisible}
-                onClose={itemdetaildrawerclose}
-                onNext={openItemDrawer}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
+            {isItemdetailvisible && (
+                <AddWeftIssueItemDetail
+                    isVisible={isItemdetailvisible}
+                    onClose={itemdetaildrawerclose}
+                    onNext={openScannerDrawer}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
+                    hasIssueDesignAccess={hasIssueDesignAccess}
 
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                handleclick={handleViewClick}
-                editData={editData}
-            />
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    handleclick={handleViewClick}
+                    editData={editData}
+                    issueMode={issueMode}
+                />
+            )}
 
-            <WeftIssueItemDrawer
-                isVisible={isItemVisible}
-                onClose={closeItemDrawer}
-                FormState={FormState}
-                setFormState={setFormState}
-                token={token}
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                editData={editData}
-                resetAllData={resetAllData}
-                closeAllDrawers={closeAllDrawers}
-                fetchbrowse={fetchbrowse} // 🔥 yahi pass hoga
-            />
+            {isItemVisible && (
+                <WeftIssueItemDrawer
+                    isVisible={isItemVisible}
+                    onClose={closeItemDrawer}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    token={token}
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    editData={editData}
+                    resetAllData={resetAllData}
+                    closeAllDrawers={closeAllDrawers}
+                    fetchbrowse={fetchbrowse}
+                    issueMode={issueMode} // 🔥 yahi pass hoga
+                />
+            )}
         </>
     );
 };
 export default WftIssue;
 const styles = StyleSheet.create({
+    modeOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 22,
+    },
+    modeCard: {
+        width: '100%',
+        maxWidth: 430,
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 22,
+        elevation: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+    },
+    modeIconWrap: {
+        width: 58,
+        height: 58,
+        borderRadius: 18,
+        backgroundColor: '#e6f7fa',
+        justifyContent: 'center',
+        alignItems: 'center',
+        alignSelf: 'center',
+        marginBottom: 12,
+    },
+    modeTitle: {
+        textAlign: 'center',
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#0f172a',
+    },
+    modeSubtitle: {
+        textAlign: 'center',
+        color: '#64748b',
+        fontSize: 13,
+        marginTop: 5,
+        marginBottom: 20,
+    },
+    modeOptionPrimary: {
+        minHeight: 76,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#0e7490',
+        marginBottom: 12,
+    },
+    modeOption: {
+        minHeight: 76,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    modeOptionIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    modeOptionIconOld: {
+        width: 44,
+        height: 44,
+        borderRadius: 13,
+        backgroundColor: '#e6f7fa',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    modeOptionTitleLight: { color: '#fff', fontSize: 15, fontWeight: '800' },
+    modeOptionDescLight: { color: '#d9f4f7', fontSize: 11, marginTop: 3 },
+    modeOptionTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
+    modeOptionDesc: { color: '#64748b', fontSize: 11, marginTop: 3 },
+
     okButton: {
         backgroundColor: '#2e7d32',
         paddingHorizontal: 25,

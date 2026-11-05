@@ -463,7 +463,7 @@ export const crlimtreq_styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
-     cardSubHeaderText12: {
+    cardSubHeaderText12: {
         color: theme.BRAND_GRADIENT_END, // Purple theme
         fontSize: 14,
         fontWeight: '600',
@@ -1275,6 +1275,56 @@ export const crlimtreq_styles = StyleSheet.create({
         flex: 1,
         padding: 6,
     },
+    partyContainer: {
+        marginTop: 10,
+        width: "100%",
+        borderWidth: 1,
+        borderColor: "#BEE3F8",
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#fff",
+    },
+
+    partyHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        backgroundColor: "#F7FAFC",
+        borderBottomWidth: 1,
+        borderBottomColor: "#E2E8F0",
+    },
+
+    headerText: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#0F6C81",
+    },
+
+    partyRow: {
+        flexDirection: "row",
+        alignItems: "flex-start", // Important
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+
+    partyName1: {
+        flex: 1,
+        fontSize: 12,
+        color: "#222",
+        fontWeight: "500",
+        lineHeight: 22,
+        paddingRight: 10,
+        flexWrap: "wrap",
+    },
+
+    partyQty: {
+        width: 90,
+        textAlign: "right",
+        fontSize: 12,
+        fontWeight: "700",
+        color: "#111",
+    },
     /**yarn purchase order sub card css end */
 });
 
@@ -1352,29 +1402,26 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 10,
         fontWeight: "500"
     },
-
-
-
     input: {
-        paddingVertical: 0,
-        paddingHorizontal: 20,
-        color: '#000000',
+        height: 49,
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: "#000",
-        borderRadius: 6,
-        //padding: 10,
-        //marginTop: 5
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 18,
+        fontSize: 16,
+        color: '#111827',
+        marginTop: 5,
     },
     inputDisabled: {
-        backgroundColor: '#fff',
-        paddingVertical: 0,
-        paddingHorizontal: 20,
-        color: '#000000',
+        height: 49,
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: "#000",
-        borderRadius: 6,
-        //padding: 10,
-        //marginTop: 5
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 18,
+        color: '#111827',
+        marginTop: 5,
     },
 
     // dropdown: {
@@ -1402,14 +1449,21 @@ export const checkingScannerStyles = StyleSheet.create({
     },
 
     submitBtn1: {
-        flex: 1, // dono button same width
-        flexDirection: 'row',
-        backgroundColor: "#007EA7",
+        flex: 1,
+        height: 50,
         justifyContent: 'center',
-        alignItems: "center",
+        alignItems: 'center',
+        borderRadius: 12,
+        backgroundColor: '#007EA7',
+
+        // flex: 1, // dono button same width
+        flexDirection: 'row',
+        // backgroundColor: "#007EA7",
+        // justifyContent: 'center',
+        // alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 18,
-        borderRadius: 14,
+        // borderRadius: 14,
 
         // Shadow
         shadowColor: "#000",
@@ -1704,6 +1758,15 @@ export const checkingScannerStyles = StyleSheet.create({
         height: 30,
         borderRadius: 19,
         backgroundColor: '#E53935',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    printButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 19,
+        backgroundColor: 'rgb(53, 85, 229)',
         justifyContent: 'center',
         alignItems: 'center',
     },

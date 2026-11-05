@@ -1,7 +1,7 @@
 // screens/MainDashboardScreen.js
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';

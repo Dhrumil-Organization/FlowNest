@@ -698,7 +698,7 @@ export function MillHubTab() {
     } finally {
       if (id === reqId.current) setLoading(false);
     }
-  }, [isReady, prpGroup, yearNo]);
+  }, [isReady, prpGroup, yearNo, direction]);
 
   const rangeRef = useRef({ from, to });
   rangeRef.current = { from, to };

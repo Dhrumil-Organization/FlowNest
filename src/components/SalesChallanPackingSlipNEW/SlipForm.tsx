@@ -8,16 +8,16 @@
 import { T } from '@/src/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
 import { confirmAsync } from '../ProductionOrderNEW/ui';
-import AllocateStep from './AllocateStep';
+import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
 import type { Api, Ctx, Mode, PartyScope, Row } from './api';
+import AllocateStep from './AllocateStep';
 import CartonScanSheet from './CartonScanSheet';
+import type { ScanDevice } from './ScanDevices';
 import { SlipStrip, SlipSummary, StockLine } from './Lines';
 import OrderSheet from './OrderSheet';
 import ProdTypeSheet from './ProdTypeSheet';
-import { opensPendingOrders, pick, qty, splitTypes } from './rules';
-import type { ScanDevice } from './ScanDevices';
+import { n3, opensPendingOrders, pick, qty, splitTypes } from './rules';
 import SlipStep from './SlipStep';
 import { Steps, Tag } from './ui';
 import { useSlipForm } from './useSlipForm';
@@ -47,7 +47,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
     return 'add';
   };
   const [nav, setNav] = useState<{ mode: Mode; uid?: string }>(() => ({ mode: allowed(startMode, startUid), uid: startUid }));
-  const [step, setStep] = useState<1 | 2>(nav.mode === 'edit' ? 2 : 1);
+  const [step, setStep] = useState<1 | 2 | 3>(nav.mode === 'edit' ? 2 : 1);
   const [sheet, setSheet] = useState<'' | 'orders' | 'types'>('');
   const [scanRow, setScanRow] = useState<Row | null>(null);
   const [scanDevice, setScanDevice] = useState<ScanDevice>('hardware');
@@ -56,7 +56,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
   const [saved, setSaved] = useState(false); // tell the list to reload on Back
 
   const mode = nav.mode;
-  const { f, stock, meta, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
+  const { f, stock, meta, extraPer, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
 
   const go = (m: Mode, id?: string, msg?: { tone: 'ok' | 'err' | 'info'; text: string }) => {
     const next = allowed(m, id);
@@ -81,7 +81,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
     if (Platform.OS !== 'android') return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (scanRow) return false; // the carton screen handles its own Back (camera → cartons → locations → slip)
-      if (step === 2 && (mode === 'add' || mode === 'edit')) setStep(1); else back();
+      if (step === 3 && mode === 'edit') setStep(2); else if (step === 2 && (mode === 'add' || mode === 'edit')) setStep(1); else back();
       return true;
     });
     return () => sub.remove();
@@ -93,8 +93,12 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
   const onSave = async () => {
     if (!(mode === 'scan' ? rights.scan : mode === 'edit' ? rights.edit : rights.add)) return;
     const id = await actions.save();
-    if (id) setSaved(true);
-    if (id) go(mode === 'scan' ? 'scan' : 'view', id, { tone: 'ok', text: mode === 'scan' ? 'Cartons saved.' : 'Packing slip saved.' });
+    if (!id) return;
+    setSaved(true);
+    const warn = actions.saveWarning(); // slip saved, but not every carton change went through
+    go(mode === 'scan' ? 'scan' : 'view', id, warn
+      ? { tone: 'err', text: warn }
+      : { tone: 'ok', text: mode === 'scan' ? 'Cartons saved.' : 'Packing slip saved.' });
   };
   const onDelete = async () => {
     if (!rights.del) return;
@@ -127,17 +131,23 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
     </View>
   );
 
+  // Modify → step 3 "Cartons": every assigned line, each with its own item / merge / grade / shade carton stock.
+  const cartonStep = mode === 'edit' && step === 3;
+  const canCartons = mode === 'edit' ? rights.edit : rights.scan;
+  const cartonLines = stock.filter((r) => n3(r.AssQty) > 0).length;
+
   const lines = (
     <>
       {problem.stock ? <Notice tone="err" text={problem.stock} action={mode === 'add' ? { label: 'Retry', onPress: onGetStock } : undefined} /> : null}
       {stock.length === 0 && !problem.stock ? (
         <Notice tone="info" text={mode === 'scan' ? 'This slip has no assigned lines to scan.' : 'No stock lines yet.'} />
       ) : null}
-      {stock.map((r, i) => (
+      {stock.map((r, i) => (cartonStep && !(n3(r.AssQty) > 0) ? null : (
         <StockLine key={`${r.SrNo}-${r.ItmCode}-${r.MerCode}-${r.GrdCode}-${r.ShdCode}-${i}`} row={r} mode={mode} d2={f.d2 || []}
-          onAssign={editing ? (v) => actions.setAssign(i, v) : undefined}
-          onScan={(d) => { if (!rights.scan) return; setScanDevice(d); setScanRow(r); }} />
-      ))}
+          cartonStep={cartonStep}
+          onAssign={editing && !cartonStep ? (v) => actions.setAssign(i, v) : undefined}
+          onScan={(d) => { if (!canCartons) return; setScanDevice(d); setScanRow(r); }} />
+      )))}
     </>
   );
 
@@ -162,7 +172,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
     );
     body = (
       <>
-        {mode === 'scan' && totals.cartonTarget ? (
+        {(mode === 'scan' || cartonStep) && totals.cartonTarget ? (
           <View style={[u.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
             <View style={{ flex: 1 }}>
               <Text style={u.kicker}>Scanned so far</Text>
@@ -171,7 +181,12 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
             <Text style={[{ fontSize: 16, fontWeight: '800', color: T.ink }, tab]}>{qty(totals.cartonQty)}</Text>
           </View>
         ) : null}
-        {editing ? (
+        {cartonStep ? (
+          <>
+            <Text style={[u.kicker, { marginBottom: 8, marginTop: 4 }]}>Cartons · {cartonLines} line{cartonLines === 1 ? '' : 's'}</Text>
+            {cartonLines ? lines : <Notice tone="info" text="No line has assign qty — go back and assign qty first." />}
+          </>
+        ) : editing ? (
           <>
             {problem.stock ? <Notice tone="err" text={problem.stock} action={mode === 'add' ? { label: 'Retry', onPress: onGetStock } : undefined} /> : null}
             {stock.length ? <AllocateStep stock={stock} mode={mode} setAssign={actions.setAssign} setMany={actions.setAssignMany} />
@@ -195,6 +210,21 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
       ? <Btn flex label={stock.length ? 'Refresh stock' : 'Get stock'} icon="arrow-forward" onPress={onGetStock} loading={busy.stock} disabled={!pick(f, 'ParCode') || !(f.d1 || []).length} />
       : <Btn flex label="Continue to assign qty" icon="arrow-forward" onPress={() => setStep(2)} />;
     if (mode === 'edit') footer = <><Btn kind="ghost" label="Cancel" onPress={() => go('view', nav.uid)} />{footer}</>;
+  } else if (cartonStep) {
+    footer = (
+      <>
+        <Btn kind="ghost" label="Back" onPress={() => setStep(2)} disabled={busy.save} />
+        <Btn flex kind="copper" icon="save" label={`Save · ${qty(totals.assigned)} · ${totals.cartons} ctn`} onPress={onSave} loading={busy.save} />
+      </>
+    );
+  } else if (editing && mode === 'edit') {
+    // Modify: qty → cartons → one Save for both.
+    footer = (
+      <>
+        <Btn kind="ghost" label="Back" onPress={() => setStep(1)} />
+        <Btn flex label="Continue to cartons" icon="arrow-forward" onPress={() => setStep(3)} disabled={!stock.some((r) => n3(r.AssQty) > 0)} />
+      </>
+    );
   } else if (editing) {
     footer = (
       <>
@@ -230,7 +260,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
       onDone={(sr, cartons) => {
         actions.applyCartons(sr, cartons);
         setScanRow(null);
-        setFlash({ tone: 'info', text: `Sr ${sr}: ${cartons.length} carton${cartons.length === 1 ? '' : 's'} ready. Tap Save cartons to keep them.` });
+        setFlash({ tone: 'info', text: `Sr ${sr}: ${cartons.length} carton${cartons.length === 1 ? '' : 's'} ready. Tap ${mode === 'edit' ? 'Save' : 'Save cartons'} to keep them.` });
       }} />
   );
   // Carton selection is a STEP of this screen (like WarehouseNEW's scanner step), not a Modal: on Android a Modal is
@@ -242,7 +272,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24, alignItems: 'center' }} keyboardShouldPersistTaps="handled">
         <View style={{ width: '100%', maxWidth: maxW }}>
           {title}
-          {editing ? <Steps labels={['Slip & orders', 'Assign qty']} step={step} /> : null}
+          {editing ? <Steps labels={mode === 'edit' ? ['Slip & orders', 'Assign qty', 'Cartons'] : ['Slip & orders', 'Assign qty']} step={step} /> : null}
           {flash ? <Notice tone={flash.tone} text={flash.text} action={{ label: 'OK', onPress: () => setFlash(null) }} /> : null}
           {busy.load ? <Notice tone="info" text="Loading packing slip…" /> : null}
           {problem.load ? <Notice tone="err" text={problem.load} action={{ label: 'Retry', onPress: actions.reload }} /> : null}

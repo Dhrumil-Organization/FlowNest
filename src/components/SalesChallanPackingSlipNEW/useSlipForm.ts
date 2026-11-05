@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as A from './api';
 import type { Api, Ctx, Mode, PartyScope, Row } from './api';
 import {
-  PARTY_CLEAR, assignQtyIssue, blank, d1Key, maxSr, n3, orderToD1, partyFields, saveIssue, splitTypes, sum, today,
+  PARTY_CLEAR, assignQtyIssue, blank, cartonsChanged, d1Key, filterPartyRows, indexPartyRows, maxSr, n3, orderToD1, partyFields, removedCartons, saveIssue, splitTypes, sum, today,
 } from './rules';
 
 type Busy = Partial<Record<'load' | 'party' | 'stock' | 'save' | 'remove' | 'voucher', boolean>>;
@@ -21,11 +21,14 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   const [f, setF] = useState<Row>({ ChalDate: today(), d1: [], d2: [] });
   const [stock, setStock] = useState<Row[]>([]);
   const [meta, setMeta] = useState<Meta>({ prpType: '', strDesc: '', storeName: '' });
+  const [extraPer, setExtraPer] = useState(0); // getsetchallan extraqtyper — extra qty % allowed on cartons
   const [busy, setBusy] = useState<Busy>({});
   const [problem, setProblem] = useState<Problems>({});
   const fRef = useRef(f);
   fRef.current = f;
   const seq = useRef({ load: 0, party: 0, stock: 0 });
+  const savedD2 = useRef<Row[]>([]); // cartons as saved on the server — what d2delete is worked out from
+  const saveWarn = useRef(''); // set by save() when the slip saved but not everything did
 
   const flag = (k: keyof Busy, v: boolean) => setBusy((b) => ({ ...b, [k]: v }));
   const fail = (k: keyof Problems, msg?: string) => setProblem((p) => ({ ...p, [k]: msg }));
@@ -45,13 +48,15 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
     const id = ++seq.current.load;
     flag('load', true); fail('load');
     try {
-      const [r, prpType, store] = await Promise.all([
+      const [r, prpType, store, setting] = await Promise.all([
         A.showPackSlip(api, ctx, uid, mode),
         A.fetchPropertyType(api, ctx.prpcode).catch(() => ''),
         A.fetchStore(api, ctx).catch(() => undefined),
+        A.fetchSetChallan(api, ctx).catch(() => ({ extraqtyper: 0 })),
       ]);
       if (id !== seq.current.load) return;
       if (store === null) throw new Error('Store is not assigned to you. Kindly contact the administrator.');
+      setExtraPer(setting.extraqtyper);
       setMeta({ prpType, strDesc: String(store?.SDesc ?? ''), storeName: String(store?.StrName ?? store?.SName ?? store?.StrDesc ?? '') });
       setF((prev) => ({
         ...r.main,
@@ -64,6 +69,7 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
         ProdTtype: splitTypes(r.main.ProdTtype),
       }));
       setStock(mode === 'add' ? [] : r.stock);
+      savedD2.current = mode === 'add' ? [] : (r.d2 || []).filter((c: Row) => !blank(c.SrNo) && !blank(c.CartNo));
     } catch (e) {
       if (id === seq.current.load) fail('load', A.apiErrorText(e, 'Packing slip could not be loaded.'));
     } finally {
@@ -94,10 +100,46 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
 
   /* ------------------------------ party (AllPartyDataSCPS) ------------------------------ */
 
-  /** Party help list, 20 a page like the web PartySelect (ServerPicker shows "Load more"). */
+  // Keep the full help list within this form and context only. The active request is
+  // shared by concurrent picker loads, so typing never starts another HTTP request.
+  // The property/store, session and party visibility scope are part of the cache key.
+  const partyListCache = useRef<{
+    key: string;
+    promise: Promise<ReturnType<typeof indexPartyRows>>;
+  } | null>(null);
+
+  /** Return locally filtered parties; page 0 exposes the complete cached list. */
   const searchParties = useCallback(async (search: string, page = 1) => {
-    const rows = await A.searchParties(api, ctx, { search, page, scope: opts.scope });
-    return { rows, more: rows.length >= A.PARTY_PAGE };
+    const cacheKey = JSON.stringify([
+      api.API, api.token, ctx.prpcode, ctx.yearno, ctx.strcode,
+      opts.scope?.isceo ?? '', opts.scope?.partype ?? '',
+    ]);
+
+    if (!partyListCache.current || partyListCache.current.key !== cacheKey) {
+      // accountbasic currently returns the complete accessible party list when
+      // limit is blank. Preserve the original server-side visibility filters.
+      const entry = {
+        key: cacheKey,
+        promise: A.searchParties(api, ctx, {
+          search: '', page: 1, limit: '', scope: opts.scope,
+        }).then(indexPartyRows),
+      };
+      partyListCache.current = entry;
+      // A failed initial load must be retried next time the picker is opened.
+      entry.promise.catch(() => {
+        if (partyListCache.current === entry) partyListCache.current = null;
+      });
+    }
+
+    const all = await partyListCache.current.promise;
+    const matches = filterPartyRows(all, search);
+    // Page 0 is the dedicated Party modal's full local dataset (not an API page).
+    // The API itself is still requested only once for this form/context.
+    if (page === 0) return { rows: matches.map((entry) => entry.row), more: false };
+    const pageNumber = Math.max(1, Math.floor(Number(page) || 1));
+    const offset = (pageNumber - 1) * A.PARTY_PAGE;
+    const rows = matches.slice(offset, offset + A.PARTY_PAGE).map((entry) => entry.row);
+    return { rows, more: offset + A.PARTY_PAGE < matches.length };
   }, [api, ctx, opts.scope]);
 
   /**
@@ -224,22 +266,42 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   /* ------------------------------ save · delete ------------------------------ */
 
   const saving = useRef(false);
+  /**
+   * add / edit → savepackslip; edit with cartons added or taken off (Modify → Cartons) → then savepackslipcarton.
+   * scan → savepackslipcarton. Cartons taken off go as d2delete (needs the PackSlipController update; without it
+   * the server keeps them — saveWarning() says so instead of pretending they were removed).
+   */
   const save = useCallback(async (): Promise<string | null> => {
     if (saving.current) return null;
     const x = fRef.current;
     const issue = saveIssue(x, stock);
     if (issue) { fail('save', issue); return null; }
     saving.current = true;
+    saveWarn.current = '';
     flag('save', true); fail('save');
+    const editedd1 = stock.filter((r) => n3(r.AssQty) > 0);
+    const d2delete = removedCartons(savedD2.current, x.d2 || []);
+    const checkRemoved = (removed: number | null) => {
+      if (!d2delete.length) return;
+      if (removed === null) saveWarn.current = `${d2delete.length} carton(s) you took off are still on the slip — the server does not remove saved cartons yet (PackSlipController needs the d2delete update).`;
+      else if (removed < d2delete.length) saveWarn.current = `Only ${removed} of ${d2delete.length} carton(s) you took off were removed on the server. Open the slip again to check.`;
+    };
     try {
-      const article = {
-        ...x,
-        editedd1: stock.filter((r) => n3(r.AssQty) > 0),
-        txntype: A.TXNTYPE,
-        ...(mode === 'scan' ? {} : { action: mode }),
-      };
-      const id = await A.saveSlip(api, article, mode === 'scan');
-      return id || str(x.UId);
+      if (mode === 'scan') {
+        const res = await A.saveCartons(api, { ...x, editedd1, txntype: A.TXNTYPE, d2delete });
+        checkRemoved(res.removed);
+        return res.uid || str(x.UId);
+      }
+      const id = (await A.saveSlip(api, { ...x, editedd1, txntype: A.TXNTYPE, action: mode }, false)) || str(x.UId);
+      if (mode === 'edit' && id && cartonsChanged(savedD2.current, x.d2 || [])) {
+        try {
+          const res = await A.saveCartons(api, { ...x, UId: id, editedd1, txntype: A.TXNTYPE, d2delete });
+          checkRemoved(res.removed);
+        } catch (e) {
+          saveWarn.current = `The packing slip was saved, but the cartons were not: ${A.apiErrorText(e, 'Cartons could not be saved.')} Open Modify → Cartons and save again.`;
+        }
+      }
+      return id;
     } catch (e) {
       fail('save', A.apiErrorText(e, 'Packing slip could not be saved.'));
       return null;
@@ -248,6 +310,9 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
       flag('save', false);
     }
   }, [api, stock, mode]);
+
+  /** Why the last save was only partly done ('' = all saved). */
+  const saveWarning = useCallback(() => saveWarn.current, []);
 
   const remove = useCallback(async (): Promise<boolean> => {
     flag('remove', true); fail('save');
@@ -271,12 +336,12 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   };
 
   return {
-    f, stock, meta, busy, problem, totals, ready,
+    f, stock, meta, extraPer, busy, problem, totals, ready,
     actions: {
       reload: load, set, checkVoucher, clearProblem: (k: keyof Problems) => fail(k),
       searchParties, chooseParty, clearParty,
       loadPendingOrders, addOrders, removeOrder, loadProdTypes,
-      getStock, setAssign, setAssignMany, loadCartons, applyCartons, save, remove,
+      getStock, setAssign, setAssignMany, loadCartons, applyCartons, save, saveWarning, remove,
     },
   };
 }

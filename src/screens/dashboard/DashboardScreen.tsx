@@ -160,7 +160,7 @@ function MonthlyReportCard({
         <Text style={styles.monthlyReportKicker}>
           {view === 'owner' ? 'OWNER' : 'MY VIEW'} · MONTHLY REPORT
         </Text>
-        <Text style={styles.monthlyReportTitle}>Monthly Report</Text>
+        <Text style={styles.monthlyReportTitle}>{view === 'my' ? 'MY MONTHLY REPORT' : 'Monthly Report'}</Text>
         <Text style={styles.monthlyReportSub}>
           {label} · Sales order, billing and collection
         </Text>
@@ -484,6 +484,8 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     production: canAccess('dashboard.production_detail'),
     collection: canAccess('dashboard.collection_detail'),
     payment: canAccess('dashboard.payment_detail'),
+    paymentsMade: canAccess('dashboard.payments_made_detail'),
+    samples: canAccess('dashboard.samples_detail'),
     outstanding: canAccess('dashboard.outstanding_detail'),
   }), [canAccess]);
 
@@ -598,7 +600,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                 'dashboard.monthly_target': () => (
                   <TargetSummary
                     cards={cards}
-                    label={periodLabel}
+                    label={view === 'my' ? `MY ${periodLabel}` : periodLabel}
                     amountMode={amountMode}
                     fyLabel={targetFY.label}
                     onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}

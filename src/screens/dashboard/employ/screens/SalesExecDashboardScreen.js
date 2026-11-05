@@ -1304,7 +1304,7 @@ export default function SalesExecDashboardScreen({
             <SectionCard>
               <SectionHeader
                 icon="📊"
-                title="SALES"
+                title={isMyView ? 'MY SALES' : 'SALES'}
                 bgColor={COLORS.salesBg}
                 badgeAction={`FY ${fyLabel}`}
                 onBadgeAction={() => openMyFy('sales')}
@@ -1364,7 +1364,7 @@ export default function SalesExecDashboardScreen({
             <SectionCard>
               <SectionHeader
                 icon="💰"
-                title="PAYMENT COLLECTION"
+                title={isMyView ? 'MY PAYMENT COLLECTION' : 'PAYMENT COLLECTION'}
                 bgColor={COLORS.collBg}
                 badgeAction={`FY ${fyLabel}`}
                 onBadgeAction={() => openMyFy('collections')}
@@ -1450,10 +1450,23 @@ export default function SalesExecDashboardScreen({
             <SectionCard>
               <SectionHeader
                 icon="⚠️"
-                title="OUTSTANDING"
+                title={isMyView ? 'MY OUTSTANDING' : 'OUTSTANDING'}
                 bgColor={COLORS.outsBg}
                 badgeAction={`FY ${fyLabel}`}
                 onBadgeAction={() => openMyFy('outstanding')}
+                action="Full report"
+                onAction={() => router.push({
+                  pathname: '/new/(tabs)/reports/collection-flow',
+                  params: {
+                    mode: 'outstanding',
+                    view: isMyView ? 'my' : 'owner',
+                    date,
+                    prptype: getUserPrptype,
+                    report_month: String(date).slice(0, 7).replace('-', ''),
+                    expected_month: String(date).slice(0, 7).replace('-', ''),
+                    level: 'executives',
+                  },
+                })}
               />
               <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
               {/* <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" /> */}

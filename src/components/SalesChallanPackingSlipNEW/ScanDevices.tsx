@@ -22,7 +22,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { cleanScannerValue } from '../WarehouseNEW/model';
-import { triggerUrovoScan, useUrovoScanner } from '../WarehouseNEW/useUrovoScanner';
+import { getUrovoDiagnostics, triggerUrovoScan, useUrovoScanner } from '../WarehouseNEW/useUrovoScanner';
 import WebCameraScanner, { hasWebBarcodeDetector } from './WebCameraScanner';
 import { isWeb, useWebWedge, wedgeInputProps } from './webWedge';
 import type { WedgeDiag } from './webWedge';
@@ -38,7 +38,19 @@ const SAME_QR_SUPPRESS_MS = 700;
 
 /* ------------------------------ hardware (Urovo + keyboard wedge) ------------------------------ */
 
-export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: string) => void; enabled: boolean; compact?: boolean }) {
+type HwProps = { onScan: (code: string) => void; enabled: boolean; compact?: boolean; paused?: boolean };
+
+/**
+ * Mount ONCE per screen (like WarehouseNEW HardwareScanStep): every mount calls UrovoScanner.start() and every
+ * unmount UrovoScanner.stop(). `paused` keeps the engine running but ignores scans (e.g. while "Type a label" is
+ * open). "Retry" remounts the engine when start() reported nothing.
+ */
+export function HardwareScanner(props: HwProps) {
+  const [attempt, setAttempt] = useState(0);
+  return <HardwareScannerEngine key={attempt} {...props} onRetry={() => setAttempt((a) => a + 1)} />;
+}
+
+function HardwareScannerEngine({ onScan, enabled, compact, paused, onRetry }: HwProps & { onRetry: () => void }) {
   const gate = useRef(false);
   const timers = useRef<any[]>([]);
   const later = (fn: () => void, ms: number) => { timers.current.push(setTimeout(fn, ms)); };
@@ -46,13 +58,14 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
   // latest props for callbacks fired by native events / timers (never a stale closure)
   const scanRef = useRef(onScan); scanRef.current = onScan;
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
+  const pausedRef = useRef(!!paused); pausedRef.current = !!paused;
 
   const [message, setMessage] = useState('');
   const [lastRaw, setLastRaw] = useState('');
 
   const take = (value: string) => {
     const v = cleanScan(value);
-    if (!v) return;
+    if (!v || pausedRef.current) return;
     if (!enabledRef.current) { setMessage('Cartons are still loading — scan again in a moment.'); return; }
     if (gate.current) return;
     gate.current = true;
@@ -67,7 +80,7 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
 
   // 2a. Browser: page-level keyboard-wedge listener (see webWedge.ts)
   const webInput = useRef<HTMLInputElement | null>(null);
-  useWebWedge(isWeb, webInput, take, (d: WedgeDiag) => {
+  useWebWedge(isWeb && !paused, webInput, take, (d: WedgeDiag) => {
     if (d.chars === 0) setMessage(`${d.ended === 'tab' ? 'Tab' : 'Enter'} received without text — set Urovo Output mode to Keyboard.`);
   });
 
@@ -79,7 +92,7 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
   const idle = useRef<any>(null);
   useEffect(() => {
     if (isWeb) return undefined;
-    const t = setInterval(() => wedge.current?.focus?.(), 500);
+    const t = setInterval(() => { if (!pausedRef.current) wedge.current?.focus?.(); }, 500);
     return () => clearInterval(t);
   }, []);
   const submit = () => {
@@ -105,12 +118,19 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
         : { text: 'No Urovo engine — keyboard scanner only', color: T.muted };
   const canTrigger = !isWeb && hw.state === 'active' && enabled;
 
+  /** What UrovoScanner.getDiagnostics() reports — to compare with WarehouseNEW on the same device. */
+  const showDiagnostics = async () => {
+    const d = await getUrovoDiagnostics();
+    const text = d ? Object.entries(d).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`).join('\n') : 'UrovoScanner module not found in this app build.';
+    AppAlert.alert(`Scanner engine: ${hw.state}`, text, [{ text: 'OK' }]);
+  };
+
   const hiddenInput = (
     <>
       {isWeb ? React.createElement('input', wedgeInputProps(webInput)) : null}
       {!isWeb ? (
         <TextInput ref={wedge} value={shown} onChangeText={onWedge} onSubmitEditing={submit} blurOnSubmit={false} autoFocus
-          showSoftInputOnFocus={false} inputMode="none" caretHidden style={st.wedge} accessibilityLabel="Hardware scanner input" />
+          showSoftInputOnFocus={false} caretHidden style={st.wedge} accessibilityLabel="Hardware scanner input" />
       ) : null}
     </>
   );
@@ -132,6 +152,17 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
             <Icon name="qr-code-scanner" size={22} color="#fff" />
           </TouchableOpacity>
         ) : null}
+        {!isWeb && hw.state !== 'active' ? (
+          // Engine did not report "active": restart it, or show what the native module says.
+          <>
+            <TouchableOpacity onPress={onRetry} accessibilityRole="button" accessibilityLabel="Restart scanner engine" style={st.slimSmall}>
+              <Icon name="refresh" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={showDiagnostics} accessibilityRole="button" accessibilityLabel="Scanner diagnostics" style={st.slimSmall}>
+              <Icon name="info-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </>
+        ) : null}
       </View>
     );
   }
@@ -148,7 +179,6 @@ export function HardwareScanner({ onScan, enabled, compact }: { onScan: (code: s
           blurOnSubmit={false}
           autoFocus
           showSoftInputOnFocus={false}
-          inputMode="none"
           caretHidden
           style={st.wedge}
           accessibilityLabel="Hardware scanner input"
@@ -292,6 +322,7 @@ const st = StyleSheet.create({
   slim: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: T.nav, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
   slimTitle: { color: '#fff', fontSize: 12.5, fontWeight: '900' },
   slimText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', marginTop: 1 },
+  slimSmall: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   slimBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center' },
   camBox: { height: 280, borderRadius: 16, overflow: 'hidden', backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: T.nav },

@@ -317,6 +317,9 @@ export default function CollectionFlowScreen() {
           prptype,
           report_type: mode,
           level,
+          // The server must resolve the logged-in user's assignment for My View;
+          // never fall back to owner scope during a full-report navigation.
+          view: analyticsView,
           executive_code: executiveCode || undefined,
           executive_name: executiveName || undefined,
           party_code: partyCode || undefined,

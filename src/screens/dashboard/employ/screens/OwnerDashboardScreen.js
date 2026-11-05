@@ -579,6 +579,7 @@
 // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
 // // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // import SalesDashboardCard from '../components/SalesDashboardCard';
+// import PaymentsMadeCard from '../components/PaymentsMadeCard';
 // // import {
 // //   ColHeader,
 // //   COLORS,
@@ -1623,6 +1624,7 @@
 // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
 // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // import SalesDashboardCard from '../components/SalesDashboardCard';
+// import PaymentsMadeCard from '../components/PaymentsMadeCard';
 // import {
 //   ColHeader,
 //   COLORS,
@@ -2706,6 +2708,8 @@ import { api, formatAmount } from '../api/api';
 import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
 import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 import SalesDashboardCard from '../components/SalesDashboardCard';
+import PaymentsMadeCard from '../components/PaymentsMadeCard';
+import SamplesDashboardCard from '../components/SamplesDashboardCard';
 import {
   ColHeader,
   COLORS,
@@ -2722,8 +2726,8 @@ import { OWNER_DASHBOARD_TOUR } from './DashboardTours';
 // ERP-dashboard columns (UI only). 'lead' = Monthly Target + Monthly Report
 // handed down from DashboardScreen so Sales follows them in column 1.
 const OWNER_LAYOUT = {
-  2: [['lead', 'sales', 'payment'], ['production', 'collection', 'outstanding']],
-  3: [['lead', 'sales'], ['production', 'collection'], ['outstanding', 'payment']],
+  2: [['lead', 'sales', 'payment'], ['production', 'samples', 'collection', 'payments_made', 'outstanding']],
+  3: [['lead', 'sales'], ['production', 'samples', 'collection'], ['payments_made', 'outstanding', 'payment']],
 };
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
@@ -2798,7 +2802,7 @@ export default function OwnerDashboardScreen({
   navigation,
   route,
   getUserPrptype,
-  visibleSections = { sales: true, production: true, collection: true, payment: true, outstanding: true },
+  visibleSections = { sales: true, production: true, collection: true, payment: true, outstanding: true, paymentsMade: false, samples: false },
   showAmountControl = true,
   lead, // array of cards -> embedded in the Business Dashboard grid (UI only)
   columns,
@@ -3271,6 +3275,22 @@ export default function OwnerDashboardScreen({
 
             </Slot>
             {/* ── PAYMENT COLLECTION SECTION ── */}
+            <Slot name="samples">
+              {visibleSections.samples && !!getUserPrptype && (
+                <SamplesDashboardCard
+                  prptype={getUserPrptype}
+                  date={dateString}
+                  onOpenReport={(stage = 'overview') => router.push({
+                    pathname: '/new/(tabs)/sampling-hub',
+                    params: { from_dashboard: 'samples', stage, date: dateString },
+                  })}
+                  onOpenSample={(sample_id) => router.push({
+                    pathname: '/new/(tabs)/sampling-hub',
+                    params: { from_dashboard: 'samples', stage: 'sample', sample_id, date: dateString },
+                  })}
+                />
+              )}
+            </Slot>
             <Slot name="collection">
               {visibleSections.collection && collection?.total && Array.isArray(collection?.daily_trend) && hasCollectionRows && (
                 <SectionCard>
@@ -3365,6 +3385,30 @@ export default function OwnerDashboardScreen({
 
             </Slot>
             {/* ── PAYMENT TO PAY SECTION ── */}
+            {/* Separate from uncleared PAYMENT TO PAY. Independent role/user override. */}
+            <Slot name="payments_made">
+              {visibleSections.paymentsMade && !!getUserPrptype && (
+                <PaymentsMadeCard
+                  prptype={getUserPrptype}
+                  date={dateString}
+                  amountMode={amountMode}
+                  onFullReport={() => router.push({
+                    pathname: '/new/(tabs)/reports/payments-made',
+                    params: { prptype: getUserPrptype, date: dateString, period: 'month' },
+                  })}
+                  onOpenFY={() => router.push({
+                    pathname: '/new/(tabs)/reports/payments-made',
+                    params: { prptype: getUserPrptype, date: dateString, period: 'fy' },
+                  })}
+                  onOpenPayment={(entry) => router.push({
+                    pathname: '/new/(tabs)/reports/payments-made',
+                    params: { prptype: getUserPrptype, date: dateString,
+                      period: 'day', day: String(entry.entry_date), party_code: String(entry.party_code),
+                      voucher_uid: String(entry.payment_uid), voucher_srno: String(entry.payment_srno) },
+                  })}
+                />
+              )}
+            </Slot>
             <Slot name="payment">
               {visibleSections.payment && payment?.total && Array.isArray(payment?.by_party) && (
                 <SectionCard>

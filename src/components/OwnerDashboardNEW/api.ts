@@ -428,6 +428,7 @@ export async function getProdOrderStageDashboard(
 //   GET {API}/api/getprodordersalesinvoicedashboard?prpcode&yearno&trackid  -> Sales bills
 //   GET {API}/api/salesorderfromproductionorder?prpcode&yearno&trackid      -> Sales orders on this production order
 //   GET {API}/api/getprodbeamplantrackid?prpcode&yearno&trackid             -> Beam plan vs actual
+//   GET {API}/api/getmisseddata?prpcode&yearno&trackid                      -> Missed data of one production order (grid button)
 //   All three return { data: [...] }; ./prodOrderModel.ts parses each row type.
 type ProdOrderPartParams = { prpcode: string; yearno: string; trackid: string };
 
@@ -473,6 +474,9 @@ export const getSalesOrderFromProductionOrder = (API: string, token: string, par
 
 export const getProdBeamPlanTrackId = (API: string, token: string, params: ProdOrderPartParams) =>
   prodOrderPartGet(API, token, 'getprodbeamplantrackid', params, 'beam plan');
+
+export const getMissedData = (API: string, token: string, params: ProdOrderPartParams) =>
+  prodOrderPartGet(API, token, 'getmisseddata', params, 'missed data');
 
 /* ------------------------------------------------------------------ */
 /* Executive dropdown (get_criterion)                                  */

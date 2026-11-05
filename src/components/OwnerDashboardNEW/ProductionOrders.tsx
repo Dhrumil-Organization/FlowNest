@@ -17,9 +17,9 @@
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, BackHandler, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CONTENT_MAX, IconBtn, PanelHeader, SearchBox } from '../erpUi';
-import { getProdOrderDashboard, getProdOrderStageDashboard, OwnerSummaryError } from './api';
+import { getMissedData, getProdOrderDashboard, getProdOrderStageDashboard, OwnerSummaryError } from './api';
 import { Card, Col, Fact, Legend, MiniTable, Pill, pillColor, StageDot, StageStrip, StateBox } from './OrderTracker';
 import {
   beamsText,
@@ -79,6 +79,50 @@ function ExecChip({ name }: { name: string | null }) {
       <Text style={st.chipText} numberOfLines={1}>
         {name}
       </Text>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* "Missed data" button (grid)                                         */
+/* ------------------------------------------------------------------ */
+//   GET /api/getmisseddata?prpcode=SIP&yearno=<yy>&trackid=<row TrackId>   (see ./api.ts -> getMissedData)
+//   No popup: only the API's "message" is shown, as a small notice at the bottom of the screen (auto-hides).
+
+type Notice = { text: string; error: boolean };
+const NOTICE_MS = 4000;
+
+function MissedDataButton({ onPress, loading, compact }: { onPress: () => void; loading?: boolean; compact?: boolean }) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      disabled={loading}
+      onPress={(e: any) => {
+        e?.stopPropagation?.(); // do not also open the production order detail
+        onPress();
+      }}
+      style={[st.missBtn, compact && st.missBtnCompact, loading && { opacity: 0.7 }]}
+      accessibilityRole="button"
+      accessibilityLabel="Show missed data"
+      accessibilityState={{ busy: !!loading, disabled: !!loading }}
+    >
+      {loading ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="sync" size={compact ? 16 : 18} color="#fff" />}
+      <Text style={[st.missBtnText, compact && { fontSize: 12 }]} numberOfLines={1}>
+        Missed data
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function NoticeBar({ notice }: { notice: Notice | null }) {
+  if (!notice) return null;
+  const color = notice.error ? T.red : T.green;
+  return (
+    <View style={st.noticeWrap} pointerEvents="none">
+      <View style={[st.notice, { borderColor: color }]} accessibilityLiveRegion="polite">
+        <Icon name={notice.error ? 'error-outline' : 'check-circle'} size={28} color={color} />
+        <Text style={st.noticeText}>{notice.text}</Text>
+      </View>
     </View>
   );
 }
@@ -248,6 +292,34 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProdFilter>('all');
   const [selected, setSelected] = useState<ProdOrderRow | null>(null);
+  const [missBusy, setMissBusy] = useState<string | null>(null); // TrackId whose "Missed data" call is running
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showNotice = useCallback((text: string, error = false) => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setNotice({ text, error });
+    noticeTimer.current = setTimeout(() => setNotice(null), NOTICE_MS);
+  }, []);
+  useEffect(() => () => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+  }, []);
+
+  // "Missed data" button -> getmisseddata for that row's TrackId -> show only the API's message
+  const runMissed = useCallback(
+    async (r: ProdOrderRow) => {
+      setMissBusy(r.TrackId);
+      try {
+        const body = await getMissedData(API, token, { prpcode: PRP_CODE, yearno: stageYearNo(), trackid: r.TrackId });
+        showNotice(String(body?.message ?? '').trim() || 'Done.');
+      } catch (err: any) {
+        showNotice((err as OwnerSummaryError)?.message || 'Unable to fetch missed data.', true);
+      } finally {
+        setMissBusy(null);
+      }
+    },
+    [API, token, showNotice],
+  );
   const [width, setWidth] = useState(0);
   const [limit, setLimit] = useState(PAGE);
   const seq = useRef(0);
@@ -383,8 +455,9 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
       { key: 'stages', label: 'Stages', flex: 2.8, render: (r) => <StageStrip defs={defs} stages={stageCells(r, defs)} /> },
       { key: 'now', label: 'Now at', flex: 2, render: (r) => <NowPill row={r} /> },
       { key: 'sold', label: 'Sold', flex: 0.7, align: 'right', render: (r) => pct(num(r.SoldPercent)) },
+      { key: 'miss', label: 'Action', flex: 1.25, align: 'center', render: (r) => <MissedDataButton compact loading={missBusy === r.TrackId} onPress={() => void runMissed(r)} /> },
     ],
-    [defs],
+    [defs, missBusy, runMissed],
   );
 
   // All -> the API's summary; one executive -> counted from his / her rows
@@ -535,8 +608,13 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
                 </View>
 
                 <View style={st.orderFoot}>
-                  <NowPill row={r} />
-                  <Icon name="chevron-right" size={20} color={T.muted} />
+                  <View style={{ flexShrink: 1, minWidth: 0 }}>
+                    <NowPill row={r} />
+                  </View>
+                  <View style={st.footRight}>
+                    <MissedDataButton loading={missBusy === r.TrackId} onPress={() => void runMissed(r)} />
+                    <Icon name="chevron-right" size={20} color={T.muted} />
+                  </View>
                 </View>
               </TouchableOpacity>
             ))
@@ -574,6 +652,7 @@ export default function ProductionOrders({ token, API, prptype = 'S', onBack, ex
       </ScrollView>
 
       {selected ? <ProdOrderDetail row={selected} session={{ API, token }} onBack={() => setSelected(null)} /> : null}
+      <NoticeBar notice={notice} />
     </View>
   );
 }
@@ -682,6 +761,50 @@ const st = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: T.hair,
   },
+
+  footRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+
+  // "Missed data" button
+  missBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: T.copper,
+    alignSelf: 'center',
+    shadowColor: T.copper,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  missBtnCompact: { height: 32, paddingHorizontal: 12, borderRadius: 9, gap: 6 },
+  missBtnText: { fontFamily: FONT, fontSize: 13.5, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
+
+  // "Missed data" message notice
+  noticeWrap: { position: 'absolute', left: 0, right: 0, bottom: 28, alignItems: 'center', paddingHorizontal: 16, zIndex: 40, elevation: 40 },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 300,
+    maxWidth: 600,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderLeftWidth: 6,
+    backgroundColor: T.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  noticeText: { flexShrink: 1, fontFamily: FONT, fontSize: 16, lineHeight: 22, fontWeight: '800', color: T.ink },
 
   // detail
   poBar: {

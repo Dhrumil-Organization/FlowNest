@@ -29,7 +29,7 @@
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, Vibration, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, BackHandler, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, Vibration, View, useWindowDimensions } from 'react-native';
 import { confirmAsync } from '../ProductionOrderNEW/ui';
 import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
 import { apiErrorText } from './api';
@@ -176,7 +176,16 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
   }, [inLoc, filter, q]);
   const hidden = counts[filter] - shown.length;
 
-  if (!row) return null;
+  // Android Back: camera → cartons → locations → slip (the screen is a step of the form, not a Modal, so the
+  // Urovo engine runs in the same window as WarehouseNEW's scanner step).
+  const closeRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !open) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeRef.current(); return true; });
+    return () => sub.remove();
+  }, [open]);
+
+  if (!row || !open) return null;
 
   // Allowed qty = balance + order qty × extraqtyper % (getsetchallan) — same as the web ItemDetail / CartonSelect.
   const orderQty = orderQtyOf(row, d1);
@@ -302,6 +311,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
     if (dirty && !(await confirmAsync('Leave without adding?', 'Cartons selected now will not be added to the packing slip.', 'Leave'))) return;
     onClose();
   };
+  closeRef.current = () => { close(); };
   const done = () => {
     const issue = cartonsIssue(row, scanned, others, target);
     dbg('done', { issue: issue || 'none', allowed: !issue });
@@ -318,7 +328,8 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
   const scannerBar = (
     <View style={{ marginBottom: 10 }}>
       {device === 'hardware' ? (
-        overlay ? null : <HardwareScanner onScan={read} enabled={ready} compact />
+        // mounted once for the whole carton screen — paused (not stopped) while "Type a label" is open
+        <HardwareScanner onScan={read} enabled={ready} paused={overlay} compact />
       ) : (
         <View style={st.camBar}>
           <Icon name="photo-camera" size={20} color="#fff" />
@@ -369,7 +380,6 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
   );
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={close} presentationStyle="fullScreen">
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         {/* ---------- app bar ---------- */}
         <View style={st.appBar}>
@@ -389,7 +399,12 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
           ) : null}
         </View>
 
-        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: phone ? 12 : 14, paddingBottom: 24, alignItems: 'center' }} keyboardShouldPersistTaps="always">
+        {/* scanner bar: outside the scroll and the view switch, so the engine is started once */}
+        <View style={{ paddingHorizontal: phone ? 12 : 14, paddingTop: 10, alignItems: 'center' }}>
+          <View style={{ width: '100%', maxWidth: 900 }}>{scannerBar}</View>
+        </View>
+
+        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: phone ? 12 : 14, paddingTop: 0, paddingBottom: 24, alignItems: 'center' }} keyboardShouldPersistTaps="always">
           <View style={{ width: '100%', maxWidth: 900 }}>
             {view === 'locations' ? (
               <>
@@ -417,7 +432,6 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
                   </View>
                 </View>
 
-                {scannerBar}
                 {strips}
 
                 {/* ---------- locations ---------- */}
@@ -471,7 +485,6 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
               </>
             ) : (
               <>
-                {scannerBar}
                 {strips}
 
                 {/* ---------- carton list (one location, or all) ---------- */}
@@ -522,7 +535,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
               <>
                 <Btn kind="ghost" icon="list" label="All cartons" onPress={() => openLocation(null)} disabled={!rows.length} />
                 {/* the only way back to the slip with the selection */}
-                <Btn flex kind="copper" icon="check" label={`Back to slip · ${scanned.length} carton${scanned.length === 1 ? '' : 's'}`} onPress={done} />
+                <Btn flex kind="copper" icon="check" label={phone ? `Back to slip · ${scanned.length}` : `Back to slip · ${scanned.length} carton${scanned.length === 1 ? '' : 's'}`} onPress={done} />
               </>
             ) : (
               // a location's cartons: Done goes back to the location summary, never to the slip
@@ -531,7 +544,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
           </View>
         </View>
 
-        {/* ---------- camera / type a label (over the list, same Modal — no nested modal / focus trap on web) ---------- */}
+        {/* ---------- camera / type a label (over the list — no nested modal / focus trap on web) ---------- */}
         {overlay ? (
           <View style={st.overlay}>
             <View style={st.appBar}>
@@ -584,7 +597,6 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
           </View>
         ) : null}
       </View>
-    </Modal>
   );
 }
 
@@ -752,7 +764,7 @@ const Info = ({ label, value, last, phone }: { label: string; value?: string; la
 );
 
 const st = {
-  appBar: { backgroundColor: T.nav, paddingTop: Platform.OS === 'ios' ? 52 : 14, paddingBottom: 14, paddingHorizontal: 12, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10 },
+  appBar: { backgroundColor: T.nav, paddingTop: 14, paddingBottom: 14, paddingHorizontal: 12, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10 },
   footer: { backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, paddingHorizontal: 14, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 14, alignItems: 'center' as const },
   camBar: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, backgroundColor: T.nav, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
   camBarTitle: { color: '#fff', fontSize: 12.5, fontWeight: '900' as const },

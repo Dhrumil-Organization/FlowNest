@@ -8,16 +8,16 @@
 import { T } from '@/src/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { confirmAsync } from '../ProductionOrderNEW/ui';
 import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
-import type { Api, Ctx, Mode, PartyScope, Row } from './api';
+import { confirmAsync } from '../ProductionOrderNEW/ui';
 import AllocateStep from './AllocateStep';
+import type { Api, Ctx, Mode, PartyScope, Row } from './api';
 import CartonScanSheet from './CartonScanSheet';
-import type { ScanDevice } from './ScanDevices';
 import { SlipStrip, SlipSummary, StockLine } from './Lines';
 import OrderSheet from './OrderSheet';
 import ProdTypeSheet from './ProdTypeSheet';
 import { opensPendingOrders, pick, qty, splitTypes } from './rules';
+import type { ScanDevice } from './ScanDevices';
 import SlipStep from './SlipStep';
 import { Steps, Tag } from './ui';
 import { useSlipForm } from './useSlipForm';
@@ -56,7 +56,7 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
   const [saved, setSaved] = useState(false); // tell the list to reload on Back
 
   const mode = nav.mode;
-  const { f, stock, meta, extraPer, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
+  const { f, stock, meta, busy, problem, totals, actions } = useSlipForm(api, ctx, mode, nav.uid, { assignRight: rights.assign, scope });
 
   const go = (m: Mode, id?: string, msg?: { tone: 'ok' | 'err' | 'info'; text: string }) => {
     const next = allowed(m, id);

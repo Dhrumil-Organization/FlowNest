@@ -14,7 +14,7 @@ import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } fr
 import { errorMessage, fetchExecutives, fetchParties } from './api';
 import { buildSelectedParty, filterParties, OrderCtx, Row } from './model';
 import { Nav } from './nav';
-import { CONTENT, ListSkeleton, PropertyChip, SearchInput, useCols } from './ui';
+import { CONTENT, ListSkeleton, SearchInput, useCols } from './ui';
 
 export type PartyParams = {
   ctx: OrderCtx;
@@ -122,7 +122,6 @@ export default function PartyStep({ token, API, nav, params }: Props) {
         crumbs={['Yarn Sales Order', crumb || (purpose === 'replace' ? 'Change party' : 'New order')]}
         title={title || 'Select Party'}
         subtitle={loading ? undefined : `${filteredParties.length} of ${parties.length} parties`}
-        right={<PropertyChip name={ctx.prpname} />}
       />
       <View style={[CONTENT, st.searchWrap]}>
         <SearchInput

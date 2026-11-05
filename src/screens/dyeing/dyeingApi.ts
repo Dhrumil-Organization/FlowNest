@@ -61,7 +61,7 @@ export const DyeingService = {
     (USE_MOCK ? mockDyeingMillHub(body) : DyeingAPI.millHub(body)),
 
   /** Mill Hub tab — outward lots (job outward GRYOut) of the range with their inward / shortage. */
-  millHubReport: (body: Ctx & { fromdate: string; todate: string }) =>
+  millHubReport: (body: Ctx & { fromdate: string; todate: string; direction?: 'outward' | 'inward' }) =>
     (USE_MOCK ? mockMillHubReport(body) : DyeingAPI.millHubReport(body)),
 
   /** Mill Hub — on-click detail of one outward lot (taka-wise out vs in, inward entries). */

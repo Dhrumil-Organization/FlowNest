@@ -8,16 +8,16 @@
 import { T } from '@/src/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { confirmAsync } from '../ProductionOrderNEW/ui';
 import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
-import type { Api, Ctx, Mode, PartyScope, Row } from './api';
+import { confirmAsync } from '../ProductionOrderNEW/ui';
 import AllocateStep from './AllocateStep';
+import type { Api, Ctx, Mode, PartyScope, Row } from './api';
 import CartonScanSheet from './CartonScanSheet';
-import type { ScanDevice } from './ScanDevices';
 import { SlipStrip, SlipSummary, StockLine } from './Lines';
 import OrderSheet from './OrderSheet';
 import ProdTypeSheet from './ProdTypeSheet';
 import { opensPendingOrders, pick, qty, splitTypes } from './rules';
+import type { ScanDevice } from './ScanDevices';
 import SlipStep from './SlipStep';
 import { Steps, Tag } from './ui';
 import { useSlipForm } from './useSlipForm';
@@ -79,9 +79,13 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
   // Android back = previous step.
   useEffect(() => {
     if (Platform.OS !== 'android') return undefined;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (step === 2 && (mode === 'add' || mode === 'edit')) setStep(1); else back(); return true; });
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (scanRow) return false; // the carton screen handles its own Back (camera → cartons → locations → slip)
+      if (step === 2 && (mode === 'add' || mode === 'edit')) setStep(1); else back();
+      return true;
+    });
     return () => sub.remove();
-  }, [step, mode, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, mode, saved, scanRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   /* ------------------------------ actions ------------------------------ */
@@ -220,6 +224,19 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
 
   const maxW = wide && side ? 1180 : 680;
 
+  const cartonScreen = (
+    <CartonScanSheet open={!!scanRow} row={scanRow} d1={f.d1 || []} extraPer={extraPer} d2={f.d2 || []} uid={f.UId} device={scanDevice} loadCartons={actions.loadCartons}
+      onClose={() => setScanRow(null)}
+      onDone={(sr, cartons) => {
+        actions.applyCartons(sr, cartons);
+        setScanRow(null);
+        setFlash({ tone: 'info', text: `Sr ${sr}: ${cartons.length} carton${cartons.length === 1 ? '' : 's'} ready. Tap Save cartons to keep them.` });
+      }} />
+  );
+  // Carton selection is a STEP of this screen (like WarehouseNEW's scanner step), not a Modal: on Android a Modal is
+  // a separate dialog window, and the Urovo scan engine reported "none" there while it works in WarehouseNEW.
+  if (scanRow) return <View style={{ flex: 1, backgroundColor: T.bg }}>{cartonScreen}</View>;
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24, alignItems: 'center' }} keyboardShouldPersistTaps="handled">
@@ -256,13 +273,6 @@ export default function SlipForm({ api, ctx, facility, onFacility, mode: startMo
         onAdd={(rows) => { actions.addOrders(rows); setSheet(''); }} />
       <ProdTypeSheet open={sheet === 'types'} onClose={() => setSheet('')} value={splitTypes(f.ProdTtype)} prpType={meta.prpType}
         load={actions.loadProdTypes} onApply={(codes) => { actions.set('ProdTtype', codes); setSheet(''); }} />
-      <CartonScanSheet open={!!scanRow} row={scanRow} d2={f.d2 || []} uid={f.UId} device={scanDevice} loadCartons={actions.loadCartons}
-        onClose={() => setScanRow(null)}
-        onDone={(sr, cartons) => {
-          actions.applyCartons(sr, cartons);
-          setScanRow(null);
-          setFlash({ tone: 'info', text: `Sr ${sr}: ${cartons.length} carton${cartons.length === 1 ? '' : 's'} ready. Tap Save cartons to keep them.` });
-        }} />
     </KeyboardAvoidingView>
   );
 }

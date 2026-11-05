@@ -204,7 +204,7 @@ export default function MyViewProductionCard({ permitted, date, prptype, refresh
     <SectionCard>
       <SectionHeader
         icon="⚙️"
-        title="PRODUCTION"
+        title="MY PRODUCTION"
         bgColor={COLORS.prodBg}
         subtitle={coverageSubtitle(data?.period)}
         badgeAction={`FY ${fyLabel(date)}`}

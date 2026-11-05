@@ -22,6 +22,8 @@ registerPermissionArea({
         { key: 'production_detail', name: 'Production Detail Card', type: 'widget', displayOrder: 120, actions: [] },
         { key: 'collection_detail', name: 'Payment Collection Detail Card', type: 'widget', displayOrder: 130, actions: [] },
         { key: 'payment_detail', name: 'Payment To Pay Detail Card', type: 'widget', displayOrder: 135, actions: [] },
+        { key: 'payments_made_detail', name: 'Payments Made Detail Card', type: 'widget', displayOrder: 136, actions: [] },
+        { key: 'samples_detail', name: 'Samples Detail Card', type: 'widget', displayOrder: 138, actions: [] },
         { key: 'outstanding_detail', name: 'Outstanding Detail Card', type: 'widget', displayOrder: 140, actions: [] },
         { key: 'creditor_dashboard', name: 'Creditor Dashboard', type: 'screen', displayOrder: 137, actions: [] },
       ],
@@ -52,8 +54,6 @@ registerPermissionArea({
         },
         // Reports → Real Costing Chain (RealCostChainController): assumed vs actual cost per metre, design → beam
         { key: 'real_costing', name: 'Real Costing Chain', type: 'report', displayOrder: 45, actions: [] },
-        // Reports → Assign Report: the web ERP's "Reports" (get_user_saved_report_settings + rpt_gateway) on FlowNest
-        { key: 'assign_report', name: 'Assign Report', type: 'report', displayOrder: 50, actions: [{ key: 'export', name: 'Export' }] },
       ],
     },
   ],

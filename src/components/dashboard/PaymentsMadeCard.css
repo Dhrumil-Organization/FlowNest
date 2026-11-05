@@ -1,0 +1,56 @@
+.pm-card { --pm-ink: #0d1a29; --pm-brown: #8d4b32; --pm-border: #e7e0d9; --pm-muted: #a6a3a1; background: #fff; color: var(--pm-ink); border: 1px solid var(--pm-border); border-radius: 14px; overflow: hidden; min-width: 0; box-shadow: 0 2px 8px rgba(25,24,22,.05); font-family: inherit; }
+.pm-card * { box-sizing: border-box; }
+.pm-card button { font-family: inherit; cursor: pointer; }
+.pm-card-head { height: 31px; background: var(--pm-brown); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 11px; gap: 10px; }
+.pm-card-title { font-size: 11px; font-weight: 850; line-height: 1; letter-spacing: .1px; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.pm-title-icon { font-size: 13px; line-height: 1; }
+.pm-head-actions { display: inline-flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
+.pm-fy { border: 1px solid #d6b09f; border-radius: 11px; padding: 1px 7px; font-size: 10px; line-height: 15px; font-weight: 750; color: #fff; }
+.pm-full-report { border: 0; padding: 0; background: transparent; color: #fff; font-size: 10px; font-weight: 800; }
+.pm-full-report:hover { text-decoration: underline; }
+.pm-from-accounts { font-size: 10px; opacity: .96; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.pm-content { padding: 12px 12px 9px; position: relative; }
+.pm-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+.pm-totals > div { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.pm-totals strong { font-size: 15px; letter-spacing: -.25px; line-height: 1.25; color: #111827; font-weight: 850; font-variant-numeric: tabular-nums; }
+.pm-totals .pm-today { color: #236b4c; }
+.pm-kicker { color: #9b8a7f; text-transform: uppercase; letter-spacing: .5px; font-size: 9px; font-weight: 800; }
+.pm-chart-section { position: relative; padding-top: 15px; margin-bottom: 2px; }
+.pm-bars { display: grid; grid-auto-columns: minmax(0,1fr); grid-auto-flow: column; gap: 2px; width: 100%; height: 80px; overflow-x: auto; align-items: end; scrollbar-width: none; }
+.pm-bars::-webkit-scrollbar { display: none; }
+.pm-chart-day { min-width: 8px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; border: 0; padding: 0; background: transparent; height: 80px; position: relative; }
+.pm-bar-track { flex: 1; height: 63px; width: 100%; display: flex; justify-content: center; align-items: flex-end; }
+.pm-bar { width: min(8px,82%); background: linear-gradient(180deg,#97543b,#b88d7f); border-radius: 2px 2px 0 0; transition: height .2s ease, background-color .16s; }
+.pm-chart-day.is-selected .pm-bar { background: #206547; }
+.pm-chart-day.is-hovered .pm-bar { filter: brightness(.84); }
+.pm-chart-day:focus-visible { outline: 2px solid #3579b7; outline-offset: 1px; }
+.pm-tick { color: #aaa9a8; font-size: 9px; margin-top: 6px; line-height: 12px; }
+.pm-chart-tooltip { position: absolute; right: 5px; top: -27px; background: #122235; color: white; border-radius: 6px; z-index: 3; padding: 7px 9px; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 5px 20px #0003; white-space: nowrap; pointer-events: none; }
+.pm-chart-tooltip strong { font-size: 11px; }
+.pm-chart-tooltip span { font-size: 10px; color: #e2e8f0; }
+.pm-divider { height: 5px; margin: 0 0 7px; border-bottom: 1px solid #e6e3e0; box-shadow: 0 4px 4px -3px #ddd; }
+.pm-days { display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; gap: 6px; padding: 0 0 2px; scrollbar-width: thin; }
+.pm-day-pill { background: #efebe7; border: 0; color: #94755c; font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; font-size: 10px; font-weight: 750; border-radius: 20px; padding: 4px 10px; white-space: nowrap; }
+.pm-day-pill.is-active { color: #236c4c; background: #e3ece8; }
+.pm-day-pill:focus-visible { outline: 2px solid #337a5f; }
+.pm-day-empty { font-size: 11px; color: #9f9b97; }
+.pm-selected-caption { color: #b0aaa8; font-size: 9px; margin: 9px 0 3px; font-weight: 750; letter-spacing: .3px; }
+.pm-payment-list { max-height: 150px; min-height: 55px; overflow-y: auto; scrollbar-width: thin; }
+.pm-payment-item { width: 100%; text-align: left; display: flex; align-items: center; gap: 9px; padding: 8px 0; background: white; border: 0; border-bottom: 1px solid #e9e5e2; min-height: 42px; }
+.pm-payment-item:hover { background: #f8f5f3; }
+.pm-party-color { display: block; flex: 0 0 7px; height: 7px; border-radius: 2px; }
+.pm-party-detail { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; flex: 1; }
+.pm-party-detail strong { font-size: 11px; font-weight: 800; color: #202534; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-party-detail small { color: #9c9899; font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 2px; }
+.pm-party-amount { font-size: 10.5px; color: #17131b; flex: 0 0 auto; white-space: nowrap; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pm-no-payments { padding: 8px 0; color: #939393; font-size: 11px; margin: 0; }
+.pm-footnote { color: #b2a5a0; font-size: 10px; line-height: 1.45; margin: 8px 0 0; }
+.pm-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.86); font-size: 12px; color: #8f5639; }
+.pm-error { padding: 9px; margin-top: 8px; color: #923025; font-size: 11px; background: #fff3f0; border-radius: 6px; }
+.pm-overlay { position: fixed; z-index: 9998; inset: 0; background: #0006; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.pm-detail-dialog { max-width: 420px; width: 100%; background: white; border-radius: 12px; box-shadow: 0 15px 60px #0004; padding: 20px; position: relative; font-size: 13px; }
+.pm-detail-dialog h3 { margin: 0 0 15px; color: #8d4b32; }
+.pm-detail-dialog p { line-height: 1.55; }
+.pm-detail-dialog code { font-size: 11px; }
+.pm-close { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 23px; line-height: 1; }
+@media (max-width: 500px) { .pm-card-head { padding: 0 8px; } .pm-head-actions { gap: 5px; } .pm-card-title { font-size: 10px; gap: 4px; } .pm-from-accounts { font-size: 9px; } .pm-fy { font-size: 9px; padding: 1px 4px; } .pm-content { padding-left: 8px; padding-right: 8px; } .pm-bars { gap: 1px; } .pm-payment-list { max-height: 150px; } }

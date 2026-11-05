@@ -136,3 +136,11 @@ The screen has these parts:
 - **Locked cartons** (`lock = 1`) are greyed out with their `lockreason`, and scanning one shows "Locked carton".
 - **Saved cartons:** cartons already saved on this line stay in the list even if the stock call no longer returns them.
 - **Footer:** "View selected (n)" and "Done · n". Done is still blocked when the selected qty is more than the balance qty, or when a carton is listed twice.
+
+### Urovo engine on the Android app
+
+The carton screen is a **step of the slip form** (SlipForm renders it in place of the form), not an RN `Modal`, the same way WarehouseNEW shows its scanner step. The hardware scanner bar sits under the header and is mounted **once** for the whole carton screen, so `UrovoScanner.start()` runs once and `stop()` only when you leave (it is paused, not stopped, while "Type a label" is open).
+
+If the bar still says *No Urovo engine* or *HW: listening*, it shows two buttons:
+- **↻** restarts the engine (`stop` + `start`).
+- **ⓘ** shows `UrovoScanner.getDiagnostics()`. Compare it with the same device in WarehouseNEW.

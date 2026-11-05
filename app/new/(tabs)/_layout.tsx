@@ -3,10 +3,18 @@ import { AppHeader } from '@/src/components/layout/AppHeader';
 import { ScreenErrorBoundary } from '@/src/core/crash/ScreenErrorBoundary';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { TopInsetHandled } from '@/src/core/layout/topInset';
-import { APP_NAVIGATION } from '@/src/core/navigation';
+import {
+  APP_NAV_GROUPS,
+  APP_NAVIGATION,
+  buildNavTree,
+  filterNavTree,
+  type NavGroupNode,
+  type NavTreeEntry,
+} from '@/src/core/navigation';
 import { usePermission } from '@/src/core/permissions';
 import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import { useMyScreens } from '@/src/core/userPrefs/useMyScreens';
+import { useMillModeStore } from '@/src/mill/millMode';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -14,7 +22,6 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, Tabs, usePathname, useRouter } from 'expo-router';
-import { useMillModeStore } from '@/src/mill/millMode';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -28,8 +35,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -73,7 +80,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   'production-order-tracking': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Production Order Tracking' },
   'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order Auth' },
   'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
-  // 'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
+																			
   'Payable-Screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Payable' },
   'receivables-screen': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Receivables' },
   'fabric-stock': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Fabric Stock' },
@@ -215,24 +222,24 @@ export default function TabsLayout() {
   const subtitle = useHeaderExtrasStore((state) => state.subtitle);
   const right = useHeaderExtrasStore((state) => state.right);
 
-  // Permission-visible items, in registry order (APP_NAVIGATION is already
-  // sorted by `order` — see navigationRegistry.ts). Deduped by routeName as
-  // a defensive measure: if the registry ever ends up with the same
-  // routeName listed twice (a copy-paste duplicate entry, for example),
-  // that item would otherwise land in both the primary bar AND the
-  // overflow "More" sheet at once, showing up twice.
-  // const visibleItems = useMemo(() => {
-  //   const filtered = APP_NAVIGATION.filter((item) => {
-  //     if (!ready) return false;
-  //     return item.action && item.action !== 'view' ? canDo(item.resource, item.action) : canAccess(item.resource);
-  //   });
-  //   const seen = new Set<string>();
-  //   return filtered.filter((item) => {
-  //     if (seen.has(item.routeName)) return false;
-  //     seen.add(item.routeName);
-  //     return true;
-  //   });
-  // }, [ready, canAccess, canDo]);
+																		   
+																			  
+																	
+																		
+																   
+													 
+										 
+														 
+								  
+																													 
+		  
+									  
+										 
+													
+								  
+					 
+		  
+								   
   // The permission-visible list is built in ONE place now (useMyScreens — same
   // rule as before: registry order, rights filter, dedupe by routeName).
   // `visibleItems` is that list minus the screens the user switched off in
@@ -264,14 +271,41 @@ export default function TabsLayout() {
   const filteredOverflowItems = useMemo(() => {
     const query = moreSearch.trim().toLowerCase();
     if (!query) return overflowItems;
-    return overflowItems.filter((item) => `${item.title} ${item.routeName}`.toLowerCase().includes(query));
+    // Also match the FOLDER name: typing "yarn dyeing" lists all its screens
+    // (Process Chemicals, Shade Recipe, Planning) even though none of them
+    // has those words in its own title.
+    return overflowItems.filter((item) => {
+      const folder = APP_NAV_GROUPS.find((g) => g.id === (item as { groupId?: string }).groupId)?.title || '';
+      return `${item.title} ${item.routeName} ${folder}`.toLowerCase().includes(query);
+    });
   }, [moreSearch, overflowItems]);
 
-  const filteredSidebarItems = useMemo(() => {
-    const query = sidebarSearch.trim().toLowerCase();
-    if (!query) return visibleItems;
-    return visibleItems.filter((item) => `${item.title} ${item.routeName}`.toLowerCase().includes(query));
-  }, [sidebarSearch, visibleItems]);
+  // MENU FOLDERS (e.g. "Yarn Dyeing"): the flat lists above stay the source of
+  // truth for tabs / routes / permissions. These trees only change how the
+  // sidebar and the More sheet DRAW the same screens.
+  const sidebarTree = useMemo(
+    () => filterNavTree(buildNavTree(visibleItems, APP_NAV_GROUPS), sidebarSearch),
+    [sidebarSearch, visibleItems],
+  );
+  const moreTree = useMemo(() => buildNavTree(overflowItems, APP_NAV_GROUPS), [overflowItems]);
+  // null = top level of the More sheet; a key = inside that folder
+  const [moreGroupKey, setMoreGroupKey] = useState<string | null>(null);
+  const moreGroup = useMemo<NavGroupNode | undefined>(() => {
+    const hit = moreGroupKey ? moreTree.find((e) => e.type === 'group' && e.key === moreGroupKey) : undefined;
+    return hit && hit.type === 'group' ? hit : undefined;
+  }, [moreTree, moreGroupKey]);
+  const searchingMore = moreSearch.trim().length > 0;
+  type MoreCell = { key: string; title: string; icon: string; routeName?: string; group?: NavGroupNode };
+  const moreCells = useMemo<MoreCell[]>(() => {
+    const leaf = (i: NavItem): MoreCell => ({ key: i.routeName, title: i.title, icon: i.icon, routeName: i.routeName });
+    if (searchingMore) return filteredOverflowItems.map(leaf); // search shows screens directly
+    if (moreGroup) return moreGroup.children.map(leaf);
+    return moreTree.map((e: NavTreeEntry): MoreCell =>
+      e.type === 'item'
+        ? leaf(e.item)
+        : { key: e.key, title: e.group.title, icon: e.group.icon, group: e },
+    );
+  }, [searchingMore, filteredOverflowItems, moreGroup, moreTree]);
 
   // FRESH SCREEN ON MENU NAVIGATION:
   // Tabs keep every visited screen mounted, so opening a module again from
@@ -288,6 +322,7 @@ export default function TabsLayout() {
 
   const goTo = (routeName: string) => {
     setMoreOpen(false);
+    setMoreGroupKey(null);
     markFreshVisit(routeName);
     const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
     router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
@@ -302,7 +337,7 @@ export default function TabsLayout() {
         {isDesktop ? (
           <DesktopSidebar
             windowWidth={windowWidth}
-            items={filteredSidebarItems}
+            tree={sidebarTree}
             activeRouteName={activeRouteName || 'index'}
             search={sidebarSearch}
             onSearchChange={setSidebarSearch}
@@ -354,7 +389,7 @@ export default function TabsLayout() {
                   barBottom={barBottomOffset}
                   barLeft={barLeftOffset}
                   barRight={barRightOffset}
-                  onMorePress={() => { setMoreSearch(''); setMoreOpen(true); }}
+                  onMorePress={() => { setMoreSearch(''); setMoreGroupKey(null); setMoreOpen(true); }}
                   onNavigateRoute={markFreshVisit}
                 />
               )}
@@ -385,7 +420,12 @@ export default function TabsLayout() {
       </View>
 
       {!isDesktop ? (
-        <Modal visible={moreOpen} transparent animationType="fade" onRequestClose={() => setMoreOpen(false)}>
+        <Modal
+          visible={moreOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => { if (moreGroupKey && !searchingMore) setMoreGroupKey(null); else setMoreOpen(false); }}
+        >
           <View style={moreStyles.shade}>
             <BlurView tint="dark" intensity={25} style={StyleSheet.absoluteFill} />
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreOpen(false)} />
@@ -399,7 +439,20 @@ export default function TabsLayout() {
               <BlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
               <View style={moreStyles.handle} />
               <View style={moreStyles.sheetHeader}>
-                <Text style={moreStyles.sheetTitle}>More</Text>
+                {moreGroup && !searchingMore ? (
+                  <TouchableOpacity
+                    onPress={() => setMoreGroupKey(null)}
+                    style={moreStyles.moreBack}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Back to all modules"
+                  >
+                    <Icon name="arrow-back" size={20} color={T.nav} />
+                    <Text style={moreStyles.sheetTitle}>{moreGroup.group.title}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={moreStyles.sheetTitle}>More</Text>
+                )}
                 <TouchableOpacity onPress={() => setMoreOpen(false)}>
                   <Text style={moreStyles.closeX}>✕</Text>
                 </TouchableOpacity>
@@ -428,12 +481,24 @@ export default function TabsLayout() {
                 bounces={filteredOverflowItems.length > 8}
                 keyboardShouldPersistTaps="handled"
               >
-                {filteredOverflowItems.length > 0 ? filteredOverflowItems.map((item) => (
-                  <TouchableOpacity key={item.routeName} style={[moreStyles.cell, { width: moreCellWidth as any }]} onPress={() => goTo(item.routeName)} activeOpacity={0.7}>
+                {moreCells.length > 0 ? moreCells.map((cell) => (
+                  <TouchableOpacity
+                    key={cell.key}
+                    style={[moreStyles.cell, { width: moreCellWidth as any }]}
+                    onPress={() => (cell.group ? setMoreGroupKey(cell.key) : goTo(cell.routeName as string))}
+                    activeOpacity={0.7}
+                    accessibilityRole={cell.group ? 'button' : 'link'}
+                    accessibilityLabel={cell.group ? `${cell.title} folder, ${cell.group.children.length} screens` : cell.title}
+                  >
                     <View style={moreStyles.iconWrap}>
-                      <Icon name={item.icon as any} size={22} color={T.copper} />
+                      <Icon name={cell.icon as any} size={22} color={T.copper} />
+                      {cell.group ? (
+                        <View style={moreStyles.groupBadge}>
+                          <Text style={moreStyles.groupBadgeText}>{cell.group.children.length}</Text>
+                        </View>
+                      ) : null}
                     </View>
-                    <Text style={moreStyles.label} numberOfLines={2}>{item.title}</Text>
+                    <Text style={moreStyles.label} numberOfLines={2}>{cell.title}</Text>
                   </TouchableOpacity>
                 )) : (
                   <View style={moreStyles.emptySearch}>
@@ -454,7 +519,7 @@ export default function TabsLayout() {
 
 type DesktopSidebarProps = {
   windowWidth: number;
-  items: NavItem[];
+  tree: NavTreeEntry[];
   activeRouteName: string;
   search: string;
   onSearchChange: (value: string) => void;
@@ -468,7 +533,7 @@ type DesktopSidebarProps = {
 // icon rail to give tables more room. Same items, search and navigation as before.
 function DesktopSidebar({
   windowWidth,
-  items,
+  tree,
   activeRouteName,
   search,
   onSearchChange,
@@ -478,6 +543,42 @@ function DesktopSidebar({
 }: DesktopSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const width = collapsed ? 68 : windowWidth >= 1440 ? 248 : 224;
+
+  // Folders (Yarn Dyeing …): the folder that holds the open screen opens by
+  // itself; while searching every matching folder is shown open.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const searching = search.trim().length > 0;
+  useEffect(() => {
+    const holder = tree.find((e) => e.type === 'group' && e.children.some((c) => c.routeName === activeRouteName));
+    if (holder) setOpen((prev) => (prev[holder.key] ? prev : { ...prev, [holder.key]: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRouteName]);
+
+  const renderItem = (item: NavItem) => {
+    const active = activeRouteName === item.routeName;
+    return (
+      <TouchableOpacity
+        key={item.routeName}
+        onPress={() => onNavigate(item.routeName)}
+        style={[
+          desktopStyles.navItem,
+          collapsed && desktopStyles.navItemCollapsed,
+          active && desktopStyles.navItemActive,
+        ]}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+      >
+        {active && !collapsed ? <View style={desktopStyles.activeMarker} /> : null}
+        <Icon name={item.icon as any} size={18} color={active ? T.copper : '#83A0B6'} />
+        {!collapsed ? (
+          <Text style={[desktopStyles.navText, active && desktopStyles.navTextActive]} numberOfLines={1}>
+            {item.title}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[desktopStyles.sidebar, { width }]}>
@@ -539,32 +640,41 @@ function DesktopSidebar({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {items.map((item) => {
-          const active = activeRouteName === item.routeName;
+        {tree.map((entry) => {
+          if (entry.type === 'item') return renderItem(entry.item);
+          const holdsActive = entry.children.some((c) => c.routeName === activeRouteName);
+          const expanded = !collapsed && (searching || !!open[entry.key]);
           return (
-            <TouchableOpacity
-              key={item.routeName}
-              onPress={() => onNavigate(item.routeName)}
-              style={[
-                desktopStyles.navItem,
-                collapsed && desktopStyles.navItemCollapsed,
-                active && desktopStyles.navItemActive,
-              ]}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-            >
-              {active && !collapsed ? <View style={desktopStyles.activeMarker} /> : null}
-              <Icon name={item.icon as any} size={18} color={active ? T.copper : '#83A0B6'} />
-              {!collapsed ? (
-                <Text style={[desktopStyles.navText, active && desktopStyles.navTextActive]} numberOfLines={1}>
-                  {item.title}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
+            <View key={entry.key}>
+              <TouchableOpacity
+                onPress={() => {
+                  // icon rail: open the sidebar and this folder together
+                  if (collapsed) setCollapsed(false);
+                  setOpen((prev) => ({ ...prev, [entry.key]: collapsed ? true : !prev[entry.key] }));
+                }}
+                style={[desktopStyles.navItem, collapsed && desktopStyles.navItemCollapsed]}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+                accessibilityLabel={`${entry.group.title}, ${entry.children.length} screens`}
+              >
+                <Icon name={entry.group.icon as any} size={18} color={holdsActive ? T.copper : '#83A0B6'} />
+                {!collapsed ? (
+                  <>
+                    <Text style={[desktopStyles.navText, { fontWeight: '700' }, holdsActive && desktopStyles.navTextActive]} numberOfLines={1}>
+                      {entry.group.title}
+                    </Text>
+                    {holdsActive && !expanded ? <View style={desktopStyles.folderDot} /> : null}
+                    <Text style={desktopStyles.folderCount}>{entry.children.length}</Text>
+                    <Icon name={expanded ? 'expand-less' : 'expand-more'} size={18} color="#7C93A8" />
+                  </>
+                ) : null}
+              </TouchableOpacity>
+              {expanded ? <View style={desktopStyles.folderChildren}>{entry.children.map((c) => renderItem(c))}</View> : null}
+            </View>
           );
         })}
-        {items.length === 0 && !collapsed ? (
+        {tree.length === 0 && !collapsed ? (
           <Text style={desktopStyles.emptyNavText}>No modules found</Text>
         ) : null}
       </ScrollView>
@@ -849,6 +959,9 @@ const desktopStyles = StyleSheet.create({
   activeMarker: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2, backgroundColor: T.copper },
   navText: { flex: 1, color: '#B4C5D2', fontSize: 12.5, fontWeight: '500' },
   navTextActive: { color: '#FFFFFF', fontWeight: '700' },
+  folderChildren: { marginLeft: 18, paddingLeft: 4, borderLeftWidth: 1, borderLeftColor: '#193149', marginBottom: 2 },
+  folderDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.copper },
+  folderCount: { color: '#7C93A8', fontSize: 10.5, fontWeight: '700' },
   emptyNavText: { color: '#8098AA', fontSize: 12, textAlign: 'center', paddingVertical: 18 },
   sidebarFooter: { borderTopWidth: 1, borderTopColor: '#193149', paddingHorizontal: 16, paddingTop: 9 },
   footerHint: { color: '#AFC1CE', fontSize: 10, fontWeight: '700' },
@@ -931,14 +1044,14 @@ const styles = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// MORE SHEET — now a centered, fixed-height glass card instead of a
-// bottom-docked sheet. `shade` centers its child both ways; the card itself
-// has an explicit `maxHeight` (capped to the screen, via percentage) so it
-// never grows unpredictably tall or gets clipped to nothing the way
-// `height: 'auto'` with no `maxHeight` could. The grid lives inside a
-// `ScrollView` that is given a bounded parent (`flexShrink: 1` on the
-// sheet's content area) so it can actually scroll instead of silently
-// refusing to when the parent has no fixed height to measure against.
+// MORE SHEET — a bottom-docked glass sheet. The grid lives inside a
+// `ScrollView` with `flex: 1` inside a fixed-height column so it scrolls
+// within bounded space.
+																	
+																	  
+																	  
+																	  
+																	  
 // ─────────────────────────────────────────────────────────────────────────
 const moreStyles = StyleSheet.create({
   shade: {
@@ -946,12 +1059,12 @@ const moreStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
-  // `height: '50%'` (fixed, not maxHeight) — an exact half-screen card.
-  // Full edge-to-edge width: no side padding on `shade`, no `maxWidth` cap
-  // here. `flexDirection: 'column'` is explicit because `scrollArea` below
-  // needs `flex: 1` to correctly claim "everything left over after the
-  // handle + header row" — that only resolves predictably inside a flex
-  // column with a fixed-height parent, which is exactly what this now is.
+																		  
+																		   
+																		   
+																	   
+																		  
+																		  
   sheet: {
     width: '100%',
     height: '70%',
@@ -977,15 +1090,18 @@ const moreStyles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: T.nav },
   closeX: { fontSize: 18, color: '#000' },
-  // `flex: 1` — claims all remaining height inside the fixed-height `sheet`
-  // (the 50% minus the handle + header above it), so the grid scrolls
-  // within that bounded space instead of pushing the sheet taller or
-  // silently refusing to scroll.
+																			  
+																	  
+																	 
+								 
   scrollArea: {
     flex: 1,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
   cell: { width: '25%', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
+  moreBack: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  groupBadge: { position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center' },
+  groupBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
   iconWrap: {
     width: 56, height: 56, borderRadius: 16,
     backgroundColor: T.sub, borderWidth: 1, borderColor: T.border,

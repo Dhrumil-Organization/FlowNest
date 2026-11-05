@@ -282,6 +282,10 @@ export const api = {
   getOwnerCardReport: (params = {}) =>
     fetchJSON(`/getOwnerDashboard`, params),
 
+  /** Payments Made: recorded vouchers, separate from uncleared Payment To Pay. */
+  getOwnerPaymentsMade: (params: any = {}) =>
+    fetchJSON(`/getOwnerDashboard`, { report_type: 'payments_made', view: 'owner', ...params }),
+
   /**
    * Financial-year Sales for one ERP financial-year database.
    * The caller supplies an anchor date inside the same FY as from_date/to_date;

@@ -11,7 +11,8 @@
 //   shownItems   : allowedItems minus the ones the user switched off
 // ─────────────────────────────────────────────────────────────
 import { getCurrentErpProperty } from '@/common/API/dynamicAPI';
-import { APP_NAVIGATION, AppNavigationItem } from '@/src/core/navigation/navigationRegistry';
+import { APP_NAV_GROUPS, APP_NAVIGATION, AppNavigationItem } from '@/src/core/navigation/navigationRegistry';
+import { buildNavTree } from '@/src/core/navigation/navTree';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { useEffect, useMemo } from 'react';
@@ -62,5 +63,9 @@ export function useMyScreens() {
 
   const shownItems = useMemo(() => withoutHidden(allowedItems, activeHidden), [allowedItems, activeHidden]);
 
-  return { ready, allowedItems, shownItems, hidden: activeHidden, prefsReady: mine, setHidden, showAll };
+  // Same screens as `shownItems`, arranged as Home / plain screens / folders
+  // (Yarn Dyeing …). Menus draw THIS; tabs / routes keep using the flat list.
+  const navTree = useMemo(() => buildNavTree(shownItems, APP_NAV_GROUPS), [shownItems]);
+
+  return { ready, allowedItems, shownItems, navTree, hidden: activeHidden, prefsReady: mine, setHidden, showAll };
 }

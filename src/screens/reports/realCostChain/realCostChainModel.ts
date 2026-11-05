@@ -22,10 +22,40 @@ export type BeamCost = {
   beamuid: string; beam: string; loom: string; shed: 'Rapier' | 'Waterjet' | 'Other' | string; date: string;
   rate: number | null; metres: number; rm_per_m: number; rm_source: string; weave_per_m: number; greige_per_m: number; cost: number;
 };
+/* ------------------------------ cost breakup (expandable cost heads) ------------------------------ */
+export type WeaveDay = {
+  date: string; metres: number; pickm: number; rate: number | null; status: string; shed: string;
+  costing_m: number; amount: number; per_m: number;
+};
+export type Breakup = {
+  rm: {
+    source: string;
+    warp: { per_m: number; kg: number; amt: number; rate: number | null };
+    warp_short: { per_m: number; kg: number; amt: number; metres: number; warp_len: number; pct: number };
+    weft: { per_m: number; kg: number; amt: number; rate: number | null; issued_kg: number };
+    weft_waste: { per_m: number; kg: number; amt: number; pct: number; basis: string };
+    costing_part: { per_m: number; metres: number; rate: number };
+    issued_amt: number; total: number;
+  };
+  /** the costing engine's own RM split (null when the costing record has no warp / weft columns) */
+  rm_asm: { warp: number; warp_short: number; warp_pct: number; weft: number; weft_waste: number; weft_pct: number; selvedge: number; total: number } | null;
+  weave: { days: WeaveDay[]; amt: number; metres: number; per_m: number; costing_rate: number };
+  greige: { per_m: number; amt: number };
+  dye: {
+    has_fin: boolean;
+    short: { pct: number; source: string; sent_m: number; back_m: number; lost_m: number; takas: number; per_m: number; amt: number };
+    fent: { pct: number; per_m: number; amt: number };
+    charge: { rate: number; source: string; billed_amt: number; billed_m: number; per_m: number; amt: number };
+    total: number;
+  };
+  final: { per_m: number; amt: number };
+};
 export type DesignChain = {
   key: string; prpcode: string; dsncode: string; name: string;
   has_costing: boolean; has_fin: boolean; made: number; nbeams: number;
   actual: Actual; assumed: Assumed | null; act_val: number; asm_val: number;
+  /** null when the server is older than the breakup version */
+  breakup: Breakup | null;
   mill: { out: number; in: number; takas: number } | null;
   learned_warp: number | null; learned_fin: number | null;
   flags: { no_rate_metres: number; no_pick_metres: number };
@@ -111,6 +141,7 @@ export function normalizeChain(raw: any): ChainData {
           warp_waste: n(m.warp_waste), fin_shrink: n(m.fin_shrink), final: n(m.final), costing_final: n(m.costing_final),
         } : null,
         act_val: n(d.act_val), asm_val: n(d.asm_val),
+        breakup: normalizeBreakup(d.breakup),
         mill: d.mill ? { out: n(d.mill.out), in: n(d.mill.in), takas: n(d.mill.takas) } : null,
         learned_warp: nn(d.learned_warp), learned_fin: nn(d.learned_fin),
         flags: { no_rate_metres: n(d.flags?.no_rate_metres), no_pick_metres: n(d.flags?.no_pick_metres) },
@@ -122,6 +153,166 @@ export function normalizeChain(raw: any): ChainData {
     }),
     rates: arr(raw.rates).map((r: any) => ({ ym: s(r.ym), section: s(r.section), rate: nn(r.rate), status: s(r.status), note: s(r.note) })),
   };
+}
+
+function normalizeBreakup(b: any): Breakup | null {
+  if (!b || typeof b !== 'object' || !b.rm || !b.weave) return null;
+  const o = (v: any) => (v && typeof v === 'object' ? v : {});
+  const rm = o(b.rm), dye = o(b.dye), a = b.rm_asm;
+  return {
+    rm: {
+      source: s(rm.source),
+      warp: { per_m: n(o(rm.warp).per_m), kg: n(o(rm.warp).kg), amt: n(o(rm.warp).amt), rate: nn(o(rm.warp).rate) },
+      warp_short: {
+        per_m: n(o(rm.warp_short).per_m), kg: n(o(rm.warp_short).kg), amt: n(o(rm.warp_short).amt),
+        metres: n(o(rm.warp_short).metres), warp_len: n(o(rm.warp_short).warp_len), pct: n(o(rm.warp_short).pct),
+      },
+      weft: { per_m: n(o(rm.weft).per_m), kg: n(o(rm.weft).kg), amt: n(o(rm.weft).amt), rate: nn(o(rm.weft).rate), issued_kg: n(o(rm.weft).issued_kg) },
+      weft_waste: { per_m: n(o(rm.weft_waste).per_m), kg: n(o(rm.weft_waste).kg), amt: n(o(rm.weft_waste).amt), pct: n(o(rm.weft_waste).pct), basis: s(o(rm.weft_waste).basis) },
+      costing_part: { per_m: n(o(rm.costing_part).per_m), metres: n(o(rm.costing_part).metres), rate: n(o(rm.costing_part).rate) },
+      issued_amt: n(rm.issued_amt), total: n(rm.total),
+    },
+    rm_asm: a && typeof a === 'object' ? {
+      warp: n(a.warp), warp_short: n(a.warp_short), warp_pct: n(a.warp_pct), weft: n(a.weft), weft_waste: n(a.weft_waste),
+      weft_pct: n(a.weft_pct), selvedge: n(a.selvedge), total: n(a.total),
+    } : null,
+    weave: {
+      days: arr(o(b.weave).days).map((x: any): WeaveDay => ({
+        date: s(x.date), metres: n(x.metres), pickm: n(x.pickm), rate: nn(x.rate), status: s(x.status), shed: s(x.shed),
+        costing_m: n(x.costing_m), amount: n(x.amount), per_m: n(x.per_m),
+      })),
+      amt: n(o(b.weave).amt), metres: n(o(b.weave).metres), per_m: n(o(b.weave).per_m), costing_rate: n(o(b.weave).costing_rate),
+    },
+    greige: { per_m: n(o(b.greige).per_m), amt: n(o(b.greige).amt) },
+    dye: {
+      has_fin: !!dye.has_fin,
+      short: {
+        pct: n(o(dye.short).pct), source: s(o(dye.short).source), sent_m: n(o(dye.short).sent_m), back_m: n(o(dye.short).back_m),
+        lost_m: n(o(dye.short).lost_m), takas: n(o(dye.short).takas), per_m: n(o(dye.short).per_m), amt: n(o(dye.short).amt),
+      },
+      fent: { pct: n(o(dye.fent).pct), per_m: n(o(dye.fent).per_m), amt: n(o(dye.fent).amt) },
+      charge: {
+        rate: n(o(dye.charge).rate), source: s(o(dye.charge).source), billed_amt: n(o(dye.charge).billed_amt),
+        billed_m: n(o(dye.charge).billed_m), per_m: n(o(dye.charge).per_m), amt: n(o(dye.charge).amt),
+      },
+      total: n(dye.total),
+    },
+    final: { per_m: n(o(b.final).per_m), amt: n(o(b.final).amt) },
+  };
+}
+
+/* ------------------------------ cost tree (Raw material → Weaving → Greige → Dyeing → Final) ------------------------------ */
+export type CostSub = { label: string; asm: number | null; act: number | null; note?: string };
+export type CostHead = {
+  key: string;
+  label: string;
+  asm: number | null;
+  act: number;
+  /** head = a cost head (may expand) · subtotal = Greige · total = Final */
+  kind: 'head' | 'subtotal' | 'total';
+  /** a one-line hint under the label (formula / basis) */
+  hint?: string;
+  subs?: CostSub[];
+  days?: WeaveDay[];
+  /** plain detail lines (dyeing heads) */
+  lines?: string[];
+};
+
+const kg = (v: number) => `${(Math.round(v * 100) / 100).toLocaleString('en-IN')} kg`;
+const mt = (v: number) => `${Math.round(v).toLocaleString('en-IN')} m`;
+const pc = (v: number) => `${Math.round(v * 100) / 100}%`;
+
+/** the cost heads of a design, in order; null when the server sent no breakup (older backend) */
+export function costTree(d: DesignChain): CostHead[] | null {
+  const B = d.breakup;
+  if (!B) return null;
+  const a = d.assumed;
+  const R = B.rm, A = B.rm_asm;
+  const out: CostHead[] = [];
+
+  // 1. Raw material — warp, warp shortage, weft, weft wastage (+ costing RM for beams with no creel issue)
+  const subs: CostSub[] = [
+    {
+      label: 'Warp yarn', asm: A ? A.warp : null, act: R.warp.per_m,
+      note: R.warp.kg > 0 ? `${kg(R.warp.kg)} in the fabric${R.warp.rate ? ` @ ${money(R.warp.rate)}/kg` : ''} · ${moneyC(R.warp.amt)}` : undefined,
+    },
+    {
+      label: `Warp shortage${R.warp_short.pct ? ` · ${pc(R.warp_short.pct)}` : ''}`, asm: A ? A.warp_short : null, act: R.warp_short.per_m,
+      note: R.warp_short.warp_len > 0
+        ? `${mt(R.warp_short.metres)} of ${mt(R.warp_short.warp_len)} warp not checked · ${kg(R.warp_short.kg)} · ${moneyC(R.warp_short.amt)}`
+          + (A && A.warp_pct ? ` (costing ${pc(A.warp_pct)})` : '')
+        : undefined,
+    },
+    {
+      label: 'Weft yarn', asm: A ? A.weft : null, act: R.weft.per_m,
+      note: R.weft.issued_kg > 0 ? `${kg(R.weft.kg)} in the fabric${R.weft.rate ? ` @ ${money(R.weft.rate)}/kg` : ''} · ${moneyC(R.weft.amt)}` : undefined,
+    },
+    {
+      label: `Weft wastage${R.weft_waste.pct ? ` · ${pc(R.weft_waste.pct)}` : ''}`, asm: A ? A.weft_waste : null, act: R.weft_waste.per_m,
+      note: R.weft_waste.basis === 'costing_pct'
+        ? `${pc(R.weft_waste.pct)} of ${kg(R.weft.issued_kg)} weft issued (costing wastage %) · ${kg(R.weft_waste.kg)} · ${moneyC(R.weft_waste.amt)}`
+        : R.weft.issued_kg > 0 ? 'No weft wastage % in the costing — all weft issued counted as weft yarn' : undefined,
+    },
+  ];
+  if (A && A.selvedge > 0) subs.push({ label: 'Selvedge yarn', asm: A.selvedge, act: null, note: 'Actual selvedge yarn is inside the creel (warp) issue' });
+  if (R.costing_part.metres > 0) {
+    subs.push({
+      label: 'Costing RM (no creel issue)', asm: null, act: R.costing_part.per_m,
+      note: `${mt(R.costing_part.metres)} on beams with no creel issue, at the costing's ${money(R.costing_part.rate)}/m`,
+    });
+  }
+  out.push({
+    key: 'rm', label: 'Raw material', kind: 'head', asm: a ? a.rm : null, act: R.total,
+    hint: R.source === 'actual' ? 'Yarn issued to the beams · incl. shortage & wastage' : R.source === 'mixed' ? 'Part issued yarn, part costing RM' : 'From the costing — no creel issue found',
+    subs,
+  });
+
+  // 2. Weaving — date-wise
+  out.push({
+    key: 'weave', label: 'Weaving charge', kind: 'head', asm: a ? a.weaving : null, act: B.weave.per_m,
+    hint: `${mt(B.weave.metres)} · ${moneyC(B.weave.amt)} · picks × monthly conversion rate`,
+    days: B.weave.days,
+  });
+
+  // 3. Greige
+  out.push({ key: 'greige', label: 'Greige fabric cost', kind: 'subtotal', asm: a ? a.greige_mfg : null, act: B.greige.per_m, hint: 'Raw material + weaving' });
+
+  // 4. Dyeing & processing
+  const D = B.dye;
+  if (D.has_fin) {
+    out.push({
+      key: 'dye_short', label: `Dyeing shortage · ${pc(D.short.pct)}`, kind: 'head', asm: a ? a.shrink : null, act: D.short.per_m,
+      hint: D.short.source === 'mill' ? 'Mill: grey sent vs fabric back' : 'Design shrink % (mill data not back yet)',
+      lines: [
+        D.short.source === 'mill'
+          ? `Sent ${mt(D.short.sent_m)} → back ${mt(D.short.back_m)} (${D.short.takas} takas) · lost ${mt(D.short.lost_m)} = ${pc(D.short.pct)}`
+          : `Design shrink ${pc(D.short.pct)} — no taka of this design has come back from the mill yet`,
+        `Greige ${money(B.greige.per_m)} ÷ (1 − ${pc(D.short.pct)}) − greige = ${money(D.short.per_m)}/m`,
+        `${money(D.short.per_m)}/m × ${mt(d.made)} = ${moneyC(D.short.amt)}`,
+      ],
+    });
+    out.push({
+      key: 'fent', label: `Fent wastage · ${pc(D.fent.pct)}`, kind: 'head', asm: a ? a.fent : null, act: D.fent.per_m,
+      lines: [`(Greige + dyeing shortage) ÷ (1 − ${pc(D.fent.pct)}) − the same = ${money(D.fent.per_m)}/m`, `× ${mt(d.made)} = ${moneyC(D.fent.amt)}`],
+    });
+    out.push({
+      key: 'dye_charge', label: `Dyeing charge · ${money(D.charge.rate)}/m`, kind: 'head', asm: a ? a.proc : null, act: D.charge.per_m,
+      hint: D.charge.source === 'mill' ? 'Mill job bills' : 'Costing rate (no mill bill yet)',
+      lines: [
+        D.charge.source === 'mill'
+          ? `Mill job bills ${moneyC(D.charge.billed_amt)} on ${mt(D.charge.billed_m)} received = ${money(D.charge.rate)}/m`
+          : `Costing dyeing / processing rate ${money(D.charge.rate)}/m — no mill bill for this design yet`,
+        `${money(D.charge.per_m)}/m × ${mt(d.made)} = ${moneyC(D.charge.amt)}`,
+      ],
+    });
+  }
+
+  // 5. Final
+  out.push({
+    key: 'final', label: 'Final cost', kind: 'total', asm: a ? a.final : null, act: B.final.per_m,
+    hint: D.has_fin ? 'Greige + dyeing shortage + fent + dyeing charge' : 'Greige design — final = greige cost',
+  });
+  return out;
 }
 
 /* ------------------------------ summary (artifact: monthly real-costing summary) ------------------------------ */

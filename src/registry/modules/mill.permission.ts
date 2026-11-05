@@ -34,6 +34,7 @@ registerPermissionArea({
         // Only its own ALLOW counts (not inherited from "Mill Hub"); it does not open any page.
         { key: 'under_development', name: 'Under Development banner (all Mill pages)', type: 'section', displayOrder: 5, actions: [view] },
         { key: 'inward', name: 'Greige Inward', type: 'screen', displayOrder: 20, actions: [view, { key: 'create', name: 'Create' }, { key: 'edit', name: 'Edit' }] },
+        { key: 'movement_register', name: 'Outward / Inward Movement Register', type: 'report', displayOrder: 25, actions: [view] },
         { key: 'lots', name: 'Lot Board', type: 'screen', displayOrder: 30, actions: [view, { key: 'edit', name: 'Edit' }] },
         { key: 'machines', name: 'Machine Planner', type: 'screen', displayOrder: 40, actions: [view, { key: 'edit', name: 'Edit' }] },
         { key: 'lab', name: 'Shade Lab', type: 'screen', displayOrder: 50, actions: [view, { key: 'edit', name: 'Edit' }] },

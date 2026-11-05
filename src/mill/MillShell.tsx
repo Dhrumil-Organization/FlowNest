@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MILL_ACTION_RIGHTS, MILL_LOGIN_REQUIRED, MILL_RIGHTS, MillApi, MillSessionApi, buildMillHtml, millCan, millRightsReason } from './millBridge';
+import { MILL_ACTION_RIGHTS, MILL_LOGIN_REQUIRED, MILL_RIGHTS, MillApi, MillMovementApi, MillSessionApi, buildMillHtml, millCan, millRightsReason } from './millBridge';
 import { MillHubFrame, type MillHubFrameHandle, type MillPageMessage } from './MillHubFrame';
 import { useMillModeStore } from './millMode';
 
@@ -73,7 +73,7 @@ export function MillShell() {
     for (const [k, [path, action]] of Object.entries(MILL_ACTION_RIGHTS)) r[k] = millCan(millSession?.permissions, path, action);
     return r;
   }, [millSession]);
-  const anyScreen = ['dash', 'inward', 'lots', 'machines', 'lab', 'recipe', 'dispatch', 'expense', 'coal_offers', 'steam_entry', 'elec_entry', 'elec_meters', 'reports'].some((k) => rights[k]);
+  const anyScreen = ['dash', 'inward', 'movement', 'lots', 'machines', 'lab', 'recipe', 'dispatch', 'expense', 'coal_offers', 'steam_entry', 'elec_entry', 'elec_meters', 'reports'].some((k) => rights[k]);
 
   const user = useMemo(() => {
     const mu: any = millSession?.millUser;
@@ -137,6 +137,15 @@ export function MillShell() {
           else await load();
         })();
       } else if (m.type === 'api') {
+        // Movement Register uses the Sudamo DyeingMillHubController directly:
+        // its endpoints enforce mill.movement_register on the server.
+        if (m.action === 'movement/report' || m.action === 'movement/lot') {
+          const request = m.action === 'movement/report'
+            ? MillMovementApi.report(m.body as any)
+            : MillMovementApi.lot(m.body as any);
+          void request.then((r) => frameRef.current?.reply(m.id, r));
+          return;
+        }
         // the page asks for data → apig → Sudamo (checks the Mill right) → Mills
         const allowed = ['expense/summary', 'expense/ledger', 'expense/issues', 'reports/summary', 'reports/party', 'discover', 'schema', 'lots', 'inward', 'machines', 'dispatch', 'lab', 'ping',
           'expense/coal', 'expense/coal/split/save', 'expense/coal/steam', 'expense/coal/steam/save', 'expense/coal/steam/delete',

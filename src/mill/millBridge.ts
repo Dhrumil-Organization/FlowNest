@@ -16,6 +16,7 @@ import { MILL_HUB_HTML_TEMPLATE } from './millHubHtml';
 export const MILL_RIGHTS: Record<string, string> = {
   dash: 'mill.dashboard',
   inward: 'mill.inward',
+  movement: 'mill.movement_register',
   lots: 'mill.lots',
   machines: 'mill.machines',
   lab: 'mill.lab',
@@ -185,6 +186,46 @@ export function useMillSwitchAllowed(enabled: boolean, userName: string, session
   }, [enabled, userName, sessionKey]);
   return allowed;
 }
+
+async function postMovement<T = any>(path: string, body: Record<string, any> = {}): Promise<MillApiAnswer<T>> {
+  try {
+    const prptype = String((await AsyncStorage.getItem('user_prptype')) || '').trim();
+    const yearRaw = String((await AsyncStorage.getItem('yno')) || '').trim();
+    const yearno = Number(yearRaw);
+    if (!prptype || !Number.isInteger(yearno) || yearno < 1 || yearno > 99) {
+      return { success: false, live: false, message: 'Property type or financial year is missing from the current login. Please sign in again.', code: 'MILL_MOVEMENT_CONTEXT_MISSING', data: null };
+    }
+
+    const raw: any = await ApiClient.post<any>(path, { ...body, prptype, yearno });
+    const payload = raw?.data ?? raw?.response?.data ?? raw?.response ?? null;
+    return {
+      success: !!raw?.success,
+      live: !!raw?.success,
+      message: String(raw?.message || (raw?.success ? 'Movement data loaded.' : 'Movement report could not be loaded.')),
+      code: raw?.success ? null : (raw?.code ?? 'MILL_MOVEMENT_ERROR'),
+      data: payload as T | null,
+      bridge: null,
+    };
+  } catch (error: any) {
+    const status = error?.status;
+    return {
+      success: false,
+      live: false,
+      message: status === 401 ? 'Your Sudamo session has expired. Please sign in again.' : (error?.message || 'Movement report request failed.'),
+      code: status === 401 ? 'MILL_LOGIN_REQUIRED' : status === 403 ? 'MILL_NO_RIGHT' : status === 404 ? 'MILL_MOVEMENT_ROUTE_MISSING' : 'MILL_MOVEMENT_ERROR',
+      data: null,
+    };
+  }
+}
+
+export const MillMovementApi = {
+  report(body: { direction: 'outward' | 'inward'; fromdate: string; todate: string; strcode?: string }) {
+    return postMovement('/api/dyeing/mill_movement_report', body);
+  },
+  lot(body: { outuid: number; outsrno: number }) {
+    return postMovement('/api/dyeing/mill_movement_lot', body);
+  },
+};
 
 export const MillApi = {
   /** Data call; on an expired Mills session it logs in again silently and retries once. */

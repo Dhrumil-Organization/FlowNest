@@ -92,7 +92,7 @@
 //     } finally {
 //       setLoading(false);
 //     }
-//   }, [isReady, prpGroup, yearNo]);
+//   }, [isReady, prpGroup, yearNo, direction]);
 
 //   const loadFromRef = useRef(loadFrom);
 //   loadFromRef.current = loadFrom;
@@ -553,6 +553,94 @@ const WT = { out: 60, in: 60, ret: 54, diff: 54 }; // taka table
 const AMBER = '#C98A1A';
 const STATUS_COLOR: Record<LotStatus, string> = { COMPLETE: '#2A6044', PARTIAL: AMBER, PENDING: '#5A6B7A' };
 
+function normalizeInwardMovementLots(response: any): HubLot[] {
+  let body: any = response?.data ?? response;
+  for (let i = 0; i < 5; i += 1) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) break;
+    if (Array.isArray(body.rows)) break;
+    const next = body.data ?? body.response ?? body.result;
+    if (!next || typeof next !== 'object') break;
+    body = next;
+  }
+
+  const rows: any[] = Array.isArray(body?.rows) ? body.rows : [];
+  const grouped = new Map<string, any>();
+
+  rows.forEach((r) => {
+    const unit = String(r.unit || '').toUpperCase();
+    const key = `${String(r.outuid || '')}|${String(r.outsrno || '')}|${unit}`;
+    let g = grouped.get(key);
+
+    if (!g) {
+      g = {
+        outuid: r.outuid,
+        outsrno: r.outsrno,
+        outno: r.outno,
+        // In inward mode this is the receipt date, not the original outward date.
+        outdate: r.inwdate || '',
+        partyname: r.partyname,
+        jobname: r.jobname,
+        chartno: r.chartno,
+        lotno: r.outlotno || r.inlotno,
+        dsnname: r.dsnname,
+        shdname: r.shdname,
+        itmname: r.itmname,
+        outtakas: 0,
+        recvtakas: 0,
+        outmtr: Number(r.outmtr || 0),
+        inmtr: 0,
+        retmtr: 0,
+        pendmtr: 0,
+        shortmtr: null,
+        shortper: null,
+        inamt: 0,
+        inwcount: 0,
+        lastinw: r.inwdate || '',
+        unmatchedin: 0,
+        status: r.status || 'PARTIAL',
+        unit,
+        outannno: r.outannno,
+        outqty: Number(r.outqty || 0),
+        outkg: Number(r.outkg || 0),
+        outmtrq: Number(r.outmtrq || 0),
+        inwqty: 0,
+        wstqty: 0,
+        retqty: 0,
+        shtqty: 0,
+        excqty: 0,
+        balqty: 0,
+        rate: Number(r.jobrate || 0),
+        balamt: 0,
+        inwamt: 0,
+      };
+      grouped.set(key, g);
+    }
+
+    // Sum only inward rows returned for the selected GRYInw.InwDate window.
+    g.inmtr += Number(r.inmtr || 0);
+    g.inwqty += Number(r.inwqty || 0);
+    g.wstqty += Number(r.wstqty || 0);
+    g.retqty += Number(r.retqty || 0);
+    g.shtqty += Number(r.shtqty || 0);
+    g.excqty += Number(r.excqty || 0);
+    g.inamt += Number(r.jobamt || 0);
+    g.inwamt += Number(r.jobamt || 0);
+    g.inwcount += 1;
+    g.recvtakas += Number(r.takas || 0);
+
+    const receiptDate = String(r.inwdate || '');
+    if (receiptDate > String(g.lastinw || '')) {
+      g.lastinw = receiptDate;
+      g.outdate = receiptDate;
+    }
+  });
+
+  return normalizeLots({
+    success: true,
+    data: { mode: body?.mode, lots: [...grouped.values()] },
+  });
+}
+
 export function MillHubTab() {
   const { prpGroup, yearNo, isReady } = useBusinessContext();
   const today = todayISO();
@@ -563,6 +651,7 @@ export function MillHubTab() {
 
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(today);
+  const [direction, setDirection] = useState<'outward' | 'inward'>('outward');
   const [lots, setLots] = useState<HubLot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -585,7 +674,7 @@ export function MillHubTab() {
     setLoading(true);
     setError(null);
     try {
-      const body = { prptype: prpGroup, yearno: yearNo, fromdate: f, todate: t };
+      const body = { prptype: prpGroup, yearno: yearNo, fromdate: f, todate: t, direction };
       console.log('[Dyeing/MillHub] request ->', body);
       const response: any = await DyeingService.millHubReport(body);
       if (id !== reqId.current) return;
@@ -593,9 +682,14 @@ export function MillHubTab() {
       if (fail) throw new Error(fail);
       const md = reportMode(response);
       setMode(md);
-      // K is read as a pending report: start on ALL until the user picks a status chip
-      if (md === 'K' && !statusTouched.current) setStatus('ALL');
-      setLots(normalizeLots(response));
+      if (direction === 'inward') {
+        // Keep the same HubLot/table/drill-down UI; only the report date basis changes.
+        setLots(normalizeInwardMovementLots(response));
+        setStatus('ALL');
+      } else {
+        if (md === 'K' && !statusTouched.current) setStatus('ALL');
+        setLots(normalizeLots(response));
+      }
       setLoaded(true);
     } catch (err: any) {
       if (id !== reqId.current) return;
@@ -758,6 +852,28 @@ export function MillHubTab() {
           <Text style={st.drillSub}>design-wise · {party === 'ALL' ? 'all parties' : party}{status !== 'ALL' ? ` · ${status.toLowerCase()} only` : ''}</Text>
         </View>
       ) : null}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+        {([['outward', 'OUTWARD DATE'], ['inward', 'INWARD DATE']] as const).map(([key, label]) => {
+          const active = direction === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => {
+                statusTouched.current = false;
+                setStatus('ALL');
+                setDirection(key);
+                setIsel(null);
+                setDsel(null);
+                setLsel(null);
+              }}
+              style={[st.preset, active && st.presetOn]}
+              activeOpacity={0.75}
+            >
+              <Text style={[st.presetText, active && { color: '#fff' }]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       {Rng}
       <View style={st.sumRow}>
         <Text style={st.sumRange}>{fmtD(from)} → {fmtD(to)}</Text>
@@ -777,8 +893,8 @@ export function MillHubTab() {
         <View style={[st.card, st.helpCard]}>
           <Text style={st.helpH}>What Mill Hub shows</Text>
           <Text style={st.helpP}>
-            Every job outward lot sent to an outside mill in the selected dates (by outward challan date), and everything received
-            back against it so far through job inward — taken straight from the outward and inward entries. Nothing is typed here.
+            OUTWARD DATE shows job outward lots by GRYOut.OutDate. INWARD DATE shows linked receipts by GRYInw.InwDate.
+            Both views use the same item, design, party, status and challan drill-down UI. Nothing is typed here.
           </Text>
           <Text style={st.helpH}>Reading a row</Text>
           <Text style={st.helpP}>
@@ -894,7 +1010,9 @@ export function MillHubTab() {
         </Text>
       ) : (
         <Text style={st.footer}>
-          Built from job outward and job inward. Lots are picked by outward challan date; inward is counted whenever it came.
+          {direction === 'outward'
+            ? 'Outward view is filtered by GRYOut.OutDate; linked inward history is included in the lot totals.'
+            : 'Inward view is filtered by GRYInw.InwDate; received quantities and job amounts include only receipts in the selected date range.'}
           Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
           {isel ? ' Tap a design for the lot-wise breakdown.' : ' Tap an item for its designs, then a design for the lot-wise breakdown.'}
         </Text>

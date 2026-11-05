@@ -5,6 +5,7 @@ export type Assumed = {
   id: string; code: string; ts: string;
   rm: number; weaving: number; weaving_rate: number; ppi_table: number; greige_mfg: number; has_fin: boolean;
   shrink: number; fent: number; proc: number; warp_waste: number; fin_shrink: number; final: number; costing_final: number;
+  brok: number | null; cut_pack: number | null; recipe: number | null;
 };
 export type Actual = {
   rm: number;
@@ -30,9 +31,9 @@ export type WeaveDay = {
 export type Breakup = {
   rm: {
     source: string;
-    warp: { per_m: number; kg: number; amt: number; rate: number | null };
+    warp: { per_m: number; kg: number; amt: number; rate: number | null; kg_m: number | null };
     warp_short: { per_m: number; kg: number; amt: number; metres: number; warp_len: number; pct: number };
-    weft: { per_m: number; kg: number; amt: number; rate: number | null; issued_kg: number };
+    weft: { per_m: number; kg: number; amt: number; rate: number | null; issued_kg: number; kg_m: number | null };
     weft_waste: { per_m: number; kg: number; amt: number; pct: number; basis: string };
     costing_part: { per_m: number; metres: number; rate: number };
     issued_amt: number; total: number;
@@ -48,6 +49,13 @@ export type Breakup = {
     charge: { rate: number; source: string; billed_amt: number; billed_m: number; per_m: number; amt: number };
     total: number;
   };
+  brok: { pct: number; per_m: number; amt: number };
+  cut: { per_m: number; amt: number };
+  /** costing-side figures for the hints and the extra estimated lines */
+  asm: {
+    brok: number; cut: number; recipe: number; final: number; shrink_pct: number; proc: number;
+    weaving_rate: number; ppi: number; warp_kg_m: number | null; weft_kg_m: number | null; warp_pct: number; weft_pct: number;
+  } | null;
   final: { per_m: number; amt: number };
 };
 export type DesignChain = {
@@ -139,6 +147,7 @@ export function normalizeChain(raw: any): ChainData {
           id: s(m.id), code: s(m.code), ts: s(m.ts), rm: n(m.rm), weaving: n(m.weaving), weaving_rate: n(m.weaving_rate), ppi_table: n(m.ppi_table),
           greige_mfg: n(m.greige_mfg), has_fin: !!m.has_fin, shrink: n(m.shrink), fent: n(m.fent), proc: n(m.proc),
           warp_waste: n(m.warp_waste), fin_shrink: n(m.fin_shrink), final: n(m.final), costing_final: n(m.costing_final),
+          brok: nn(m.brok), cut_pack: nn(m.cut_pack), recipe: nn(m.recipe),
         } : null,
         act_val: n(d.act_val), asm_val: n(d.asm_val),
         breakup: normalizeBreakup(d.breakup),
@@ -162,12 +171,12 @@ function normalizeBreakup(b: any): Breakup | null {
   return {
     rm: {
       source: s(rm.source),
-      warp: { per_m: n(o(rm.warp).per_m), kg: n(o(rm.warp).kg), amt: n(o(rm.warp).amt), rate: nn(o(rm.warp).rate) },
+      warp: { per_m: n(o(rm.warp).per_m), kg: n(o(rm.warp).kg), amt: n(o(rm.warp).amt), rate: nn(o(rm.warp).rate), kg_m: nn(o(rm.warp).kg_m) },
       warp_short: {
         per_m: n(o(rm.warp_short).per_m), kg: n(o(rm.warp_short).kg), amt: n(o(rm.warp_short).amt),
         metres: n(o(rm.warp_short).metres), warp_len: n(o(rm.warp_short).warp_len), pct: n(o(rm.warp_short).pct),
       },
-      weft: { per_m: n(o(rm.weft).per_m), kg: n(o(rm.weft).kg), amt: n(o(rm.weft).amt), rate: nn(o(rm.weft).rate), issued_kg: n(o(rm.weft).issued_kg) },
+      weft: { per_m: n(o(rm.weft).per_m), kg: n(o(rm.weft).kg), amt: n(o(rm.weft).amt), rate: nn(o(rm.weft).rate), issued_kg: n(o(rm.weft).issued_kg), kg_m: nn(o(rm.weft).kg_m) },
       weft_waste: { per_m: n(o(rm.weft_waste).per_m), kg: n(o(rm.weft_waste).kg), amt: n(o(rm.weft_waste).amt), pct: n(o(rm.weft_waste).pct), basis: s(o(rm.weft_waste).basis) },
       costing_part: { per_m: n(o(rm.costing_part).per_m), metres: n(o(rm.costing_part).metres), rate: n(o(rm.costing_part).rate) },
       issued_amt: n(rm.issued_amt), total: n(rm.total),
@@ -197,6 +206,13 @@ function normalizeBreakup(b: any): Breakup | null {
       },
       total: n(dye.total),
     },
+    brok: { pct: n(o(b.brok).pct), per_m: n(o(b.brok).per_m), amt: n(o(b.brok).amt) },
+    cut: { per_m: n(o(b.cut).per_m), amt: n(o(b.cut).amt) },
+    asm: b.asm && typeof b.asm === 'object' ? {
+      brok: n(b.asm.brok), cut: n(b.asm.cut), recipe: n(b.asm.recipe), final: n(b.asm.final), shrink_pct: n(b.asm.shrink_pct),
+      proc: n(b.asm.proc), weaving_rate: n(b.asm.weaving_rate), ppi: n(b.asm.ppi), warp_kg_m: nn(b.asm.warp_kg_m),
+      weft_kg_m: nn(b.asm.weft_kg_m), warp_pct: n(b.asm.warp_pct), weft_pct: n(b.asm.weft_pct),
+    } : null,
     final: { per_m: n(o(b.final).per_m), amt: n(o(b.final).amt) },
   };
 }
@@ -208,109 +224,137 @@ export type CostHead = {
   label: string;
   asm: number | null;
   act: number;
-  /** head = a cost head (may expand) · subtotal = Greige · total = Final */
+  /** head = a cost head · subtotal = Greige · total = Final */
   kind: 'head' | 'subtotal' | 'total';
-  /** a one-line hint under the label (formula / basis) */
+  /** small grey tag after the label ("as costed", "sheet") */
+  chip?: string;
+  /** monospace line under the label: "assumed → actual" */
   hint?: string;
   subs?: CostSub[];
   days?: WeaveDay[];
   /** plain detail lines (dyeing heads) */
   lines?: string[];
+  /** note at the bottom of the open panel */
+  foot?: string;
 };
 
-const kg = (v: number) => `${(Math.round(v * 100) / 100).toLocaleString('en-IN')} kg`;
+const kg = (v: number) => `${(Math.round(v * 10) / 10).toLocaleString('en-IN')} kg`;
 const mt = (v: number) => `${Math.round(v).toLocaleString('en-IN')} m`;
-const pc = (v: number) => `${Math.round(v * 100) / 100}%`;
+const pc = (v: number) => `${Math.round(v * 10) / 10}%`;
+const k4 = (v: number | null | undefined) => (v == null ? '—' : v.toFixed(4));
 
-/** the cost heads of a design, in order; null when the server sent no breakup (older backend) */
-export function costTree(d: DesignChain): CostHead[] | null {
+/**
+ * The cost heads of a design, in screen order. Works with an older server too (no `breakup`): then the heads come
+ * from `actual` / `assumed` and the detail inside them is shorter (`d.breakup === null` → the screen says so).
+ */
+export function costTree(d: DesignChain): CostHead[] {
   const B = d.breakup;
-  if (!B) return null;
   const a = d.assumed;
-  const R = B.rm, A = B.rm_asm;
+  const A = d.actual;
+  const X = B?.asm || null;
+  const R = B?.rm || null;
+  const RA = B?.rm_asm || null;
   const out: CostHead[] = [];
 
-  // 1. Raw material — warp, warp shortage, weft, weft wastage (+ costing RM for beams with no creel issue)
-  const subs: CostSub[] = [
-    {
-      label: 'Warp yarn', asm: A ? A.warp : null, act: R.warp.per_m,
-      note: R.warp.kg > 0 ? `${kg(R.warp.kg)} in the fabric${R.warp.rate ? ` @ ${money(R.warp.rate)}/kg` : ''} · ${moneyC(R.warp.amt)}` : undefined,
-    },
-    {
-      label: `Warp shortage${R.warp_short.pct ? ` · ${pc(R.warp_short.pct)}` : ''}`, asm: A ? A.warp_short : null, act: R.warp_short.per_m,
-      note: R.warp_short.warp_len > 0
-        ? `${mt(R.warp_short.metres)} of ${mt(R.warp_short.warp_len)} warp not checked · ${kg(R.warp_short.kg)} · ${moneyC(R.warp_short.amt)}`
-          + (A && A.warp_pct ? ` (costing ${pc(A.warp_pct)})` : '')
-        : undefined,
-    },
-    {
-      label: 'Weft yarn', asm: A ? A.weft : null, act: R.weft.per_m,
-      note: R.weft.issued_kg > 0 ? `${kg(R.weft.kg)} in the fabric${R.weft.rate ? ` @ ${money(R.weft.rate)}/kg` : ''} · ${moneyC(R.weft.amt)}` : undefined,
-    },
-    {
-      label: `Weft wastage${R.weft_waste.pct ? ` · ${pc(R.weft_waste.pct)}` : ''}`, asm: A ? A.weft_waste : null, act: R.weft_waste.per_m,
-      note: R.weft_waste.basis === 'costing_pct'
-        ? `${pc(R.weft_waste.pct)} of ${kg(R.weft.issued_kg)} weft issued (costing wastage %) · ${kg(R.weft_waste.kg)} · ${moneyC(R.weft_waste.amt)}`
-        : R.weft.issued_kg > 0 ? 'No weft wastage % in the costing — all weft issued counted as weft yarn' : undefined,
-    },
-  ];
-  if (A && A.selvedge > 0) subs.push({ label: 'Selvedge yarn', asm: A.selvedge, act: null, note: 'Actual selvedge yarn is inside the creel (warp) issue' });
-  if (R.costing_part.metres > 0) {
+  // 1. Raw material
+  const subs: CostSub[] = [];
+  if (R) {
     subs.push({
-      label: 'Costing RM (no creel issue)', asm: null, act: R.costing_part.per_m,
-      note: `${mt(R.costing_part.metres)} on beams with no creel issue, at the costing's ${money(R.costing_part.rate)}/m`,
+      label: 'Warp yarn', asm: RA ? RA.warp : null, act: R.warp.per_m,
+      note: `${k4(X?.warp_kg_m)} → ${k4(R.warp.kg_m)} kg/m${R.warp.rate ? ` · ${money2(R.warp.rate)}/kg` : ''}`,
     });
+    subs.push({
+      label: 'Warp shortage', asm: RA ? RA.warp_short : null, act: R.warp_short.per_m,
+      note: `${pc(X?.warp_pct ?? RA?.warp_pct ?? 0)} assumed → ${pc(R.warp_short.pct)}`
+        + (R.warp_short.warp_len > 0 ? ` · ${mt(R.warp_short.metres)} short of ${mt(R.warp_short.warp_len)} warped (${kg(R.warp_short.kg)})` : ''),
+    });
+    subs.push({
+      label: 'Weft yarn', asm: RA ? RA.weft : null, act: R.weft.per_m,
+      note: `${k4(X?.weft_kg_m)} → ${k4(R.weft.kg_m)} kg/m${R.weft.rate ? ` · ${money2(R.weft.rate)}/kg` : ''}`,
+    });
+    subs.push({
+      label: 'Weft wastage', asm: RA ? RA.weft_waste : null, act: R.weft_waste.per_m,
+      note: `${pc(X?.weft_pct ?? RA?.weft_pct ?? 0)} assumed → `
+        + (R.weft_waste.basis === 'costing_pct' ? `${pc(R.weft_waste.pct)} of ${kg(R.weft.issued_kg)} weft issued (${kg(R.weft_waste.kg)})` : 'no weft-waste % in the costing'),
+    });
+    if (RA && RA.selvedge > 0) subs.push({ label: 'Selvedge yarn', asm: RA.selvedge, act: null, note: 'actual selvedge yarn is inside the creel (warp) issue' });
+    if (R.costing_part.metres > 0) {
+      subs.push({ label: 'Costing RM (no creel issue)', asm: null, act: R.costing_part.per_m, note: `${mt(R.costing_part.metres)} at the costing's ${money2(R.costing_part.rate)}/m` });
+    }
+  } else {
+    subs.push({ label: 'Warp yarn (incl. shortage)', asm: null, act: A.rm_warp });
+    subs.push({ label: 'Weft yarn', asm: null, act: A.rm_weft });
+    if (A.rm_costing > 0) subs.push({ label: 'Costing RM (no creel issue)', asm: null, act: A.rm_costing, note: `${mt(A.rm_fb_metres)} at the costing RM` });
   }
   out.push({
-    key: 'rm', label: 'Raw material', kind: 'head', asm: a ? a.rm : null, act: R.total,
-    hint: R.source === 'actual' ? 'Yarn issued to the beams · incl. shortage & wastage' : R.source === 'mixed' ? 'Part issued yarn, part costing RM' : 'From the costing — no creel issue found',
+    key: 'rm', label: 'Raw material', kind: 'head', asm: a ? a.rm : null, act: R ? R.total : A.rm,
+    hint: A.rm_source === 'costing' ? 'from the costing · no creel issue found' : 'warp + weft · incl. shortage & wastage',
     subs,
+    foot: `Actual yarn from the issues: each closed beam's creel (warp) share and its weft issues, returns deducted, every carton at its own purchase / job-inward rate — over ${mt(d.made)} produced from ${d.nbeams} beam${d.nbeams === 1 ? '' : 's'}. Shortage = warp lost at beam close.`,
   });
 
-  // 2. Weaving — date-wise
+  // 2. Weaving
   out.push({
-    key: 'weave', label: 'Weaving charge', kind: 'head', asm: a ? a.weaving : null, act: B.weave.per_m,
-    hint: `${mt(B.weave.metres)} · ${moneyC(B.weave.amt)} · picks × monthly conversion rate`,
-    days: B.weave.days,
+    key: 'weave', label: 'Weaving charge', kind: 'head', asm: a ? a.weaving : null, act: A.weaving,
+    hint: `${a && a.weaving_rate ? `${money2(a.weaving_rate)}/pick × ${Math.round(a.ppi_table)} assumed` : 'costing weaving'} → rate on woven date`,
+    days: B && B.weave.days.length ? B.weave.days : undefined,
   });
 
   // 3. Greige
-  out.push({ key: 'greige', label: 'Greige fabric cost', kind: 'subtotal', asm: a ? a.greige_mfg : null, act: B.greige.per_m, hint: 'Raw material + weaving' });
+  out.push({ key: 'greige', label: 'Greige fabric cost', kind: 'subtotal', asm: a ? a.greige_mfg : null, act: B ? B.greige.per_m : A.greige_mfg, hint: 'raw material + weaving' });
 
   // 4. Dyeing & processing
-  const D = B.dye;
-  if (D.has_fin) {
+  if (d.has_fin) {
+    const D = B?.dye || null;
+    const sp = D ? D.short.pct : A.fin_shrink_pct;
+    const fromMill = (D ? D.short.source : A.fin_shrink_source) === 'mill';
+    const asmPct = X?.shrink_pct ?? a?.fin_shrink ?? 0;
     out.push({
-      key: 'dye_short', label: `Dyeing shortage · ${pc(D.short.pct)}`, kind: 'head', asm: a ? a.shrink : null, act: D.short.per_m,
-      hint: D.short.source === 'mill' ? 'Mill: grey sent vs fabric back' : 'Design shrink % (mill data not back yet)',
+      key: 'dye_short', label: 'Dyeing shortage', kind: 'head', asm: a ? a.shrink : null, act: A.shrink,
+      hint: `${pc(asmPct)} assumed → ${fromMill && D ? `${pc(sp)} · ${mt(D.short.lost_m)} short on ${mt(D.short.sent_m)} sent` : `no matched challan yet · ${pc(sp)}`}`,
       lines: [
-        D.short.source === 'mill'
-          ? `Sent ${mt(D.short.sent_m)} → back ${mt(D.short.back_m)} (${D.short.takas} takas) · lost ${mt(D.short.lost_m)} = ${pc(D.short.pct)}`
-          : `Design shrink ${pc(D.short.pct)} — no taka of this design has come back from the mill yet`,
-        `Greige ${money(B.greige.per_m)} ÷ (1 − ${pc(D.short.pct)}) − greige = ${money(D.short.per_m)}/m`,
-        `${money(D.short.per_m)}/m × ${mt(d.made)} = ${moneyC(D.short.amt)}`,
+        fromMill && D
+          ? `Mill: ${mt(D.short.sent_m)} grey sent → ${mt(D.short.back_m)} back (${D.short.takas} takas) · ${mt(D.short.lost_m)} lost = ${pc(sp)}`
+          : `No taka of this design has come back from the mill yet — design shrink ${pc(sp)} used`,
+        `Greige ${money2(B ? B.greige.per_m : A.greige_mfg)} ÷ (1 − ${pc(sp)}) − greige = ${money2(A.shrink)}/m`,
+        `${money2(A.shrink)}/m × ${mt(d.made)} = ${moneyC(A.shrink * d.made)}`,
       ],
     });
     out.push({
-      key: 'fent', label: `Fent wastage · ${pc(D.fent.pct)}`, kind: 'head', asm: a ? a.fent : null, act: D.fent.per_m,
-      lines: [`(Greige + dyeing shortage) ÷ (1 − ${pc(D.fent.pct)}) − the same = ${money(D.fent.per_m)}/m`, `× ${mt(d.made)} = ${moneyC(D.fent.amt)}`],
+      key: 'fent', label: 'Fent wastage', kind: 'head', asm: a ? a.fent : null, act: A.fent,
+      hint: `${pc(A.fent_pct)} assumed → ${pc(A.fent_pct)} on the finished metres`,
     });
+    const asmProc = X ? X.proc : a ? a.proc : 0;
     out.push({
-      key: 'dye_charge', label: `Dyeing charge · ${money(D.charge.rate)}/m`, kind: 'head', asm: a ? a.proc : null, act: D.charge.per_m,
-      hint: D.charge.source === 'mill' ? 'Mill job bills' : 'Costing rate (no mill bill yet)',
+      key: 'dye_charge', label: 'Dyeing charge', kind: 'head', asm: a ? a.proc : null, act: A.proc,
+      hint: `${money2(asmProc)}/m assumed → ${A.proc_source === 'mill' ? `${money2(A.proc)}/m from challans` : 'no challan rate yet'}`,
       lines: [
-        D.charge.source === 'mill'
-          ? `Mill job bills ${moneyC(D.charge.billed_amt)} on ${mt(D.charge.billed_m)} received = ${money(D.charge.rate)}/m`
-          : `Costing dyeing / processing rate ${money(D.charge.rate)}/m — no mill bill for this design yet`,
-        `${money(D.charge.per_m)}/m × ${mt(d.made)} = ${moneyC(D.charge.amt)}`,
+        A.proc_source === 'mill' && D
+          ? `Mill job bills ${moneyC(D.charge.billed_amt)} on ${mt(D.charge.billed_m)} received = ${money2(A.proc)}/m`
+          : `Costing dyeing / processing rate ${money2(A.proc)}/m — no mill bill for this design yet`,
+        `${money2(A.proc)}/m × ${mt(d.made)} = ${moneyC(A.proc * d.made)}`,
       ],
     });
   }
 
-  // 5. Final
+  // 5. Brokerage, cutting / packing, recipe revision (as costed)
+  if (B && (B.brok.per_m > 0 || (a?.brok || 0) > 0)) {
+    out.push({ key: 'brok', label: 'Brokerage', chip: 'as costed', kind: 'head', asm: a ? a.brok ?? null : null, act: B.brok.per_m, hint: `${pc(B.brok.pct)} on cost · as costed` });
+  }
+  if (B && (B.cut.per_m > 0 || (a?.cut_pack || 0) > 0)) {
+    out.push({ key: 'cut', label: 'Cutting / packing', chip: 'as costed', kind: 'head', asm: a ? a.cut_pack ?? null : null, act: B.cut.per_m, hint: 'per metre · as costed' });
+  }
+  if (a && a.recipe != null && Math.abs(a.recipe) >= 0.005) {
+    out.push({ key: 'recipe', label: 'Recipe revised since costing', chip: 'sheet', kind: 'head', asm: a.recipe, act: 0, hint: "difference to the saved sheet's final" });
+  }
+
+  // 6. Final
+  const extra = B && (B.brok.per_m > 0 || B.cut.per_m > 0);
   out.push({
-    key: 'final', label: 'Final cost', kind: 'total', asm: a ? a.final : null, act: B.final.per_m,
-    hint: D.has_fin ? 'Greige + dyeing shortage + fent + dyeing charge' : 'Greige design — final = greige cost',
+    key: 'final', label: 'Final cost ₹/m', kind: 'total', asm: a ? a.final : null, act: B ? B.final.per_m : A.final,
+    hint: d.has_fin
+      ? `greige + dyeing shortage + fent + dyeing charge${extra ? ' + brokerage / packing' : ''}`
+      : `greige fabric${extra ? ' + brokerage' : ''}`,
   });
   return out;
 }
@@ -349,6 +393,11 @@ export function compareRows(d: DesignChain): CmpRow[] {
 }
 
 /* ------------------------------ formatting ------------------------------ */
+/** ₹ with 2 fixed decimals and a real minus: −₹7.60 (cost breakup) */
+export const money2 = (v: number) => {
+  const x = Math.round((+v || 0) * 100) / 100;
+  return (x < 0 ? '−' : '') + '₹' + Math.abs(x).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 export const money = (v: number) => '₹' + (Math.round((+v || 0) * 100) / 100).toLocaleString('en-IN');
 export const moneyC = (v: number) => {
   const x = +v || 0;

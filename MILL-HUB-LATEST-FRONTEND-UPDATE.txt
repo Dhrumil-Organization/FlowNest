@@ -1,0 +1,27 @@
+Latest frontend refresh — Dyeing > Mill Hub Outward/Inward toggle
+
+Based on the newly uploaded main(2).zip.
+
+Updated:
+  src/screens/dyeing/MillHubTab.tsx
+  src/screens/dyeing/dyeingApi.ts (only if the current API body type needed direction)
+
+Important root cause:
+  The active load() callback sends `direction` in its payload and already selects
+  normalizeInwardMovementLots() for inward mode, but direction was missing from the
+  callback dependency array. That left a stale closure, so selecting Inward could
+  continue using the old outward value.
+
+Fix:
+  Added `direction` to the active load() useCallback dependency array.
+  The existing useFocusEffect watches load, so switching direction causes a fresh
+  report callback/request while the Mill Hub screen is focused.
+  Existing UI, date range, filters, grouping and challan detail are retained.
+
+Expected Network payload:
+  OUTWARD DATE -> direction: "outward"
+  INWARD DATE  -> direction: "inward"
+
+Backend dependency:
+  Deploy the previously supplied Sudamo controller patch that supports the optional
+  `direction` field on existing POST /dyeing/mill_hub_report.

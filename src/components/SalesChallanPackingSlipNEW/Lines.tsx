@@ -7,13 +7,15 @@ import { Platform, Text, TextInput, View } from 'react-native';
 import { Btn, ErrorText, FieldLabel, Hint, LinkBtn, tab, u } from '../PackingAutomationNEW/ui';
 import type { Mode, Row } from './api';
 import type { ScanDevice } from './ScanDevices';
-import { assignQtyIssue, canAssign, cartonsOf, maxAssign, n3, pick, qty, splitTypes, sum } from './rules';
+import { assignQtyIssue, canAssign, cartonsOf, maxAssign, n3, onChallan, pick, qty, splitTypes, sum } from './rules';
 import { Bar, Sr, Stats, Tag, Tags } from './ui';
 
 /* ------------------------------ one line ------------------------------ */
 
-export function StockLine({ row, mode, d2, onAssign, onScan }: {
+export function StockLine({ row, mode, d2, onAssign, onScan, cartonStep }: {
   row: Row; mode: Mode; d2: Row[]; onAssign?: (v: string) => string; onScan?: (device: ScanDevice) => void;
+  /** Modify → Cartons: show the carton view of the line (as in Scan). */
+  cartonStep?: boolean;
 }) {
   const [draft, setDraft] = useState(String(row.AssQty ?? ''));
   useEffect(() => { setDraft(String(row.AssQty ?? '')); }, [row.AssQty]);
@@ -34,9 +36,11 @@ export function StockLine({ row, mode, d2, onAssign, onScan }: {
   const full = target > 0 && n3(scannedQty) >= target;
   const assigned = n3(row.AssQty) > 0;
   const shortStock = n3(row.StkQty) < n3(row.BQty);
+  const showCartons = mode === 'scan' || !!cartonStep;
+  const challan = onChallan(row);
 
   return (
-    <View style={[u.card, assigned && mode !== 'scan' && { borderColor: T.copper + '66' }, mode === 'scan' && full && { borderColor: T.green + '66' }]}>
+    <View style={[u.card, assigned && !showCartons && { borderColor: T.copper + '66' }, showCartons && full && { borderColor: T.green + '66' }]}>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <Sr n={row.SrNo} />
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -46,13 +50,14 @@ export function StockLine({ row, mode, d2, onAssign, onScan }: {
             {row.MerName ? <Tag text={`Merge ${row.MerName}`} /> : null}
             {row.GrdName ? <Tag text={`Grade ${row.GrdName}`} /> : null}
             {row.ShdName ? <Tag text={row.ShdName} /> : null}
-            {!editable && (mode === 'add' || mode === 'edit') ? <Tag text="Locked" tone="amber" /> : null}
-            {mode === 'scan' && full ? <Tag text="All scanned" tone="green" /> : null}
+            {!editable && !showCartons && (mode === 'add' || mode === 'edit') ? <Tag text="Locked" tone="amber" /> : null}
+            {showCartons && challan ? <Tag text="On sales challan" tone="amber" /> : null}
+            {showCartons && full && !challan ? <Tag text="All scanned" tone="green" /> : null}
           </Tags>
         </View>
       </View>
 
-      {mode === 'scan' ? (
+      {showCartons ? (
         <>
           <Stats items={[
             { label: 'Bal. qty', value: qty(row.BQty) },
@@ -61,11 +66,20 @@ export function StockLine({ row, mode, d2, onAssign, onScan }: {
           ]} />
           <View style={{ marginTop: 10 }}><Bar value={target ? scannedQty / target : 0} tone={full ? 'green' : 'copper'} /></View>
           {/* Two scanner device types, like WarehouseNEW Assign / Transfer */}
-          <Text style={[u.kicker, { marginTop: 12, marginBottom: 6 }]}>{cartons.length ? 'Continue scanning with' : 'Scan cartons with'}</Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Btn flex label="Hardware scanner" icon="qr-code-scanner" kind={full ? 'ghost' : 'dark'} onPress={() => onScan?.('hardware')} />
-            <Btn flex label="Mobile camera" icon="photo-camera" kind="ghost" onPress={() => onScan?.('camera')} />
-          </View>
+          {challan ? (
+            // Already on a sales challan: its cartons stay as they are (server refuses changes too).
+            <Hint>This line is on a sales challan — its cartons cannot be added or taken off.</Hint>
+          ) : (
+            <>
+              <Text style={[u.kicker, { marginTop: 12, marginBottom: 6 }]}>
+                {cartons.length ? (cartonStep ? 'Add or take off cartons with' : 'Continue scanning with') : 'Scan cartons with'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Btn flex label="Hardware scanner" icon="qr-code-scanner" kind={full ? 'ghost' : 'dark'} onPress={() => onScan?.('hardware')} />
+                <Btn flex label="Mobile camera" icon="photo-camera" kind="ghost" onPress={() => onScan?.('camera')} />
+              </View>
+            </>
+          )}
         </>
       ) : (
         <>

@@ -30,6 +30,7 @@ import {
   isRange,
   matches,
   money,
+  money2,
   moneyC,
   monthLbl,
   normalizeChain,
@@ -43,6 +44,8 @@ const periodLbl = (p: string) => (isRange(p) ? `${dateFull(p.slice(2, 12))} – 
 
 const MF = Platform.select({ ios: 'Menlo', android: 'monospace', default: "'DM Mono', monospace" }) as string;
 const GREEN = '#2A6044';
+/** cost breakup column widths (label · estimated · actual · Δ) */
+const CW = { l: 2.6, lNarrow: 1.5, n: 1, d: 0.8 };
 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
@@ -170,106 +173,106 @@ export function RealCostChainView() {
     </View>
   );
 
-  /** Δ cell: actual − estimated (red = costlier than estimated, green = cheaper) */
+  /** Δ cell: actual − estimated (red = costlier than estimated, green = cheaper, — = no difference / no estimate) */
   const deltaCell = (asm: number | null, act: number | null, has: boolean, small = false) => {
     const ok = has && asm != null && act != null;
     const dd = ok ? (act as number) - (asm as number) : 0;
+    const zero = !ok || Math.abs(dd) < 0.005;
     return (
-      <Text style={[st.gNum, st.r, { flex: 0.9, fontSize: small ? 9.5 : 10, fontWeight: '800', color: !ok || Math.abs(dd) < 0.005 ? C.mut : dd > 0 ? T.red : GREEN }]}>
-        {ok ? (dd > 0 ? '+' : '') + money(dd).replace('₹', '') : ''}
+      <Text style={[st.cNum, st.r, { flex: CW.d, fontSize: small ? 10 : 10.5, fontWeight: '800', color: zero ? C.faint : dd > 0 ? T.red : GREEN }]}>
+        {zero ? '—' : (dd > 0 ? '+' : '−') + money2(Math.abs(dd)).replace('₹', '')}
       </Text>
     );
   };
 
-  /** expandable cost heads: Raw material → Weaving → Greige → Dyeing → Final */
+  /** expandable cost heads: Raw material → Weaving → Greige → Dyeing → Brokerage / packing → Final */
   const costBreakup = (d: DesignChain, heads: CostHead[]) => {
     const has = !!d.assumed;
+    const lw = narrow ? CW.lNarrow : CW.l;
     return (
       <View>
-        <Text style={st.sec}>COST BREAKUP · ESTIMATED vs ACTUAL · ₹ per metre</Text>
-        <View style={st.gRow}>
-          <Text style={[st.gHead, { flex: 1.3 }]}>Tap a cost head for its detail</Text>
-          <Text style={[st.gHead, st.r]}>ESTIMATED</Text>
-          <Text style={[st.gHead, st.r]}>ACTUAL</Text>
-          <Text style={[st.gHead, st.r, { flex: 0.9 }]}>Δ</Text>
+        <View style={[st.gRow, st.cHeadRow]}>
+          <Text style={[st.cTitle, { flex: lw }]}>COST BREAKUP <Text style={st.cTitleSub}>· per metre</Text></Text>
+          <Text style={[st.gHead, st.r, { flex: CW.n }]}>ESTIMATED</Text>
+          <Text style={[st.gHead, st.r, { flex: CW.n }]}>ACTUAL</Text>
+          <Text style={[st.gHead, st.r, { flex: CW.d }]}>Δ</Text>
         </View>
         {heads.map((h) => {
           const k = `${d.key}|${h.key}`;
           const canOpen = !!(h.subs?.length || h.days?.length || h.lines?.length);
           const isOpen = canOpen && !!exp[k];
+          const total = h.kind === 'total';
           const strong = h.kind !== 'head';
           return (
-            <View key={h.key} style={[st.cBlock, h.kind === 'subtotal' && st.cSubtotal, h.kind === 'total' && st.cTotal, isOpen && st.cBlockOpen]}>
+            <View key={h.key} style={[st.cBlock, total && st.cTotal, isOpen && st.cBlockOpen]}>
               <Pressable
                 disabled={!canOpen}
                 onPress={() => setExp((x) => ({ ...x, [k]: !x[k] }))}
-                style={({ pressed }) => [st.gRow, st.cRow, pressed && canOpen && { opacity: 0.7 }]}
+                style={({ pressed }: { pressed: boolean }) => [st.gRow, st.cRow, pressed && canOpen ? { opacity: 0.7 } : null]}
                 accessibilityRole={canOpen ? 'button' : undefined}
                 accessibilityLabel={canOpen ? `${h.label} — ${isOpen ? 'hide' : 'show'} detail` : h.label}
               >
-                <View style={st.cLblWrap}>
-                  <Text style={[st.cChev, !canOpen && { color: 'transparent' }]}>{isOpen ? '▾' : '▸'}</Text>
+                <View style={[st.cLblWrap, { flex: lw }]}>
+                  {canOpen ? <Text style={st.cChev}>{isOpen ? '▾' : '▸'}</Text> : null}
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[st.cLbl, strong && st.cLblStrong, h.kind === 'total' && { color: T.copper }]} numberOfLines={2}>{h.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[st.cLbl, strong && st.cLblStrong, total && { color: T.copper }]} numberOfLines={1}>{h.label}</Text>
+                      {h.chip ? <Text style={st.cChip}>{h.chip}</Text> : null}
+                    </View>
                     {h.hint ? <Text style={st.cHint} numberOfLines={2}>{h.hint}</Text> : null}
                   </View>
                 </View>
-                <Text style={[st.gNum, st.r, { color: C.mut }, strong && { fontWeight: '800' }]}>{has && h.asm != null ? money(h.asm) : '—'}</Text>
-                <Text style={[st.gNum, st.r, { fontWeight: strong ? '800' : '700', color: h.kind === 'total' ? T.copper : T.ink }, h.kind === 'total' && { fontSize: 12.5 }]}>{money(h.act)}</Text>
+                <Text style={[st.cNum, st.r, { flex: CW.n, color: C.faint }]}>{has && h.asm != null ? money2(h.asm) : '—'}</Text>
+                <Text style={[st.cNum, st.r, { flex: CW.n, fontWeight: '800', color: total ? T.copper : T.ink }, total && { fontSize: 13 }]}>{money2(h.act)}</Text>
                 {deltaCell(h.asm, h.act, has)}
               </Pressable>
 
               {isOpen && h.subs ? (
                 <View style={st.cPanel}>
                   {h.subs.map((s, i) => (
-                    <View key={i} style={st.cSubRow}>
-                      <View style={st.gRow}>
-                        <Text style={[st.cSubLbl, { flex: 1.3 }]} numberOfLines={2}>{s.label}</Text>
-                        <Text style={[st.gNum, st.r, st.cSubNum, { color: C.mut }]}>{has && s.asm != null ? money(s.asm) : '—'}</Text>
-                        <Text style={[st.gNum, st.r, st.cSubNum, { fontWeight: '700', color: T.ink }]}>{s.act != null ? money(s.act) : '—'}</Text>
-                        {deltaCell(s.asm, s.act, has, true)}
+                    <View key={i} style={[st.gRow, st.cSubRow]}>
+                      <View style={{ flex: lw, minWidth: 0, paddingLeft: 18 }}>
+                        <Text style={st.cSubLbl} numberOfLines={1}>{s.label}</Text>
+                        {s.note ? <Text style={st.cHint} numberOfLines={2}>{s.note}</Text> : null}
                       </View>
-                      {s.note ? <Text style={st.cNote}>{s.note}</Text> : null}
+                      <Text style={[st.cNum, st.r, st.cSubNum, { flex: CW.n, color: C.faint }]}>{has && s.asm != null ? money2(s.asm) : '—'}</Text>
+                      <Text style={[st.cNum, st.r, st.cSubNum, { flex: CW.n, fontWeight: '800', color: T.ink }]}>{s.act != null ? money2(s.act) : '—'}</Text>
+                      {deltaCell(s.asm, s.act, has, true)}
                     </View>
                   ))}
-                  <View style={[st.gRow, st.cPanelTot]}>
-                    <Text style={[st.cSubLbl, { flex: 1.3, fontWeight: '800' }]}>{h.label} total</Text>
-                    <Text style={[st.gNum, st.r, st.cSubNum, { color: C.mut, fontWeight: '800' }]}>{has && h.asm != null ? money(h.asm) : '—'}</Text>
-                    <Text style={[st.gNum, st.r, st.cSubNum, { fontWeight: '800', color: T.ink }]}>{money(h.act)}</Text>
-                    {deltaCell(h.asm, h.act, has, true)}
-                  </View>
+                  {h.foot ? <Text style={st.cFoot}>{h.foot}</Text> : null}
                 </View>
               ) : null}
 
               {isOpen && h.days ? (
                 <View style={st.cPanel}>
-                  <View style={st.dRow}>
-                    {['DATE', ...(narrow ? [] : ['SHED']), 'METRES', '₹/PK·M', '₹/M', 'AMOUNT'].map((t, i) => (
-                      <Text key={t} style={[st.gHead, { flex: t === 'DATE' ? 1 : 0.9 }, i > (narrow ? 0 : 1) && st.r]}>{t}</Text>
+                  <View style={[st.dRow, { paddingLeft: 18 }]}>
+                    {['WOVEN', ...(narrow ? [] : ['SHED']), 'METRES', '₹/PICK·M', '₹/M', 'AMOUNT'].map((t, i) => (
+                      <Text key={t} style={[st.gHead, { flex: t === 'WOVEN' ? 1 : 0.9 }, i > (narrow ? 0 : 1) && st.r]}>{t}</Text>
                     ))}
                   </View>
                   {h.days.map((x) => (
-                    <View key={x.date} style={st.dRow}>
+                    <View key={x.date} style={[st.dRow, { paddingLeft: 18 }]}>
                       <Text style={[st.dTxt, { flex: 1 }]}>{dateShort(x.date)}</Text>
                       {narrow ? null : <Text style={[st.dTxt, { flex: 0.9, color: C.mut }]} numberOfLines={1}>{x.shed || '—'}</Text>}
                       <Text style={[st.dTxt, st.r, { flex: 0.9 }]}>{fm(x.metres)}</Text>
-                      <Text style={[st.dTxt, st.r, { flex: 0.9, color: x.rate != null ? T.ink : C.mut }]}>
-                        {x.rate != null ? x.rate.toFixed(4) : '—'}{x.status === 'LIVE' ? '' : x.status ? ' F' : ''}
+                      <Text style={[st.dTxt, st.r, { flex: 0.9, color: x.rate != null ? T.ink : C.faint }]}>
+                        {x.rate != null ? x.rate.toFixed(4) : '—'}{x.rate != null && x.status && x.status !== 'LIVE' ? ' F' : ''}
                       </Text>
                       <Text style={[st.dTxt, st.r, { flex: 0.9 }]}>{x.per_m.toFixed(2)}{x.costing_m > 0 ? '*' : ''}</Text>
-                      <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '700' }]}>{moneyC(x.amount)}</Text>
+                      <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{moneyC(x.amount)}</Text>
                     </View>
                   ))}
-                  <View style={[st.dRow, st.cPanelTot]}>
+                  <View style={[st.dRow, { paddingLeft: 18, borderBottomWidth: 0 }]}>
                     <Text style={[st.dTxt, { flex: 1, fontWeight: '800' }]}>Total</Text>
                     {narrow ? null : <Text style={[st.dTxt, { flex: 0.9 }]} />}
-                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{fm(d.breakup?.weave.metres || 0)}</Text>
+                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{fm(d.breakup?.weave.metres || d.made)}</Text>
                     <Text style={[st.dTxt, st.r, { flex: 0.9 }]} />
-                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{(d.breakup?.weave.per_m || 0).toFixed(2)}</Text>
-                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{moneyC(d.breakup?.weave.amt || 0)}</Text>
+                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{h.act.toFixed(2)}</Text>
+                    <Text style={[st.dTxt, st.r, { flex: 0.9, fontWeight: '800' }]}>{moneyC(d.breakup?.weave.amt || h.act * d.made)}</Text>
                   </View>
-                  <Text style={st.cNote}>
-                    Amount = pick-metres (metres × picks) × that month's conversion rate (₹ per pick-metre; F = month frozen, else live).
+                  <Text style={st.cFoot}>
+                    Amount = metres × picks × that month's conversion rate (₹ per pick-metre; F = month frozen, else live).
                     {h.days.some((x) => x.costing_m > 0) ? ` * part of the day's metres had no rate / picks — charged at the costing ${money(d.breakup?.weave.costing_rate || 0)}/m.` : ''}
                   </Text>
                 </View>
@@ -277,7 +280,7 @@ export function RealCostChainView() {
 
               {isOpen && h.lines ? (
                 <View style={st.cPanel}>
-                  {h.lines.map((l, i) => <Text key={i} style={[st.cNote, { fontSize: 10, color: T.ink, marginTop: i ? 3 : 0 }]}>{l}</Text>)}
+                  {h.lines.map((l, i) => <Text key={i} style={[st.cLine, { paddingLeft: 18 }]}>{l}</Text>)}
                 </View>
               ) : null}
             </View>
@@ -293,7 +296,13 @@ export function RealCostChainView() {
     const cmp = compareRows(d);
     return (
       <View style={st.detail}>
-        {tree ? costBreakup(d, tree) : null}
+        {d.breakup ? null : (
+          <Text style={[st.warn, { marginTop: 0, marginBottom: 8 }]}>
+            The server is still on the old Real Costing code — deploy the new RealCostChainController.php (cache rcc:v6) to see
+            warp / weft shortage, date-wise weaving and brokerage here.
+          </Text>
+        )}
+        {costBreakup(d, tree)}
         {tree ? null : <Text style={st.sec}>ASSUMED vs ACTUAL · per metre</Text>}
         {tree ? null : (
           <View style={st.gRow}>
@@ -319,17 +328,11 @@ export function RealCostChainView() {
         <Text style={st.foot}>
           {d.assumed
             ? tree
-              ? `Estimated from costing ${d.assumed.code || d.assumed.id} · ${dateFull(d.assumed.ts)} (costing final ${money(d.assumed.costing_final)} incl. brokerage / cut-pack; compared without them).${d.breakup?.rm_asm ? '' : ' This costing has no warp / weft split, so the raw material detail shows actual only.'} `
+              ? `Tap a cost head for its detail. Estimated from ${d.assumed.code || d.assumed.id} · generated ${dateFull(d.assumed.ts)}.${d.breakup && !d.breakup.rm_asm ? ' This costing has no warp / weft split, so the raw material lines show actual only.' : ''} `
               : `Assumed from costing ${d.assumed.code || d.assumed.id} · ${dateFull(d.assumed.ts)} (costing final ${money(d.assumed.costing_final)} incl. brokerage / cut-pack; compared without them). Assumed warp shortage = costing warp wastage ${d.assumed.warp_waste}% — already inside the costing RM, so not added to the assumed final. `
             : 'No costing record for this design — only the actual is shown. '}
           Recipe now learns warp {d.learned_warp != null ? d.learned_warp + '%' : '—'} · finish {d.learned_fin != null ? d.learned_fin + '%' : '—'} (actual + 1% buffer).
         </Text>
-        {tree ? (
-          <Text style={st.foot}>
-            Raw material = yarn really issued to the closed beams (creel warp split by warp length, weft of each beam), each carton at its own
-            purchase / job-inward rate, returns deducted. Warp shortage = yarn of the beam length that was not checked.
-          </Text>
-        ) : null}
         {tree ? null : <Text style={st.foot}>
           {A.rm_source === 'actual' || A.rm_source === 'mixed'
             ? `RM from yarn really issued: warp ${money(A.rm_warp)}/m (creel cartons − returns, split by warp length) + weft ${money(A.rm_weft)}/m (beam cartons − returns) on ${fm(A.rm_metres)} m` +
@@ -594,24 +597,28 @@ const st = StyleSheet.create({
   gNum: { flex: 1, fontFamily: MF, fontSize: 11 },
   r: { textAlign: 'right' },
   foot: { fontSize: 9.5, color: C.mut, marginTop: 7, lineHeight: 14 },
-  // cost breakup (expandable heads)
-  cBlock: { borderRadius: 8, marginVertical: 1 },
-  cBlockOpen: { backgroundColor: T.surface, borderWidth: 1, borderColor: C.bd },
-  cSubtotal: { backgroundColor: T.alt, marginTop: 4, marginBottom: 4 },
-  cTotal: { borderTopWidth: 1.5, borderTopColor: T.copper, borderRadius: 0, marginTop: 6, paddingTop: 2 },
-  cRow: { paddingVertical: 6, paddingHorizontal: 6 },
-  cLblWrap: { flex: 1.3, flexDirection: 'row', alignItems: 'flex-start', gap: 6, minWidth: 0 },
-  cChev: { width: 12, fontSize: 11, lineHeight: 15, color: T.copper, fontWeight: '800' },
-  cLbl: { fontSize: 11.5, fontWeight: '600', color: T.ink },
-  cLblStrong: { fontWeight: '800', fontSize: 12 },
-  cHint: { fontSize: 9, color: C.mut, marginTop: 1, lineHeight: 12 },
-  cPanel: { marginLeft: 24, marginRight: 6, marginBottom: 8, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: T.copper },
-  cSubRow: { paddingVertical: 3 },
-  cSubLbl: { fontSize: 10.5, fontWeight: '600', color: T.ink },
+  // cost breakup (expandable heads) — screenshot layout
+  cHeadRow: { paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: C.bd, marginBottom: 2 },
+  cTitle: { fontSize: 9, fontWeight: '800', color: T.nav, letterSpacing: 0.6 },
+  cTitleSub: { fontWeight: '600', color: C.mut, letterSpacing: 0 },
+  cBlock: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.bd },
+  cBlockOpen: { backgroundColor: '#F6F1EA', borderRadius: 8, borderBottomColor: 'transparent', marginVertical: 2 },
+  cTotal: { borderBottomWidth: 0, borderTopWidth: 1.5, borderTopColor: T.copper, marginTop: 6 },
+  cRow: { paddingVertical: 9, paddingHorizontal: 8, gap: 8 },
+  cLblWrap: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minWidth: 0 },
+  cChev: { width: 10, fontSize: 9, lineHeight: 16, color: C.mut, fontWeight: '800' },
+  cLbl: { fontSize: 12.5, fontWeight: '700', color: T.ink },
+  cLblStrong: { fontWeight: '800' },
+  cChip: { fontSize: 8.5, fontWeight: '700', color: C.mut, backgroundColor: '#EFE9E1', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  cHint: { fontFamily: MF, fontSize: 9, color: C.faint, marginTop: 2, lineHeight: 13 },
+  cNum: { fontFamily: MF, fontSize: 11.5 },
+  cPanel: { paddingHorizontal: 8, paddingBottom: 10 },
+  cSubRow: { paddingVertical: 6, gap: 8 },
+  cSubLbl: { fontSize: 11, fontWeight: '700', color: T.ink },
   cSubNum: { fontSize: 10.5 },
-  cNote: { fontSize: 9, color: C.mut, lineHeight: 13, marginTop: 1 },
-  cPanelTot: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.bd, marginTop: 4, paddingTop: 5 },
-  dRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.bd },
+  cFoot: { fontSize: 9, color: C.mut, lineHeight: 13, marginTop: 6, paddingLeft: 18 },
+  cLine: { fontFamily: MF, fontSize: 10, color: T.ink, lineHeight: 16 },
+  dRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8DFD3' },
   dTxt: { fontSize: 10, fontFamily: MF, color: T.ink },
   warn: { fontSize: 10.5, color: '#9A6B12', backgroundColor: '#FBF1DC', borderWidth: 1, borderColor: '#EAD9A8', borderRadius: 8, padding: 8, marginTop: 8, lineHeight: 15 },
   bRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, borderTopWidth: 1, borderTopColor: T.alt },

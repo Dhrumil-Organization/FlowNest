@@ -3,7 +3,7 @@
 // endpoints, params and headers as the React Web ERP:
 //   SalesChallanPackingSlip.js      showpackslip · checkvoucherno · get_pack_current_stock · savepackslip
 //                                   savepackslipcarton · packslipdelete · getproperty · getstore
-//   AllPartyDataSCPS (+ PartySelect) accountbasic (party help, searched on the server, 20 a page)
+//   AllPartyDataSCPS (+ PartySelect) accountbasic (load all once; client-side search)
 //                                   accountget    (full party record on pick)
 //                                   getlimit      (credit limit → crlimit[0] merged into the form)
 //   PendingOrderSelect / Single     showpendingso
@@ -104,17 +104,18 @@ export async function checkVoucherNo(a: Api, c: Ctx, p: { vouno: string; suffix:
 /* ------------------------------ party (AllPartyDataSCPS) ------------------------------ */
 
 /**
- * Web PartySelect (the "?" help dialog) → GET accountbasic. Searched on the server.
+ * Party master from GET accountbasic. The Party modal requests the full list once
+ * (limit: '') and filters it in memory; no HTTP request is made while typing.
  * Rows: acccode, accountname, Address, City, Cnty, GSTIN, MHName, SHName, GrpCode, PanNo, Balance.
  */
-export async function searchParties(a: Api, c: Ctx, p: { search: string; page?: number; scope?: PartyScope; parcode?: string }) {
+export async function searchParties(a: Api, c: Ctx, p: { search: string; page?: number; limit?: number | ''; scope?: PartyScope; parcode?: string }) {
   const r = resp(await get(a, 'accountbasic', {
     ...base(c),
     txntype: TXNTYPE,
     partytype: 'p',
     type: '',
     page: p.page ?? 1,
-    limit: PARTY_PAGE,
+    limit: p.limit ?? PARTY_PAGE,
     search: p.search,
     isceo: p.scope?.isceo ?? '',
     partype: p.scope?.partype ?? '',
@@ -212,6 +213,17 @@ export async function fetchCartons(a: Api, c: Ctx, row: Row, p: { date: string; 
   return arr(resp(body, 'Cartons could not be loaded.').data);
 }
 
+/**
+ * Web ItemDetail.getSetChallan → GET getsetchallan (prpcode, yearno).
+ * data: { extraqtyper (e.g. 25 = 25 %), ratedisable, calculatedisconrate }.
+ * extraqtyper = extra qty allowed over the order balance, as % of the order qty (SOQty).
+ */
+export async function fetchSetChallan(a: Api, c: Ctx): Promise<{ extraqtyper: number }> {
+  const r = resp(await get(a, 'getsetchallan', { prpcode: c.prpcode, yearno: c.yearno }), 'Challan settings could not be loaded.');
+  const x = parseFloat(String(r?.data?.extraqtyper ?? '').replace(',', '.'));
+  return { extraqtyper: Number.isFinite(x) && x > 0 ? x : 0 };
+}
+
 /* ------------------------------ browse ------------------------------ */
 
 /**
@@ -229,9 +241,26 @@ export async function browseSlips(a: Api, c: Ctx): Promise<Row[]> {
 
 /** Web handleSaveClick / handleSaveCartons. Same article: the form + editedd1 + txntype (+ action). */
 export async function saveSlip(a: Api, article: Row, cartons: boolean): Promise<string> {
-  const body = await post(a, cartons ? 'savepackslipcarton' : 'savepackslip', article);
-  if (body?.success !== true) throw new Error(body?.message || 'Packing slip could not be saved.');
-  return String(body?.response?.main?.[0]?.UId ?? '');
+  if (cartons) return (await saveCartons(a, article)).uid;
+  const body = await post(a, 'savepackslip', article);
+  const r = body?.response || {};
+  if (body?.success !== true || r.error === true) throw new Error(r.message || body?.message || 'Packing slip could not be saved.');
+  return String(r.main?.[0]?.UId ?? '');
+}
+
+/**
+ * savepackslipcarton — the whole slip with every carton (`d2`), plus `d2delete`: saved cartons the user took off
+ * ({ SrNo, SubSr, CartNo }). The server upserts each d2 row by UId + SrNo + SubSr; it removes saved cartons only
+ * with the d2delete update in PackSlipController (it then answers `removed` = rows deleted). `removed: null` =
+ * the server did not report it (not updated yet), so nothing was removed.
+ * The duplicate-carton check answers success:true with response.error:true — that is a failure here.
+ */
+export async function saveCartons(a: Api, article: Row): Promise<{ uid: string; removed: number | null }> {
+  const body = await post(a, 'savepackslipcarton', article);
+  const r = body?.response || {};
+  if (body?.success !== true || r.error === true) throw new Error(r.message || body?.message || 'Cartons could not be saved.');
+  const removed = r.removed === undefined || r.removed === null ? null : Number(r.removed);
+  return { uid: String(r.UId ?? r.uid ?? r.main?.[0]?.UId ?? ''), removed: Number.isFinite(removed) ? removed : null };
 }
 
 export async function deleteSlip(a: Api, c: Ctx, uid: string): Promise<string> {

@@ -69,6 +69,38 @@ export const partyRowView = (r: Row) => ({
   address: pick(r, 'Address'),
 });
 
+/** Index the master once and remove duplicate rows caused by accountbasic joins.
+ * FAMAcc.AccCode uniquely identifies a party within the active property.
+ */
+export type PartySearchEntry = { row: Row; terms: string };
+export const indexPartyRows = (rows: Row[]): PartySearchEntry[] => {
+  const seen = new Set<string>();
+  const result: PartySearchEntry[] = [];
+  for (const r of rows) {
+    const code = pick(r, 'acccode', 'AccCode', 'ParCode');
+    const name = pick(r, 'accountname', 'accname', 'AccName', 'ParName');
+    const gstin = pick(r, 'GSTIN', 'gstin');
+    const key = code ? `code:${code.toLocaleLowerCase()}` : `name:${name.toLocaleLowerCase()}:${gstin.toLocaleLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Avoid common ledger head / address matches which produce irrelevant results.
+    // These fields remain visible in each row but do not influence matching.
+    result.push({
+      row: r,
+      terms: [name, code, pick(r, 'City', 'city', 'DCity'), gstin]
+        .join(' ').toLocaleLowerCase(),
+    });
+  }
+  return result;
+};
+
+/** Every search word must be present in this party's own name/code/city/GSTIN. */
+export const filterPartyRows = (entries: PartySearchEntry[], query: string): PartySearchEntry[] => {
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return entries;
+  return entries.filter((e) => terms.every((word) => e.terms.includes(word)));
+};
+
 /** Every form field AllPartyDataSCPS clears (clearBoxDueDay). */
 export const PARTY_CLEAR: Row = {
   ParCode: '', ParName: '', PrintParty: '', PrintPartyName: '', BADDRESS: '', BAccCode: '', BAccName: '',
@@ -162,6 +194,39 @@ export function assignQtyIssue(row: Row, value: string): string {
 export const maxAssign = (row: Row) => Math.min(n3(row.BQty), n3(row.StkQty));
 export const canAssign = (row: Row, mode: string) => mode === 'add' || String(row.D1Flag) === '0';
 
+/* ------------------------------ saved cartons: add / remove ------------------------------ */
+// packslipshow sets D1Flag = 1 when the line has saved cartons (FAMPackSlipD2) OR is already on a sales challan
+// (FAMSalD1.PSUId / PSSrNo). With the PackSlipController update it also sends the two apart:
+//   SalFlag = 1  line is on a sales challan → its cartons stay as they are (no add, no remove)
+//   CtnFlag = 1  line has saved cartons     → they can be taken off (sent as d2delete)
+// Without SalFlag (server not updated) the web rule stays: saved cartons of a D1Flag = 1 line cannot be removed.
+
+/** Line already on a sales challan (needs SalFlag from the server; unknown → false). */
+export const onChallan = (row: Row | null | undefined) => String(row?.SalFlag ?? '') === '1';
+
+/** Saved cartons of this line may be taken off. */
+export const canRemoveSaved = (row: Row | null | undefined) =>
+  row?.SalFlag !== undefined && row?.SalFlag !== null ? !onChallan(row) : String(row?.D1Flag) !== '1';
+
+const cartonKey = (c: Row) => `${str(c.SrNo)}|${str(c.CartNo).toUpperCase()}`;
+
+/** Saved cartons that are not on the slip any more → d2delete ({ SrNo, SubSr, CartNo }). */
+export function removedCartons(saved: Row[] | undefined, current: Row[] | undefined): Row[] {
+  const now = new Set((current || []).map(cartonKey));
+  return (saved || [])
+    .filter((c) => !blank(c.SrNo) && !blank(c.SubSr) && !blank(c.CartNo) && !now.has(cartonKey(c)))
+    .map((c) => ({ SrNo: c.SrNo, SubSr: c.SubSr, CartNo: c.CartNo }));
+}
+
+/** Any carton added or taken off since the slip was loaded. */
+export function cartonsChanged(saved: Row[] | undefined, current: Row[] | undefined): boolean {
+  const a = new Set((saved || []).filter((c) => !blank(c.CartNo)).map(cartonKey));
+  const b = new Set((current || []).filter((c) => !blank(c.CartNo)).map(cartonKey));
+  if (a.size !== b.size) return true;
+  for (const k of a) if (!b.has(k)) return true;
+  return false;
+}
+
 /** handleSaveClick / handleSaveCartons — same checks, same order. */
 export function saveIssue(f: Row, stock: Row[]): string {
   if (!stock.some((r) => !blank(r.SrNo))) return 'Serial number needs to be set in each order line.';
@@ -179,7 +244,7 @@ export const normQr = (v: any) => (v ? String(v).replace(/(^,)|(,$)/g, '') : '')
 const cleanQr = (v: any) => (v ? String(v).trim().replace(/\r?\n|\r/g, '') : '');
 const dec3 = (s: string, sep: string) => s.split(sep).map((v) => (v === '' || isNaN(v as any) ? v : Number(v).toFixed(3))).join(sep);
 
-export type ScanResult = { status: 'added' | 'duplicate' | 'notfound' | 'locked' | 'mismatch'; carton?: Row; source?: Row; message: string };
+export type ScanResult = { status: 'added' | 'duplicate' | 'notfound' | 'locked' | 'mismatch' | 'overqty'; carton?: Row; source?: Row; message: string };
 
 /** One stock carton (getcartondetail row) as the list shows it. */
 export const cartonView = (r: Row) => ({
@@ -200,7 +265,7 @@ export const cartonView = (r: Row) => ({
  *   "{a,b,…}" → carton no. at index 15, compared with qrcodestring1 (last 4 parts ignored)
  *   "a~b~…"   → carton no. at index 6,  compared with qrcodestring  (last 4 parts ignored)
  */
-export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; others: Row[]; srNo: any; uid: any }): ScanResult {
+export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; others: Row[]; srNo: any; uid: any; limit?: number }): ScanResult {
   const code = normQr(raw);
   if (!code) return { status: 'notfound', message: 'Empty scan.' };
   const dup = (cartNo: any) =>
@@ -230,11 +295,19 @@ export function matchCarton(raw: string, p: { list: Row[]; scanned: Row[]; other
  * The checks after a stock carton is identified — shared by a scan and a manual pick from the list:
  * locked (lock = 1) → refused; already on this or another line → duplicate; else the D2 carton row.
  */
-export function pickCarton(found: Row, p: { scanned: Row[]; others: Row[]; srNo: any; uid: any }): ScanResult {
+export function pickCarton(found: Row, p: { scanned: Row[]; others: Row[]; srNo: any; uid: any; limit?: number }): ScanResult {
   const d = p.scanned.find((c) => String(c.CartNo) === String(found.cartno)) || p.others.find((c) => String(c.CartNo) === String(found.cartno));
   if (d) return { status: 'duplicate', source: found, message: `Carton ${found.cartno} is already on Sr ${d.SrNo} / Sub ${d.SubSr}.` };
   if (String(found.lock ?? '0').trim() === '1') {
     return { status: 'locked', source: found, message: `Carton ${found.cartno} is locked${found.lockreason ? `: ${found.lockreason}` : ''}.` };
+  }
+  // Qty limit (web CartonSelect finalTotal): selected qty of this line + this carton must stay within
+  // balance qty + extra qty % (getsetchallan extraqtyper) of the order qty.
+  if (p.limit !== undefined) {
+    const next = n3(sum(p.scanned, 'QtyWt') + n3(found.qty));
+    if (next > n3(p.limit)) {
+      return { status: 'overqty', source: found, message: `Selected Qty ${qty(next)} cannot be more than Ordered Qty (${qty(p.limit)}). Carton ${found.cartno} (${qty(found.qty)}) not added.` };
+    }
   }
   const carton: Row = {
     Amount: null, BalMtr: null, CartNo: found.cartno, Chees: found.chees, DispNo: null, DispSubSr: null,
@@ -247,9 +320,10 @@ export function pickCarton(found: Row, p: { scanned: Row[]; others: Row[]; srNo:
 }
 
 /** handleItemOk — total ≤ balance qty and no carton twice (ProSrNo|ProSubSr|ProUId|CartNo|EntType). */
-export function cartonsIssue(row: Row, scanned: Row[], others: Row[]): string {
+export function cartonsIssue(row: Row, scanned: Row[], others: Row[], limit?: number): string {
   const total = sum(scanned, 'QtyWt');
-  if (n3(total) > n3(row.BQty)) return `Scanned ${qty(total)} is more than balance qty ${qty(row.BQty)}. Remove a carton.`;
+  const max = limit === undefined ? n3(row.BQty) : n3(limit);
+  if (n3(total) > max) return `Scanned ${qty(total)} is more than ${limit === undefined ? 'balance' : 'allowed'} qty ${qty(max)}. Remove a carton.`;
   const seen = new Set<string>();
   for (const c of [...others, ...scanned]) {
     const k = `${c.ProSrNo}|${c.ProSubSr}|${c.ProUId}|${c.CartNo}|${c.EntType}`;
@@ -258,6 +332,20 @@ export function cartonsIssue(row: Row, scanned: Row[], others: Row[]): string {
   }
   return '';
 }
+
+/** Order qty (SOQty) of the order line a stock / carton row belongs to — web `SelectedRowSoQty` (d1 row's SOQty). */
+export const orderQtyOf = (row: Row | null | undefined, d1: Row[] | undefined): number => {
+  if (!row) return 0;
+  const hit = (d1 || []).find((r) => d1Key(r) === d1Key(row));
+  return n3(hit?.SOQty ?? row.SOQty);
+};
+
+/**
+ * Most qty that may be selected as cartons for one line (web ItemDetail totalSoQtyToSale):
+ *   balance qty (BQty) + order qty (SOQty) × extraqtyper / 100      — extraqtyper from getsetchallan.
+ */
+export const cartonLimit = (row: Row, orderQty: number, extraPer: number): number =>
+  n3(n3(row.BQty) + (n3(orderQty) * n3(extraPer)) / 100);
 
 export const cartonsOf = (d2: Row[] | undefined, srNo: any) =>
   (d2 || []).filter((c) => parseInt(c.SrNo, 10) === parseInt(srNo, 10));

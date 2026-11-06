@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { formatActualDashboardQuantity, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { api } from '../api/api';
 import {
   COLORS,
@@ -24,7 +25,8 @@ const asNumber = (value: unknown): number => {
 const formatMeters = (value: unknown): string =>
   asNumber(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
-const formatShedMeters = (value: unknown): string => {
+const formatShedMeters = (value: unknown, mode: 'compact' | 'actual' = 'compact'): string => {
+  if (mode === 'actual') return formatActualDashboardQuantity(value as number | string | null | undefined);
   const amount = asNumber(value);
   if (Math.abs(amount) >= 1000) {
     return `${(amount / 1000).toFixed(Math.abs(amount) >= 10000 ? 0 : 1)}K m`;
@@ -100,6 +102,7 @@ type Props = {
  */
 export default function MyViewProductionCard({ permitted, date, prptype, refreshKey = 0 }: Props) {
   const router = useRouter();
+  const { mode: amountMode } = useDashboardAmountMode();
   const [state, setState] = useState<ProductionCardState>(initialState);
   const [retryKey, setRetryKey] = useState(0);
 
@@ -269,8 +272,9 @@ export default function MyViewProductionCard({ permitted, date, prptype, refresh
                   key={shed.key}
                   rank={index + 1}
                   name={shed.label}
-                  leftVal={formatShedMeters(shed.yesterdayMetres)}
-                  rightVal={formatShedMeters(shed.mtdMetres)}
+                  leftVal={formatShedMeters(shed.yesterdayMetres, amountMode)}
+                  rightVal={formatShedMeters(shed.mtdMetres, amountMode)}
+                  dense={amountMode === 'actual'}
                   rawLeftVal={shed.yesterdayMetres}
                   rawRightVal={shed.mtdMetres}
                   trendUp={shed.yesterdayMetres > 0}

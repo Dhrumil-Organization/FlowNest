@@ -37,6 +37,28 @@ import {
 } from './weftIssueApi';
 
 type Props = { token: string; API: string; username?: string };
+/** Financial year range from YearName like "2026-2027" (or "2026-27") -> 01-Apr-2026 .. 31-Mar-2027. */
+const fyRange = (yearName: any): { min: Date; max: Date } | null => {
+  const m = String(yearName || '').match(/(\d{4})\s*[-/]\s*(\d{2,4})/);
+  if (!m) return null;
+  const y1 = Number(m[1]);
+  return { min: new Date(y1, 3, 1), max: new Date(y1 + 1, 2, 31) };
+};
+const inFy = (d: Date | null, yearName: any) => {
+  const r = fyRange(yearName);
+  if (!r || !d) return true; // unknown year -> don't block
+  return d >= r.min && d <= r.max;
+};
+/** Keep a date inside the FY; otherwise snap to nearest boundary (today if inside). */
+const clampToFy = (d: Date | null, yearName: any): Date => {
+  const r = fyRange(yearName);
+  const x = d || new Date();
+  if (!r) return x;
+  if (x < r.min) return r.min;
+  if (x > r.max) return r.max;
+  return x;
+};
+
 type Step = 'mode' | 'list' | 'header' | 'items' | 'cartons';
 
 type Issue = {
@@ -136,7 +158,7 @@ export default function WeftIssueModule({ token, API }: Props) {
       const d = toDate(m.IssDate);
       setIssue({
         ...emptyIssue(str(m.PrpCode || prp.PrpCode), str(year.YearNo), str(prp.LngName), str(year.YearName)),
-        UId: m.UId ?? row.UId, IssNo: str(m.IssNo ?? row.IssNo), IssDate: d ? dmy(d) : dmy(new Date()),
+        UId: m.UId ?? row.UId, IssNo: str(m.IssNo ?? row.IssNo), IssDate: dmy(clampToFy(d, year.YearName)),
         Remark: m.Remark, BatchNo: m.BatchNo, RecipeUId: m.RecipeUId, BeamUId: m.BeamUId ?? '', BeamNo: str(m.BeamNo ?? row.BeamNo),
         DsnCode: m.DsnCode ?? '', DsnName: str(m.DsnName ?? row.DsnName), StkType: str(m.StkType ?? ''), WarpLen: m.WarpLen ?? '',
         month: str(m.month) || monthOf(d), suffix: str(m.suffix), yarnstrcode: str(m.yarnstrcode),
@@ -544,9 +566,10 @@ function HeaderView({ api, mode, issue, patch, properties, userId, onAccess, onB
         setAccess(ok);
         onAccess(ok);
         const next: Issue = { ...ref.current, ...clean, PrpCode: ref.current.PrpCode, YearNo: ref.current.YearNo } as Issue;
-        const d = toDate(next.IssDate) || new Date();
+        const d = clampToFy(toDate(next.IssDate), ref.current.YearName);
         next.IssDate = dmy(d);
         next.month = monthOf(d);
+        lastApplied.current = next.IssDate;
         patch(next);
         await Promise.all([checkVoucher(next), loadBeams(next)]);
       } catch (e) {
@@ -558,12 +581,43 @@ function HeaderView({ api, mode, issue, patch, properties, userId, onAccess, onB
     return () => { alive = false; };
   }, [api, ctx.prpcode, ctx.yearno, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onDate = (v: string) => {
+  // Calendar scroll / typing fires onChange many times with half-baked dates.
+  // So: show the value instantly, but validate + hit voucher/beam APIs only
+  // after the user stops changing it (debounce).
+  const dateTimer = useRef<any>(null);
+  const lastApplied = useRef<string>('');
+  useEffect(() => () => { if (dateTimer.current) clearTimeout(dateTimer.current); }, []);
+
+  const applyDate = (v: string) => {
     const d = toDate(v);
+    lastApplied.current = v;
     const next = { ...ref.current, IssDate: v, month: monthOf(d) };
     patch({ IssDate: v, month: monthOf(d) });
     void checkVoucher(next);
     void loadBeams(next);
+  };
+
+  const settleDate = (v: string) => {
+    const d = toDate(v);
+    if (!d || d.getFullYear() < 1900) return;      // incomplete date (e.g. year still being typed)
+    if (v === lastApplied.current) return;           // nothing really changed -> no API call
+    if (!inFy(d, ref.current.YearName)) {
+      const r = fyRange(ref.current.YearName);
+      AppAlert.alert(
+        'Invalid Date',
+        `Date must be within financial year ${ref.current.YearName} (${dmy(r!.min)} to ${dmy(r!.max)}).`,
+        [{ text: 'OK', onPress: () => applyDate(dmy(clampToFy(new Date(), ref.current.YearName))) }],
+      );
+      return;
+    }
+    applyDate(v);
+  };
+
+  const onDate = (v: string) => {
+    const d = toDate(v);
+    patch({ IssDate: v, ...(d ? { month: monthOf(d) } : {}) });   // display only, no validation/API yet
+    if (dateTimer.current) clearTimeout(dateTimer.current);
+    dateTimer.current = setTimeout(() => settleDate(v), 800);
   };
 
   const pickStk = async (stk: string) => {
@@ -587,6 +641,12 @@ function HeaderView({ api, mode, issue, patch, properties, userId, onAccess, onB
       [v.PrpCode, 'Please select Property'], [v.YearNo, 'Please select Year'], [v.BeamNo, 'Please select Beam'],
       [v.StkType, 'Please select Stock Type'], [v.DsnCode, 'Please select Design'],
     ];
+    if (dateTimer.current) clearTimeout(dateTimer.current);
+    if (!inFy(toDate(v.IssDate), v.YearName)) {
+      const r = fyRange(v.YearName);
+      const msg = `Issue Date must be within ${v.YearName} (${dmy(r!.min)} to ${dmy(r!.max)})`;
+      setError(msg); AppAlert.alert(msg); return;
+    }
     const bad = rules.find(([val]) => blank(val));
     if (bad) { setError(bad[1]); AppAlert.alert(bad[1]); return; }
     setError(null);
@@ -617,7 +677,7 @@ function HeaderView({ api, mode, issue, patch, properties, userId, onAccess, onB
       <Card title="Voucher">
         <View style={s.row2}>
           <View style={s.col}><KV k="Property" v={prpName} /><KV k="Year" v={issue.YearName || issue.YearNo} last /></View>
-          <View style={s.col}><DateField label="Issue Date" value={issue.IssDate} onChange={onDate} minToday={false} /></View>
+          <View style={s.col}><DateField label="Issue Date" value={issue.IssDate} onChange={onDate} minToday={false} minDate={fyRange(issue.YearName)?.min} maxDate={fyRange(issue.YearName)?.max} /></View>
         </View>
         <Text style={s.label}>Voucher No <Text style={{ color: T.red }}>*</Text></Text>
         <View style={s.vouRow}>

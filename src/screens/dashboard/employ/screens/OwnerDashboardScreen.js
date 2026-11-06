@@ -2686,7 +2686,7 @@
 // });
 
 // screens/OwnerDashboardScreen.js
-import { AmountDisplayModeControl, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
+import { AmountDisplayModeControl, formatActualDashboardQuantity, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
 import { buildProductionShedSummary } from '@/src/screens/dashboard/ProductionShedSummary';
 import { usePermission } from '@/src/core/permissions';
@@ -2757,7 +2757,8 @@ const coverageSubtitle = period => {
   return period.freshness_label || period.display_label || '';
 };
 
-const formatShedMetres = amount => {
+const formatShedMetres = (amount, mode = 'compact') => {
+  if (mode === 'actual') return formatActualDashboardQuantity(amount);
   const n = Number(amount) || 0;
   if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1)}K m`;
   return `${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })} m`;
@@ -3257,8 +3258,9 @@ export default function OwnerDashboardScreen({
                           key={shed.key}
                           rank={i + 1}
                           name={shed.label}
-                          leftVal={formatShedMetres(shed.yesterdayMetres)}
-                          rightVal={formatShedMetres(shed.mtdMetres)}
+                          leftVal={formatShedMetres(shed.yesterdayMetres, amountMode)}
+                          rightVal={formatShedMetres(shed.mtdMetres, amountMode)}
+                          dense={amountMode === 'actual'}
                           rawLeftVal={shed.yesterdayMetres}
                           rawRightVal={shed.mtdMetres}
                           trendUp={shed.yesterdayMetres > 0}
@@ -3369,6 +3371,7 @@ export default function OwnerDashboardScreen({
                     {/* {collection.by_exec.map(exec => ( */}
                     {sortedCollection.map(exec => (
                       <RankRow
+                        dense={amountMode === 'actual'}
                         key={exec.exec_id}
                         name={exec.name}
                         avatarColor={exec.avatar_color}
@@ -3429,7 +3432,7 @@ export default function OwnerDashboardScreen({
                     <LongPressValue
                       rawValue={Number(payment?.total?.to_pay || 0)}
                       formattedValue={displayAmount(Number(payment?.total?.to_pay || 0))}
-                      style={styles.outsTotalValue}
+                      style={[styles.outsTotalValue, amountMode === 'actual' && styles.outsTotalValueActual]}
                     />
                   </View>
 
@@ -3446,6 +3449,7 @@ export default function OwnerDashboardScreen({
                   <TableWrapper rowCount={sortedPayment.length}>
                     {sortedPayment.map((party, i) => (
                       <RankRow
+                        dense={amountMode === 'actual'}
                         key={`${party?.prpcode || ''}-${party?.party_code || ''}-${i}`}
                         rank={i + 1}
                         name={party?.party_name || party?.party_code || 'Unknown Party'}
@@ -3485,7 +3489,7 @@ export default function OwnerDashboardScreen({
                     <LongPressValue
                       rawValue={outstanding.total_due}
                       formattedValue={displayAmount(outstanding.total_due)}
-                      style={styles.outsTotalValue}
+                      style={[styles.outsTotalValue, amountMode === 'actual' && styles.outsTotalValueActual]}
                     />
                   </View>
 
@@ -3510,6 +3514,7 @@ export default function OwnerDashboardScreen({
                   <TableWrapper rowCount={sortedOutstanding.length}>
                     {sortedOutstanding.map(exec => (
                       <RankRow
+                        dense={amountMode === 'actual'}
                         key={exec.exec_id}
                         name={exec.name}
                         avatarColor={exec.avatar_color}
@@ -3625,6 +3630,7 @@ const styles = StyleSheet.create({
   },
   outsTotalLabel: { fontSize: 12, color: COLORS.textMid, fontWeight: '600' },
   outsTotalValue: { fontSize: 18, fontWeight: '800', color: COLORS.red },
+  outsTotalValueActual: { fontSize: 15.5, fontVariant: ['tabular-nums'] },
 
   // ── Category 2-row ──
   catItem: {

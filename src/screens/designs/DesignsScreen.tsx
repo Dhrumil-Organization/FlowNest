@@ -1543,6 +1543,161 @@ const yp = StyleSheet.create({
     changeMainTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
 });
 
+// ── HSN (DAPDesign.GSTGrp) ──
+// Same source as the Web ERP Design Master HSN dropdown:
+// GET /get_criterion?fetch=hsn → [{ HsnCode, HsnName }].
+// The value saved is HsnCode; the backend writes it to DAPDesign.GSTGrp
+// during the TMSMASTER → DAPDesign sync (main_designs has no HSN column).
+type HsnOption = { value: string; label: string };
+
+// Backend default used when no HSN is sent (DesignController DEFAULT_ERP_GST_GRP).
+const DEFAULT_HSN_CODE = '105';
+const HSN_TXNTYPE = 'design_master';
+
+function useHsnOptions() {
+    const { prpcode, yearno } = useERP();
+    const [options, setOptions] = useState<HsnOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const prptype = (await AsyncStorage.getItem('user_prptype')) || DEFAULT_PRPTYPE;
+            const res = await client.get('/get_criterion', {
+                params: {
+                    fetch: 'hsn',
+                    prptype,
+                    YearNo: yearno,
+                    PrpCode: prpcode,
+                    txntype: HSN_TXNTYPE,
+                },
+            });
+            const root: any = res?.data?.response ?? res?.data;
+            if (root?.isauth === '_AUTHFAILED') {
+                throw new Error('Your session has expired. Please sign in again.');
+            }
+            const rows: any[] = Array.isArray(root?.data) ? root.data : [];
+            const seen = new Set<string>();
+            const list: HsnOption[] = [];
+            rows.forEach((row: any) => {
+                const value = String(row?.HsnCode ?? '').trim();
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                list.push({ value, label: String(row?.HsnName ?? value).trim() || value });
+            });
+            setOptions(list);
+            if (!list.length) setError('No HSN found for this property.');
+        } catch (e: any) {
+            setOptions([]);
+            setError(e?.message || 'Unable to load HSN list. Please retry.');
+            console.warn('Design HSN API error', e?.message || e);
+        } finally {
+            setLoading(false);
+        }
+    }, [prpcode, yearno]);
+
+    useEffect(() => { load(); }, [load]);
+
+    return { options, loading, error, reload: load };
+}
+
+function HsnPickerModal({ visible, options, loading, error, selected, onRetry, onSelect, onClose }: {
+    visible: boolean;
+    options: HsnOption[];
+    loading: boolean;
+    error: string;
+    selected?: string;
+    onRetry: () => void;
+    onSelect: (value: HsnOption) => void;
+    onClose: () => void;
+}) {
+    const [search, setSearch] = useState('');
+
+    const closePicker = () => {
+        onClose();
+        setSearch('');
+    };
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return options;
+        return options.filter(o =>
+            o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
+        );
+    }, [options, search]);
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={closePicker}>
+            <View style={yp.overlay}>
+                <View style={yp.sheet}>
+                    <View style={yp.handle} />
+
+                    <View style={yp.header}>
+                        <Text style={yp.title}>Select HSN</Text>
+                        <TouchableOpacity onPress={closePicker} style={yp.closeBtn}>
+                            <Text style={yp.closeTxt}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={yp.searchWrap}>
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Search HSN..."
+                            placeholderTextColor={T.muted}
+                            style={yp.search}
+                            autoFocus
+                        />
+                    </View>
+
+                    {!!error && !loading && (
+                        <View style={yp.errorBox}>
+                            <Text style={yp.errorText}>{error}</Text>
+                            <TouchableOpacity onPress={onRetry}>
+                                <Text style={yp.retryText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 10 }} />}
+
+                    <View style={yp.listFrame}>
+                        <FlatList
+                            data={filtered}
+                            keyExtractor={(item) => item.value}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => {
+                                const active = item.value === selected;
+                                return (
+                                    <TouchableOpacity
+                                        style={[yp.row, active && { backgroundColor: T.copper + '15' }]}
+                                        activeOpacity={0.7}
+                                        onPress={() => {
+                                            onSelect(item);
+                                            closePicker();
+                                        }}
+                                    >
+                                        <Text style={yp.yarnName}>{item.label}</Text>
+                                        <Text style={yp.yarnSub}>Code {item.value}</Text>
+                                    </TouchableOpacity>
+                                );
+                            }}
+                            ItemSeparatorComponent={() => (
+                                <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />
+                            )}
+                            ListEmptyComponent={
+                                !loading && !error ? <Text style={yp.emptyText}>No HSN Found</Text> : null
+                            }
+                        />
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
 // ── Yarn line row ──
 function YarnLineRow({ yarn, type, onChange, onRemove }: {
     yarn: any; type: 'warp' | 'weft' | 'selvedge';
@@ -2313,6 +2468,11 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+    const [hsnPickerVisible, setHsnPickerVisible] = useState(false);
+    const hsn = useHsnOptions();
+    // HSN as loaded from DAPDesign for the design being edited. It is sent on
+    // save only for a new design or when the user changes it.
+    const originalGstGrp = useRef('');
     // Raw text is kept separately so values like `85.` and `85.50`
     // remain typeable instead of being collapsed by parseFloat.
     const [greigeWidthText, setGreigeWidthText] = useState('');
@@ -2323,6 +2483,8 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     }, [design]);
 
     useEffect(() => {
+        const savedGstGrp = String((design as any)?.erp_gst_grp ?? '').trim();
+        originalGstGrp.current = design ? savedGstGrp : '';
         if (design) setForm({
             ...EMPTY_FORM, ...design,
             width_basis: 'greige',
@@ -2331,9 +2493,27 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             warp_wastage: (design as any).warp_wastage ?? 0,
             weft_wastage: (design as any).weft_wastage ?? 6,
             fin_width: (design as any).fin_width ?? 58,
+            erp_gst_grp: savedGstGrp,
         });
         else setForm({ ...EMPTY_FORM });
     }, [design]);
+
+    // New design: preselect the backend's existing default HSN when the
+    // property's HSN list contains it, so behaviour is unchanged unless the
+    // user picks another HSN.
+    useEffect(() => {
+        if (design?.id) return;
+        if (!hsn.options.some(o => o.value === DEFAULT_HSN_CODE)) return;
+        setForm((f: any) => (String(f.erp_gst_grp || '').trim()
+            ? f
+            : { ...f, erp_gst_grp: DEFAULT_HSN_CODE }));
+    }, [design?.id, hsn.options]);
+
+    const selectedHsnLabel = useMemo(() => {
+        const value = String(form.erp_gst_grp || '').trim();
+        if (!value) return '';
+        return hsn.options.find(o => o.value === value)?.label || value;
+    }, [form.erp_gst_grp, hsn.options]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
@@ -2390,6 +2570,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             return;
         }
 
+        const hsnCode = String(form.erp_gst_grp || '').trim();
+        if (!hsnCode) {
+            AppAlert.alert('Validation', 'HSN is required.');
+            return;
+        }
+        const hsnChanged = !design?.id || hsnCode !== originalGstGrp.current;
+        if (hsnChanged && hsn.options.length > 0 && !hsn.options.some(o => o.value === hsnCode)) {
+            AppAlert.alert('Validation', 'Select a valid HSN from the list.');
+            return;
+        }
+
         if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
             AppAlert.alert('Validation', 'At least one warp yarn is required.');
             return;
@@ -2425,6 +2616,10 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
                 strcode,
                 StrCode: strcode,
+
+                // Sent only when it must be written to DAPDesign.GSTGrp:
+                // new design, or an HSN change on an existing design.
+                erp_gst_grp: hsnChanged ? hsnCode : undefined,
 
                 width_basis: 'greige',
                 reed_space: Number(form.reed_space) || 0,
@@ -2794,6 +2989,28 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     </Text>
                 </TouchableOpacity>
 
+                <Text style={fm.label}>HSN</Text>
+
+                {selectedHsnLabel ? (
+                    <View style={yl.row}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={yl.name}>{selectedHsnLabel}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => set('erp_gst_grp', '')} style={{ paddingLeft: 8 }}>
+                            <Text style={{ color: T.pd, fontSize: 18 }}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
+
+                <TouchableOpacity style={fm.addBtn} onPress={() => setHsnPickerVisible(true)}>
+                    <Text style={fm.addBtnTxt}>
+                        {hsn.loading ? 'Loading HSN...' : selectedHsnLabel ? 'Change HSN' : '+ Select HSN'}
+                    </Text>
+                </TouchableOpacity>
+                {!!hsn.error && !hsn.loading && (
+                    <Text style={[fm.hint, { marginTop: 4, color: T.pd }]}>{hsn.error}</Text>
+                )}
+
 
                 <Text style={fm.label}>DYE TYPE</Text>
                 <View style={fm.chipRow}>
@@ -2971,6 +3188,16 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     });
                 }}
                 onClose={() => setCategoryPickerVisible(false)}
+            />
+            <HsnPickerModal
+                visible={hsnPickerVisible}
+                options={hsn.options}
+                loading={hsn.loading}
+                error={hsn.error}
+                selected={String(form.erp_gst_grp || '')}
+                onRetry={hsn.reload}
+                onSelect={(option) => set('erp_gst_grp', option.value)}
+                onClose={() => setHsnPickerVisible(false)}
             />
 
         </>

@@ -116,11 +116,11 @@ function TargetSummary({ cards, label, onOpen, onOpenFY, fyLabel, amountMode }: 
 
           <View style={styles.targetMetrics}>
             <Text style={styles.darkKicker}>SALES</Text>
-            <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{formatDashboardAmount(so?.actual || 0, amountMode)}</Text></Text>
-            <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{formatDashboardAmount(billing?.actual || 0, amountMode)}</Text></Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={[styles.darkLine, amountMode === 'actual' && styles.darkLineActual]}>SO booked <Text style={styles.copper}>{formatDashboardAmount(so?.actual || 0, amountMode)}</Text></Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={[styles.darkLine, amountMode === 'actual' && styles.darkLineActual]}>Billed <Text style={styles.blueText}>{formatDashboardAmount(billing?.actual || 0, amountMode)}</Text></Text>
             <Text style={[styles.darkKicker, { marginTop: 12 }]}>COLLECTION</Text>
             <ProgressBar value={collection?.achievement_pct || 0} />
-            <Text style={styles.collectionLine}>
+            <Text numberOfLines={amountMode === 'actual' ? 2 : 1} style={[styles.collectionLine, amountMode === 'actual' && styles.collectionLineActual]}>
               {formatDashboardAmount(collection?.actual || 0, amountMode)} / {formatDashboardAmount(collection?.target || 0, amountMode)}
             </Text>
           </View>
@@ -800,9 +800,11 @@ const styles = StyleSheet.create({
   targetMetrics: { flex: 1, minWidth: 0 },
   darkKicker: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   darkLine: { color: T.ink, fontSize: 12, fontWeight: '700', marginTop: 4 },
+  darkLineActual: { fontSize: 11 },
   copper: { color: T.copper, fontWeight: '900' },
   blueText: { color: T.blue, fontWeight: '900' },
   collectionLine: { color: T.muted, fontSize: 10, marginTop: 5, fontWeight: '700' },
+  collectionLineActual: { fontSize: 9.3, lineHeight: 13 },
   reportLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 15, padding: 14, gap: 12, marginBottom: 14, ...S.card },
   reportIcon: { width: 43, height: 43, borderRadius: 11, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
   reportEmoji: { fontSize: 21 },

@@ -71,8 +71,8 @@ export default function PaymentsMadeCard({ prptype, date, amountMode = 'compact'
       </View>
       <View style={s.body}>
         <View style={s.totals}>
-          <View style={s.total}><Text style={s.kicker}>TODAY</Text><Text numberOfLines={1} style={s.today}>{money(data?.summary.today_amount || 0)}</Text></View>
-          <View style={[s.total, { alignItems: 'flex-end' }]}><Text style={s.kicker}>THIS MONTH</Text><Text numberOfLines={1} style={s.totalValue}>{money(data?.summary.month_amount || 0)}</Text></View>
+          <View style={s.total}><Text style={s.kicker}>TODAY</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[s.today, amountMode === 'actual' && s.moneyActual]}>{money(data?.summary.today_amount || 0)}</Text></View>
+          <View style={[s.total, { alignItems: 'flex-end' }]}><Text style={s.kicker}>THIS MONTH</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[s.totalValue, amountMode === 'actual' && s.moneyActual]}>{money(data?.summary.month_amount || 0)}</Text></View>
         </View>
         {error ? <TouchableOpacity onPress={() => void load()} style={s.error}><Text style={s.errorText}>{error} · Tap to retry</Text></TouchableOpacity> : null}
         {loading && !data ? <View style={s.busy}><ActivityIndicator color={C.brown}/></View> : (
@@ -125,7 +125,7 @@ export default function PaymentsMadeCard({ prptype, date, amountMode = 'compact'
                     <Text style={s.partyName} numberOfLines={1}>{p.party_name || p.party_code}</Text>
                     <Text style={s.paymentSub} numberOfLines={1}>{p.payment_count} {p.payment_count === 1 ? 'payment' : 'payments'} · {p.bill_count} {p.bill_count === 1 ? 'bill' : 'bills'}</Text>
                   </View>
-                  <Text style={s.paymentAmount} numberOfLines={1}>{money(p.amount)}</Text>
+                  <Text style={[s.paymentAmount, amountMode === 'actual' && s.paymentAmountActual]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{money(p.amount)}</Text>
                   <Text style={s.chevron}>›</Text>
                 </TouchableOpacity>
               ))}
@@ -155,6 +155,7 @@ const s = StyleSheet.create({
   total: { flex: 1, minWidth: 0 }, kicker: { color: C.muted, fontSize: 9, fontWeight: '800' },
   today: { color: C.green, fontSize: 13, fontWeight: '900', marginTop: 2 },
   totalValue: { color: C.text, fontSize: 13, fontWeight: '900', marginTop: 2 },
+  moneyActual: { fontSize: 12, fontVariant: ['tabular-nums'] },
   dateAxisHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 5, marginTop: 8 },
   dateAxisText: { fontSize: 8, color: C.muted, fontWeight: '700' },
   chartScroll: { marginTop: 2 }, chartScrollContent: { paddingBottom: 4 },
@@ -181,6 +182,7 @@ const s = StyleSheet.create({
   partyName: { color: C.text, fontSize: 10.5, fontWeight: '800' },
   paymentSub: { color: '#9E8B7E', fontSize: 8.3, marginTop: 2 },
   paymentAmount: { color: C.text, fontWeight: '900', fontSize: 9.8 },
+  paymentAmountActual: { fontSize: 9.1, fontVariant: ['tabular-nums'], flexShrink: 0 },
   chevron: { color: '#C9BFB5', fontSize: 16 },
   noPayments: { color: C.muted, textAlign: 'center', paddingVertical: 12, fontSize: 10 },
   footer: { fontSize: 9, color: '#A58E80', lineHeight: 14, marginTop: 8 },

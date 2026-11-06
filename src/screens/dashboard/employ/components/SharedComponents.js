@@ -205,6 +205,7 @@ export const RankRow = ({
   noBorder,
   rawLeftVal,
   rawRightVal,
+  dense = false,
 }) => (
   <TouchableOpacity
     style={[styles.rankRow, noBorder && { borderBottomWidth: 0 }]}
@@ -217,7 +218,7 @@ export const RankRow = ({
         <Text style={styles.avatarText}>{name.charAt(0)}</Text>
       </View>
     )}
-    <Text style={[styles.rankName, { flex: 1 }]} numberOfLines={1}>
+    <Text style={[styles.rankName, { flex: 1, minWidth: 0 }, dense && styles.rankNameDense]} numberOfLines={1}>
       {name}
     </Text>
 
@@ -226,10 +227,10 @@ export const RankRow = ({
         <LongPressValue
           rawValue={rawLeftVal}
           formattedValue={leftVal}
-          style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}
+          style={[styles.rankVal, dense && styles.rankValDense, { color: COLORS.teal, marginRight: dense ? 7 : 12 }]}
         />
       ) : (
-        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.rankVal, dense && styles.rankValDense, { color: COLORS.teal, marginRight: dense ? 7 : 12 }]}>
           {leftVal}
         </Text>
       ))}
@@ -241,6 +242,7 @@ export const RankRow = ({
           formattedValue={rightVal}
           style={[
             styles.rankVal,
+            dense && styles.rankValDense,
             trendUp === true && { color: COLORS.green },
             trendUp === false && { color: COLORS.red },
           ]}
@@ -252,6 +254,7 @@ export const RankRow = ({
           minimumFontScale={0.58}
           style={[
             styles.rankVal,
+            dense && styles.rankValDense,
             trendUp === true && { color: COLORS.green },
             trendUp === false && { color: COLORS.red },
           ]}
@@ -483,6 +486,9 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   rankName: { fontSize: 13, color: COLORS.textDark },
   rankVal: { fontSize: 12, fontWeight: '600', color: COLORS.textDark },
+  // Opt-in for tight dashboard columns when displaying complete Actual amounts.
+  rankValDense: { fontSize: 10.5, fontVariant: ['tabular-nums'] },
+  rankNameDense: { fontSize: 12 },
   colHeader: {
     flexDirection: 'row',
     paddingHorizontal: 14,

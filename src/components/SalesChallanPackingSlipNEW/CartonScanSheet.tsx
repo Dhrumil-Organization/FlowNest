@@ -35,7 +35,7 @@ import { confirmAsync } from '../ProductionOrderNEW/ui';
 import { Btn, LinkBtn, Notice, tab, u } from '../PackingAutomationNEW/ui';
 import { apiErrorText } from './api';
 import type { Row } from './api';
-import { canRemoveSaved, cartonLimit, cartonsIssue, cartonsOf, cartonView, matchCarton, n3, orderQtyOf, pickCarton, qty, sum } from './rules';
+import { canRemoveSaved, cartonBaseIsAssigned, cartonLimit, cartonsIssue, cartonsOf, cartonView, matchCarton, n3, orderQtyOf, pickCarton, qty, sum } from './rules';
 import type { ScanResult } from './rules';
 import { CameraScanner, HardwareScanner } from './ScanDevices';
 import type { ScanDevice } from './ScanDevices';
@@ -190,10 +190,11 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
 
   if (!row || !open) return null;
 
-  // Allowed qty = balance + order qty × extraqtyper % (getsetchallan) — same as the web ItemDetail / CartonSelect.
+  // Allowed qty = ASSIGNED qty of the line (or balance when nothing is assigned) + order qty × extraqtyper %
+  // (getsetchallan) — every scan / hand pick / select-all is checked against it (rules.pickCarton).
   const orderQty = orderQtyOf(row, d1);
   const target = cartonLimit(row, orderQty, extraPer);
-  const targetNote = extraPer > 0 ? `of ${qty(target)} allowed (bal. + ${extraPer}%)` : `of ${qty(target)} bal.`;
+  const targetNote = cartonBaseIsAssigned(row) ? (extraPer > 0 ? `of ${qty(target)} allowed (assigned ${qty(row.AssQty)} + ${extraPer}%)` : `of ${qty(target)} assigned`) : extraPer > 0 ? `of ${qty(target)} allowed (bal. + ${extraPer}%)` : `of ${qty(target)} bal.`;
   const sQty = sum(scanned, 'QtyWt');
   const over = n3(sQty) > target;
 
@@ -407,6 +408,33 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
           <View style={{ width: '100%', maxWidth: 900 }}>{scannerBar}</View>
         </View>
 
+                {/* both views: running count + qty against the allowed (assigned) qty, always in view */}
+        {rows.length ? (
+          <View style={{ paddingHorizontal: phone ? 12 : 14, alignItems: 'center' }}>
+            <View style={[st.selBar, over && { borderColor: T.red }]}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={st.selLabel} numberOfLines={1}>{view === 'locations' ? 'Locations used' : curLoc ? `Selected in ${curLoc.name}` : 'Selected'}</Text>
+                <Text style={[st.selValue, tab]} numberOfLines={1}>
+                  {view === 'locations' ? `${selLocs} of ${locations.length}` : `${curLoc ? curLoc.sel : scanned.length} ctn · ${qty(curLoc ? curLoc.selQty : sQty)}`}
+                </Text>
+              </View>
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: T.border }} />
+              <View style={{ flex: 1.3, minWidth: 0 }}>
+                <Text style={st.selLabel} numberOfLines={1}>Line total</Text>
+                <Text style={[st.selValue, tab, over && { color: T.red }]} numberOfLines={1}>{scanned.length} ctn · {qty(sQty)}</Text>
+                <Text style={[{ fontSize: 11.5, color: over ? T.red : T.muted, fontWeight: '600' }, tab]} numberOfLines={1}>
+                  {over ? `${qty(n3(sQty - target))} over ${qty(target)}` : `${targetNote} · ${qty(n3(target - sQty))} left`}
+                </Text>
+              </View>
+            </View>
+            <View style={{ width: '100%', maxWidth: 900, marginBottom: 6 }}>
+              <Bar value={target ? sQty / target : 0} tone={over ? 'red' : 'green'} height={6} />
+            </View>
+            {/* refused / added message pinned here too, so it is seen while scrolled down the list */}
+            <View style={{ width: '100%', maxWidth: 900 }}>{strips}</View>
+          </View>
+        ) : null}
+
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: phone ? 12 : 14, paddingTop: 0, paddingBottom: 24, alignItems: 'center' }} keyboardShouldPersistTaps="always">
           <View style={{ width: '100%', maxWidth: 900 }}>
             {view === 'locations' ? (
@@ -488,7 +516,6 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
               </>
             ) : (
               <>
-                {strips}
 
                 {/* ---------- carton list (one location, or all) ---------- */}
                 <View style={[u.field, { minHeight: 46, marginBottom: 8 }]}>
@@ -542,7 +569,7 @@ export default function CartonScanSheet({ open, row, d1, extraPer = 0, d2, uid, 
               </>
             ) : (
               // a location's cartons: Done goes back to the location summary, never to the slip
-              <Btn flex kind="copper" icon="check" label={`Done · ${curLoc ? `${curLoc.sel} in ${curLoc.name}` : `${scanned.length} selected`}`} onPress={toLocations} />
+              <Btn flex kind="copper" icon="check" label={`Done · ${curLoc ? `${curLoc.sel} in ${curLoc.name}` : `${scanned.length} selected`} · ${qty(curLoc ? curLoc.selQty : sQty)}`} onPress={toLocations} />
             )}
           </View>
         </View>
@@ -783,6 +810,9 @@ const st = {
   factText: { fontSize: 14, fontWeight: '800' as const, color: T.ink },
   locPill: { backgroundColor: T.green + '14', borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8, maxWidth: '100%' as const },
   hiddenBar: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, backgroundColor: T.amber + '14', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8 },
+  selBar: { width: '100%' as const, maxWidth: 900, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 6 },
+  selLabel: { fontSize: 11.5, fontWeight: '700' as const, color: T.muted },
+  selValue: { fontSize: 16, fontWeight: '900' as const, color: T.ink, marginTop: 1 },
   overlay: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: T.bg, zIndex: 10 },
   devBar: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
   navBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center' as const, justifyContent: 'center' as const },

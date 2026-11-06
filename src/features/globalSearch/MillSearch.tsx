@@ -14,6 +14,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { filterByRights } from './erpIndex';
+import { FlowNestMark } from './FlowNestMark';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { MILL_HELP } from './helpContent';
 import { buildMillIndex } from './millIndex';
@@ -107,8 +108,9 @@ export function MillSearchBar({ session, onOpenPage, onRefresh, onMillOff }: Pro
     <>
       <View style={s.bar}>
         <TouchableOpacity onPress={() => show('mill')} style={s.pill} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Search Mill Hub">
-          <Icon name="search" size={17} color="#99f6e4" />
-          <Text style={s.pillText} numberOfLines={1}>Search Mill Hub…</Text>
+          <FlowNestMark size={14} color="#5eead4" />
+          <Text style={s.pillText} numberOfLines={1}>Search or speak — Mill Hub…</Text>
+          <Icon name="mic" size={16} color="#99f6e4" />
           <Text style={s.hint}>{Platform.OS === 'web' ? 'Ctrl K' : '/help'}</Text>
         </TouchableOpacity>
       </View>

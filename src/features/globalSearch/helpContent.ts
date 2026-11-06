@@ -273,7 +273,7 @@ export const SCREEN_HELP: Record<string, ScreenHelp> = {
   'production.visits': {
     summary: 'Visits: gate register for the watchman — new visitor entry with photos, mark OUT, English / Hindi.',
     steps: ['Tap New entry and fill visitor details / photo.', 'When the visitor leaves, tap Mark OUT.'],
-    keywords: ['gate', 'visitor entry', 'watchman', 'security'],
+    keywords: ['gate', 'gate register', 'visitor entry', 'watchman', 'security'],
   },
   'production.visitors_report': {
     summary: 'Visitors Report: summary, register and photos; edit / delete; Excel / PDF / print.',

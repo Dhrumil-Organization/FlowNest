@@ -13,6 +13,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useId } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlowNestMark } from './FlowNestMark';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { recentKey, useGlobalSearchStore } from './store';
 import type { SearchEntry } from './types';
@@ -112,10 +113,16 @@ export function GlobalSearch({ variant = 'icon', size = 36 }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Search screens"
       >
-        <Icon name="search" size={wide ? 18 : 19} color="#fff" />
+        {/* the FlowNest mark, gently alive, with a small magnifier = "search" */}
+        <View style={s.markWrap}>
+          <FlowNestMark size={wide ? 15 : 16} color="#2DD4BF" />
+          <View style={s.badge}>
+            <Icon name="search" size={10} color="#0D1B2A" />
+          </View>
+        </View>
         {wide ? (
           <>
-            <Text style={s.pillText} numberOfLines={1}>Search…</Text>
+            <Text style={s.pillText} numberOfLines={1}>Search or speak…</Text>
             {Platform.OS === 'web' ? (
               <View style={s.kbd}>
                 <Text style={s.kbdText}>Ctrl K</Text>
@@ -162,6 +169,8 @@ const s = StyleSheet.create({
     borderColor: '#2A4055',
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
+  markWrap: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', right: -2, bottom: -1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#E5EEF5', alignItems: 'center', justifyContent: 'center' },
   pillText: { flex: 1, color: '#9FB0BF', fontSize: 12.5, fontWeight: '600' },
   kbd: { borderWidth: 1, borderColor: '#3A5068', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   kbdText: { color: '#9FB0BF', fontSize: 10, fontWeight: '700' },

@@ -16,7 +16,12 @@ const STOP = new Set([
   'a', 'an', 'the', 'to', 'of', 'for', 'in', 'on', 'at', 'my', 'me', 'i', 'is', 'are', 'and', 'or',
   'how', 'do', 'does', 'can', 'what', 'where', 'which', 'who', 'show', 'open', 'go', 'goto', 'find',
   'screen', 'page', 'please', 'want', 'with', 'from', 'it', 'this', 'that', 'there', 'about',
-  'ka', 'ki', 'ke', 'kaise', 'kya', 'kahan', 'hai', 'mein', 'me',
+  'ka', 'ki', 'ke', 'kaise', 'kya', 'kahan', 'kaha', 'hai', 'hain', 'mein', 'me',
+  // Hinglish (typed or spoken): "mujhe yarn ka stock dekhna hai", "sales order kholo"
+  'mujhe', 'muje', 'mereko', 'hume', 'humko', 'dekhna', 'dekhni', 'dekhne', 'dekho', 'dikhao', 'dikha', 'dikhado',
+  'karo', 'karna', 'karni', 'kar', 'karke', 'de', 'dena', 'wala', 'wali', 'wale', 'chahiye', 'plz', 'pls',
+  'ek', 'jo', 'se', 'par', 'pe', 'liye', 'ko', 'aur', 'ya', 'abhi', 'kholo', 'khol', 'kholna', 'kholiye',
+  'jao', 'chalo', 'le', 'lo', 'ji', 'bhai', 'bhaiya', 'sir', 'yaar', 'please', 'zara', 'jara',
 ]);
 
 /**
@@ -27,7 +32,7 @@ const SYNONYM_GROUPS: string[][] = [
   ['auth', 'authorization', 'authorisation', 'authorize', 'approve', 'approval', 'approvals', 'verify', 'accept', 'reject', 'pending'],
   ['party', 'customer', 'client', 'buyer', 'account', 'debtor'],
   ['vendor', 'supplier', 'creditor', 'seller'],
-  ['receivable', 'receivables', 'outstanding', 'due', 'dues', 'udhar', 'baki', 'collection'],
+  ['receivable', 'receivables', 'outstanding', 'due', 'dues', 'udhar', 'baki', 'baaki', 'bakaya', 'collection'],
   ['payable', 'payables', 'payment', 'payments', 'pay', 'creditor'],
   ['collection', 'receipt', 'received', 'collect'],
   ['fabric', 'febric', 'cloth', 'kapda', 'taka', 'roll'],
@@ -67,6 +72,19 @@ const SYNONYM_GROUPS: string[][] = [
   ['profile', 'user', 'account'],
   ['permission', 'permissions', 'rights', 'role', 'roles', 'access'],
   ['credit', 'limit', 'credit limit'],
+  // Hindi / Hinglish words people say
+  ['new', 'naya', 'nayi', 'naye'],
+  ['payment', 'bhugtan', 'jama'],
+  ['collection', 'vasooli', 'vasuli', 'ugrahi'],
+  ['ledger', 'khata', 'hisab', 'hisaab'],
+  ['colour', 'rang'],
+  ['salary', 'tankhwah', 'pagar', 'vetan'],
+  ['purchase', 'kharid', 'kharidi'],
+  ['sales', 'bikri', 'bechna'],
+  ['approve', 'manjuri', 'manjoor', 'pass'],
+  ['visitor', 'mehman', 'aagantuk'],
+  ['machine', 'mashin', 'loom'],
+  ['report', 'riport'],
 ];
 
 const SYN = new Map<string, Set<string>>();
@@ -78,15 +96,88 @@ for (const group of SYNONYM_GROUPS) {
   }
 }
 
-/** lower-case, accents / punctuation removed, "&" → "and", single spaces. */
+// ── Devanagari → Latin ─────────────────────────────────────
+// Voice in Hindi (and many Android keyboards) writes English ERP words in
+// Devanagari: "यार्न स्टॉक", "प्रोडक्शन ऑर्डर". They are turned into Latin
+// letters here; soundKey() below then matches "stok" ~ "stock",
+// "prodakshan" ~ "production".
+const DEV_CONS: Record<string, string> = {
+  'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'n', 'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'n',
+  'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n', 'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n',
+  'प': 'p', 'फ': 'f', 'ब': 'b', 'भ': 'bh', 'म': 'm', 'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh',
+  'ष': 'sh', 'स': 's', 'ह': 'h', 'ळ': 'l', 'क़': 'q', 'ख़': 'kh', 'ग़': 'g', 'ज़': 'z', 'ड़': 'r', 'ढ़': 'rh', 'फ़': 'f',
+};
+const DEV_VOWEL: Record<string, string> = {
+  'अ': 'a', 'आ': 'a', 'इ': 'i', 'ई': 'i', 'उ': 'u', 'ऊ': 'u', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri', 'ऑ': 'o', 'ऍ': 'e',
+};
+const DEV_MATRA: Record<string, string> = {
+  'ा': 'a', 'ि': 'i', 'ी': 'i', 'ु': 'u', 'ू': 'u', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ॉ': 'o', 'ॅ': 'e',
+};
+const DEV_RE = /[\u0900-\u097f]/;
+const isDevLetter = (c: string | undefined) => !!c && (c in DEV_CONS || c in DEV_VOWEL || c in DEV_MATRA || c === '्' || c === '़');
+
+export function transliterate(text: string): string {
+  if (!DEV_RE.test(text)) return text;
+  const chars = Array.from(text.normalize('NFC'));
+  let out = '';
+  for (let i = 0; i < chars.length; i += 1) {
+    let c = chars[i];
+    if (chars[i + 1] === '़' && DEV_CONS[c + '़']) {
+      c += '़';
+      i += 1;
+    }
+    if (DEV_CONS[c]) {
+      out += DEV_CONS[c];
+      const next = chars[i + 1];
+      if (next && DEV_MATRA[next]) {
+        out += DEV_MATRA[next];
+        i += 1;
+      } else if (next === '्') {
+        i += 1; // no vowel
+      } else if (isDevLetter(next)) {
+        out += 'a'; // inherent vowel (dropped at the end of a word)
+      }
+    } else if (DEV_VOWEL[c]) out += DEV_VOWEL[c];
+    else if (DEV_MATRA[c]) out += DEV_MATRA[c];
+    else if (c === 'ं' || c === 'ँ') out += 'n';
+    else if (c === 'ः') out += 'h';
+    else if (c >= '०' && c <= '९') out += String(c.charCodeAt(0) - 0x0966);
+    else if (c === '।') out += ' ';
+    else if (!DEV_RE.test(c)) out += c;
+  }
+  return out;
+}
+
+/**
+ * How a word SOUNDS (consonant skeleton): "stock"/"stok"/"स्टॉक" → "stk",
+ * "production"/"prodakshan" → "prdkshn", "fabric"/"febric"/"फैब्रिक" → "fbrk".
+ */
+export function soundKey(word: string): string {
+  let w = word.toLowerCase();
+  w = w
+    .replace(/tion|sion|shan|shun/g, 'shn')
+    .replace(/ph/g, 'f')
+    .replace(/ck/g, 'k')
+    .replace(/c(?=[eiy])/g, 's')
+    .replace(/c/g, 'k')
+    .replace(/q/g, 'k')
+    .replace(/x/g, 'ks')
+    .replace(/w/g, 'v')
+    .replace(/z/g, 'j')
+    .replace(/([a-z])\1+/g, '$1');
+  // keep the first letter, drop vowels / y / h after it, collapse repeats
+  return ((w[0] || '') + w.slice(1).replace(/[aeiouyh]/g, '')).replace(/([a-z])\1+/g, '$1');
+}
+
+/** lower-case, Hindi letters → Latin, accents / punctuation removed, "&" → "and", single spaces. */
 export function normalize(value: unknown): string {
-  return String(value ?? '')
+  return transliterate(String(value ?? ''))
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/&/g, ' and ')
     .replace(/([a-z])([0-9])/g, '$1 $2')
-    .replace(/[^a-z0-9ऀ-ॿ]+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
 }
@@ -138,9 +229,16 @@ export function editDistance(a: string, b: string, max = 2): number {
 }
 
 /** How well ONE query word matches ONE word of the entry (0 … 1). */
+/** "sampling" / "samples" / "sampled" → "sampl" (same word, other ending). */
+export function stem(w: string): string {
+  if (w.length <= 4) return w;
+  return w.replace(/(ings|ing|ers|er|ies|es|ed|s|e)$/, '') || w;
+}
+
 export function wordScore(q: string, w: string): number {
   if (!q || !w) return 0;
   if (q === w) return 1;
+  if (q.length >= 4 && w.length >= 4 && stem(q) === stem(w)) return 0.92;
   if (w.startsWith(q)) return q.length >= 2 ? 0.86 : 0.45;
   if (q.length >= 4 && q.startsWith(w) && w.length >= 3) return 0.7; // "authorization" typed, "auth" in title
   if (q.length >= 3 && w.includes(q)) return 0.55;

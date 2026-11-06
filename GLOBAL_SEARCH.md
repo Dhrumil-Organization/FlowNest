@@ -56,6 +56,27 @@ plain-language help is in `src/features/globalSearch/helpContent.ts`.
   `src/mill/millHubHtml.ts` + `tools/build_mill_html.py` (patch 11: `window.__millNav`),
   `package.json` (scanner hooks)
 
+## Update 2 (6 Nov 2026): voice, animated logo, filters, smarter matching
+- **Fixed: the list kept scrolling down by itself.** Hovering a row selected it and scrolled the list,
+  which put a new row under the mouse, and so on. Now only the ↑ ↓ keys scroll the list. Tested in a
+  browser: scroll position stays the same while the mouse moves over the list.
+- **Voice search 🎤** (English India / हिंदी, saved per device). There is a live waveform and the
+  animated FlowNest logo that grows with your voice, and the words show as you speak. Saying
+  "… kholo / open …" opens the best match after 1 second (Cancel or Esc stops it).
+  Android / iOS use `expo-speech-recognition` (added to package.json + app.json plugin, so **a new
+  dev / store build is needed**). Until that build is installed, the mic button just does not show.
+  Web uses the browser speech API (Chrome, Edge, Safari).
+- **FlowNest logo, alive:** in the header button, the search box and the voice screen (native-driver
+  animation).
+- **Filter chips with counts:** All · Screens · Tabs · Cards · Reports · Actions. With an empty box,
+  tap a chip to see everything of that kind you can open.
+- **Best match card** with Open / How to use (Enter opens it).
+- **Smarter matching:** Hindi (Devanagari) text from voice is turned into Latin letters, sound-alike words
+  match ("stok" = stock, "prodakshan" = production), Hinglish works ("mujhe yarn ka stock dekhna hai",
+  "payable dikhao", "collection kaise karte hain" → help), and word endings match ("sampling" = "samples").
+- Accuracy test: 60 real queries (English, Hinglish, Hindi script, typos, short forms, help):
+  **59/60 have the expected screen in the top 3.** About 7 ms per search.
+
 ## Checked
 - Real registries: 89 screens, 36 tabs, 11 cards, 6 reports, 6 sub-pages and 155 actions
   indexed. No `mill.*` entry in the ERP index.

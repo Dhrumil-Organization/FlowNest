@@ -20,6 +20,7 @@ import {
   initials,
   normalize,
   queryTokens,
+  soundKey,
   tokenize,
 } from './searchText';
 import type {
@@ -27,6 +28,7 @@ import type {
   RightsChecker,
   SearchEntry,
   SearchEntryKind,
+  SearchFilter,
   SearchMode,
   SearchOutcome,
   SearchResult,
@@ -40,6 +42,9 @@ export type PreparedEntry = {
   extra: string[];
   initials: string;
   titleNorm: string;
+  /** how the title / keyword words sound (soundKey) */
+  titleSounds: string[];
+  keywordSounds: string[];
 };
 
 export type PreparedIndex = {
@@ -76,13 +81,57 @@ export function prepareIndex(entries: readonly SearchEntry[]): PreparedIndex {
     ),
     initials: initials(entry.title),
     titleNorm: normalize(entry.title),
+    titleSounds: [],
+    keywordSounds: [],
   }));
+  for (const p of prepared) {
+    p.titleSounds = p.title.filter((w) => w.length >= 3).map(soundKey);
+    p.keywordSounds = p.keywords.filter((w) => w.length >= 3).map(soundKey);
+  }
   const vocab = new Set<string>();
   for (const p of prepared) for (const w of [...p.title, ...p.keywords]) if (w.length >= 3) vocab.add(w);
   return { entries: prepared, byId: new Map(prepared.map((p) => [p.entry.id, p])), vocabulary: Array.from(vocab) };
 }
 
 type Parsed = { mode: SearchMode; text: string };
+
+const HELP_WORDS = /(^|\s)(samjhao|samjha|samjhaiye|samjhana|samajh|batao|bataiye|explain|kaise|kese|guide|tutorial|madad)(\s|$)/i;
+const HELP_WORDS_ALL = /\b(samjhao|samjha|samjhaiye|samjhana|samajh|batao|bataiye|explain|kaise|kese|guide|tutorial|madad|karte|karein|kare|hain|hai)\b/gi;
+
+/**
+ * Voice: "yarn stock kholo", "open sales order", "payable dikhao" → open the
+ * best match at once when it is clearly the one meant.
+ * "… samjhao / batao / help" → help for it.
+ */
+export function readVoiceIntent(spoken: string): { query: string; open: boolean } {
+  const t = String(spoken || '').trim();
+  const open = /(^|\s)(open|kholo|khol|kholiye|kholna|dikhao|dikha|dikhado|chalo|jao|go to|goto|le chalo)(\s|$)/i.test(t);
+  const cleaned = t.replace(/(^|\s)(open|go to|goto|le chalo|kholo|khol do|khol|kholiye|kholna|dikhao|dikha do|dikhado|dikha|chalo|jao)(?=\s|$)/gi, ' ').replace(/\s+/g, ' ').trim();
+  return { query: cleaned, open };
+}
+
+export const FILTERS: Array<{ key: SearchFilter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'screens', label: 'Screens' },
+  { key: 'tabs', label: 'Tabs' },
+  { key: 'cards', label: 'Cards' },
+  { key: 'reports', label: 'Reports' },
+  { key: 'actions', label: 'Actions' },
+];
+
+export function filterOf(kind: SearchEntryKind): SearchFilter {
+  if (kind === 'screen' || kind === 'page' || kind === 'app') return 'screens';
+  if (kind === 'tab') return 'tabs';
+  if (kind === 'card') return 'cards';
+  if (kind === 'report') return 'reports';
+  return 'actions';
+}
+
+function countByFilter(list: readonly { entry: SearchEntry }[]): Record<SearchFilter, number> {
+  const c: Record<SearchFilter, number> = { all: list.length, screens: 0, tabs: 0, cards: 0, reports: 0, actions: 0 };
+  for (const r of list) c[filterOf(r.entry.kind)] += 1;
+  return c;
+}
 
 const HELP_PREFIX = /^(\/help\b|\/h(?=\s|$)|\/\?|\?|help\b|how\s+to\b|how\s+do\s+i\b|how\s+can\s+i\b|what\s+is\b|what\s+does\b|kaise\b|madad\b)\s*/i;
 
@@ -95,6 +144,8 @@ export function parseQuery(raw: string): Parsed {
   if (/^\/(all|a|screens)\b/i.test(t)) return { mode: 'all', text: t.replace(/^\/\S+\s*/, '') };
   const help = t.match(HELP_PREFIX);
   if (help) return { mode: 'help', text: t.slice(help[0].length) };
+  // "yarn stock samjhao", "collection kaise karte hain", "explain payable"
+  if (HELP_WORDS.test(t)) return { mode: 'help', text: t.replace(HELP_WORDS_ALL, ' ').replace(/\s+/g, ' ').trim() };
   if (t.startsWith('/')) {
     // a half-typed command ("/he") → show the command list
     const word = t.slice(1).toLowerCase();
@@ -109,12 +160,20 @@ function scoreEntry(p: PreparedEntry, tokens: string[], phrase: string): number 
   let total = 0;
   let missed = 0;
   for (const t of tokens) {
-    const s = Math.max(
+    let s = Math.max(
       bestWordScore(t, p.title) * 1.0,
       bestWordScore(t, p.keywords) * 0.72,
       bestWordScore(t, p.breadcrumb) * 0.5,
       bestWordScore(t, p.extra) * 0.34,
     );
+    // sounds the same ("stok" / स्टॉक → Stock, "prodakshan" → Production)
+    if (s < 0.58 && t.length >= 3) {
+      const k = soundKey(t);
+      if (k.length >= 3) {
+        if (p.titleSounds.some((x) => x === k || (k.length >= 4 && x.startsWith(k)))) s = Math.max(s, 0.6);
+        else if (p.keywordSounds.some((x) => x === k)) s = Math.max(s, 0.44);
+      }
+    }
     if (s < 0.4) {
       missed += 1;
       continue;
@@ -148,6 +207,8 @@ export type SearchOptions = {
    *  allowed screen are not given to this user ("ask your admin"). Never used
    *  to show a screen the user cannot open. */
   unfiltered?: readonly SearchEntry[];
+  /** filter chip */
+  filter?: SearchFilter;
 };
 
 function toResult(p: PreparedEntry, score: number, tokens: string[]): SearchResult {
@@ -250,8 +311,23 @@ export function runSearch(index: PreparedIndex, raw: string, opts: SearchOptions
     };
   }
 
-  const results = rank(index, parsed.text, opts);
-  return { mode: 'search', query, results, suggestion: results.length ? null : didYouMean(index, parsed.text) };
+  const filter = opts.filter || 'all';
+  const all = rank(index, parsed.text, { ...opts, limit: 400 });
+  const counts = countByFilter(all);
+  const results = (filter === 'all' ? all : all.filter((r) => filterOf(r.entry.kind) === filter)).slice(0, opts.limit ?? 60);
+  const [a, b] = all;
+  const confident = !!a && a.score >= 1.45 && (!b || a.score - b.score >= 0.3);
+  return { mode: 'search', query, results, counts, filter, confident, suggestion: all.length ? null : didYouMean(index, parsed.text) };
+}
+
+/** Empty box + a filter chip: everything of that kind the user can open (browse). */
+export function browse(index: PreparedIndex, filter: SearchFilter): SearchOutcome {
+  const everything = index.entries.map((p) => ({ entry: p.entry, score: 0, highlight: [] as Array<[number, number]> }));
+  const counts = countByFilter(everything);
+  const list = everything
+    .filter((r) => filter === 'all' || filterOf(r.entry.kind) === filter)
+    .sort((x, y) => screensFirst(x.entry, y.entry));
+  return { mode: 'all', query: '', results: list, counts, filter };
 }
 
 /** Everything a user needs to know about one screen, from what he is allowed to do there. */

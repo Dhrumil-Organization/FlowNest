@@ -143,6 +143,28 @@ registerPermissionArea({
           actions: [{ key: 'view', name: 'View' }],
         },
         {
+          key: 'salary',
+          name: 'Salary',
+          type: 'screen',
+          displayOrder: 71,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'edit', name: 'Modify monthly values' },
+            { key: 'save', name: 'Save monthly values' },
+          ],
+        },
+        {
+          key: 'unit_consumption',
+          name: 'Unit Consumption',
+          type: 'screen',
+          displayOrder: 72,
+          actions: [
+            { key: 'view', name: 'View' },
+            { key: 'edit', name: 'Modify monthly values' },
+            { key: 'save', name: 'Save monthly values' },
+          ],
+        },
+        {
           key: 'daily_collection_report_new',
           name: 'Daily Payment Report',
           type: 'screen',
@@ -904,6 +926,44 @@ registerUiNodes([
     permission: 'production.daily_payment_report',
     action: 'view',
     order: 110,
+  },
+  // Salary — permission resource is registered above in this same module.
+  {
+    id: 'nav.salary',
+    kind: 'navigation',
+    title: 'Salary',
+    permission: 'production.salary',
+    action: 'view',
+    route: 'salary',
+    icon: 'payments',
+    order: 111,
+  },
+  {
+    id: 'screen.salary',
+    kind: 'screen',
+    title: 'Salary',
+    permission: 'production.salary',
+    action: 'view',
+    order: 111,
+  },
+  // Unit Consumption — permission resource is registered above in this same module.
+  {
+    id: 'nav.unit_consumption',
+    kind: 'navigation',
+    title: 'Unit Consumption',
+    permission: 'production.unit_consumption',
+    action: 'view',
+    route: 'unit-consumption',
+    icon: 'analytics',
+    order: 112,
+  },
+  {
+    id: 'screen.unit_consumption',
+    kind: 'screen',
+    title: 'Unit Consumption',
+    permission: 'production.unit_consumption',
+    action: 'view',
+    order: 112,
   },
   // Snap View
   {

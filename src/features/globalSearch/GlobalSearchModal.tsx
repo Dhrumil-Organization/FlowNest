@@ -319,14 +319,26 @@ export function GlobalSearchModal(props: Props) {
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appear = useRef(new Animated.Value(0)).current;
 
+  const voiceResetRef = useRef<(() => void) | null>(null);
   // ── open / close ──
   useEffect(() => {
-    if (!visible) return undefined;
+    if (!visible) {
+      // closed → forget everything, so the next open starts clean
+      setQuery('');
+      setFilter('all');
+      setOpening(null);
+      setHeardFrom(null);
+      if (openTimer.current) clearTimeout(openTimer.current);
+      voiceResetRef.current?.();
+      return undefined;
+    }
     setQuery(props.initialQuery || '');
     setFilter('all');
     setActive(0);
     setOpening(null);
     appear.setValue(0);
+    voiceResetRef.current?.();
+    setHeardFrom(null);
     Animated.timing(appear, { toValue: 1, duration: 190, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     const t = setTimeout(() => inputRef.current?.focus(), Platform.OS === 'android' ? 260 : 60);
     return () => clearTimeout(t);
@@ -415,12 +427,26 @@ export function GlobalSearchModal(props: Props) {
     [index],
   );
   const pendingOpen = useRef(false);
+  const [heardFrom, setHeardFrom] = useState<string | null>(null);
   const voice = useVoiceSearch({
-    onFinal: (text) => {
-      const intent = readVoiceIntent(text);
+    // The recognizer gives its best guess + other ways it may have heard you.
+    // Each one is searched; the one that finds the clearest screen wins
+    // ("yarn stock" over "yarn stuck", "doff entry" over "dog entry").
+    onFinal: (text, alternatives) => {
+      let best = readVoiceIntent(text);
+      let bestScore = runSearch(index, best.query, { recents }).results[0]?.score ?? 0;
+      for (const alt of alternatives.slice(0, 4)) {
+        const intent = readVoiceIntent(alt);
+        const sc = runSearch(index, intent.query, { recents }).results[0]?.score ?? 0;
+        if (sc > bestScore + 0.15) {
+          best = { query: intent.query, open: best.open || intent.open };
+          bestScore = sc;
+        }
+      }
       setFilter('all');
-      setQuery(intent.query);
-      pendingOpen.current = intent.open;
+      setQuery(best.query);
+      setHeardFrom(text);
+      pendingOpen.current = best.open;
     },
   });
   // "… kholo / open …" + one clear match → open it (with a moment to cancel)
@@ -451,7 +477,8 @@ export function GlobalSearchModal(props: Props) {
       voice.start(lang, hints);
     }
   };
-  const { listening: voiceListening, cancel: voiceCancel } = voice;
+  const { listening: voiceListening, cancel: voiceCancel, clearError: voiceClearError } = voice;
+  voiceResetRef.current = voice.reset;
   useEffect(() => {
     if (!visible && voiceListening) voiceCancel();
   }, [visible, voiceListening, voiceCancel]);
@@ -534,6 +561,12 @@ export function GlobalSearchModal(props: Props) {
                   <Text style={[s.chipText, { color: accent }]}>Did you mean “{item.suggestion}”?</Text>
                 </TouchableOpacity>
               ) : null}
+              {voice.available ? (
+                <TouchableOpacity onPress={() => voice.start(lang, hints)} style={[s.chip, { borderColor: accent, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  <Icon name="mic" size={14} color={accent} />
+                  <Text style={[s.chipText, { color: accent }]}>Speak again</Text>
+                </TouchableOpacity>
+              ) : null}
               <Text style={s.emptyHint}>Only what your rights allow in {contextLabel} is searched. Type /help to see what you can open.</Text>
             </View>
           );
@@ -541,17 +574,19 @@ export function GlobalSearchModal(props: Props) {
           return null;
       }
     },
-    [accent, active, contextLabel, helpMode, onHover, openEntry, pickResult, pickRow, showHelpFor, voice.available],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accent, active, contextLabel, helpMode, onHover, openEntry, pickResult, pickRow, showHelpFor, voice.available, lang, hints],
   );
 
-  const voiceView = voice.listening || voice.error ? (
+  const voiceView = voice.listening ? (
     <View style={s.voice}>
       <FlowNestMark size={58} mode={voice.listening ? 'listening' : 'idle'} level={voice.level} color={accent} />
-      <Text style={s.voiceTitle}>{voice.listening ? (voice.partial ? 'Got it…' : 'Listening… speak now') : 'Voice search'}</Text>
+      <Text style={s.voiceTitle}>{voice.partial ? 'Got it…' : 'Listening… speak now'}</Text>
       <Text style={[s.voiceText, !voice.partial && { color: T.muted }]} numberOfLines={3}>
-        {voice.error || voice.partial || (lang === 'hi-IN' ? 'जैसे: "यार्न स्टॉक खोलो"' : 'e.g. "open yarn stock", "new production order"')}
+        {voice.partial || (lang === 'hi-IN' ? 'जैसे: "यार्न स्टॉक खोलो"' : 'e.g. "open yarn stock", "new production order"')}
       </Text>
-      {voice.listening ? <Waveform level={voice.level} color={accent} /> : null}
+      <Waveform level={voice.level} color={accent} />
+      <Text style={s.voiceHint}>Say a screen name. Add “kholo” / “open” to open it at once. Tap ■ when done.</Text>
       <View style={s.voiceBtns}>
         <TouchableOpacity onPress={toggleLang} style={s.langBtn} accessibilityRole="button" accessibilityLabel="Change voice language">
           <Icon name="translate" size={15} color={T.ink} />
@@ -560,8 +595,15 @@ export function GlobalSearchModal(props: Props) {
         <TouchableOpacity onPress={micPress} style={[s.micBig, { backgroundColor: voice.listening ? T.red : accent }]} accessibilityRole="button" accessibilityLabel={voice.listening ? 'Stop listening' : 'Speak'}>
           <Icon name={voice.listening ? 'stop' : 'mic'} size={26} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => voice.cancel()} style={s.langBtn} accessibilityRole="button">
-          <Text style={s.langText}>{voice.listening ? 'Cancel' : 'Type instead'}</Text>
+        <TouchableOpacity
+          onPress={() => {
+            voice.cancel();
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }}
+          style={s.langBtn}
+          accessibilityRole="button"
+        >
+          <Text style={s.langText}>Type instead</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -595,6 +637,8 @@ export function GlobalSearchModal(props: Props) {
           value={query}
           onChangeText={(v: string) => {
             setQuery(v);
+            if (voice.error) voiceClearError();
+            if (heardFrom) setHeardFrom(null);
             if (opening) {
               if (openTimer.current) clearTimeout(openTimer.current);
               setOpening(null);
@@ -680,6 +724,27 @@ export function GlobalSearchModal(props: Props) {
         </View>
       ) : null}
 
+      {!voice.listening && voice.error ? (
+        <View style={s.vErr}>
+          <Icon name="mic-off" size={18} color={T.red} style={{ marginTop: 1 }} />
+          <Text style={s.vErrText}>{voice.error}</Text>
+          <TouchableOpacity onPress={micPress} style={[s.vErrBtn, { borderColor: accent }]} accessibilityRole="button">
+            <Text style={[s.vErrBtnText, { color: accent }]}>Try again</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={voiceClearError} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close message">
+            <Icon name="close" size={18} color={T.muted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {!voice.listening && heardFrom && !voice.error ? (
+        <View style={s.heard}>
+          <Icon name="graphic-eq" size={15} color={accent} />
+          <Text style={s.heardText} numberOfLines={1}>Heard: “{heardFrom}”</Text>
+          <TouchableOpacity onPress={micPress} hitSlop={8}>
+            <Text style={[s.heardAgain, { color: accent }]}>Speak again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       {voiceView || (
         <FlatList
           ref={listRef}
@@ -908,6 +973,14 @@ const s = StyleSheet.create({
   micBig: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   langBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 92, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
   langText: { fontSize: 12.5, fontWeight: '700', color: T.ink },
+  vErr: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: `${T.red}12`, borderWidth: 1, borderColor: `${T.red}40` },
+  vErrText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: T.ink, fontWeight: '600' },
+  vErrBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'center' },
+  vErrBtnText: { fontSize: 11.5, fontWeight: '800' },
+  heard: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: T.sub, borderBottomWidth: 1, borderBottomColor: T.hair },
+  heardText: { flex: 1, fontSize: 12, color: T.muted, fontWeight: '600' },
+  heardAgain: { fontSize: 12, fontWeight: '800' },
+  voiceHint: { fontSize: 11.5, color: T.muted, textAlign: 'center', maxWidth: 360 },
   footer: { borderTopWidth: 1, borderTopColor: T.hair, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: T.sub },
   footerText: { fontSize: 11, color: T.muted },
 });

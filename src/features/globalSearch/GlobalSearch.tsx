@@ -57,6 +57,7 @@ export function GlobalSearch({ variant = 'icon', size = 36 }: Props) {
   const router = useRouter();
   const open = useGlobalSearchStore((s) => s.open);
   const initialQuery = useGlobalSearchStore((s) => s.initialQuery);
+  const openId = useGlobalSearchStore((s) => s.openId);
   const show = useGlobalSearchStore((s) => s.show);
   const hide = useGlobalSearchStore((s) => s.hide);
   const recents = useGlobalSearchStore((s) => s.recent);
@@ -134,6 +135,7 @@ export function GlobalSearch({ variant = 'icon', size = 36 }: Props) {
 
       {isOwner ? (
         <GlobalSearchModal
+          key={openId}
           visible={visible}
           onClose={hide}
           index={index}

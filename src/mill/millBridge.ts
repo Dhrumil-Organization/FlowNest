@@ -296,6 +296,7 @@ export function buildMillHtml(boot: MillBoot): string {
   const script = `<script>(function(){var c=${scriptJson(cfg)};
 c.can=function(k){return !!(c.rights&&c.rights[k]);};
 c.post=function(m){var s=JSON.stringify(m);if(window.ReactNativeWebView&&window.ReactNativeWebView.postMessage){window.ReactNativeWebView.postMessage(s);}else if(window.parent&&window.parent!==window){window.parent.postMessage({__mill:1,msg:m},'*');}};
-window.MILL=c;})();</script>`;
+window.MILL=c;
+window.addEventListener('message',function(e){var d=e&&e.data;if(d&&d.__millNav&&typeof window.__millNav==='function'){window.__millNav(String(d.__millNav));}});})();</script>`;
   return MILL_HUB_HTML_TEMPLATE.replace('<!--MILL_BOOT-->', script);
 }

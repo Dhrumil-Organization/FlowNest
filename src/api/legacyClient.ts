@@ -875,3 +875,11 @@ export const GreyPackingAPI = {
 
 };
 
+
+
+// Monthly Salary + Unit Consumption — legacy ERP costing endpoint.
+// Uses the shared authenticated client so the selected ERP property host and
+// bearer token are resolved on every request.
+export const ExpenseCostingAPI = {
+  crud: (body: Record<string, any>) => client.post('/exp_costing_crud', body),
+};

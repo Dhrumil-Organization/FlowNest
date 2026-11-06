@@ -8,6 +8,8 @@ export const PermissionKeys = {
     creditorDashboard: 'dashboard.creditor_dashboard',
     pendingAuthorizations: 'dashboard.pending_authorizations',
     reports: 'reports',
+    salary: 'production.salary',
+    unitConsumption: 'production.unit_consumption',
     beamShortageReport: 'reports.production_report.beam_shortage',
     productionBeamShortageReport: 'reports.production_report.beam_shortage',
     conversionReport: 'reports.production_report.conversion',

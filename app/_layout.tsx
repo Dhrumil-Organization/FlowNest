@@ -510,7 +510,7 @@ export default function RootLayout() {
                 </>
               )}
             </Stack>
-            {isWeb() && <AppAlertHost />}
+            <AppAlertHost />
             {/* New build (web) / new store version (Android, iOS) notice */}
             <AppUpdateGate />
             <View style={styles.snackbarHost} pointerEvents="box-none">

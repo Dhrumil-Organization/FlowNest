@@ -18,7 +18,11 @@ export type MillPageMessage =
   | { type: 'share'; text: string }
   | { type: 'api'; id: number; action: string; body?: Record<string, any> };
 
-export type MillHubFrameHandle = { reply: (id: number, result: any) => void };
+export type MillHubFrameHandle = {
+  reply: (id: number, result: any) => void;
+  /** Global Search: open a Mill page by its key (only pages the user's Mill rights show). */
+  navigate: (page: string) => void;
+};
 
 type Props = { html: string; onMessage: (m: MillPageMessage) => void };
 
@@ -39,6 +43,9 @@ const WebFrame = forwardRef<MillHubFrameHandle, Props>(function WebFrame({ html,
   useImperativeHandle(handle, () => ({
     reply: (id, result) => {
       try { ref.current?.contentWindow?.postMessage({ __millReply: 1, payload: { id, result } }, '*'); } catch { /* frame gone */ }
+    },
+    navigate: (page) => {
+      try { ref.current?.contentWindow?.postMessage({ __millNav: page }, '*'); } catch { /* frame gone */ }
     },
   }));
   useEffect(() => {
@@ -71,6 +78,10 @@ export const MillHubFrame = forwardRef<MillHubFrameHandle, Props>(function MillH
       if (Platform.OS === 'web') { frameRef.current?.reply(id, result); return; }
       const js = `window.__millReply && window.__millReply(${JSON.stringify({ id, result }).replace(/</g, '\\u003c')}); true;`;
       webRef.current?.injectJavaScript(js);
+    },
+    navigate: (page) => {
+      if (Platform.OS === 'web') { frameRef.current?.navigate(page); return; }
+      webRef.current?.injectJavaScript(`window.__millNav && window.__millNav(${JSON.stringify(String(page))}); true;`);
     },
   }));
 

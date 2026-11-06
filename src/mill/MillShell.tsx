@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MILL_ACTION_RIGHTS, MILL_LOGIN_REQUIRED, MILL_RIGHTS, MillApi, MillMovementApi, MillSessionApi, buildMillHtml, millCan, millRightsReason } from './millBridge';
 import { MillHubFrame, type MillHubFrameHandle, type MillPageMessage } from './MillHubFrame';
 import { useMillModeStore } from './millMode';
+import { MillSearchBar } from '@/src/features/globalSearch/MillSearch';
 
 const NAV = '#1e1b4b';
 
@@ -252,6 +253,13 @@ export function MillShell() {
         </View>
       ) : (
         <>
+          {/* GLOBAL SEARCH (Mill only): Mill pages the user's MILL rights allow — never ERP screens. */}
+          <MillSearchBar
+            session={millSession}
+            onOpenPage={(page) => frameRef.current?.navigate(page)}
+            onRefresh={() => onMessage({ type: 'refresh' })}
+            onMillOff={() => void exitMill()}
+          />
           {millSession?.underDevelopment ? (
             <View style={s.devBar} accessibilityRole="text">
               <Text style={s.devText} numberOfLines={2}>

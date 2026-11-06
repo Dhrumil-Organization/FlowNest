@@ -16,6 +16,7 @@ import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 import { useMillModeStore } from '@/src/mill/millMode';
 import { useMillSwitchAllowed } from '@/src/mill/millBridge';
+import { GlobalSearch } from '@/src/features/globalSearch/GlobalSearch';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -268,6 +269,9 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
       </View>
 
       <View style={[s.right, size !== 'mobile' && s.rightWide]}>
+        {/* GLOBAL SEARCH: every screen / tab / action the user's rights allow in
+            this property (Ctrl K on web). See src/features/globalSearch. */}
+        <GlobalSearch variant={size === 'mobile' ? 'icon' : 'pill'} size={size === 'desktop' ? 38 : 36} />
         {right}
         {/* Theme: one tap on tablet / desktop; on phones it is inside Settings. */}
         {size !== 'mobile' ? <ThemeToggleButton onDark size={size === 'desktop' ? 38 : 36} /> : null}

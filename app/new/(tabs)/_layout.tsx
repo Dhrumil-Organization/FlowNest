@@ -14,6 +14,7 @@ import {
 import { usePermission } from '@/src/core/permissions';
 import { ThemeToggleButton } from '@/src/core/theme/ThemeControls';
 import { useMyScreens } from '@/src/core/userPrefs/useMyScreens';
+import { useGlobalSearchStore } from '@/src/features/globalSearch/store';
 import { useMillModeStore } from '@/src/mill/millMode';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
@@ -327,6 +328,17 @@ export default function TabsLayout() {
     const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
     router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
   };
+
+  // GLOBAL SEARCH opens tab screens the same way the menu does (fresh screen,
+  // More sheet closed). The latest goTo is kept in a ref so the registered
+  // function never goes stale.
+  const goToRef = useRef(goTo);
+  goToRef.current = goTo;
+  const setSearchNavigator = useGlobalSearchStore((state) => state.setNavigator);
+  useEffect(() => {
+    setSearchNavigator((route: string) => goToRef.current(route));
+    return () => setSearchNavigator(null);
+  }, [setSearchNavigator]);
 
   if (millOn) return <Redirect href={'/new/mill' as any} />;
 

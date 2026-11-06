@@ -3,15 +3,22 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "node ./scripts/build-global-search-index.js",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "prebuild:web": "node ./scripts/build-global-search-index.js",
     "build:web": "node ./scripts/build-web.js",
     "version:bump": "node ./scripts/bump-version.js",
     "store:live": "node ./scripts/set-store-version.js",
+    "preandroid": "node ./scripts/build-global-search-index.js",
     "android": "expo run:android",
+    "preios": "node ./scripts/build-global-search-index.js",
     "ios": "expo run:ios",
+    "preweb": "node ./scripts/build-global-search-index.js",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "search:index": "node ./scripts/build-global-search-index.js",
+    "postinstall": "node ./scripts/build-global-search-index.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -143,7 +143,7 @@ import {
   ExpenseDashboardData,
   fetchExpenseDashboardCard,
 } from '../../services/Dashboard/expenseDashboardApi';
-import { formatDashboardAmount, useDashboardAmountMode } from './AmountDisplayModeControl';
+import { formatActualDashboardQuantity, formatDashboardAmount, useDashboardAmountMode } from './AmountDisplayModeControl';
 import { useReportLayout } from './ResponsiveReport';
 
 type Props = {
@@ -599,7 +599,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
             <View style={styles.metricsColumn}>
               <CompactMetric
                 label="PRODUCTION"
-                value={formatMetres(summary.production_mtr)}
+                value={amountMode === 'actual' ? formatActualDashboardQuantity(summary.production_mtr) : formatMetres(summary.production_mtr)}
               />
             </View>
             <View style={styles.metricsColumn}>
@@ -619,7 +619,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
             />
             <CompactMetric
               label="PRODUCTION"
-              value={formatMetres(summary.production_mtr)}
+              value={amountMode === 'actual' ? formatActualDashboardQuantity(summary.production_mtr) : formatMetres(summary.production_mtr)}
             />
           </View>
 

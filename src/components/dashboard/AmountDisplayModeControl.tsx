@@ -99,6 +99,15 @@ export const formatSummaryAmount = (
 // monetary value on those screens, not only to the top summary card.
 export const formatDashboardAmount = formatSummaryAmount;
 
+// Show the original metre quantity with Indian digit grouping in Actual mode.
+// Unlike the abbreviated dashboard labels, this never converts to K or L.
+export const formatActualDashboardQuantity = (
+  value: number | string | null | undefined,
+  unit = 'm',
+): string => `${asNumber(value).toLocaleString('en-IN', {
+  maximumFractionDigits: 3,
+})} ${unit}`;
+
 export function useDashboardAmountMode() {
   const [mode, setModeState] = useState<DashboardAmountMode>(globalMode);
 

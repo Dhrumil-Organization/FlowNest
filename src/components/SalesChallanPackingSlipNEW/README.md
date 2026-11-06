@@ -160,3 +160,15 @@ Modify has three steps: **Slip & orders → Assign qty → Cartons**. The Carton
 - `savepackslipcarton` reads `d2delete: [{ SrNo, SubSr, CartNo }]`: refuses the save if the line is on a sales challan, deletes those rows **before** the `d2` upsert, puts a line whose last carton came off back to its assigned qty (`Qty = BQty`, `QtyPcs = TotChees = 0`), and answers `removed`.
 
 Without the update: saved cartons cannot be taken off (no `SalFlag` → web rule), and if `d2delete` is sent to an old server the app says the cartons are still on the slip instead of "saved".
+
+### Carton qty limit = assigned qty + extra %
+
+`cartonLimit` in `rules.ts`:
+- **Line with an assigned qty:** assigned qty + `extraqtyper` % **of the assigned qty** (200 assigned, 10 % → 220), never more than the order allows (balance + SOQty × extraqtyper %).
+- **Nothing assigned** (Scan of an older slip): balance + SOQty × extraqtyper % (web ItemDetail).
+
+It is checked on every screen: scan (hardware / camera / typed), hand pick, "select all" of a location (stops at the limit), Done / Back to slip, and **Save** (`cartonsVsAssigned` — also catches lowering the assign qty after picking cartons). A bar pinned under the scanner on both the Locations and the Cartons screen shows the count and qty selected, "of X allowed (assigned Y + Z %)" and what is left; the refused / added message is pinned under it.
+
+### Modify save: DueDate
+
+`packslipshow` sends `DueDate` as dd-mm-yyyy, but `savepackslip` stores it unconverted, so saving a Modify failed with SQL "Error converting data type nvarchar to numeric". The app now sends it as yyyymmdd (`ymdDate` in `rules.ts`); the backend patch converts a dd-mm-yyyy value too.

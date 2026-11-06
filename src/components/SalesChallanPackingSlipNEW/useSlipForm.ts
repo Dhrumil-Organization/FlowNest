@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as A from './api';
 import type { Api, Ctx, Mode, PartyScope, Row } from './api';
 import {
-  PARTY_CLEAR, assignQtyIssue, blank, cartonsChanged, d1Key, filterPartyRows, indexPartyRows, maxSr, n3, orderToD1, partyFields, removedCartons, saveIssue, splitTypes, sum, today,
+  PARTY_CLEAR, assignQtyIssue, blank, cartonsChanged, d1Key, filterPartyRows, indexPartyRows, maxSr, n3, orderToD1, partyFields, removedCartons, saveIssue, ymdDate, splitTypes, sum, today,
 } from './rules';
 
 type Busy = Partial<Record<'load' | 'party' | 'stock' | 'save' | 'remove' | 'voucher', boolean>>;
@@ -274,7 +274,7 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   const save = useCallback(async (): Promise<string | null> => {
     if (saving.current) return null;
     const x = fRef.current;
-    const issue = saveIssue(x, stock);
+    const issue = saveIssue(x, stock, extraPer);
     if (issue) { fail('save', issue); return null; }
     saving.current = true;
     saveWarn.current = '';
@@ -292,7 +292,8 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
         checkRemoved(res.removed);
         return res.uid || str(x.UId);
       }
-      const id = (await A.saveSlip(api, { ...x, editedd1, txntype: A.TXNTYPE, action: mode }, false)) || str(x.UId);
+      // DueDate: loaded as dd-mm-yyyy, the server saves it unconverted (SQL "nvarchar to numeric") → yyyymmdd.
+      const id = (await A.saveSlip(api, { ...x, DueDate: ymdDate(x.DueDate), editedd1, txntype: A.TXNTYPE, action: mode }, false)) || str(x.UId);
       if (mode === 'edit' && id && cartonsChanged(savedD2.current, x.d2 || [])) {
         try {
           const res = await A.saveCartons(api, { ...x, UId: id, editedd1, txntype: A.TXNTYPE, d2delete });
@@ -309,7 +310,7 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
       saving.current = false;
       flag('save', false);
     }
-  }, [api, stock, mode]);
+  }, [api, stock, mode, extraPer]);
 
   /** Why the last save was only partly done ('' = all saved). */
   const saveWarning = useCallback(() => saveWarn.current, []);
@@ -330,8 +331,9 @@ export function useSlipForm(api: Api, ctx: Ctx, mode: Mode, uid: string | undefi
   const totals = {
     assigned: sum(stock, 'AssQty'),
     lines: stock.filter((r) => n3(r.AssQty) > 0).length,
-    cartons: (f.d2 || []).length,
-    cartonQty: sum(f.d2, 'QtyWt'),
+    // d2 can hold the web's empty starter row — count real cartons only
+    cartons: (f.d2 || []).filter((c: Row) => !blank(c.CartNo)).length,
+    cartonQty: sum((f.d2 || []).filter((c: Row) => !blank(c.CartNo)), 'QtyWt'),
     cartonTarget: stock.reduce((s, r) => s + (parseInt(r.TotCarton, 10) || 0), 0),
   };
 

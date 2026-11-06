@@ -228,13 +228,31 @@ export function cartonsChanged(saved: Row[] | undefined, current: Row[] | undefi
 }
 
 /** handleSaveClick / handleSaveCartons — same checks, same order. */
-export function saveIssue(f: Row, stock: Row[]): string {
+export function saveIssue(f: Row, stock: Row[], extraPer = 0): string {
   if (!stock.some((r) => !blank(r.SrNo))) return 'Serial number needs to be set in each order line.';
   const over = groupStock(stock).find((g) => groupIssue(g));
   if (over) return `SO ${over.head.SONo} · ${over.head.ItmName}: ${groupIssue(over)}`;
   if (blank(f.ChalNo)) return 'Please add packing number.';
   if (blank(f.ParCode) || n3(f.ParCode) === 0) return 'Please choose the party.';
   if (!stock.some((r) => n3(r.AssQty) > 0)) return 'Assign qty in at least one line.';
+  return cartonsVsAssigned(f.d2, stock, extraPer);
+}
+
+/**
+ * Cartons of each line must not be more than its assigned qty — checked on Save too, so lowering the assign qty
+ * after picking cartons (or any other route) cannot get past it.
+ */
+export function cartonsVsAssigned(d2: Row[] | undefined, stock: Row[], extraPer = 0): string {
+  const real = (d2 || []).filter((c) => !blank(c.CartNo));
+  for (const r of stock) {
+    if (blank(r.SrNo)) continue;
+    const mine = real.filter((c) => parseInt(c.SrNo, 10) === parseInt(r.SrNo, 10));
+    if (!mine.length) continue;
+    const got = n3(sum(mine, 'QtyWt'));
+    const cap = n3(n3(r.AssQty) * (1 + n3(extraPer) / 100)); // same as cartonLimit: assigned + extra %
+    if (n3(r.AssQty) <= 0) return `Sr ${r.SrNo} · ${str(r.ItmName)}: has ${mine.length} carton(s) (${qty(got)}) but no assign qty. Assign qty or take the cartons off.`;
+    if (got > cap) return `Sr ${r.SrNo} · ${str(r.ItmName)}: cartons ${qty(got)} are more than the allowed ${qty(cap)}${n3(extraPer) > 0 ? ` (assigned ${qty(r.AssQty)} + ${n3(extraPer)}%)` : ''}. Take ${qty(n3(got - cap))} off in Cartons.`;
+  }
   return '';
 }
 
@@ -302,11 +320,11 @@ export function pickCarton(found: Row, p: { scanned: Row[]; others: Row[]; srNo:
     return { status: 'locked', source: found, message: `Carton ${found.cartno} is locked${found.lockreason ? `: ${found.lockreason}` : ''}.` };
   }
   // Qty limit (web CartonSelect finalTotal): selected qty of this line + this carton must stay within
-  // balance qty + extra qty % (getsetchallan extraqtyper) of the order qty.
+  // assigned qty (or balance qty) + extra qty % (getsetchallan extraqtyper) of the order qty — see cartonLimit.
   if (p.limit !== undefined) {
     const next = n3(sum(p.scanned, 'QtyWt') + n3(found.qty));
     if (next > n3(p.limit)) {
-      return { status: 'overqty', source: found, message: `Selected Qty ${qty(next)} cannot be more than Ordered Qty (${qty(p.limit)}). Carton ${found.cartno} (${qty(found.qty)}) not added.` };
+      return { status: 'overqty', source: found, message: `Carton ${found.cartno} (${qty(found.qty)}) would make ${qty(next)} — more than the allowed ${qty(p.limit)}. Not added.` };
     }
   }
   const carton: Row = {
@@ -341,11 +359,45 @@ export const orderQtyOf = (row: Row | null | undefined, d1: Row[] | undefined): 
 };
 
 /**
- * Most qty that may be selected as cartons for one line (web ItemDetail totalSoQtyToSale):
- *   balance qty (BQty) + order qty (SOQty) × extraqtyper / 100      — extraqtyper from getsetchallan.
+ * The qty the cartons of a line are measured against: the ASSIGNED qty of the line when it has one (Assign qty step
+ * / saved slip), never more than the order balance; otherwise the order balance (BQty).
  */
-export const cartonLimit = (row: Row, orderQty: number, extraPer: number): number =>
-  n3(n3(row.BQty) + (n3(orderQty) * n3(extraPer)) / 100);
+export const cartonBase = (row: Row): number => {
+  const assigned = n3(row.AssQty);
+  const balance = n3(row.BQty);
+  if (assigned > 0) return balance > 0 ? Math.min(assigned, balance) : assigned;
+  return balance;
+};
+
+/**
+ * packslipshow sends DueDate as dd-mm-yyyy but savepackslip stores it as it comes (BillDate / LRDate go through
+ * format_date). Back to yyyymmdd before saving; yyyymmdd / empty / 0 stay as they are.
+ */
+export const ymdDate = (v: any): string => {
+  const t = str(v);
+  let m = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (m) return `${m[3]}${m[2].padStart(2, '0')}${m[1].padStart(2, '0')}`;
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}${m[2]}${m[3]}`;
+  return t;
+};
+
+/** True when cartonBase is the assigned qty (for the wording on screen). */
+export const cartonBaseIsAssigned = (row: Row): boolean => n3(row.AssQty) > 0;
+
+/**
+ * Most qty that may be selected as cartons for one line:
+ *   • line with an assigned qty → assigned qty + extraqtyper % OF THE ASSIGNED QTY (200 assigned, 10 % → 220),
+ *     and never more than the order allows (balance + SOQty × extraqtyper %);
+ *   • nothing assigned (e.g. Scan of an older slip) → balance qty + order qty (SOQty) × extraqtyper / 100,
+ *     like the web ItemDetail totalSoQtyToSale (extraqtyper from getsetchallan).
+ */
+export const cartonLimit = (row: Row, orderQty: number, extraPer: number): number => {
+  const orderMax = n3(n3(row.BQty) + (n3(orderQty) * n3(extraPer)) / 100);
+  if (!cartonBaseIsAssigned(row)) return orderMax;
+  const assignedMax = n3(n3(row.AssQty) * (1 + n3(extraPer) / 100));
+  return n3(row.BQty) > 0 ? Math.min(assignedMax, orderMax) : assignedMax;
+};
 
 export const cartonsOf = (d2: Row[] | undefined, srNo: any) =>
   (d2 || []).filter((c) => parseInt(c.SrNo, 10) === parseInt(srNo, 10));

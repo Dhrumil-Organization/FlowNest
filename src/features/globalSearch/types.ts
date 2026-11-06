@@ -79,10 +79,18 @@ export type SearchResult = {
 
 export type SearchMode = 'search' | 'help' | 'recent' | 'all' | 'commands';
 
+/** The filter chips: what kind of result to show. */
+export type SearchFilter = 'all' | 'screens' | 'tabs' | 'cards' | 'reports' | 'actions';
+
 export type SearchOutcome = {
   mode: SearchMode;
   query: string;
   results: SearchResult[];
+  /** results per filter chip (before the chip is applied) */
+  counts?: Record<SearchFilter, number>;
+  filter?: SearchFilter;
+  /** the first result is clearly the one meant (voice "… kholo" may open it at once) */
+  confident?: boolean;
   /** In help mode: the best article (+ results list for others). */
   article?: HelpArticle | null;
   /** "Did you mean …" when nothing matched. */

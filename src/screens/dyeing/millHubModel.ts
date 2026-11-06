@@ -65,6 +65,16 @@ export type HubLot = {
   rate: number;
   balAmt: number;
   inwAmt: number;
+  /** Inward-view context supplied by the backend across the full outward-lot history. */
+  originalOutDate?: string;
+  movementDate?: string;
+  otherInwardMonths?: string[];
+  overallInM?: number;
+  overallShort?: number | null;
+  overallPct?: number | null;
+  overallStatus?: LotStatus;
+  overallRecvTakas?: number;
+  movementEntries?: Array<Record<string, any>>;
   merge: string;
   grade: string;
   dept: string;
@@ -214,6 +224,19 @@ export const normalizeLots = (response: any): HubLot[] => {
       rate: n(r.rate),
       balAmt: n(r.balamt),
       inwAmt: n(r.inwamt),
+      originalOutDate: date(r.originaloutdate || r.outdate),
+      movementDate: date(r.movementdate || r.lastinw),
+      otherInwardMonths: Array.isArray(r.otherinwardmonths)
+        ? r.otherinwardmonths.map((v: any) => s(v)).filter(Boolean)
+        : s(r.otherinwardmonths || r.othermonths).split(',').map((v: string) => v.trim()).filter(Boolean),
+      overallInM: nOrNull(r.overallinmtr) ?? undefined,
+      overallShort: nOrNull(r.overallshortmtr),
+      overallPct: nOrNull(r.overallshortper),
+      overallStatus: (['COMPLETE', 'PARTIAL', 'PENDING'].includes(s(r.overallstatus).toUpperCase())
+        ? s(r.overallstatus).toUpperCase()
+        : '') as HubLot['overallStatus'],
+      overallRecvTakas: nOrNull(r.overallrecvtakas) ?? undefined,
+      movementEntries: Array.isArray(r.movemententries) ? r.movemententries : [],
       merge: s(r.mername),
       grade: s(r.grdname),
       dept: s(r.department),

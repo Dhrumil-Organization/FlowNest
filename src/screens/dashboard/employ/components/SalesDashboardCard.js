@@ -47,8 +47,14 @@ const NEXT_LEVEL_BY_DIMENSION = {
   party: 'categories',
 };
 
-const formatQty = value => {
-  const amount = Number(value || 0);
+const formatQty = (value, mode = 'compact') => {
+  // Sales detail rows, expanded children, and the Total all use this formatter.
+  // Actual must use the raw API metres, never the abbreviated dashboard label.
+  const parsed = Number(value ?? 0);
+  const amount = Number.isFinite(parsed) ? parsed : 0;
+  if (mode === 'actual') {
+    return `${amount.toLocaleString('en-IN', { maximumFractionDigits: 3 })} m`;
+  }
   if (Math.abs(amount) >= 100000) return `${(amount / 100000).toFixed(1)} L m`;
   if (Math.abs(amount) >= 1000) return `${(amount / 1000).toFixed(1)} K m`;
   return `${amount.toLocaleString('en-IN', { maximumFractionDigits: 1 })} m`;
@@ -80,10 +86,13 @@ const coverageSubtitle = period => {
 };
 
 function MetricValue({ quantity, amount, compact = false, amountMode = 'compact' }) {
+  // In Actual mode, two full-length figures cannot share a 122px row.
+  // Stack them within the SAME metric cell; Compact mode stays unchanged.
+  const actual = amountMode === 'actual';
   return (
-    <View style={[styles.metricValue, compact && styles.metricValueCompact]}>
-      <Text numberOfLines={1} style={[styles.qty, compact && styles.childQty]}>{formatQty(quantity)}</Text>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.amount, compact && styles.childAmount]}>{cleanAmount(amount, amountMode)}</Text>
+    <View style={[styles.metricValue, compact && styles.metricValueCompact, actual && styles.metricValueActual]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[styles.qty, compact && styles.childQty, actual && styles.qtyActual]}>{formatQty(quantity, amountMode)}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[styles.amount, compact && styles.childAmount, actual && styles.amountActual]}>{cleanAmount(amount, amountMode)}</Text>
     </View>
   );
 }
@@ -237,11 +246,11 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
       <View style={styles.summaryRow}>
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryLabel}>TODAY</Text>
-          <Text style={styles.todayValue}>{cleanAmount(sales?.total?.today, amountMode)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.todayValue, amountMode === 'actual' && styles.summaryActualValue]}>{cleanAmount(sales?.total?.today, amountMode)}</Text>
         </View>
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryLabel}>THIS MONTH</Text>
-          <Text style={styles.monthValue}>{cleanAmount(sales?.total?.mtd, amountMode)}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.monthValue, amountMode === 'actual' && styles.summaryActualValue]}>{cleanAmount(sales?.total?.mtd, amountMode)}</Text>
         </View>
       </View>
 
@@ -269,7 +278,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
         {/* <Text style={styles.columnMetric}>QTY   AMOUNT</Text> */}
         <TouchableOpacity onPress={toggleSort}>
           <Text style={styles.columnMetric}>
-            QTY   AMOUNT ▼
+            {amountMode === 'actual' ? 'QTY / AMOUNT ▼' : 'QTY   AMOUNT ▼'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -290,7 +299,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
                 </View>
               )}
               {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85', '#7440B7', '#168274', '#2563EB', '#B55E10', '#0A9B6C', '#D98200'][index % 7] }]} />}
-              <Text numberOfLines={1} style={styles.parentName}>{row.name}</Text>
+              <Text numberOfLines={1} style={[styles.parentName, amountMode === 'actual' && styles.parentNameActual]}>{row.name}</Text>
               <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} amountMode={amountMode} />
             </TouchableOpacity>
 
@@ -347,6 +356,7 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 9, letterSpacing: 1.1, color: '#8C837B', fontWeight: '700' },
   todayValue: { marginTop: 3, fontSize: 17, color: '#16633C', fontWeight: '800' },
   monthValue: { marginTop: 3, fontSize: 17, color: '#121417', fontWeight: '800' },
+  summaryActualValue: { fontSize: 14.5, fontVariant: ['tabular-nums'] },
   chartWrap: { paddingHorizontal: 12, paddingBottom: 6, overflow: 'visible' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 12, paddingVertical: 10 },
   tab: { paddingHorizontal: 14, height: 34, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEAE6' },
@@ -360,18 +370,24 @@ const styles = StyleSheet.create({
   parentRow: { minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' },
   chevron: { width: 14, color: '#9C9288', fontSize: 16 },
   rankDot: { width: 9, height: 9, borderRadius: 2, marginRight: 8 },
-  parentName: { flex: 1, fontSize: 13, fontWeight: '800', color: '#111317' },
+  parentName: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', color: '#111317' },
+  parentNameActual: { fontSize: 12 },
   metricValue: { width: 122, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 7 },
   metricValueCompact: { width: 125 },
+  // Full rupee values remain readable, with Qty above Amount, instead of
+  // being clipped by the original side-by-side fixed-width metric cell.
+  metricValueActual: { width: 148, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: 0 },
   qty: { fontSize: 11, color: '#827B74', fontVariant: ['tabular-nums'] },
   amount: { fontSize: 12, color: '#111317', fontWeight: '900', fontVariant: ['tabular-nums'] },
   childQty: { fontSize: 10 },
   childAmount: { fontSize: 11 },
+  qtyActual: { fontSize: 9, lineHeight: 12 },
+  amountActual: { fontSize: 10.5, lineHeight: 14 },
   expandedBody: { marginLeft: 20, paddingLeft: 14, paddingRight: 12, paddingBottom: 12, borderLeftWidth: 1, borderLeftColor: '#CDC6BF' },
   childSection: { marginTop: 9 },
   childTitle: { marginBottom: 5, fontSize: 8, letterSpacing: 1, color: '#9C9188', fontWeight: '700' },
   childRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center' },
-  childNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  childNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
   childName: { flex: 1, fontSize: 11, color: '#7E6A5C' },
   squareDot: { width: 7, height: 7, borderRadius: 1, backgroundColor: '#2563EB', marginRight: 7 },
   avatar: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 7 },

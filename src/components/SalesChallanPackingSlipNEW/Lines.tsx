@@ -7,7 +7,7 @@ import { Platform, Text, TextInput, View } from 'react-native';
 import { Btn, ErrorText, FieldLabel, Hint, LinkBtn, tab, u } from '../PackingAutomationNEW/ui';
 import type { Mode, Row } from './api';
 import type { ScanDevice } from './ScanDevices';
-import { assignQtyIssue, canAssign, cartonsOf, maxAssign, n3, onChallan, pick, qty, splitTypes, sum } from './rules';
+import { assignQtyIssue, canAssign, cartonBase, cartonBaseIsAssigned, cartonsOf, maxAssign, n3, onChallan, pick, qty, splitTypes, sum } from './rules';
 import { Bar, Sr, Stats, Tag, Tags } from './ui';
 
 /* ------------------------------ one line ------------------------------ */
@@ -29,10 +29,10 @@ export function StockLine({ row, mode, d2, onAssign, onScan, cartonStep }: {
   };
   const issue = editable ? assignQtyIssue(row, draft) : '';
 
-  const cartons = cartonsOf(d2, row.SrNo);
+  const cartons = cartonsOf(d2, row.SrNo).filter((c) => String(c.CartNo ?? '').trim() !== '');
   const scannedQty = sum(cartons, 'QtyWt');
   const total = parseInt(row.TotCarton, 10) || 0;
-  const target = n3(row.BQty);
+  const target = cartonBase(row); // assigned qty when the line has one, else balance
   const full = target > 0 && n3(scannedQty) >= target;
   const assigned = n3(row.AssQty) > 0;
   const shortStock = n3(row.StkQty) < n3(row.BQty);
@@ -60,7 +60,7 @@ export function StockLine({ row, mode, d2, onAssign, onScan, cartonStep }: {
       {showCartons ? (
         <>
           <Stats items={[
-            { label: 'Bal. qty', value: qty(row.BQty) },
+            { label: cartonBaseIsAssigned(row) ? 'Assigned' : 'Bal. qty', value: qty(target) },
             { label: 'Cartons', value: `${cartons.length} / ${total}` },
             { label: 'Scanned qty', value: qty(scannedQty), tone: full ? 'green' : undefined },
           ]} />

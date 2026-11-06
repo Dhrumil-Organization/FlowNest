@@ -17,6 +17,10 @@
 
 // import { useBusinessContext } from '@/src/core/business';
 // import { T } from '@/src/theme';
+import { Alert, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { buildXlsx, c, toBase64, SheetSpec } from '@/src/components/VisitorsReportNEW/xlsxLite';
 // import { useFocusEffect } from '@react-navigation/native';
 // import React, { useCallback, useMemo, useRef, useState } from 'react';
 // import {
@@ -215,7 +219,7 @@
 //         {outside > 0 && (
 //           <Text onPress={showAll} style={st.link}>+{outside} outside range — show all</Text>
 //         )}
-//         <Text onPress={() => setHelp((h) => !h)} style={[st.link, { marginLeft: 'auto' }]}>ⓘ {help ? 'Hide guide' : 'How to read this'}</Text>
+//         <Text onPress={() => setHelp((h) => !h)} style={st.link}>ⓘ {help ? 'Hide guide' : 'How to read this'}</Text>
 //       </View>
 //       {loading && <ActivityIndicator color={T.copper} size="small" />}
 //       {!!error && (
@@ -577,7 +581,7 @@ function normalizeInwardMovementLots(response: any): HubLot[] {
         outsrno: r.outsrno,
         outno: r.outno,
         // In inward mode this is the receipt date, not the original outward date.
-        outdate: r.inwdate || '',
+        outdate: r.outdate || '',
         partyname: r.partyname,
         jobname: r.jobname,
         chartno: r.chartno,
@@ -590,7 +594,7 @@ function normalizeInwardMovementLots(response: any): HubLot[] {
         outmtr: Number(r.outmtr || 0),
         inmtr: 0,
         retmtr: 0,
-        pendmtr: 0,
+        pendmtr: Number(r.overallpendmtr ?? 0),
         shortmtr: null,
         shortper: null,
         inamt: 0,
@@ -612,6 +616,15 @@ function normalizeInwardMovementLots(response: any): HubLot[] {
         rate: Number(r.jobrate || 0),
         balamt: 0,
         inwamt: 0,
+        originaloutdate: r.outdate || '',
+        movementdate: r.inwdate || '',
+        otherinwardmonths: r.otherinwardmonths ?? [],
+        overallinmtr: r.overallinmtr == null ? null : Number(r.overallinmtr),
+        overallshortmtr: r.overallshortmtr ?? null,
+        overallshortper: r.overallshortper ?? null,
+        overallstatus: r.overallstatus || '',
+        overallrecvtakas: r.overallrecvtakas == null ? null : Number(r.overallrecvtakas),
+        movemententries: [],
       };
       grouped.set(key, g);
     }
@@ -625,19 +638,51 @@ function normalizeInwardMovementLots(response: any): HubLot[] {
     g.excqty += Number(r.excqty || 0);
     g.inamt += Number(r.jobamt || 0);
     g.inwamt += Number(r.jobamt || 0);
+    g.movemententries.push({
+      inwNo: String(r.inwno || ''),
+      inwDate: String(r.inwdate || ''),
+      challanNo: String(r.chalno || ''),
+      inwardUid: String(r.inuid || ''),
+      inwardSrNo: String(r.insrno || ''),
+      quantityMtr: Number(r.inmtr || 0),
+      takas: Number(r.takas || 0),
+      jobRate: Number(r.jobrate || 0),
+      jobAmount: Number(r.jobamt || 0),
+    });
     g.inwcount += 1;
     g.recvtakas += Number(r.takas || 0);
 
     const receiptDate = String(r.inwdate || '');
     if (receiptDate > String(g.lastinw || '')) {
       g.lastinw = receiptDate;
-      g.outdate = receiptDate;
     }
+    if (Array.isArray(r.otherinwardmonths)) {
+      g.otherinwardmonths = [...new Set([...(g.otherinwardmonths || []), ...r.otherinwardmonths.map(String)])];
+    } else if (r.otherinwardmonths || r.othermonths) {
+      const rawMonths = r.otherinwardmonths ?? r.othermonths;
+      const months = Array.isArray(rawMonths) ? rawMonths : String(rawMonths).split(',').map((x: string) => x.trim()).filter(Boolean);
+      g.otherinwardmonths = [...new Set([...(g.otherinwardmonths || []), ...months])];
+    }
+    if (r.overallinmtr !== undefined && r.overallinmtr !== null) g.overallinmtr = Number(r.overallinmtr);
+    if (r.overallshortmtr !== undefined) g.overallshortmtr = r.overallshortmtr;
+    if (r.overallshortper !== undefined) g.overallshortper = r.overallshortper;
+    if (r.overallstatus) g.overallstatus = r.overallstatus;
+    if (r.overallrecvtakas !== undefined && r.overallrecvtakas !== null) g.overallrecvtakas = Number(r.overallrecvtakas);
   });
 
   return normalizeLots({
     success: true,
-    data: { mode: body?.mode, lots: [...grouped.values()] },
+    data: { mode: body?.mode, lots: [...grouped.values()].map((g) => ({
+      ...g,
+      outdate: g.originaloutdate || g.outdate,
+      shortmtr: g.overallshortmtr ?? null,
+      shortper: g.overallshortper,
+      status: g.overallstatus || g.status,
+      recvtakas: g.overallrecvtakas ?? g.recvtakas,
+      overallinmtr: g.overallinmtr,
+      movementdate: g.movementdate || g.lastinw,
+      movemententries: g.movemententries || [],
+    })) },
   });
 }
 
@@ -655,6 +700,7 @@ export function MillHubTab() {
   const [lots, setLots] = useState<HubLot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const [party, setParty] = useState('ALL');
@@ -725,6 +771,103 @@ export function MillHubTab() {
   const itemLots = useMemo(() => (isel ? lotsOfItem(shown, isel) : []), [shown, isel]);
   const hub = useMemo(() => buildDesignRows(itemLots), [itemLots]);
   const challans = useMemo(() => new Set(shown.map((l) => l.outUId)).size, [shown]);
+
+  const exportExcel = useCallback(async () => {
+    if (!shown.length) {
+      Alert.alert('Nothing to export', 'There are no rows in the current filter.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const columns = [
+        'View', 'Selected From', 'Selected To', 'Item', 'Design', 'Shade', 'Mill / Party',
+        'Outward Challan', 'Original Outward Date', 'Selected-period Inward Date(s)',
+        'Outward Qty (MTR)', 'Selected-period Inward Qty (MTR)', 'Overall Inward Qty (MTR)',
+        'Returned (MTR)', 'Pending (MTR)', 'Overall Shortage (MTR)', 'Overall Shortage %',
+        'Received in Other Months', 'Overall Status', 'Inward Amount',
+      ];
+      const rows = [
+        columns.map((h) => c(h, 'head')),
+        ...shown.map((l, i) => {
+          const any = l as HubLot & Record<string, any>;
+          const otherMonths = Array.isArray(any.otherInwardMonths) ? any.otherInwardMonths.join(', ') : '';
+          const overallIn = any.overallInM != null ? any.overallInM : (direction === 'outward' ? l.inM : '');
+          const overallShort = any.overallShort !== undefined ? (any.overallShort ?? '') : (direction === 'outward' ? (l.short ?? '') : '');
+          const overallPct = any.overallPct !== undefined ? (any.overallPct ?? '') : (direction === 'outward' ? (l.pct ?? '') : '');
+          const movementDate = any.movementDate || l.lastInw || '';
+          const values: (string | number)[] = [
+            direction === 'inward' ? 'INWARD DATE' : 'OUTWARD DATE',
+            from, to, l.item, l.design, l.shade, l.party, l.outNo,
+            any.originalOutDate || l.outDate, movementDate,
+            l.outM, l.inM, overallIn, l.retM, l.pend, overallShort, overallPct,
+            otherMonths, any.overallStatus || l.status, l.inAmt,
+          ];
+          return values.map((v, j) => c(v, j >= 10 && j !== 17 && j !== 18 && typeof v === 'number' ? (i % 2 ? 'numAlt' : 'num') : (i % 2 ? 'cellAlt' : 'cell')));
+        }),
+      ];
+      const sheet: SheetSpec = {
+        name: direction === 'inward' ? 'Inward Mill Hub' : 'Outward Mill Hub',
+        cols: [16, 13, 13, 22, 22, 16, 24, 18, 17, 22, 16, 20, 19, 16, 16, 19, 16, 28, 16, 18],
+        rows,
+        freezeRow: 1,
+        filter: rows.length > 1 ? `A1:T${rows.length}` : undefined,
+      };
+      const entryHeaders = [
+        'Item', 'Design', 'Shade', 'Mill / Party', 'Original Outward Challan',
+        'Original Outward Date', 'Inward Challan', 'Inward Date', 'Inward Qty (MTR)',
+        'Takas', 'Job Rate', 'Job Amount', 'Other Months Also Received',
+        'Overall Inward (MTR)', 'Overall Shortage (MTR)', 'Overall Shortage %', 'Overall Status',
+      ];
+      const entryRows = [
+        entryHeaders.map((h) => c(h, 'head')),
+        ...shown.flatMap((l) => {
+          const any = l as HubLot & Record<string, any>;
+          const entries = Array.isArray(any.movementEntries) ? any.movementEntries : [];
+          return entries.map((e: any, i: number) => {
+            const values: (string | number)[] = [
+              l.item, l.design, l.shade, l.party, l.outNo, any.originalOutDate || l.outDate,
+              e.inwNo || '', e.inwDate || '', Number(e.quantityMtr || 0), Number(e.takas || 0),
+              Number(e.jobRate || 0), Number(e.jobAmount || 0),
+              Array.isArray(any.otherInwardMonths) ? any.otherInwardMonths.join(', ') : '',
+              any.overallInM ?? '', any.overallShort ?? '', any.overallPct ?? '', any.overallStatus || l.status,
+            ];
+            return values.map((v, j) => c(v, j >= 8 && j <= 11 ? (i % 2 ? 'numAlt' : 'num') : (i % 2 ? 'cellAlt' : 'cell')));
+          });
+        }),
+      ];
+      const entrySheet: SheetSpec = {
+        name: 'Inward Entries',
+        cols: [22, 22, 16, 24, 18, 17, 18, 16, 18, 12, 14, 16, 28, 18, 18, 16, 16],
+        rows: entryRows,
+        freezeRow: 1,
+        filter: entryRows.length > 1 ? `A1:Q${entryRows.length}` : undefined,
+      };
+      const bytes = buildXlsx([sheet, entrySheet]);
+      const safe = (v: string) => v.replace(/[^A-Za-z0-9_-]+/g, '_');
+      const fileName = `Mill_Hub_${direction}_${safe(from)}_${safe(to)}.xlsx`;
+      const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      if (Platform.OS === 'web') {
+        const g: any = globalThis;
+        const url = g.URL.createObjectURL(new g.Blob([bytes], { type: mime }));
+        const link = g.document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        g.document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => g.URL.revokeObjectURL(url), 4000);
+      } else {
+        const path = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(path, toBase64(bytes), { encoding: FileSystem.EncodingType.Base64 });
+        if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
+        await Sharing.shareAsync(path, { mimeType: mime, dialogTitle: 'Export Mill Hub Excel', UTI: 'org.openxmlformats.spreadsheetml.sheet' });
+      }
+    } catch (e: any) {
+      Alert.alert('Excel export failed', e?.message || 'Unable to create the Mill Hub Excel file.');
+    } finally {
+      setExporting(false);
+    }
+  }, [shown, direction, from, to]);
 
   const tableMin = narrow ? 470 : undefined;
 
@@ -880,7 +1023,10 @@ export function MillHubTab() {
         <Text style={st.sumText}>
           {plural(shown.length, 'lot')} · {plural(challans, 'challan')} · {counts.COMPLETE} complete · {counts.PARTIAL} partial · {counts.PENDING} pending
         </Text>
-        <Text onPress={() => setHelp((h) => !h)} style={[st.link, { marginLeft: 'auto' }]}>ⓘ {help ? 'Hide guide' : 'How to read this'}</Text>
+        <TouchableOpacity onPress={exportExcel} disabled={exporting || loading || shown.length === 0} style={[st.preset, (exporting || loading || shown.length === 0) && { opacity: 0.5 }]}>
+          <Text style={st.presetText}>{exporting ? 'Preparing Excel…' : '↓ Export Excel'}</Text>
+        </TouchableOpacity>
+        <Text onPress={() => setHelp((h) => !h)} style={st.link}>ⓘ {help ? 'Hide guide' : 'How to read this'}</Text>
       </View>
       {loading && <ActivityIndicator color={T.copper} size="small" />}
       {!!error && (
@@ -1012,7 +1158,7 @@ export function MillHubTab() {
         <Text style={st.footer}>
           {direction === 'outward'
             ? 'Outward view is filtered by GRYOut.OutDate; linked inward history is included in the lot totals.'
-            : 'Inward view is filtered by GRYInw.InwDate; received quantities and job amounts include only receipts in the selected date range.'}
+            : 'Inward view is filtered by GRYInw.InwDate; IN is the selected-period receipt quantity. Overall shortage/status and receipts from other months require the backend all-history fields.'}
           Shortage = outward − inward metres, only for lots whose every taka is back. Pending = takas still at the mill.
           {isel ? ' Tap a design for the lot-wise breakdown.' : ' Tap an item for its designs, then a design for the lot-wise breakdown.'}
         </Text>
@@ -1541,7 +1687,14 @@ function LotLine({ l, onPress, k }: { l: HubLot; onPress: () => void; k?: boolea
         `${l.recvTakas}/${l.outTakas} takas back`,
         l.retTakas ? `${l.retTakas} returned` : '',
         l.lastInw ? `last inward ${fmtD(l.lastInw)}` : '',
+        ...((l as any).otherInwardMonths?.length
+          ? [`also received ${((l as any).otherInwardMonths as string[]).join(', ')}`]
+          : []),
       ]
+  ).concat(
+    Array.isArray((l as any).otherInwardMonths) && (l as any).otherInwardMonths.length
+      ? [`also received ${((l as any).otherInwardMonths as string[]).join(', ')}`]
+      : [],
   ).filter(Boolean).join(' · ');
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.6}>

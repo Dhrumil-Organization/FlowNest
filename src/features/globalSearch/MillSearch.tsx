@@ -47,6 +47,7 @@ type Props = {
 export function MillSearchBar({ session, onOpenPage, onRefresh, onMillOff }: Props) {
   const open = useGlobalSearchStore((s) => s.open);
   const initialQuery = useGlobalSearchStore((s) => s.initialQuery);
+  const openId = useGlobalSearchStore((s) => s.openId);
   const show = useGlobalSearchStore((s) => s.show);
   const hide = useGlobalSearchStore((s) => s.hide);
   const recents = useGlobalSearchStore((s) => s.recent);
@@ -115,6 +116,7 @@ export function MillSearchBar({ session, onOpenPage, onRefresh, onMillOff }: Pro
         </TouchableOpacity>
       </View>
       <GlobalSearchModal
+        key={openId}
         visible={visible}
         onClose={hide}
         index={index}

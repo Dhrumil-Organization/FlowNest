@@ -19,6 +19,8 @@ type State = {
   /** which search is open ('' = none) */
   open: '' | 'erp' | 'mill';
   initialQuery: string;
+  /** +1 on every open → the window is built fresh each time (no old text / filter / mic state) */
+  openId: number;
   show: (which: 'erp' | 'mill', query?: string) => void;
   hide: () => void;
 
@@ -35,7 +37,8 @@ type State = {
 export const useGlobalSearchStore = create<State>((set, get) => ({
   open: '',
   initialQuery: '',
-  show: (which, query = '') => set({ open: which, initialQuery: query }),
+  openId: 0,
+  show: (which, query = '') => set({ open: which, initialQuery: query, openId: get().openId + 1 }),
   hide: () => set({ open: '', initialQuery: '' }),
 
   navigate: null,

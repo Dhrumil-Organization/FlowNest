@@ -26,11 +26,15 @@ export type VoiceState = {
   /** 0 … 1, smoothed mic level (drives the animation; native driver friendly) */
   level: Animated.Value;
   start: (lang: VoiceLang, hints?: string[]) => void;
+  /** forget the last error / words (search closed, user typed, "Type instead") */
+  reset: () => void;
+  clearError: () => void;
   stop: () => void;
   cancel: () => void;
 };
 
-type Handlers = { onFinal: (text: string) => void };
+/** text = best transcript, alternatives = other ways it may have been heard */
+type Handlers = { onFinal: (text: string, alternatives: string[]) => void };
 
 // ── native module (loaded lazily so an old build without it never crashes) ──
 let nativeModule: any | undefined;
@@ -64,8 +68,31 @@ export function isVoiceAvailable(): boolean {
   }
 }
 
+function micBlockedText(): string {
+  if (Platform.OS === 'web') {
+    let inFrame = false;
+    try {
+      inFrame = typeof window !== 'undefined' && window.top !== window.self;
+    } catch {
+      inFrame = true;
+    }
+    try {
+      const { protocol, hostname } = window.location;
+      if (protocol === 'http:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(hostname)) {
+        return 'Browsers allow the microphone only on https:// (or localhost). Open FlowNest with https:// to use voice search.';
+      }
+    } catch {
+      /* ignore */
+    }
+    if (inFrame) return 'The microphone is blocked because FlowNest is open inside another page. Open FlowNest directly in the browser, or allow the microphone on that page.';
+    return 'The microphone is blocked for this site. Click the 🔒 lock icon left of the address bar → Microphone → Allow, then tap the mic again.';
+  }
+  if (Platform.OS === 'ios') return 'Microphone is off for FlowNest. Open iPhone Settings → FlowNest → turn on Microphone and Speech Recognition, then tap the mic again.';
+  return 'Microphone is off for FlowNest. Open phone Settings → Apps → FlowNest → Permissions → Microphone → Allow, then tap the mic again.';
+}
+
 const ERRORS: Record<string, string> = {
-  'not-allowed': 'Microphone permission is off. Allow the microphone for this app and try again.',
+  'not-allowed': '',
   'service-not-allowed': 'Speech recognition is turned off on this device (Settings → Siri & Dictation / Google voice typing).',
   'language-not-supported': 'This language is not installed for voice typing on this device.',
   'no-speech': "Didn't hear anything — tap the mic and speak.",
@@ -75,7 +102,7 @@ const ERRORS: Record<string, string> = {
   busy: 'The microphone is busy in another app.',
 };
 const errorText = (code?: string, message?: string) =>
-  (code && ERRORS[code]) || message || 'Voice search stopped. Please try again.';
+  code === 'not-allowed' ? micBlockedText() : (code && ERRORS[code]) || message || 'Voice search stopped. Please try again.';
 
 export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
   const [available] = useState(isVoiceAvailable);
@@ -85,11 +112,13 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
   const level = useRef(new Animated.Value(0)).current;
 
   const finalRef = useRef('');
+  const altRef = useRef<string[]>([]);
   const cancelledRef = useRef(false);
   const onFinalRef = useRef(onFinal);
   onFinalRef.current = onFinal;
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastLevel = useRef(0);
+  const watchRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const pushLevel = useCallback(
     (v: number) => {
@@ -103,12 +132,14 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
   );
 
   const finish = useCallback(() => {
+    watchRef.current.forEach(clearTimeout);
+    watchRef.current = [];
     cleanupRef.current?.();
     cleanupRef.current = null;
     setListening(false);
     pushLevel(0);
     const text = finalRef.current.trim();
-    if (!cancelledRef.current && text) onFinalRef.current(text);
+    if (!cancelledRef.current && text) onFinalRef.current(text, altRef.current.filter((a) => a.trim() && a.trim() !== text));
   }, [pushLevel]);
 
   const startNative = useCallback(
@@ -117,17 +148,20 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
       if (!M) return setError('Voice search needs the latest app build.');
       try {
         const perm = await M.requestPermissionsAsync();
-        if (!perm?.granted) return setError(ERRORS['not-allowed']);
+        if (!perm?.granted) return setError(micBlockedText());
       } catch {
-        return setError(ERRORS['not-allowed']);
+        return setError(micBlockedText());
       }
       const subs: Array<{ remove: () => void }> = [];
       subs.push(
         M.addListener('result', (e: any) => {
-          const text = String(e?.results?.[0]?.transcript || '');
+          const list: string[] = (e?.results || []).map((r: any) => String(r?.transcript || '')).filter(Boolean);
+          const text = list[0] || '';
           setPartial(text);
-          if (e?.isFinal) finalRef.current = text;
-          else if (text) finalRef.current = text; // keep the latest words if the service ends without a final
+          if (text) {
+            finalRef.current = text; // keep the latest words even if the service ends without a final
+            altRef.current = list.slice(1);
+          }
         }),
       );
       subs.push(
@@ -168,6 +202,12 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
     async (lang: VoiceLang) => {
       const SR = getWebRecognition();
       if (!SR) return setError('Voice search is not supported in this browser. Use Chrome, Edge or Safari.');
+      try {
+        const st = await (navigator as any).permissions?.query?.({ name: 'microphone' });
+        if (st?.state === 'denied') return setError(micBlockedText());
+      } catch {
+        /* Safari / Firefox: no permissions API → just try */
+      }
       const rec = new SR();
       rec.lang = lang;
       rec.interimResults = true;
@@ -220,12 +260,18 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
       rec.onresult = (e: any) => {
         let text = '';
         let isFinal = false;
+        const alts: string[] = [];
         for (let i = 0; i < e.results.length; i += 1) {
           text += e.results[i][0].transcript;
           if (e.results[i].isFinal) isFinal = true;
         }
+        const last = e.results[e.results.length - 1];
+        if (e.results.length === 1 && last) {
+          for (let j = 1; j < (last.length || 0); j += 1) if (last[j]?.transcript) alts.push(String(last[j].transcript));
+        }
         setPartial(text);
         finalRef.current = text;
+        altRef.current = alts;
         if (isFinal) {
           try {
             rec.stop();
@@ -261,10 +307,32 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
     [finish, pushLevel],
   );
 
+  // Watchdog: a browser / phone speech service that never answers must not
+  // leave the user stuck on "Listening…": nothing heard in 8 s → stop; 20 s max.
+  const clearWatch = () => {
+    watchRef.current.forEach(clearTimeout);
+    watchRef.current = [];
+  };
+  const stopRef = useRef<() => void>(() => {});
+
   const start = useCallback(
     (lang: VoiceLang, hints: string[] = []) => {
       if (listening) return;
+      clearWatch();
+      watchRef.current.push(
+        setTimeout(() => {
+          if (!finalRef.current.trim() && cleanupRef.current) {
+            cancelledRef.current = true;
+            stopRef.current();
+            setError(errorText('no-speech'));
+          }
+        }, 8000),
+        setTimeout(() => {
+          if (cleanupRef.current) stopRef.current();
+        }, 20000),
+      );
       finalRef.current = '';
+      altRef.current = [];
       cancelledRef.current = false;
       setPartial('');
       setError(null);
@@ -287,7 +355,20 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
     }
   }, [finish]);
 
+  stopRef.current = () => {
+    // stop + release the mic (used by the watchdog)
+    if (Platform.OS !== 'web') {
+      try {
+        getNative()?.abort();
+      } catch {
+        /* ignore */
+      }
+    }
+    finish();
+  };
+
   const cancel = useCallback(() => {
+    clearWatch();
     cancelledRef.current = true;
     if (Platform.OS !== 'web') {
       try {
@@ -300,12 +381,21 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
     cleanupRef.current = null;
     setListening(false);
     setPartial('');
+    setError(null);
     pushLevel(0);
   }, [pushLevel]);
+
+  const clearError = useCallback(() => setError(null), []);
+  const reset = useCallback(() => {
+    if (cleanupRef.current || listening) cancel();
+    setError(null);
+    setPartial('');
+  }, [cancel, listening]);
 
   // closing the search always releases the mic
   useEffect(() => () => {
     cancelledRef.current = true;
+    watchRef.current.forEach(clearTimeout);
     cleanupRef.current?.();
     try {
       getNative()?.abort();
@@ -314,5 +404,5 @@ export function useVoiceSearch({ onFinal }: Handlers): VoiceState {
     }
   }, []);
 
-  return { available, listening, partial, error, level, start, stop, cancel };
+  return { available, listening, partial, error, level, start, stop, cancel, reset, clearError };
 }

@@ -11,7 +11,7 @@
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useId } from 'react';
+import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FlowNestMark } from './FlowNestMark';
 import { GlobalSearchModal } from './GlobalSearchModal';
@@ -91,15 +91,40 @@ export function GlobalSearch({ variant = 'icon', size = 36 }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isOwner, show, hide]);
 
+  // one open at a time (a tap + Enter, or a double tap, used to navigate twice)
+  const opening = useRef(false);
   const onOpen = useCallback(
     (entry: SearchEntry) => {
+      if (opening.current) return;
+      opening.current = true;
       pushRecent(entry.id);
       hide();
-      if (entry.target.type !== 'route') return;
+      if (entry.target.type !== 'route') {
+        opening.current = false;
+        return;
+      }
       const route = entry.target.route;
-      // tab routes go through the tabs layout (fresh screen, More sheet closed)
-      if (!route.startsWith('/') && navigate) navigate(route);
-      else router.push(toTabsHref(route) as any);
+      // navigate on the next frame, after the search window is gone — opening
+      // a screen while the window is still closing could drop the navigation
+      requestAnimationFrame(() => {
+        try {
+          // tab routes go through the tabs layout (fresh screen, More sheet closed,
+          // sub-screens opened on top of their folder's home)
+          const nav = useGlobalSearchStore.getState().navigate || navigate;
+          if (!route.startsWith('/') && nav) nav(route);
+          else router.push(toTabsHref(route) as any);
+        } catch {
+          try {
+            router.navigate(toTabsHref(route) as any);
+          } catch {
+            /* the screen keeps its own error boundary — nothing more to do */
+          }
+        } finally {
+          setTimeout(() => {
+            opening.current = false;
+          }, 500);
+        }
+      });
     },
     [hide, navigate, pushRecent, router],
   );

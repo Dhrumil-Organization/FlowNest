@@ -12,6 +12,7 @@
 //   "/all"              every screen you can open
 //   "/"                 the list of commands
 // ─────────────────────────────────────────────────────────────
+import { buildEntryFilter, mayMatchInitials, mayMatchToken, probeInitials, probeToken, type EntryFilter } from './bloom';
 import { kindLabel } from './erpIndex';
 import {
   bestWordScore,
@@ -45,13 +46,20 @@ export type PreparedEntry = {
   /** how the title / keyword words sound (soundKey) */
   titleSounds: string[];
   keywordSounds: string[];
+  /** bloom-filter bit-sets: "can this entry match that word at all?" (see bloom.ts) */
+  filter: EntryFilter;
 };
 
 export type PreparedIndex = {
   entries: PreparedEntry[];
   byId: Map<string, PreparedEntry>;
   vocabulary: string[];
+  /** recent searches of this index → results (typing back / voice alternatives are instant) */
+  cache: Map<string, SearchOutcome>;
+  cacheOwner: { unfiltered?: readonly SearchEntry[]; recents: string };
 };
+
+const CACHE_SIZE = 80;
 
 const KIND_BOOST: Record<SearchEntryKind, number> = {
   screen: 0.32,
@@ -83,14 +91,22 @@ export function prepareIndex(entries: readonly SearchEntry[]): PreparedIndex {
     titleNorm: normalize(entry.title),
     titleSounds: [],
     keywordSounds: [],
+    filter: undefined as unknown as EntryFilter,
   }));
   for (const p of prepared) {
     p.titleSounds = p.title.filter((w) => w.length >= 3).map(soundKey);
     p.keywordSounds = p.keywords.filter((w) => w.length >= 3).map(soundKey);
+    p.filter = buildEntryFilter([...p.title, ...p.keywords, ...p.breadcrumb], p.title, p.entry.title);
   }
   const vocab = new Set<string>();
   for (const p of prepared) for (const w of [...p.title, ...p.keywords]) if (w.length >= 3) vocab.add(w);
-  return { entries: prepared, byId: new Map(prepared.map((p) => [p.entry.id, p])), vocabulary: Array.from(vocab) };
+  return {
+    entries: prepared,
+    byId: new Map(prepared.map((p) => [p.entry.id, p])),
+    vocabulary: Array.from(vocab),
+    cache: new Map(),
+    cacheOwner: { recents: '' },
+  };
 }
 
 type Parsed = { mode: SearchMode; text: string };
@@ -160,12 +176,12 @@ function scoreEntry(p: PreparedEntry, tokens: string[], phrase: string): number 
   let total = 0;
   let missed = 0;
   for (const t of tokens) {
-    let s = Math.max(
-      bestWordScore(t, p.title) * 1.0,
-      bestWordScore(t, p.keywords) * 0.72,
-      bestWordScore(t, p.breadcrumb) * 0.5,
-      bestWordScore(t, p.extra) * 0.34,
-    );
+    // same as max(title, keywords×.72, place×.5, help text×.34) — a list is
+    // only scored when it could still beat what is already found
+    let s = bestWordScore(t, p.title);
+    if (s < 0.72) s = Math.max(s, bestWordScore(t, p.keywords) * 0.72);
+    if (s < 0.5) s = Math.max(s, bestWordScore(t, p.breadcrumb) * 0.5);
+    if (s < 0.34) s = Math.max(s, bestWordScore(t, p.extra) * 0.34);
     // sounds the same ("stok" / स्टॉक → Stock, "prodakshan" → Production)
     if (s < 0.58 && t.length >= 3) {
       const k = soundKey(t);
@@ -220,7 +236,12 @@ function rank(index: PreparedIndex, text: string, opts: SearchOptions): SearchRe
   const phrase = normalize(text);
   const recentRank = new Map((opts.recents || []).map((id, i) => [id, i]));
   const out: SearchResult[] = [];
+  // bloom pre-check: skip entries that cannot match before the costly scoring
+  const probes = tokens.map(probeToken);
+  const allowedMiss = tokens.length >= 4 ? 1 : 0;
+  const initialsProbe = tokens.length === 1 && tokens[0].length >= 2 ? probeInitials(tokens[0]) : null;
   for (const p of index.entries) {
+    if (!couldMatch(p.filter, probes, allowedMiss, initialsProbe)) continue;
     let s = scoreEntry(p, tokens, phrase);
     if (s <= 0) continue;
     const r = recentRank.get(p.entry.id);
@@ -240,6 +261,22 @@ function rank(index: PreparedIndex, text: string, opts: SearchOptions): SearchRe
     trimmed.push(r);
   }
   return trimmed.slice(0, opts.limit ?? 40);
+}
+
+function couldMatch(
+  f: EntryFilter,
+  probes: ReturnType<typeof probeToken>[],
+  allowedMiss: number,
+  initialsProbe: [number, number, number] | null,
+): boolean {
+  if (!probes.length) return false;
+  let missed = 0;
+  for (const pr of probes) {
+    if (mayMatchToken(f, pr)) continue;
+    missed += 1;
+    if (missed > allowedMiss) return !!initialsProbe && mayMatchInitials(f, initialsProbe);
+  }
+  return true;
 }
 
 function didYouMean(index: PreparedIndex, text: string): string | null {
@@ -268,6 +305,26 @@ const screensFirst = (a: SearchEntry, b: SearchEntry) =>
   (a.kind === 'screen' ? 0 : 1) - (b.kind === 'screen' ? 0 : 1) || a.order - b.order || a.title.localeCompare(b.title);
 
 export function runSearch(index: PreparedIndex, raw: string, opts: SearchOptions = {}): SearchOutcome {
+  // same index + same recents + same text + same chip → same answer
+  const recentsKey = (opts.recents || []).join(',');
+  if (index.cacheOwner.unfiltered !== opts.unfiltered || index.cacheOwner.recents !== recentsKey) {
+    index.cache.clear();
+    index.cacheOwner = { unfiltered: opts.unfiltered, recents: recentsKey };
+  }
+  const key = `${opts.filter || 'all'}|${opts.limit ?? ''}|${raw}`;
+  const hit = index.cache.get(key);
+  if (hit) {
+    index.cache.delete(key);
+    index.cache.set(key, hit); // most recently used last
+    return hit;
+  }
+  const outcome = searchUncached(index, raw, opts);
+  index.cache.set(key, outcome);
+  if (index.cache.size > CACHE_SIZE) index.cache.delete(index.cache.keys().next().value as string);
+  return outcome;
+}
+
+function searchUncached(index: PreparedIndex, raw: string, opts: SearchOptions): SearchOutcome {
   const parsed = parseQuery(raw);
   const query = raw;
 

@@ -161,6 +161,21 @@ function buildRows(outcome: SearchOutcome, query: string, browsing: boolean): Ro
   return rows;
 }
 
+/**
+ * "… kholo / open …" by voice: open the top hit when it is clearly the one
+ * meant — or when the only close rival is a LONGER name that starts with it
+ * ("open yarn stok" → Yarn Stock, not Yarn Stock Verification).
+ */
+function voiceSure(outcome: SearchOutcome): boolean {
+  if (outcome.confident) return true;
+  const [a, b] = outcome.results;
+  if (!a || !['screen', 'page', 'app'].includes(a.entry.kind) || a.score < 1.1) return false;
+  if (!b) return true;
+  const ta = a.entry.title.toLowerCase();
+  const tb = b.entry.title.toLowerCase();
+  return tb.startsWith(`${ta} `) && a.score >= b.score;
+}
+
 function Highlighted({ text, ranges, style, strongStyle }: { text: string; ranges: Array<[number, number]>; style: any; strongStyle: any }) {
   if (!ranges.length) return <Text style={style} numberOfLines={1}>{text}</Text>;
   const parts: React.ReactNode[] = [];
@@ -427,12 +442,15 @@ export function GlobalSearchModal(props: Props) {
     [index],
   );
   const pendingOpen = useRef(false);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const [heardFrom, setHeardFrom] = useState<string | null>(null);
   const voice = useVoiceSearch({
     // The recognizer gives its best guess + other ways it may have heard you.
     // Each one is searched; the one that finds the clearest screen wins
     // ("yarn stock" over "yarn stuck", "doff entry" over "dog entry").
     onFinal: (text, alternatives) => {
+      if (!visibleRef.current) return; // search was closed while the words came in
       let best = readVoiceIntent(text);
       let bestScore = runSearch(index, best.query, { recents }).results[0]?.score ?? 0;
       for (const alt of alternatives.slice(0, 4)) {
@@ -453,7 +471,7 @@ export function GlobalSearchModal(props: Props) {
   useEffect(() => {
     if (!pendingOpen.current || deferred !== query) return;
     pendingOpen.current = false;
-    if (outcome.mode === 'search' && outcome.confident && outcome.results[0]) {
+    if (outcome.mode === 'search' && voiceSure(outcome) && outcome.results[0]) {
       const entry = outcome.results[0].entry;
       setOpening(entry);
       openTimer.current = setTimeout(() => openEntry(entry), 1100);
@@ -467,15 +485,20 @@ export function GlobalSearchModal(props: Props) {
     AsyncStorage.setItem(VOICE_LANG_KEY, next).catch(() => undefined);
     if (voice.listening) {
       voice.cancel();
-      setTimeout(() => voice.start(next, hints), 250);
+      // the voice engine waits for the old session to close by itself
+      setTimeout(() => voice.start(next, hints), 60);
     }
+  };
+  const startVoice = () => {
+    Keyboard.dismiss();
+    if (openTimer.current) clearTimeout(openTimer.current);
+    setOpening(null);
+    setHeardFrom(null);
+    voice.start(lang, hints);
   };
   const micPress = () => {
     if (voice.listening) voice.stop();
-    else {
-      Keyboard.dismiss();
-      voice.start(lang, hints);
-    }
+    else startVoice();
   };
   const { listening: voiceListening, cancel: voiceCancel, clearError: voiceClearError } = voice;
   voiceResetRef.current = voice.reset;
@@ -562,7 +585,7 @@ export function GlobalSearchModal(props: Props) {
                 </TouchableOpacity>
               ) : null}
               {voice.available ? (
-                <TouchableOpacity onPress={() => voice.start(lang, hints)} style={[s.chip, { borderColor: accent, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                <TouchableOpacity onPress={startVoice} style={[s.chip, { borderColor: accent, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                   <Icon name="mic" size={14} color={accent} />
                   <Text style={[s.chipText, { color: accent }]}>Speak again</Text>
                 </TouchableOpacity>
@@ -581,12 +604,27 @@ export function GlobalSearchModal(props: Props) {
   const voiceView = voice.listening ? (
     <View style={s.voice}>
       <FlowNestMark size={58} mode={voice.listening ? 'listening' : 'idle'} level={voice.level} color={accent} />
-      <Text style={s.voiceTitle}>{voice.partial ? 'Got it…' : 'Listening… speak now'}</Text>
+      <View style={[s.voicePill, { backgroundColor: voice.phase === 'starting' ? T.alt : `${accent}1F` }]}>
+        <View style={[s.voiceDot, { backgroundColor: voice.phase === 'starting' ? T.muted : voice.phase === 'finishing' ? T.amber : T.red }]} />
+        <Text style={[s.voiceTitle, { marginTop: 0, color: voice.phase === 'starting' ? T.muted : T.ink }]}>
+          {voice.phase === 'starting'
+            ? 'Getting the mic ready…'
+            : voice.phase === 'finishing'
+              ? 'Got it — finding it…'
+              : voice.hearing
+                ? 'Listening… keep going'
+                : 'Listening… speak now'}
+        </Text>
+      </View>
       <Text style={[s.voiceText, !voice.partial && { color: T.muted }]} numberOfLines={3}>
         {voice.partial || (lang === 'hi-IN' ? 'जैसे: "यार्न स्टॉक खोलो"' : 'e.g. "open yarn stock", "new production order"')}
       </Text>
-      <Waveform level={voice.level} color={accent} />
-      <Text style={s.voiceHint}>Say a screen name. Add “kholo” / “open” to open it at once. Tap ■ when done.</Text>
+      <Waveform level={voice.level} color={voice.phase === 'starting' ? T.muted : accent} />
+      <Text style={s.voiceHint}>
+        {voice.hearing
+          ? 'Stop talking for a moment and it searches by itself — or tap ■.'
+          : 'Say a screen name. Add “kholo” / “open” to open it at once. Take your time — it waits for you.'}
+      </Text>
       <View style={s.voiceBtns}>
         <TouchableOpacity onPress={toggleLang} style={s.langBtn} accessibilityRole="button" accessibilityLabel="Change voice language">
           <Icon name="translate" size={15} color={T.ink} />
@@ -726,21 +764,30 @@ export function GlobalSearchModal(props: Props) {
 
       {!voice.listening && voice.error ? (
         <View style={s.vErr}>
-          <Icon name="mic-off" size={18} color={T.red} style={{ marginTop: 1 }} />
-          <Text style={s.vErrText}>{voice.error}</Text>
-          <TouchableOpacity onPress={micPress} style={[s.vErrBtn, { borderColor: accent }]} accessibilityRole="button">
-            <Text style={[s.vErrBtnText, { color: accent }]}>Try again</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={voiceClearError} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close message">
-            <Icon name="close" size={18} color={T.muted} />
-          </TouchableOpacity>
+          <View style={s.vErrTop}>
+            <Icon name="mic-off" size={18} color={T.red} style={{ marginTop: 1 }} />
+            <Text style={s.vErrText}>{voice.error}</Text>
+            <TouchableOpacity onPress={voiceClearError} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close message">
+              <Icon name="close" size={18} color={T.muted} />
+            </TouchableOpacity>
+          </View>
+          <View style={s.vErrBtns}>
+            {voice.errorFixInSettings ? (
+              <TouchableOpacity onPress={voice.openSettings} style={[s.vErrBtn, { borderColor: accent }]} accessibilityRole="button">
+                <Text style={[s.vErrBtnText, { color: accent }]}>Open Settings</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity onPress={startVoice} style={[s.vErrBtn, { borderColor: accent, backgroundColor: accent }]} accessibilityRole="button">
+              <Text style={[s.vErrBtnText, { color: '#fff' }]}>Try again</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
       {!voice.listening && heardFrom && !voice.error ? (
         <View style={s.heard}>
           <Icon name="graphic-eq" size={15} color={accent} />
           <Text style={s.heardText} numberOfLines={1}>Heard: “{heardFrom}”</Text>
-          <TouchableOpacity onPress={micPress} hitSlop={8}>
+          <TouchableOpacity onPress={startVoice} hitSlop={8}>
             <Text style={[s.heardAgain, { color: accent }]}>Speak again</Text>
           </TouchableOpacity>
         </View>
@@ -965,6 +1012,8 @@ const s = StyleSheet.create({
   openBtn: { marginTop: 14, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
   openText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   voice: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 20, gap: 10 },
+  voicePill: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, marginTop: 4 },
+  voiceDot: { width: 8, height: 8, borderRadius: 4 },
   voiceTitle: { fontSize: 13, fontWeight: '800', color: T.muted, letterSpacing: 0.6, marginTop: 4 },
   voiceText: { fontSize: 20, fontWeight: '700', color: T.ink, textAlign: 'center', minHeight: 56, maxWidth: 520 },
   wave: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 54, marginVertical: 4 },
@@ -973,9 +1022,11 @@ const s = StyleSheet.create({
   micBig: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   langBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 92, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
   langText: { fontSize: 12.5, fontWeight: '700', color: T.ink },
-  vErr: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: `${T.red}12`, borderWidth: 1, borderColor: `${T.red}40` },
+  vErrTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  vErrBtns: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  vErr: { marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: `${T.red}12`, borderWidth: 1, borderColor: `${T.red}40` },
   vErrText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: T.ink, fontWeight: '600' },
-  vErrBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'center' },
+  vErrBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   vErrBtnText: { fontSize: 11.5, fontWeight: '800' },
   heard: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: T.sub, borderBottomWidth: 1, borderBottomColor: T.hair },
   heardText: { flex: 1, fontSize: 12, color: T.muted, fontWeight: '600' },

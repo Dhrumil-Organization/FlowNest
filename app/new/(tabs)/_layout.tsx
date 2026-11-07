@@ -324,9 +324,25 @@ export default function TabsLayout() {
   const goTo = (routeName: string) => {
     setMoreOpen(false);
     setMoreGroupKey(null);
-    markFreshVisit(routeName);
     const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
-    router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
+    const href = (path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any;
+    // A SUB-SCREEN inside a tab folder (reports/real-costing, costing/history,
+    // designs/new — opened from the Global Search). It used to be pushed alone,
+    // with nothing under it: its Back / "OK → back" then had nowhere to go
+    // ("GO_BACK was not handled" error) and the folder's home was lost.
+    // Now it opens ON TOP of the folder's home screen (withAnchor + the
+    // folder layout's initialRouteName = 'index'), and the tab is NOT
+    // remounted in the same moment (that raced with the push).
+    if (path.includes('/')) {
+      try {
+        router.navigate(href, { withAnchor: true });
+      } catch {
+        router.push(href);
+      }
+      return;
+    }
+    markFreshVisit(routeName);
+    router.push(href);
   };
 
   // GLOBAL SEARCH opens tab screens the same way the menu does (fresh screen,

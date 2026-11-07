@@ -88,3 +88,32 @@ plain-language help is in `src/features/globalSearch/helpContent.ts`.
 - The search window, rendered with react-native-web at phone and desktop widths: search, help,
   empty and keyboard (Enter) states.
 - NOT done: a run on a device or against the real server.
+
+## Update 3 (7 Nov 2026): reliable mic, bloom-filter speed, sub-screens open without errors
+- **Fixed: mic on but voice not recognised after closing and reopening the search.** Every open
+  builds a new search window; the new one started the speech service while the old session was
+  still closing (Android: "busy", or the old session's late "end" stopped the new one while the
+  phone's mic stayed on). On web a second mic stream (only for the waveform) took the mic away
+  from Chrome's speech engine on phones. Now `voice.ts` keeps ONE recogniser for the app, every
+  session has a number (old events are ignored), a new start waits for the old one to end, and
+  phones on the web never open a second mic stream. Checked with a simulated phone speech
+  service: the old code reproduces the bug, the new code passes 13/13 scenarios.
+- **Friendlier voice:** "Getting the mic ready…" until the mic is really open, then "Listening…
+  speak now". A pause before you speak does not end it (quiet restart up to ~9 s); after you
+  speak, ~1.4 s of silence searches by itself; ■ keeps what was heard. Mic blocked → an
+  **Open Settings** button. App to background / search closed → mic released.
+  "open yarn stok" now opens Yarn Stock (a longer name like "… Verification" no longer blocks it).
+- **Bloom-filter search (`bloom.ts`).** Each entry carries a 2048-bit bloom filter (word starts,
+  whole words, stems, sound keys, initials) and an exact letter-pair bit-set (typos, swapped
+  letters). A query word first asks "can this entry match at all?"; only the "maybe" entries are
+  scored. Plus an 80-query result cache per index. Checked on 4,445 queries × 2 chips against the
+  old engine: **0 differences**, about **4× faster** on average (≈1.5 ms vs 6.7 ms per query).
+- **Fixed: opening a sub-screen (reports/real-costing, costing/history, designs/new) from the
+  search sometimes errored.** It was pushed with nothing under it, so its Back / "OK → back"
+  had nowhere to go ("GO_BACK was not handled"), and the tab was remounted in the same moment.
+  Now it opens on top of its folder's home (`withAnchor` + `unstable_settings.initialRouteName`
+  in `reports/`, `costing/`, `designs/` layouts), one open at a time, after the window has closed.
+- Files: `voice.ts` (rewritten), `bloom.ts` (new), `searchEngine.ts`, `searchText.ts`,
+  `GlobalSearchModal.tsx`, `GlobalSearch.tsx`, `app/new/(tabs)/_layout.tsx`,
+  `app/new/(tabs)/{reports,costing,designs}/_layout.tsx`.
+- Still to do on a device: one real run on Android + iPhone (voice and sub-screen Back).

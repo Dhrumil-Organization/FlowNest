@@ -205,6 +205,18 @@ export function synonymsOf(token: string): string[] {
   return [];
 }
 
+const synMemo = new Map<string, string[]>();
+/** the synonym WORDS of a query word (tokenized once, then remembered) */
+export function synonymWords(token: string): string[] {
+  let v = synMemo.get(token);
+  if (!v) {
+    v = synonymsOf(token).flatMap(tokenize);
+    if (synMemo.size > 3000) synMemo.clear();
+    synMemo.set(token, v);
+  }
+  return v;
+}
+
 /** Damerau-Levenshtein distance, stops early above `max`. */
 export function editDistance(a: string, b: string, max = 2): number {
   if (a === b) return 0;
@@ -230,9 +242,16 @@ export function editDistance(a: string, b: string, max = 2): number {
 
 /** How well ONE query word matches ONE word of the entry (0 … 1). */
 /** "sampling" / "samples" / "sampled" → "sampl" (same word, other ending). */
+const stemMemo = new Map<string, string>();
 export function stem(w: string): string {
   if (w.length <= 4) return w;
-  return w.replace(/(ings|ing|ers|er|ies|es|ed|s|e)$/, '') || w;
+  let v = stemMemo.get(w);
+  if (v === undefined) {
+    v = w.replace(/(ings|ing|ers|er|ies|es|ed|s|e)$/, '') || w;
+    if (stemMemo.size > 6000) stemMemo.clear();
+    stemMemo.set(w, v);
+  }
+  return v;
 }
 
 export function wordScore(q: string, w: string): number {
@@ -270,8 +289,8 @@ export function bestWordScore(q: string, words: readonly string[]): number {
   if (best >= 0.86) return best;
   // synonyms count only when they match exactly or as a word start — a typo of
   // a synonym ("gate" ~ "rate") is never a match
-  for (const alt of synonymsOf(q)) {
-    for (const altWord of tokenize(alt)) {
+  for (const altWord of synonymWords(q)) {
+    {
       for (const w of words) {
         const s = (w === altWord ? 1 : altWord.length >= 3 && w.startsWith(altWord) ? 0.86 : 0) * 0.8;
         if (s > best) best = s;

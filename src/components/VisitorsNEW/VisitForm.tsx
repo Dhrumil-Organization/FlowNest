@@ -411,7 +411,7 @@ export default function VisitForm({ open, api, lang, onLang, suggestions, editin
   const hostHints = hints('host', suggestions.hosts, shared.hostName);
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={requestClose} presentationStyle="fullScreen">
+    <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" onRequestClose={requestClose} presentationStyle="fullScreen">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={f.root}>
         {/* header */}
         <View style={[f.header, { paddingTop: Math.max(insets.top, 10) + 6 }]}>

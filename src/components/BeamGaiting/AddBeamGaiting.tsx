@@ -898,7 +898,7 @@ const CartonAddDrawer = (props) => {
 
     return (
         <>
-            <Modal
+            <Modal statusBarTranslucent
                 visible={beamdetailvisible}
                 transparent
                 animationType="slide"

@@ -102,7 +102,7 @@ export default function ExportPreview({ kind, input, onClose }: Props) {
   const sheet = excel?.sheets[Math.min(tab, (excel?.sheets.length || 1) - 1)];
 
   return (
-    <Modal visible={!!kind} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+    <Modal statusBarTranslucent navigationBarTranslucent visible={!!kind} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <View style={p.root}>
         <View style={[p.header, { paddingTop: Math.max(insets.top, 10) + 6 }]}>
           <TouchableOpacity style={p.headBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close preview">

@@ -3,7 +3,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import { usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { initAPI } from '../../../common/API/dynamicAPI';
 import type { NewErpProperty } from '../../api/client';
 import { setNewErpProperty } from '../../api/client';
@@ -17,6 +17,7 @@ import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/
 import { useMillModeStore } from '@/src/mill/millMode';
 import { useMillSwitchAllowed } from '@/src/mill/millBridge';
 import { GlobalSearch } from '@/src/features/globalSearch/GlobalSearch';
+import { HeaderSupportButtons, useSupportRights } from '@/src/features/support/HeaderSupportButtons';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -51,6 +52,8 @@ function getInitials(u: any): string {
 export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, right, showSignOut = true }: Props) {
   const logout = useAppSessionStore(s => s.logout);
   const { isDesktop, isTablet } = useDashboardResponsive();
+  const { width: screenW } = useWindowDimensions();
+  const support = useSupportRights();
   const router = useRouter();
   const pathname = usePathname();
   const isGreyPackingRoute = pathname?.includes('grey-packing') || pathname?.includes('greypacking');
@@ -187,10 +190,67 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   const size = isDesktop ? 'desktop' : isTablet ? 'tablet' : 'mobile';
   const iconSize = isDesktop ? 20 : 18;
   const showMeta = !isGreyPackingRoute && (!!appVersion || switchUserLogin || millAllowed);
+  // TWO-ROW HEADER (phone, tablet, small laptop): the version + Switch Property + Mills toggles get
+  // their own full-width line under the title (never squeezed / cut), with the Support icons at
+  // the end of that line — the top line keeps search, theme, settings, sign out and the avatar.
+  // Wide desktop keeps everything on one line.
+  const twoRow = !isGreyPackingRoute && (size !== 'desktop' || screenW < 1280) && (showMeta || (!embedded && support.any));
+  const supportBtns = !embedded && support.any
+    ? <HeaderSupportButtons size={size} iconSize={twoRow ? 17 : iconSize} btnStyle={twoRow ? s.iconBtnSmall : [s.iconBtn, size === 'desktop' && s.iconBtnDesktop]} />
+    : null;
+
+  const metaItems = (
+    <>
+      {!!appVersion && (
+        <View style={s.versionChip}>
+          <Text style={s.versionText} numberOfLines={1}>v{appVersion}</Text>
+        </View>
+      )}
+
+      {switchUserLogin && (
+        <View style={[s.propertySwitchRow, twoRow && s.switchFull]}>
+          <Text style={[s.propertySwitchText, twoRow && s.switchTextFull]} numberOfLines={1}>
+            {switchingProperty
+              ? 'Switching...'
+              : currentProperty
+                ? PROPERTY_LABELS[currentProperty]
+                : 'Switch Property'}
+          </Text>
+          <Switch
+            value={currentProperty === 'rayons'}
+            onValueChange={(value) =>
+              void switchProperty(value ? 'rayons' : 'sudamo_knits')
+            }
+            disabled={switchingProperty || !currentProperty}
+            trackColor={{ false: '#3A5068', true: T.copper }}
+            thumbColor="#FFFFFF"
+            style={s.propertySwitchToggle}
+          />
+        </View>
+      )}
+
+      {millAllowed && (
+        <View style={[s.propertySwitchRow, twoRow && s.switchFull]}>
+          <Text style={[s.propertySwitchText, twoRow && s.switchTextFull]} numberOfLines={1}>
+            {millBusy ? 'Opening Mills...' : 'Mills'}
+          </Text>
+          <Switch
+            value={false}
+            onValueChange={(value) => { if (value) void openMill(); }}
+            disabled={millBusy || switchingProperty}
+            trackColor={{ false: '#3A5068', true: '#2dd4bf' }}
+            thumbColor="#FFFFFF"
+            style={s.propertySwitchToggle}
+          />
+        </View>
+      )}
+    </>
+  );
 
   return <View style={s.safe}>
     <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-    <View style={[s.header, size === 'tablet' && s.headerTablet, size === 'desktop' && s.headerDesktop, isGreyPackingRoute && s.headerCompact]}>
+    <View style={[s.header, size === 'tablet' && s.headerTablet, size === 'desktop' && s.headerDesktop, isGreyPackingRoute && s.headerCompact, twoRow && s.headerTwoRow]}>
+     <View style={[s.topRow, !twoRow && s.topRowFill]}>
       {isGreyPackingRoute && (
         <TouchableOpacity
           onPress={() => router.back()}
@@ -219,53 +279,7 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
 
         {!isGreyPackingRoute && !!subtitle && <Text style={[s.subtitle, size !== 'mobile' && s.subtitleWide]} numberOfLines={1}>{subtitle}</Text>}
 
-        {showMeta && (
-          <View style={s.versionRow}>
-            {!!appVersion && (
-              <View style={s.versionChip}>
-                <Text style={s.versionText} numberOfLines={1}>v{appVersion}</Text>
-              </View>
-            )}
-
-            {switchUserLogin && (
-              <View style={s.propertySwitchRow}>
-                <Text style={s.propertySwitchText} numberOfLines={1}>
-                  {switchingProperty
-                    ? 'Switching...'
-                    : currentProperty
-                      ? PROPERTY_LABELS[currentProperty]
-                      : 'Switch Property'}
-                </Text>
-                <Switch
-                  value={currentProperty === 'rayons'}
-                  onValueChange={(value) =>
-                    void switchProperty(value ? 'rayons' : 'sudamo_knits')
-                  }
-                  disabled={switchingProperty || !currentProperty}
-                  trackColor={{ false: '#3A5068', true: T.copper }}
-                  thumbColor="#FFFFFF"
-                  style={s.propertySwitchToggle}
-                />
-              </View>
-            )}
-
-            {millAllowed && (
-              <View style={s.propertySwitchRow}>
-                <Text style={s.propertySwitchText} numberOfLines={1}>
-                  {millBusy ? 'Opening Mills...' : 'Mills'}
-                </Text>
-                <Switch
-                  value={false}
-                  onValueChange={(value) => { if (value) void openMill(); }}
-                  disabled={millBusy || switchingProperty}
-                  trackColor={{ false: '#3A5068', true: '#2dd4bf' }}
-                  thumbColor="#FFFFFF"
-                  style={s.propertySwitchToggle}
-                />
-              </View>
-            )}
-          </View>
-        )}
+        {showMeta && !twoRow && <View style={s.versionRow}>{metaItems}</View>}
       </View>
 
       <View style={[s.right, size !== 'mobile' && s.rightWide]}>
@@ -273,6 +287,9 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
             this property (Ctrl K on web). See src/features/globalSearch. */}
         <GlobalSearch variant={size === 'mobile' ? 'icon' : 'pill'} size={size === 'desktop' ? 38 : 36} />
         {right}
+        {/* SUPPORT DESK: Raise ticket (with a screenshot of this screen) + IT Desk — rights-wise,
+            two small icons on tablet / desktop, one icon + menu on phones. */}
+        {!twoRow ? supportBtns : null}
         {/* Theme: one tap on tablet / desktop; on phones it is inside Settings. */}
         {size !== 'mobile' ? <ThemeToggleButton onDark size={size === 'desktop' ? 38 : 36} /> : null}
         <TouchableOpacity
@@ -303,6 +320,14 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
           <Text style={[s.avatarText, size === 'desktop' && s.avatarTextDesktop]}>{initials}</Text>
         </TouchableOpacity>
       </View>
+     </View>
+
+      {twoRow && (
+        <View style={s.bottomRow}>
+          {showMeta ? <View style={s.metaLine}>{metaItems}</View> : <View style={{ flex: 1 }} />}
+          {supportBtns ? <View style={s.supportLine}>{supportBtns}</View> : null}
+        </View>
+      )}
     </View>
   </View>
 }
@@ -326,6 +351,22 @@ const s = StyleSheet.create({
   headerTablet: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
   headerDesktop: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12 },
   headerCompact: { paddingTop: 8, paddingBottom: 10 },
+  headerTwoRow: { flexDirection: 'column', alignItems: 'stretch', paddingBottom: 8 },
+  topRow: { flexDirection: 'row', alignItems: 'center' },
+  topRowFill: { flex: 1, minWidth: 0 },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.10)',
+  },
+  metaLine: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', rowGap: 4 },
+  supportLine: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  switchFull: { flexShrink: 0 },
+  switchTextFull: { flexShrink: 0, fontSize: 11.5 },
   left: { flex: 1, paddingRight: 10, minWidth: 0 },
   eyebrow: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#8EA6BA' },
   eyebrowDesktop: { fontSize: 10, letterSpacing: 1.6 },
@@ -362,6 +403,16 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBtnDesktop: { width: 38, height: 38, borderRadius: 12 },
+  iconBtnSmall: {
+    width: 34,
+    height: 30,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#2A4055',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backButton: { marginRight: 10 },
   avatar: {
     width: 36,

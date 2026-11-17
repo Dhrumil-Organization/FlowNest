@@ -325,6 +325,58 @@ export function buildExp(mEntry, d, settings) {
     dailyProd: prodRowsOf(d),
     monthProd,
     salaryErp: { A: num(d.section_a_salary), B: num(d.section_b_salary) },
+    // Finish Department (Section C) — raw block of the ERP; read only through xFinish()
+    finish: d.finish_department || null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  FINISH DEPARTMENT (Section C)                                      */
+/*  Checking · folding · packing · dispatch of finished fabric.        */
+/*  No looms -> costed PER METRE only:                                 */
+/*    cost / metre = (salary + stores) ÷ finished-fabric dispatch m    */
+/*  Completely apart from Sections A and B: nothing here goes into     */
+/*  cost per pick, the section conversion rates, roll / design costing */
+/*  or the FY weaving cost report. Salary + stores only.               */
+/* ------------------------------------------------------------------ */
+/**
+ * @param raw     d.finish_department (ExpenseFinishDepartmentService)
+ * @param actual  Salary · Finish Department actually disbursed (month-end adjustment), or 0
+ * @returns null when the month has no Finish Department block (months before Section A / B)
+ */
+export function xFinish(raw, actual) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (raw.error) return { error: String(raw.error), ready: false, empty: true, cpm: null, daily: [], storeRows: [], invRows: [], depts: [] };
+  const S = raw.salary || {}, ST = raw.stores || {}, D = raw.dispatch || {};
+  const recDaily = (Array.isArray(S.daily) ? S.daily : [])
+    .map((r) => ({ ymd: Number(r.date_ymd), d: dayLabel(r.date_ymd), amt: num(r.amount) }))
+    .filter((r) => r.ymd)
+    .sort((a, b) => a.ymd - b.ymd);
+  const salRec = recDaily.reduce((a, r) => a + r.amt, 0);
+  // month-end adjustment: the day-wise column is scaled, on its own, so it adds up exactly to the actual total
+  const adjusted = +actual > 0;
+  const target = adjusted ? Math.round(+actual) : salRec;
+  const col = adjusted && salRec > 0 ? xScaleToTotal(recDaily.map((r) => r.amt), target) : recDaily.map((r) => r.amt);
+  const daily = recDaily.map((r, i) => ({ ...r, rec: r.amt, amt: col[i] }));
+  const salary = adjusted ? target : salRec;
+  const stores = num(ST.total);
+  const metres = num(D.metres);
+  const cost = salary + stores;
+  return {
+    ready: true,
+    salaryReady: S.column_ready !== false,
+    salRec, salary, salDays: recDaily.length, daily, adjusted, salF: salRec > 0 ? salary / salRec : 1,
+    stores, storeIssues: num(ST.issues), storeRows: Array.isArray(ST.rows) ? ST.rows : [], storeMore: !!ST.rows_truncated,
+    depts: Array.isArray(ST.departments) ? ST.departments : [], deptBy: ST.matched_by || null, alsoInAB: num(ST.also_in_section_ab),
+    metres, invoices: num(D.invoices), invRows: Array.isArray(D.rows) ? D.rows : [], invMore: !!D.rows_truncated,
+    fabricReady: D.fabric_type_ready !== false,
+    cost,
+    cpm: metres > 0 ? cost / metres : null, // no divide by zero: null = "—"
+    salPerM: metres > 0 ? salary / metres : null,
+    storePerM: metres > 0 ? stores / metres : null,
+    cutoff: raw.cutoff_ymd ? Number(raw.cutoff_ymd) : null,
+    empty: !(salary > 0) && !(stores > 0),
+    errors: [S.error, ST.error, D.error].filter(Boolean),
   };
 }
 
@@ -339,6 +391,7 @@ export function xCurrent(exp) {
   let salary = xSumSal(exp.dailySalary);
   if (salary.A + salary.B === 0 && exp.salaryErp.A + exp.salaryErp.B > 0) salary = exp.salaryErp;
   return xCompute({
+    fin: xFinish(exp.finish, exp.finActual), // Section C rides along untouched — xCompute never reads it
     key: exp.cur, label: exp.label, rate: exp.rate, days: exp.days, counts: exp.counts,
     units: xSumUnits(exp.dailyUnits), eAll, salary, stores: exp.stores,
     prod: exp.monthProd.prod, picks: exp.monthProd.picks,
@@ -396,7 +449,8 @@ export function legacyMonth(mEntry, d) {
 
 /* ------------------------------------------------------------------ */
 /*  Monthly adjustment & freeze (artifact xScaleToTotal / xRecorded /  */
-/*  xAdjCalc / xEffective) — Section A + B only, no Finish department  */
+/*  xAdjCalc / xEffective) — Sections A + B, and the Finish Department */
+/*  salary total as a THIRD, separate actual (scaled on its own).       */
 /* ------------------------------------------------------------------ */
 /** scale a column to an exact total (largest remainder — the parts add up exactly) */
 export const xScaleToTotal = (vals, target) => {
@@ -415,17 +469,20 @@ export function xRecorded(exp) {
   (exp.dailyUnits || []).forEach((r) => { const el = xDayElec(r, exp); XUKEYS.forEach((k) => (elec += el.e(k))); });
   const fromDays = (exp.dailySalary || []).length > 0;
   const S = fromDays ? xSumSal(exp.dailySalary) : { A: num(exp.salaryErp && exp.salaryErp.A), B: num(exp.salaryErp && exp.salaryErp.B) };
-  return { units, elec, salary: S.A + S.B, salA: S.A, salB: S.B, rate: units > 0 ? elec / units : num(exp.rate), byMeter: u, salaryFromDays: fromDays };
+  const fin = xFinish(exp.finish, 0);
+  return { units, elec, salary: S.A + S.B, salA: S.A, salB: S.B, rate: units > 0 ? elec / units : num(exp.rate), byMeter: u, salaryFromDays: fromDays, fin: fin && fin.ready ? fin.salRec : 0 };
 }
 /** the reconciliation: the rate follows the actual bill, the salary follows the actual total */
 export function xAdjCalc(exp, a) {
   const rec = xRecorded(exp);
   const units = rec.units;
-  const hasElec = +(a && a.elec) > 0, hasSal = +(a && a.salary) > 0;
+  const hasElec = +(a && a.elec) > 0, hasSal = +(a && a.salary) > 0, hasFin = +(a && a.fin) > 0;
   const elec = hasElec ? +a.elec : rec.elec;
   const salary = hasSal ? Math.round(+a.salary) : rec.salary;
   const rate = hasElec && units > 0 ? elec / units : rec.rate;
-  return { units, elec, salary, rate, hasElec, hasSal, unitF: 1, salF: rec.salary > 0 ? salary / rec.salary : 1, rec };
+  // Finish Department: its own total and its own factor — never part of the A + B salary
+  const fin = hasFin ? Math.round(+a.fin) : rec.fin;
+  return { units, elec, salary, rate, hasElec, hasSal, hasFin, fin, finF: rec.fin > 0 ? fin / rec.fin : 1, unitF: 1, salF: rec.salary > 0 ? salary / rec.salary : 1, rec };
 }
 /** the month as every reader sees it: day rows re-rated / scaled to the adjustment, adding up exactly */
 export function xEffective(exp, adj) {
@@ -443,13 +500,14 @@ export function xEffective(exp, adj) {
       out.salaryErp = { A: tA, B: tB };
     }
   }
+  if (adj.hasFin) out.finActual = adj.fin; // xFinish scales the Finish Department day rows to this total
   return out;
 }
 /** month_close (Sudamo ExpMonthClose) -> the adjustment of that month, or null */
 export function xCloseAdj(exp, mc) {
   if (!mc || !mc.actuals) return null;
-  const a = { elec: mc.actuals.elec, salary: mc.actuals.salary };
-  if (!(+a.elec > 0) && !(+a.salary > 0)) return null;
+  const a = { elec: mc.actuals.elec, salary: mc.actuals.salary, fin: mc.actuals.fin_salary };
+  if (!(+a.elec > 0) && !(+a.salary > 0) && !(+a.fin > 0)) return null;
   return xAdjCalc(exp, a);
 }
 

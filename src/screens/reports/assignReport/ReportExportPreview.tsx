@@ -98,7 +98,7 @@ export function ReportExportPreview({ kind, input, onClose }: { kind: ExportKind
   };
 
   return (
-    <Modal visible={!!kind} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+    <Modal statusBarTranslucent navigationBarTranslucent visible={!!kind} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <View style={p.root}>
         <View style={[p.header, { paddingTop: Math.max(insets.top, 10) + 6 }]}>
           <TouchableOpacity style={p.headBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close preview">

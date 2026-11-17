@@ -820,7 +820,7 @@ export function GlobalSearchModal(props: Props) {
   );
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
+    <Modal navigationBarTranslucent visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
       <Animated.View style={[s.backdrop, wide ? s.backdropWide : null, wide ? { opacity: appear } : null]}>
         {wide ? <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close search" /> : null}
         {panel}

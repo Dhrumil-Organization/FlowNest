@@ -8,7 +8,7 @@ import { Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from '
 import {
   T, XC, makeXSEC, makeXU_CARDS, makeXU_METERS, xClosedRates, xCr, xCurrent, xDailySeries, xDayKwhAB, xK0, xM, xPc,
   xR2, xR3, xR4, xSectionMTD, xUtilDaily, xUtilMeters, XUKEYS, xGroupHeads,
-  xAdjCalc, xDayElec, xEffective, xRecorded,
+  xAdjCalc, xDayElec, xEffective, xRecorded, xFinish, dayLabel,
 } from './xCalc';
 import { card, DefaultTip, Grid, hbuzz, MONO, PremiumTip, Sheet, XChart, XDonut, XKPI, XSection, XSecTag, XStat } from './xUi';
 
@@ -444,7 +444,15 @@ function DailyUnitsModule({ exp, close }) {
 
 /** Salary — wages come from the Web ERP salary entry, split to A / B by the machine map (view only here). */
 function DailySalaryModule({ exp, close }) {
-  const rows = exp.dailySalary;
+  // Finish Department (Section C) has its own salary column — shown next to A and B, never added to them
+  const fin = useMemo(() => xFinish(exp.finish, exp.finActual), [exp.finish, exp.finActual]);
+  const rows = useMemo(() => {
+    const by = {};
+    (exp.dailySalary || []).forEach((r) => { by[r.ymd] = { ...r, F: 0 }; });
+    ((fin && fin.daily) || []).forEach((f) => { by[f.ymd] = { ...(by[f.ymd] || { ymd: f.ymd, d: f.d, A: 0, B: 0 }), F: f.amt }; });
+    return Object.values(by).sort((a, b) => a.ymd - b.ymd);
+  }, [exp.dailySalary, fin]);
+  const tF = rows.reduce((s, r) => s + (+r.F || 0), 0);
   const XSEC = makeXSEC(exp.counts);
   const [open, setOpen] = useState(rows.length - 1);
   useEffect(() => { setOpen(rows.length - 1); }, [rows.length]);
@@ -470,6 +478,7 @@ function DailySalaryModule({ exp, close }) {
       <Text style={{ fontSize: 17, fontWeight: '800', marginBottom: 2, color: T.ink }}>Salary entry</Text>
       <Text style={{ fontSize: 11.5, color: T.muted, marginBottom: 12, lineHeight: 16.7 }}>
         Tap a day to see wage cost per section (₹) — Section A (Waterjet + S. Rapier 230 cm) and Section B (Rapier 190 cm). Wages come from the Web ERP salary entry, split to A / B by the machine map.
+        The Finish Department is its own column of the same entry — it is shown here but never added to Section A / B.
       </Text>
       <View style={[card, { paddingVertical: 13, paddingHorizontal: 15, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: XC.sal }]}>
         <Text style={{ fontSize: 9, color: T.muted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Month to date</Text>
@@ -478,21 +487,40 @@ function DailySalaryModule({ exp, close }) {
           <Text style={{ color: XSEC.A.color, fontWeight: '700', fontFamily: MONO, fontSize: 10.5 }}>A {xCr(tA)}</Text>
           <Text style={{ color: XSEC.B.color, fontWeight: '700', fontFamily: MONO, fontSize: 10.5 }}>B {xCr(tB)}</Text>
         </View>
+        {fin && fin.ready ? (
+          <Text style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: T.alt, color: FIN_C, fontWeight: '700', fontFamily: MONO, fontSize: 10.5 }}>
+            Finish Department {xCr(tF)} <Text style={{ color: T.muted, fontWeight: '500' }}>· separate · not in A + B</Text>
+          </Text>
+        ) : null}
       </View>
       {rows.length === 0 ? <Text style={{ fontSize: 11.5, color: T.muted, textAlign: 'center', paddingVertical: 16 }}>No salary entries for this month yet.</Text> : null}
       {rows.map((r, i) => {
-        const t = tot(r), isOpen = open === i, empty = t === 0;
+        const t = tot(r), isOpen = open === i, empty = t === 0 && !(+r.F > 0);
         return (
           <View key={r.ymd || i} style={[card, { marginBottom: 8, borderColor: isOpen ? XC.sal + '66' : T.border }]}>
-            <DayHead i={i} r={r} isOpen={isOpen} color={XC.sal} empty={empty} sub={empty ? 'Not entered' : xCr(t)} onPress={() => setOpen(isOpen ? -1 : i)} />
+            <DayHead i={i} r={r} isOpen={isOpen} color={XC.sal} empty={empty} sub={empty ? 'Not entered' : `${xCr(t)}${+r.F > 0 ? ` · Finish ${xCr(r.F)}` : ''}`} onPress={() => setOpen(isOpen ? -1 : i)} />
             {isOpen ? (
               <View style={{ paddingTop: 2, paddingHorizontal: 15, paddingBottom: 15 }}>
                 {fld(r, 'A')}
                 {fld(r, 'B')}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: T.border }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: T.muted }}>Day total</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: T.muted }}>Day total · A + B</Text>
                   <Text style={{ fontFamily: MONO, fontSize: 15, fontWeight: '800', color: XC.sal }}>{xCr(t)}</Text>
                 </View>
+                {fin && fin.ready ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 9, marginTop: 9, borderTopWidth: 1, borderTopColor: T.alt }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <FinTag />
+                        <Text style={{ fontSize: 12.5, color: T.ink, fontWeight: '700', flexShrink: 1 }}>Finish Department</Text>
+                      </View>
+                      <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 1, lineHeight: 12.8 }}>checking · folding · packing · dispatch — per metre only</Text>
+                    </View>
+                    <View style={{ width: 140, flexShrink: 0 }}>
+                      <View style={bigBox}><Text style={[bigTxt, { color: r.F ? T.ink : T.muted }]} numberOfLines={1}>{r.F ? xK0(r.F) : '0'}</Text></View>
+                    </View>
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -576,7 +604,8 @@ function DailyRWCModule({ title, note, color, rows, counts, setCell, addDay, clo
 
 /* ------------------------------------------------------------------ */
 /*  Monthly adjustment & freeze (artifact XAdjustSection)              */
-/*  Section A + B only. Saved on the server (Sudamo ExpMonthClose).    */
+/*  Sections A + B, plus "Salary · Finish Department" as a separate     */
+/*  third actual. Saved on the server (Sudamo ExpMonthClose).           */
 /*  Freeze: Expense · Freeze right. Unfreeze / delete: user id 1 only. */
 /* ------------------------------------------------------------------ */
 const fmtD = (d) => {
@@ -591,9 +620,12 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
   const fz = mc.status === 'frozen', has = !!mc.actuals;
   const actE = has && mc.actuals.elec ? String(mc.actuals.elec) : '';
   const actS = has && mc.actuals.salary ? String(mc.actuals.salary) : '';
+  const actF = has && mc.actuals.fin_salary ? String(mc.actuals.fin_salary) : '';
+  const finOk = mc.fin_supported === true; // ExpMonthClose has the Finish Department columns
   const [ae, setAe] = useState(actE);
   const [as, setAs] = useState(actS);
-  useEffect(() => { setAe(actE); setAs(actS); }, [mc.version, actE, actS]);
+  const [af, setAf] = useState(actF);
+  useEffect(() => { setAe(actE); setAs(actS); setAf(actF); }, [mc.version, actE, actS, actF]);
   const [arm, setArm] = useState(null);
   const armT = useRef(null);
   useEffect(() => () => clearTimeout(armT.current), []);
@@ -605,9 +637,12 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
   const [histOpen, setHistOpen] = useState(false);
 
   const rec = useMemo(() => xRecorded(md), [md]);
-  const prev = useMemo(() => xAdjCalc(md, { elec: ae, salary: as }), [md, ae, as]);
+  const prev = useMemo(() => xAdjCalc(md, { elec: ae, salary: as, fin: finOk ? af : '' }), [md, ae, as, af, finOk]);
   const eff = useMemo(() => xEffective(md, prev), [md, prev]);
-  const dirty = !fz && (ae !== '' || as !== '') && (!has || +ae !== +(mc.actuals.elec || 0) || +as !== +(mc.actuals.salary || 0));
+  const finRec = useMemo(() => xFinish(md.finish, 0), [md]);
+  const finEff = useMemo(() => xFinish(md.finish, prev.hasFin ? prev.fin : 0), [md, prev]);
+  const anyIn = ae !== '' || as !== '' || (finOk && af !== '');
+  const dirty = !fz && anyIn && (!has || +ae !== +(mc.actuals.elec || 0) || +as !== +(mc.actuals.salary || 0) || (finOk && +af !== +(mc.actuals.fin_salary || 0)));
 
   const run = async (action, body) => {
     hbuzz(9);
@@ -633,6 +668,8 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
     elec: +ae > 0 ? +ae : null, salary: +as > 0 ? +as : null,
     rec_units: rec.units, rec_elec: Math.round(rec.elec * 100) / 100, rec_salary: Math.round(rec.salary * 100) / 100,
     rec_salary_a: Math.round(rec.salA * 100) / 100, rec_salary_b: Math.round(rec.salB * 100) / 100, rec_rate: rec.rate,
+    // Finish Department — its own total, scaled on its own (not part of the A + B salary)
+    fin_salary: finOk && +af > 0 ? +af : null, rec_fin_salary: Math.round((rec.fin || 0) * 100) / 100,
   });
   const loadHist = async () => {
     const next = !histOpen;
@@ -692,8 +729,10 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
       x.s0 = (+r.A || 0) + (+r.B || 0);
       x.s1 = (+(s1[r.d] || {}).A || 0) + (+(s1[r.d] || {}).B || 0);
     });
+    ((finEff && finEff.daily) || []).forEach((r) => { const x = put(r.d, r.ymd); x.f0 = r.rec; x.f1 = r.amt; });
     return Object.values(by).sort((a, b) => a.ymd - b.ymd);
-  }, [md, eff]);
+  }, [md, eff, finEff]);
+  const showFin = !!(finRec && finRec.ready);
   const effRec = useMemo(() => xRecorded(eff), [eff]);
   const cellW = 104;
   const cell = (a, b, f, bold) => (
@@ -717,7 +756,7 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
           <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: sc + '18' }}><Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', color: sc }}>{status}</Text></View>
         </View>}>
         <Text style={{ fontSize: 10.5, color: T.muted, lineHeight: 15.75, marginBottom: 10 }}>
-          Enter totals, not per-pick figures: the electricity bill amount and the salary actually disbursed — Sections A + B together. Units are not entered: the bill is spread over the kWh consumed as recorded, which re-derives the unit rate, and every unit-based figure (per meter, per section, per metre, per pick, per machine-day) follows it; the A and B salary columns are scaled to the total. Stores and maintenance need no entry — they stay as recorded. Freezing locks the entries, the actuals and the adjustment — only the admin can reopen a frozen month.
+          Enter totals, not per-pick figures: the electricity bill amount and the salary actually disbursed — Sections A + B together, the Finish Department on its own. Units are not entered: the bill is spread over the kWh consumed as recorded, which re-derives the unit rate, and every unit-based figure (per meter, per section, per metre, per pick, per machine-day) follows it; the A and B salary columns are scaled to the total. Stores and maintenance need no entry — they stay as recorded. Freezing locks the entries, the actuals and the adjustment — only the admin can reopen a frozen month.
         </Text>
 
         {mc.unfrozen_from && !fz ? (
@@ -731,20 +770,33 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {kcol('Electricity bill', xCr(rec.elec), rec.elec, ae, setAe, xCr(prev.elec), '₹ total bill', `spread over ${fmtU(rec.units)} consumed · re-derives the unit rate`)}
           {kcol('Salary · Sections A + B', xCr(rec.salary), rec.salary, as, setAs, xCr(prev.salary), '₹ total disbursed', 'scales the A and B day-wise entries')}
+          {showFin ? (finOk || fz
+            ? kcol('Salary · Finish Department', xCr(rec.fin), rec.fin, af, setAf, xCr(prev.fin), '₹ total disbursed', 'scales the Finish Department column on its own · separate')
+            : (
+              <View style={[card, { paddingVertical: 10, paddingHorizontal: 12, flex: 1, minWidth: 170 }]}>
+                <Text style={lab}>Salary · Finish Department</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
+                  <Text style={{ fontSize: 10.5, color: T.muted }}>Recorded</Text>
+                  <Text style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: '800', color: T.ink }}>{xCr(rec.fin)}</Text>
+                </View>
+                <Text style={{ fontSize: 9.5, color: T.amber, marginTop: 8, lineHeight: 13 }}>The actual total cannot be entered yet — the Finish Department columns are not in ExpMonthClose (run the SQL script).</Text>
+              </View>
+            )) : null}
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 4, paddingTop: 10, paddingHorizontal: 2 }}>
           <Text style={{ fontSize: 10.5, color: T.muted }}>Rate {B(`₹${(+rec.rate || 0).toFixed(2)}`)} → {B(`₹${(+prev.rate || 0).toFixed(3)}`, T.copper)}/kWh</Text>
           <Text style={{ fontSize: 10.5, color: T.muted }}>Units {B(fmtU(rec.units))} as recorded</Text>
           <Text style={{ fontSize: 10.5, color: T.muted }}>Salary A + B {B(factor(prev.salF))}</Text>
+          {showFin ? <Text style={{ fontSize: 10.5, color: T.muted }}>Salary Finish {B(factor(prev.finF))}</Text> : null}
           <Text style={{ fontSize: 10.5, color: T.muted }}>Electricity cost after adjustment {B(xCr(prev.elec))}</Text>
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
-          {!fz ? btn(busy === 'apply' ? 'Saving…' : has && !dirty ? 'Adjustment applied ✓' : has ? 'Re-apply adjustment' : 'Apply adjustment', apply, true, !!busy || !(ae !== '' || as !== '') || (has && !dirty)) : null}
+          {!fz ? btn(busy === 'apply' ? 'Saving…' : has && !dirty ? 'Adjustment applied ✓' : has ? 'Re-apply adjustment' : 'Apply adjustment', apply, true, !!busy || !anyIn || (has && !dirty)) : null}
           {!fz && has ? (mc.previous
             ? btn(busy === 'clear' ? 'Saving…' : arm === 'clear' ? 'Tap again to confirm' : `Discard changes · back to ${prevTxt}`, () => twoTap('clear', () => run('clear')), false, !!busy)
-            : btn(busy === 'clear' ? 'Saving…' : 'Clear actuals', () => { setAe(''); setAs(''); run('clear'); }, false, !!busy)) : null}
+            : btn(busy === 'clear' ? 'Saving…' : 'Clear actuals', () => { setAe(''); setAs(''); setAf(''); run('clear'); }, false, !!busy)) : null}
           {!fz && has && !dirty ? (mc.can_freeze
             ? btn(busy === 'freeze' ? 'Freezing…' : arm === 'freeze' ? 'Tap again to confirm — the month gets locked' : `Freeze ${label} · lock`, () => twoTap('freeze', () => run('freeze')), true, !!busy)
             : <Text style={{ fontSize: 9.5, color: T.muted }}>Freezing needs the Expense · Freeze right.</Text>) : null}
@@ -774,12 +826,13 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
         </Pressable>
         {rows ? (
           <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginTop: 6 }}>
-            <View style={{ minWidth: 56 + cellW * 3 + 18 }}>
+            <View style={{ minWidth: 56 + cellW * (showFin ? 4 : 3) + 24 }}>
               <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: T.border }}>
                 <Text style={[lab, { width: 56 }]}>Day</Text>
                 <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Units kWh</Text>
                 <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Electricity ₹</Text>
                 <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Salary A+B ₹</Text>
+                {showFin ? <Text style={[lab, { width: cellW, textAlign: 'right' }]}>Finish ₹</Text> : null}
               </View>
               {dayRows.map((r) => (
                 <View key={r.d} style={{ flexDirection: 'row', gap: 6, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: T.alt }}>
@@ -787,6 +840,7 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
                   {cell(r.u, r.u, xK0)}
                   {cell(r.e0, r.e1, rs)}
                   {cell(r.s0, r.s1, rs)}
+                  {showFin ? cell(r.f0, r.f1, rs) : null}
                 </View>
               ))}
               <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 5 }}>
@@ -794,6 +848,7 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
                 {cell(rec.units, effRec.units, xK0, true)}
                 {cell(rec.elec, effRec.elec, rs, true)}
                 {cell(rec.salary, effRec.salary, rs, true)}
+                {showFin ? cell(rec.fin, prev.fin, rs, true) : null}
               </View>
               {!rec.salaryFromDays && rec.salary > 0 ? <Text style={{ fontSize: 9.5, color: T.muted }}>Salary of this month is a month total in the ERP (no day-wise rows) — it is scaled as a whole.</Text> : null}
             </View>
@@ -812,7 +867,7 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
             {hist && (hist.log || []).map((l) => {
               const d = l.detail || {};
               const fig = l.action === 'apply'
-                ? [d.ActualElec ? `bill ${xCr(d.ActualElec)}` : null, d.ActualSalary ? `salary ${xCr(d.ActualSalary)}` : null].filter(Boolean).join(' · ')
+                ? [d.ActualElec ? `bill ${xCr(d.ActualElec)}` : null, d.ActualSalary ? `salary ${xCr(d.ActualSalary)}` : null, d.ActualFinSalary ? `finish salary ${xCr(d.ActualFinSalary)}` : null].filter(Boolean).join(' · ')
                 : d.reason ? `“${d.reason}”` : '';
               return (
                 <View key={l.id} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: T.alt }}>
@@ -827,6 +882,181 @@ function XAdjustSection({ md, label, mc, open, onToggle, onAct, onLayout }) {
         ) : null}
       </XSection>
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  FINISH DEPARTMENT (Section C) — one card at the very bottom        */
+/*  cost / metre = (salary + stores) ÷ finished-fabric dispatch metres */
+/*  Per metre only. Never per pick, never clubbed with A / B.          */
+/* ------------------------------------------------------------------ */
+const FIN_C = '#2A6044';
+const FinTag = () => (
+  <View style={{ backgroundColor: FIN_C + '18', borderWidth: 1, borderColor: FIN_C + '44', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, flexShrink: 0, alignSelf: 'center' }}>
+    <Text style={{ fontSize: 8.5, fontWeight: '800', color: FIN_C, fontFamily: MONO }}>F</Text>
+  </View>
+);
+const xMt = (n) => `${xK0(n)} m`;
+const xRs = (n) => `₹${xK0(n)}`;
+
+function XFinishCard({ fin, prev, label, prevLabel, status }) {
+  const [drill, setDrill] = useState(null); // 'stores' | 'inv' | null
+  useEffect(() => { setDrill(null); }, [label]);
+  const lab = { fontSize: 8.5, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: '800' };
+  const sc = status === 'LIVE' ? T.amber : status === 'FROZEN' ? T.green : status === 'ADJUSTED' ? T.amber : T.muted;
+  const badge = (
+    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: sc + '18' }}>
+      <Text style={{ fontSize: 9, fontWeight: '800', color: sc, letterSpacing: 0.4 }}>{status}</Text>
+    </View>
+  );
+  const head = (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <FinTag />
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '800', color: T.ink }}>Finish Department</Text>
+        {badge}
+      </View>
+      <Text style={{ fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 14 }}>
+        Checking · folding · packing · dispatch of finished fabric · costed per metre of finished fabric dispatched · kept apart from Sections A and B
+      </Text>
+    </View>
+  );
+  const shell = (children) => (
+    <View style={[card, { paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8, borderTopWidth: 4, borderTopColor: FIN_C }]}>
+      {head}
+      {children}
+    </View>
+  );
+
+  if (fin.error) return shell(<Text style={{ fontSize: 10.5, color: T.red, marginTop: 10, lineHeight: 15 }}>Could not load the Finish Department: {fin.error}</Text>);
+
+  const notes = [];
+  if (!fin.salaryReady) notes.push('Salary: the Finish Department column is not in the salary entry yet (ExpCosting.Finish_Salary) — run the SQL script, then enter it day-wise in the Salary screen.');
+  if (!fin.depts.length) notes.push('Stores: no department with “Finish” in its name was found in the department master, so stores are ₹0. Set the department code in ExpenseFinishDepartmentService.');
+  if (fin.alsoInAB > 0) notes.push(`Stores: ${xRs(fin.alsoInAB)} of these issues is also inside the Section A / B stores (Store-2 issue to a machine). Sections A and B are not changed.`);
+  if (!fin.fabricReady) notes.push('Dispatch: this year’s sales orders have no Finished / Greige flag (FAMSO.FabricType), so no metres can be counted.');
+  (fin.errors || []).forEach((e) => notes.push(String(e)));
+  const noteBox = notes.length ? (
+    <View style={{ backgroundColor: T.amber + '14', borderWidth: 1, borderColor: T.amber + '44', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 10, marginTop: 10, gap: 3 }}>
+      {notes.map((n, i) => <Text key={i} style={{ fontSize: 10, color: T.ink, lineHeight: 14.5 }}>{n}</Text>)}
+    </View>
+  ) : null;
+
+  // nothing booked for the month: a short message, not a number
+  if (fin.empty) {
+    return shell(
+      <>
+        <Text style={{ fontSize: 11.5, color: T.muted, marginTop: 12, lineHeight: 16 }}>
+          No Finish Department salary or stores for {label} yet — enter the salary in the Salary screen (Finish Department column).
+          {fin.metres > 0 ? ` ${xMt(fin.metres)} finished fabric dispatched so far.` : ''}
+        </Text>
+        {noteBox}
+      </>,
+    );
+  }
+
+  const d = fin.cpm !== null && prev && prev.ready && prev.cpm ? ((fin.cpm - prev.cpm) / prev.cpm) * 100 : null;
+  const perM = (v) => (v === null ? '—' : `${xR2(v)} / m`);
+  const tile = (title, value, sub, auto, color) => (
+    <View style={[card, { paddingVertical: 10, paddingHorizontal: 12, flex: 1, minWidth: 150 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={lab}>{title}</Text>
+        {auto ? (
+          <View style={{ backgroundColor: T.green + '15', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 20 }}>
+            <Text style={{ fontSize: 7.5, fontWeight: '800', color: T.green, letterSpacing: 0.4 }}>● AUTO</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={{ fontFamily: MONO, fontSize: 15, fontWeight: '800', color, marginTop: 4 }} numberOfLines={1}>{value}</Text>
+      <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 2, lineHeight: 13 }}>{sub}</Text>
+    </View>
+  );
+  const link = (key, txt) => (
+    <Pressable onPress={() => { hbuzz(7); setDrill(drill === key ? null : key); }} hitSlop={6}>
+      <Text style={{ fontSize: 11.5, fontWeight: '700', color: T.copper }}>{txt} {drill === key ? '▾' : '›'}</Text>
+    </Pressable>
+  );
+  /* drill-down table: date | text | number, with a total row */
+  const table = (rows, more, h2, h3, mid, val, fmt, total, emptyTxt) => (
+    <View style={{ marginTop: 8, borderWidth: 1, borderColor: T.border, borderRadius: 9, overflow: 'hidden', backgroundColor: T.sub }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: T.border }}>
+        <Text style={[lab, { width: 52 }]}>Date</Text>
+        <Text style={[lab, { flex: 1 }]}>{h2}</Text>
+        <Text style={[lab, { width: 84, textAlign: 'right' }]}>{h3}</Text>
+      </View>
+      {rows.length === 0 ? <Text style={{ fontSize: 10.5, color: T.muted, paddingVertical: 10, paddingHorizontal: 10 }}>{emptyTxt}</Text> : null}
+      {rows.map((r, i) => {
+        const [a, b] = mid(r);
+        return (
+          <View key={i} style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: T.alt, alignItems: 'flex-start' }}>
+            <Text style={{ width: 52, fontFamily: MONO, fontSize: 10.5, color: T.ink }}>{dayLabel(r.date_ymd)}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: T.ink }} numberOfLines={2}>{a}</Text>
+              {b ? <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 1 }} numberOfLines={1}>{b}</Text> : null}
+            </View>
+            <Text style={{ width: 84, textAlign: 'right', fontFamily: MONO, fontSize: 10.5, fontWeight: '700', color: T.ink }}>{fmt(val(r))}</Text>
+          </View>
+        );
+      })}
+      {more ? <Text style={{ fontSize: 9.5, color: T.muted, paddingVertical: 5, paddingHorizontal: 10 }}>First {rows.length} rows shown — the total is of all rows.</Text> : null}
+      <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 7, paddingHorizontal: 10, backgroundColor: T.surface }}>
+        <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: T.ink }}>Total</Text>
+        <Text style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: '800', color: T.ink }}>{fmt(total)}</Text>
+      </View>
+    </View>
+  );
+
+  return shell(
+    <>
+      <Text style={[lab, { marginTop: 12 }]}>Cost / metre</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 10, rowGap: 2 }}>
+        <Text style={{ fontFamily: MONO, fontSize: 24, fontWeight: '800', color: T.copper }}>
+          {fin.cpm === null ? '—' : xR2(fin.cpm)}<Text style={{ fontSize: 11, color: T.muted, fontWeight: '600' }}> /m</Text>
+        </Text>
+        {d !== null ? (
+          <Text style={{ fontSize: 11, fontFamily: MONO, fontWeight: '700', color: d > 0 ? T.red : T.green }}>
+            {d > 0 ? '▲' : '▼'} {Math.abs(d).toFixed(1)}%<Text style={{ color: T.muted, fontWeight: '500' }}> vs {prevLabel}</Text>
+          </Text>
+        ) : null}
+        <View style={{ flex: 1 }} />
+        <Text style={{ fontSize: 10, color: T.muted, fontFamily: MONO }}>{label}{status === 'LIVE' && fin.cutoff ? ` · to ${dayLabel(fin.cutoff)}` : ''}</Text>
+      </View>
+      {fin.cpm === null ? <Text style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>No finished fabric invoiced{status === 'LIVE' ? ' up to the last day entered' : ' in this month'} — cost per metre cannot be worked out.</Text> : null}
+
+      <View style={{ backgroundColor: T.alt, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 10, marginTop: 8 }}>
+        <Text style={{ fontFamily: MONO, fontSize: 10.5, color: T.ink, lineHeight: 15 }}>
+          ({xRs(fin.salary)} salary + {xRs(fin.stores)} stores) ÷ {xMt(fin.metres)} finished dispatched = {fin.cpm === null ? '—' : `${xR2(fin.cpm)} / m`}
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        {tile('Salary', xRs(fin.salary), `${fin.salDays} day${fin.salDays === 1 ? '' : 's'} entered · ${perM(fin.salPerM)}${fin.adjusted ? ` · adjusted from ${xRs(fin.salRec)}` : ''}`, false, XC.sal)}
+        {tile('Stores', xRs(fin.stores), `${fin.storeIssues} store issue${fin.storeIssues === 1 ? '' : 's'} · ${perM(fin.storePerM)}`, true, XC.store)}
+        {tile('Finished dispatch', xMt(fin.metres), `${fin.invoices} invoice${fin.invoices === 1 ? '' : 's'} · greige excluded`, true, XC.elec)}
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 6, marginTop: 10 }}>
+        {link('stores', 'Store issues')}
+        {link('inv', 'Finished invoices')}
+      </View>
+      {drill === 'stores' ? table(
+        fin.storeRows, fin.storeMore, 'Item · quantity', 'Amount',
+        (r) => [r.item || '—', `qty ${(+r.qty || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}${r.issue_no ? ` · issue ${r.issue_no}` : ''}`],
+        (r) => r.amount, xRs, fin.stores, 'No store issue booked to the Finish Department.',
+      ) : null}
+      {drill === 'inv' ? table(
+        fin.invRows, fin.invMore, 'Invoice no · customer', 'Metres',
+        (r) => [r.bill_no || '—', r.party || ''],
+        (r) => r.metres, xMt, fin.metres, 'No finished-fabric invoice.',
+      ) : null}
+
+      {noteBox}
+
+      <Text style={{ fontSize: 9.5, color: T.muted, marginTop: 10, lineHeight: 13.5 }}>
+        Salary is entered day-wise in the salary entry (Finish Department column). Stores are the store issues booked to the Finish Department{fin.depts.length ? ` (${fin.depts.map((x) => x.name || x.code).join(', ')})` : ''}.
+        Dispatch is the metres invoiced for finished-fabric orders{status === 'LIVE' ? ' up to the last day entered' : ''}. The Finish Department is costed per metre only — it is not converted to per pick and is not part of cost / pick, the section rates, roll costing or the FY cost report.
+      </Text>
+    </>,
   );
 }
 
@@ -1091,7 +1321,7 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
       {/* inputs (always the ongoing month) */}
       {heading(`Inputs ${isCur ? '' : '· ongoing month'}`)}
       {inputRow('⚡', 17, XC.elec, 'Daily units consumed', `${exp.dailyUnits.length} days · ${xK0(cur.unitsTotal)} kWh`, 'View ›', () => setView('units'))}
-      {inputRow('₹', 17, XC.sal, 'Daily salary expenses', `${exp.dailySalary.length} days · ${xCr(cur.salT)}`, 'View ›', () => setView('salary'))}
+      {inputRow('₹', 17, XC.sal, 'Daily salary expenses', `${exp.dailySalary.length} days · ${xCr(cur.salT)}${cur.fin && cur.fin.ready ? ` · Finish ${xCr(cur.fin.salary)}` : ''}`, 'View ›', () => setView('salary'))}
       {inputRow('▦', 16, XC.fixed, 'Daily maintenance', `${exp.dailyMaint.length} days · ${xCr(cur.maintT)}`, 'Edit ›', () => setView('maint'))}
       {inputRow('＋', 16, XC.other, 'Daily other expenses', `${exp.dailyOther.length} days · ${xCr(cur.otherT)}`, 'Edit ›', () => setView('other'))}
 
@@ -1294,6 +1524,20 @@ export default function ExpenseModule({ exp, months, setSetting, rwc, renderLega
           </View>
         );
       })}
+
+      {/* Finish Department (Section C) — its own block after everything of A and B */}
+      {m.fin ? (
+        <>
+          {heading('Finish Department', 14)}
+          <XFinishCard
+            fin={m.fin}
+            prev={prev && prev.fin}
+            label={m.label}
+            prevLabel={prev && prev.label}
+            status={isCur ? 'LIVE' : selClose && selClose.status === 'frozen' ? 'FROZEN' : m.fin.adjusted ? 'ADJUSTED' : 'CLOSED'}
+          />
+        </>
+      ) : null}
     </View>
   );
 }

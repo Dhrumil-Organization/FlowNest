@@ -43,21 +43,69 @@ export const fmtShowDate = (d: Date) => `${pad(d.getDate())} ${MON[d.getMonth()]
 export const str = (v: any) => (v === null || v === undefined ? '' : String(v));
 export const errMsg = (e: any, fb: string) => e?.response?.data?.message || e?.response?.data?.error || e?.message || fb;
 
+/** true when the request never reached the server (no network / DNS / timeout) -> safe to keep for later. */
+export const isNetErr = (e: any) => {
+  if (!e || e.response) return false;
+  const code = str(e.code);
+  return (
+    code === 'ERR_NETWORK' || code === 'ECONNABORTED' || code === 'ETIMEDOUT' || code === 'ERR_INTERNET_DISCONNECTED' ||
+    /network error|network request failed|timeout|failed to fetch/i.test(str(e.message))
+  );
+};
+
+/** Server said "this taka is already saved" (add_roll_cut_detail duplicate check). */
+export const isDuplicateMsg = (m: any) => /duplicate\s*taka/i.test(str(m));
+
+const swapCase = (t: string) => t.replace(/[a-zA-Z]/g, (ch) => (ch === ch.toLowerCase() ? ch.toUpperCase() : ch.toLowerCase()));
+const lowerKeys = (o: any) => Object.keys(o).reduce((a: any, k) => ((a[k.toLowerCase()] = o[k]), a), {});
+
+/**
+ * Raw scanner text -> clean JSON text (null when it is not a QR of this module).
+ * Camera gives the exact text. A scanner GUN "types" the text like a keyboard, so it can arrive with
+ * a prefix / suffix (Enter, Tab), curly quotes (iOS smart punctuation) or inverted case (Caps Lock ON).
+ */
+export function normalizeQrText(value: string): string | null {
+  let t = str(value)
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/[\u2018\u2019\u2032]/g, "'")
+    .replace(/[\u0000-\u001F\u007F\uFEFF]/g, '');
+  const a = t.indexOf('{');
+  const b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  t = t.slice(a, b + 1);
+  const tryParse = (text: string) => {
+    try {
+      const o = JSON.parse(text);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+    } catch {
+      return null;
+    }
+  };
+  const good = (o: any) => !!o && !!str(o.beamno) && !!str(o.takano);
+  // 1) exactly as printed (keys are lowercase: beamno, takano ...)
+  const exact = tryParse(t);
+  if (good(exact)) return JSON.stringify(exact);
+  // 2) Caps Lock was ON while the gun typed: every letter is inverted -> invert back (keys AND values)
+  const inverted = tryParse(swapCase(t));
+  if (good(inverted)) return JSON.stringify(inverted);
+  // 3) QR printed with other key casing (BeamNo / TakaNo): only the keys are normalised
+  const loose = exact ? lowerKeys(exact) : null;
+  if (good(loose)) return JSON.stringify(loose);
+  return null;
+}
+
 /** Scanned text -> QR object (null when it is not valid JSON / has no beam or taka). */
 export function parseQr(value: string): QrData | null {
-  try {
-    const o = JSON.parse(value);
-    if (!o || typeof o !== 'object') return null;
-    return {
-      ...o,
-      prpcode: str(o.prpcode),
-      beamno: str(o.beamno),
-      takano: str(o.takano),
-      yearno: o.yearno ? str(o.yearno) : undefined,
-    };
-  } catch {
-    return null;
-  }
+  const clean = normalizeQrText(value);
+  if (!clean) return null;
+  const o = JSON.parse(clean);
+  return {
+    ...o,
+    prpcode: str(o.prpcode),
+    beamno: str(o.beamno),
+    takano: str(o.takano),
+    yearno: o.yearno ? str(o.yearno) : undefined,
+  };
 }
 
 export function createRollCutApi(API: string, token: string) {
@@ -71,10 +119,18 @@ export function createRollCutApi(API: string, token: string) {
 
   return {
     /** Save one scan — flat payload: txntype + all QR keys. */
-    save: async (p: { prpcode: string; yearno: string; scannedString: string }) => {
+    save: async (p: { prpcode: string; yearno: string; scannedString: string; scannedAt?: number }) => {
       // flat payload: QR keys go straight into the body (no scannedString, no nested object/array)
       const q = JSON.parse(p.scannedString);
-      const body = { txntype: TXN_ROLL_CUT, ...q, prpcode: p.prpcode, yearno: p.yearno, uid: '0' };
+      const body: Record<string, any> = { txntype: TXN_ROLL_CUT, ...q, prpcode: p.prpcode, yearno: p.yearno, uid: '0' };
+      // Offline scan uploaded later: send the real scan date/time too. The backend ignores unknown keys today
+      // (it stamps RcDate with the server date) — it can start using `scandate` without any app change.
+      if (p.scannedAt) {
+        const d = new Date(p.scannedAt);
+        body.offline = '1';
+        body.scandate = fmtApiDate(d);
+        body.scantime = `${pad(d.getHours())}.${pad(d.getMinutes())}`;
+      }
       return (await c.post(SAVE_ENDPOINT, body, xhr)).data;
     },
 

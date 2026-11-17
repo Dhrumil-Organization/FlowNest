@@ -1001,6 +1001,9 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
         // Monthly adjustment & freeze state of this month (Sudamo ExpMonthClose).
         // A frozen month's payload is the snapshot taken when it was frozen.
         data.month_close = payload.month_close || null;
+        // Finish Department (Section C) — per metre only, apart from Sections A and B.
+        // Frozen month: this is the block saved in the freeze snapshot.
+        data.finish_department = payload.finish_department || null;
         data.demo_copy_of = payload.demo_copy_of || null;
 
         if (myGen !== loadGen.current) return null;

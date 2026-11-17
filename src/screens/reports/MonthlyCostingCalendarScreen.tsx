@@ -180,6 +180,14 @@ function normalizeRows(rawRows: any[]): Row[] {
     .sort((a, b) => dayOf(a.Date) - dayOf(b.Date));
 }
 
+/**
+ * Finish Department salary (Section C). It is its own column, separate from the weaving sections:
+ * a day may have weaving salary without Finish salary and the other way round, so it is never a
+ * "missing field" — but a day that has only Finish salary is still a saved day.
+ */
+const OPTIONAL_KEYS = new Set(['finish_salary']);
+const isOptionalKey = (key: string) => OPTIONAL_KEYS.has(String(key).toLowerCase());
+
 const toneFor = (key: string): Tone => {
   if (/^mw/i.test(key)) return 'blue';
   if (/^(sud|sip)/i.test(key)) return 'copper';
@@ -211,6 +219,8 @@ function buildLayout(rows: Row[], month: number, kind: ModuleKind): Layout {
       if (label.toLowerCase() === 'waterjet salary') label = 'Waterjet + 230 cm rapier';
       else if (label.toLowerCase() === 'rapier salary') label = '190 cm rapiers';
     }
+    // Section C of the Expense report: the Finish Department has its own salary column (ExpCosting.Finish_Salary)
+    if (isOptionalKey(key)) label = 'Finish Department';
     const lastRaw = parts[parts.length - 1] || key;
     const lastOnly = ['looms', 'luwa'].includes(lastRaw.toLowerCase());
     const last = lastRaw.charAt(0).toUpperCase() + lastRaw.slice(1).toLowerCase();
@@ -398,16 +408,23 @@ export function MonthlyCostingCalendarScreen({ kind }: { kind: ModuleKind }) {
     () => kind === 'unit' ? layout.keys.filter((key) => !layout.totals.some((field) => field.key === key)) : layout.keys,
     [kind, layout],
   );
+  // fields that must be filled together (Finish Department salary is optional, see OPTIONAL_KEYS)
+  const mustKeys = useMemo(() => validationKeys.filter((key) => !isOptionalKey(key)), [validationKeys]);
+  /** required fields still empty on a day where at least one required field is filled */
+  const missingOf = useCallback(
+    (row: Row) => (mustKeys.some((key) => !isEmptyValue(row[key])) ? mustKeys.filter((key) => isEmptyValue(row[key])) : []),
+    [mustKeys],
+  );
   const validationErrors = useMemo(() => {
     if (!showValidation) return [] as { Date: string; missing: string[] }[];
     return rows.flatMap((row) => {
       if (!editedDates.has(row.Date)) return [];
       const filled = validationKeys.some((key) => !isEmptyValue(row[key]));
       if (!filled) return []; // a completely cleared day is valid
-      const missing = validationKeys.filter((key) => isEmptyValue(row[key]));
+      const missing = missingOf(row);
       return missing.length ? [{ Date: row.Date, missing }] : [];
     });
-  }, [showValidation, rows, editedDates, validationKeys]);
+  }, [showValidation, rows, editedDates, validationKeys, missingOf]);
 
   const statusFor = useCallback(
     (row: Row): Status => {
@@ -415,11 +432,11 @@ export function MonthlyCostingCalendarScreen({ kind }: { kind: ModuleKind }) {
       if (!keys.length) return '';
       const emptyCount = keys.filter((k) => isEmptyValue(row[k])).length;
       if (emptyCount === keys.length) return '';
-      if (emptyCount > 0) return validationErrors.some((item) => item.Date === row.Date) ? 'error' : '';
+      if (missingOf(row).length > 0) return validationErrors.some((item) => item.Date === row.Date) ? 'error' : '';
       if (editedDates.has(row.Date)) return 'edited';
       return initialCompleteMap[row.Date] ? 'complete' : '';
     },
-    [validationKeys, editedDates, initialCompleteMap, validationErrors],
+    [validationKeys, editedDates, initialCompleteMap, validationErrors, missingOf],
   );
 
   const filledDays = useMemo(() => rows.filter((r) => layout.keys.some((k) => !isEmptyValue(r[k]))).length, [rows, layout]);
@@ -491,7 +508,7 @@ export function MonthlyCostingCalendarScreen({ kind }: { kind: ModuleKind }) {
     const payloadRows: Record<string, any>[] = [];
 
     rows.forEach((row) => {
-      const emptyList = requiredKeys.filter((k) => isEmptyValue(row[k]));
+      const emptyList = missingOf(row);
       // Unit totals are calculated/read-only; emptiness is determined by editable detail fields.
       const allValuesEmpty = requiredKeys.every((k) => isEmptyValue(row[k]));
       const currentIsEmpty = allValuesEmpty ? '1' : '0';
@@ -510,7 +527,7 @@ export function MonthlyCostingCalendarScreen({ kind }: { kind: ModuleKind }) {
       payloadRow.action = action;
       payloadRows.push(payloadRow);
 
-      if (editedDates.has(row.Date) && requiredKeys.some((k) => !isEmptyValue(row[k])) && emptyList.length > 0) {
+      if (editedDates.has(row.Date) && emptyList.length > 0) {
         errors.push({ Date: row.Date, missing: emptyList });
       }
     });
@@ -836,7 +853,7 @@ function DayCard({ row, layout, kind, editing, today, status, expanded, onToggle
           {layout.totals.map((f) => (
             <View key={f.key} style={[styles.totalCell, { backgroundColor: TONE_BG[f.tone] }]}>
               <Text style={[styles.totalLabel, { color: TONE_FG[f.tone] }]} numberOfLines={1}>{f.label}</Text>
-              <Value row={row} field={f} editing={false} onChange={onChange} big invalid={status === 'error' && !(kind === 'unit' && f.isTotal) && isEmptyValue(row[f.key])} />
+              <Value row={row} field={f} editing={false} onChange={onChange} big invalid={status === 'error' && !(kind === 'unit' && f.isTotal) && !isOptionalKey(f.key) && isEmptyValue(row[f.key])} />
             </View>
           ))}
         </View>
@@ -856,7 +873,7 @@ function DayCard({ row, layout, kind, editing, today, status, expanded, onToggle
             {s.fields.map((f) => (
               <View key={f.key} style={[styles.valueCell, f.isTotal && { backgroundColor: TONE_BG[f.tone], borderRadius: 9, padding: 6 }]}>
                 <Text style={[styles.valueLabel, f.isTotal && { color: TONE_FG[f.tone] }]} numberOfLines={3}>{f.label}</Text>
-                <Value row={row} field={f} editing={editing} onChange={onChange} invalid={status === 'error' && !(kind === 'unit' && f.isTotal) && isEmptyValue(row[f.key])} />
+                <Value row={row} field={f} editing={editing} onChange={onChange} invalid={status === 'error' && !(kind === 'unit' && f.isTotal) && !isOptionalKey(f.key) && isEmptyValue(row[f.key])} />
               </View>
             ))}
           </View>
@@ -930,7 +947,7 @@ function TableView({ rows, layout, sums, kind, editing, today, statusFor, onChan
               return (
                 <View key={`r-${r.Date}`} style={[{ flexDirection: 'row', height: ROW_H }, rowBg(r)]}>
                   {columns.map((f) => {
-                    const invalid = st === 'error' && !(kind === 'unit' && f.isTotal) && isEmptyValue(r[f.key]);
+                    const invalid = st === 'error' && !(kind === 'unit' && f.isTotal) && !isOptionalKey(f.key) && isEmptyValue(r[f.key]);
                     return (
                       <View key={f.key} style={[styles.tdCell, { width: columnWidth(f) }, invalid && styles.tdCellInvalid]}>
                         {editing && !(kind === 'unit' && f.isTotal) ? (

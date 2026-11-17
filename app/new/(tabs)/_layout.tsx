@@ -448,7 +448,7 @@ export default function TabsLayout() {
       </View>
 
       {!isDesktop ? (
-        <Modal
+        <Modal statusBarTranslucent navigationBarTranslucent
           visible={moreOpen}
           transparent
           animationType="fade"

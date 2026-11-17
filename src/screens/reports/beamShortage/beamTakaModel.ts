@@ -8,9 +8,18 @@
 //   { success, data: { beam: {...}, takas: [...], summary: {...} } }
 // Every taka is one GRYProcessC checking entry. Graded = the checking entry
 // carries a grade (GrdCode not blank / 0) — the same value the GRADE column shows.
+// `faults` = the faults saved for that checking entry in the Checking Scanner
+// (GRYProcessCD1, only the ones that carry a value) — shown inside the opened taka.
 // gradeSummary() groups the takas grade-wise (takas · metres · share of metres).
 
 import { num, parseAnyDate } from './beamShortageModel';
+
+/** one fault of a checking entry, as entered in the Checking Scanner ("Added Faults") */
+export type TakaFault = {
+  code: string; // GENReason.RsnCode
+  name: string; // GENReason.RDesc
+  value: string; // the fault value the checker typed (GRYProcessCD1.Remark), never blank
+};
 
 export type TakaEntry = {
   key: string;
@@ -42,6 +51,8 @@ export type TakaEntry = {
   dsnName: string;
   /** checking grade present (GrdCode not blank / 0) */
   graded: boolean;
+  /** faults of this checking entry that have a value; [] = none */
+  faults: TakaFault[];
 };
 
 export type TakaSummary = {
@@ -96,6 +107,16 @@ const unwrap = (response: any): any => {
   return body;
 };
 
+/** backend `faults` array of one taka -> only the faults that really carry a value */
+const normalizeFaults = (list: any): TakaFault[] =>
+  (Array.isArray(list) ? list : [])
+    .map((raw) => {
+      const f = lower(raw);
+      const code = s(f.rsncode);
+      return { code, name: s(f.rdesc) || (code ? `Fault ${code}` : 'Fault'), value: s(f.remark) };
+    })
+    .filter((f) => f.value !== '');
+
 export const normalizeTakas = (response: any): TakaData => {
   const body = lower(unwrap(response));
   const list: any[] = Array.isArray(body.takas) ? body.takas : Array.isArray(response) ? response : [];
@@ -130,6 +151,7 @@ export const normalizeTakas = (response: any): TakaData => {
       gaitDate: parseAnyDate(r.gaittingdate),
       dsnName: s(r.dsnname),
       graded: hasGrade(r.grdcode),
+      faults: normalizeFaults(r.faults),
     };
   });
   return { takas, summary: summarize(takas) };
@@ -202,7 +224,7 @@ export const filterTakas = (takas: TakaEntry[], f: TakaFilter, q: string) => {
   return takas.filter((t) => {
     if (f !== 'all' && gradeKeyOf(t) !== f) return false;
     if (!qq) return true;
-    return [t.takaNo, t.chkName, t.grdName, t.wvrName].some((v) => v.toLowerCase().includes(qq));
+    return [t.takaNo, t.chkName, t.grdName, t.wvrName, ...t.faults.map((f) => f.name)].some((v) => v.toLowerCase().includes(qq));
   });
 };
 
@@ -228,6 +250,7 @@ export const mockBeamTakas = async (body: TakaRequest, produced: number) => {
       islasttaka: i === n - 1 ? 1 : 0, orderno: 'PO/27/118', trackid: 4021,
       entrydate: `2026-09-${day}`, entrytime: '14.32', macname: 'R-76', gaittingdate: '2026-09-01',
       dsnname: '',
+      faults: i % 4 === 1 ? [{ rsncode: '12', rdesc: 'Broken pick', remark: '44', faults: 0 }, { rsncode: '31', rdesc: 'Oil stain', remark: '10-20', faults: 0 }] : [],
     };
   });
   return { data: { success: true, data: { takas } } };

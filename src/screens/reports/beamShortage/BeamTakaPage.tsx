@@ -42,6 +42,7 @@ import {
   normalizeTakas,
   TakaData,
   TakaEntry,
+  TakaFault,
   TakaFilter,
 } from './beamTakaModel';
 
@@ -164,7 +165,7 @@ export default function BeamTakaPage({ line, backLabel, onBack, prptype, prpcode
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="taka no. / checker / grade"
+            placeholder="taka no. / checker / grade / fault"
             placeholderTextColor={T.muted}
             autoCorrect={false}
             autoCapitalize="none"
@@ -250,6 +251,7 @@ function Tags({ t }: { t: TakaEntry }) {
   if (t.isMending) tags.push(['MENDING', T.purple, '#F1E8F5']);
   if (t.isSample) tags.push(['SAMPLE', T.blue, '#E6ECF5']);
   if (t.isLastTaka) tags.push(['LAST TAKA', T.yd, '#E3EEF5']);
+  if (t.faults.length) tags.push([`${t.faults.length} FAULT${t.faults.length === 1 ? '' : 'S'}`, T.red, '#F8E7E3']);
   if (!tags.length) return null;
   return (
     <View style={st.tags}>
@@ -286,6 +288,34 @@ function TakaDetail({ t }: { t: TakaEntry }) {
           </View>
         ))}
       </View>
+      <TakaFaults faults={t.faults} />
+    </View>
+  );
+}
+
+/**
+ * Faults of the opened taka — the ones saved for this checking entry in the Checking Scanner,
+ * only those that carry a value. Chips wrap, so it fits a phone and a wide screen alike.
+ */
+function TakaFaults({ faults }: { faults: TakaFault[] }) {
+  return (
+    <View style={st.faults}>
+      <View style={st.faultHead}>
+        <Text style={st.factK}>Faults</Text>
+        {faults.length ? <Text style={st.faultCount}>{faults.length}</Text> : null}
+      </View>
+      {faults.length ? (
+        <View style={st.faultList}>
+          {faults.map((f, i) => (
+            <View key={`${f.code}|${f.value}|${i}`} style={st.faultChip}>
+              <Text style={st.faultName} numberOfLines={2}>{f.name}</Text>
+              <Text style={[st.faultValue, st.mono]} numberOfLines={1}>{f.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={st.factV}>—</Text>
+      )}
     </View>
   );
 }
@@ -423,6 +453,13 @@ const st = StyleSheet.create({
   facts: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 },
   fact: { width: '50%', paddingRight: 8 },
   factK: { fontSize: 8, fontWeight: '800', color: T.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  faults: { paddingTop: 8, borderTopWidth: 1, borderTopColor: T.hair },
+  faultHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
+  faultCount: { fontSize: 8.5, fontWeight: '900', color: T.red, backgroundColor: '#F8E7E3', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  faultList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  faultChip: { flexDirection: 'row', alignItems: 'center', gap: 7, maxWidth: '100%', paddingLeft: 9, paddingRight: 4, paddingVertical: 4, borderRadius: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: `${T.red}40` },
+  faultName: { flexShrink: 1, fontSize: 10.5, fontWeight: '700', color: T.ink },
+  faultValue: { fontSize: 10.5, fontWeight: '900', color: T.red, backgroundColor: '#F8E7E3', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   factV: { fontSize: 10.5, color: T.ink, marginTop: 1 },
 
   footer: { fontSize: 9.5, color: T.muted, lineHeight: 14 },

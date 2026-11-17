@@ -20,6 +20,7 @@ import { ERP_FONT_FILES, ErpFontScope, ErpTypeScale, getErpTypeScale } from '@/s
 import { installErpFont } from '@/src/core/fonts/erpFontPatch';
 import { ThemeRoot } from '@/src/core/theme/ThemeRoot';
 import { screenGuard } from '@/src/core/crash/ScreenErrorBoundary';
+import { RollCutOfflineBoot } from '@/src/components/RollCutScanner/offline/RollCutOfflineBoot';
 
 // NEW ERP font: Inter on every text of this tree (see src/core/fonts/erpFont.tsx).
 installErpFont();
@@ -66,6 +67,9 @@ export default function NewAppLayout() {
         <SafeAreaProvider>
           <StatusBar barStyle="light-content" backgroundColor={T.nav} />
           <AppCoreProvider>
+            {/* Roll Cut Scanner offline: after login keeps Property + Beam lists on the device and
+                uploads scans made without network (renders nothing). */}
+            <RollCutOfflineBoot />
             {/* Light <-> Dark: the screens under here are rebuilt once in the new
                 theme. The open route is kept (the stack's state lives in the
                 parent navigator), the providers above stay mounted. */}

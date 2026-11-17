@@ -89,7 +89,7 @@ export function DyeingGuide({
   const next = SECTIONS[idx + 1];
 
   return (
-    <Modal visible={visible} animationType={wide ? 'fade' : 'slide'} transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType={wide ? 'fade' : 'slide'} transparent onRequestClose={onClose}>
       <View style={[g.overlay, wide && g.overlayWide]}>
         <View
           style={[

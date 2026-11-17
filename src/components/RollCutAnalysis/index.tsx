@@ -232,7 +232,7 @@ export default function RollCutAnalysis({ token, API }: Props) {
       if (status === 'late') { const m = r.gap_min ?? r.wait_min; if (!(m !== null && m > 1440)) return false; }
       else if (status !== 'all' && r.stage !== status) return false;
       if (!words.length) return true;
-      const hay = `${r.takano} ${r.beamno} ${r.rollcut_at || ''} ${r.checking_at || ''}`.toLowerCase();
+      const hay = `${r.takano} ${r.beamno} ${r.macname || ''} ${r.maccode || ''} ${r.dsnname || ''} ${r.dsncode || ''} ${r.rollcut_at || ''} ${r.checking_at || ''}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
   }, [rep, q, status, bucket, beamPick]);
@@ -391,7 +391,7 @@ export default function RollCutAnalysis({ token, API }: Props) {
     <View>
       <View style={st.searchBox}>
         <Icon name="search" size={19} color={qInput ? T.copper : T.muted} />
-        <TextInput value={qInput} onChangeText={setQInput} placeholder="Search taka no, beam no, date…" placeholderTextColor={T.muted} style={st.searchInput} autoCapitalize="none" autoCorrect={false} />
+        <TextInput value={qInput} onChangeText={setQInput} placeholder="Search taka, beam, machine, design, date…" placeholderTextColor={T.muted} style={st.searchInput} autoCapitalize="none" autoCorrect={false} />
         {qInput ? <TouchableOpacity onPress={() => setQInput('')}><Icon name="cancel" size={18} color={T.muted} /></TouchableOpacity> : null}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
@@ -570,6 +570,22 @@ function TakaCard({ r }: { r: TakaRow }) {
         </View>
         <Badge text={sl.t} color={sl.c} />
       </View>
+      <View style={st.meta}>
+        <View style={st.metaItem}>
+          <Icon name="precision-manufacturing" size={14} color={r.macname ? T.copper : T.muted} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.metaK}>MACHINE</Text>
+            <Text style={[st.metaV, !r.macname && { color: T.muted }]} numberOfLines={1}>{r.macname || '—'}</Text>
+          </View>
+        </View>
+        <View style={[st.metaItem, { flex: 1.6 }]}>
+          <Icon name="palette" size={14} color={r.dsnname ? T.copper : T.muted} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.metaK}>DESIGN{r.dsn_planned ? ' · PLANNED' : ''}</Text>
+            <Text style={[st.metaV, !r.dsnname && { color: T.muted }]} numberOfLines={1}>{r.dsnname || '—'}</Text>
+          </View>
+        </View>
+      </View>
       <View style={st.steps}>
         {steps.map((s, i) => (
           <View key={s.k} style={st.step}>
@@ -707,6 +723,10 @@ const st = StyleSheet.create({
   row: { backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, borderLeftWidth: 4, borderLeftColor: T.copper, padding: 12, marginBottom: 10 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.6, color: T.muted },
+  meta: { flexDirection: 'row', gap: 10, marginTop: 9, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: T.sub, borderWidth: 1, borderColor: T.hair },
+  metaItem: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  metaK: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5, color: T.muted },
+  metaV: { fontSize: 12.5, fontWeight: '800', color: T.ink, marginTop: 1 },
   rowMain: { fontSize: 14, fontWeight: '900', color: T.ink, fontFamily: MONO, marginTop: 1 },
   badge: { height: 24, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, justifyContent: 'center', maxWidth: 190 },
   badgeText: { fontSize: 10.5, fontWeight: '900', letterSpacing: 0.3 },

@@ -143,26 +143,34 @@ export default function ExpenseScreen({ token, apiBase }) {
       setDemoMsg((e && e.message) || 'Could not clear.');
     }
   }, [resetArm, monthClose, months]);
-  // const demoBar = demo ? (
-  //   <View style={dm.banner}>
-  //     <Text style={dm.title}>🧪 DUMMY TEST MODE — not live data</Text>
-  //     <Text style={dm.text}>
-  //       Today is treated as 15 Jan 2027. Oct '26 and earlier are the real ERP months; Nov '26, Dec '26 and Jan '27 are copies of October with the dates moved.
-  //       Adjust, freeze, unfreeze and delete are saved separately as dummy rows — the live report and live entries are not touched. Daily maintenance / other entry is off in this mode.
-  //     </Text>
-  //     <View style={dm.row}>
-  //       <TouchableOpacity onPress={() => switchDemo(false)} style={dm.live}><Text style={dm.liveText}>Back to live</Text></TouchableOpacity>
-  //       {isAdmin ? (
-  //         <TouchableOpacity onPress={demoReset} style={dm.reset}><Text style={dm.resetText}>{resetArm ? 'Tap again to clear all dummy data' : 'Clear dummy data'}</Text></TouchableOpacity>
-  //       ) : null}
-  //     </View>
-  //     {demoMsg ? <Text style={dm.text}>{demoMsg}</Text> : null}
-  //   </View>
-  // ) : demoAvailable ? (
-  //   <TouchableOpacity onPress={() => { setDemoMsg(''); switchDemo(true); }} style={dm.off}>
-  //     <Text style={dm.offText}>🧪 Dummy test mode · off — tap to test adjust & freeze with dummy Nov / Dec / Jan</Text>
-  //   </TouchableOpacity>
-  // ) : null;
+  /*
+   * DUMMY TEST MODE bar — ON.
+   *   off (default): a small grey chip "Dummy test mode · off" above the report -> tap to start testing.
+   *   on           : red banner; "Back to live" returns to the real report at once.
+   * Nothing of the live report is touched in test mode (adjust / freeze are saved as separate dummy rows).
+   * To hide the switch for everybody again: ExpenseMonthCloseService::DEMO_ENABLED = false on the server.
+   */
+  const demoBar = demo ? (
+    <View style={dm.banner}>
+      <Text style={dm.title}>🧪 DUMMY TEST MODE — not live data</Text>
+      <Text style={dm.text}>
+        Today is treated as 15 Jan 2027, so the months up to Dec 2026 are finished months you can adjust and freeze. Months up to the real current month are the real ERP figures;
+        the months after it are copies of the current month with the dates moved. Adjust, freeze, unfreeze and delete are saved separately as dummy rows — the live report and
+        live entries are not touched. Daily maintenance / other entry is off in this mode.
+      </Text>
+      <View style={dm.row}>
+        <TouchableOpacity onPress={() => switchDemo(false)} style={dm.live}><Text style={dm.liveText}>Back to live</Text></TouchableOpacity>
+        {isAdmin ? (
+          <TouchableOpacity onPress={demoReset} style={dm.reset}><Text style={dm.resetText}>{resetArm ? 'Tap again to clear all dummy data' : 'Clear dummy data'}</Text></TouchableOpacity>
+        ) : null}
+      </View>
+      {demoMsg ? <Text style={dm.text}>{demoMsg}</Text> : null}
+    </View>
+  ) : demoAvailable ? (
+    <TouchableOpacity onPress={() => { setDemoMsg(''); switchDemo(true); }} style={dm.off}>
+      <Text style={dm.offText}>🧪 Dummy test mode · off — tap to test adjust & freeze with dummy months</Text>
+    </TouchableOpacity>
+  ) : null;
   const scrollTo = useCallback((y) => { if (scrollRef.current && scrollRef.current.scrollTo) scrollRef.current.scrollTo({ y: Math.max(0, y - 8), animated: true }); }, []);
 
   /* months before 1 Oct 2026 -> the previous Rapier / Waterjet report */
@@ -266,7 +274,7 @@ export default function ExpenseScreen({ token, apiBase }) {
     <View style={st.safe}>
       <ScrollView ref={scrollRef} style={st.body} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
         <View style={[st.wrap, legacyWide && { maxWidth: 1360 }]}>
-          {/* {demoBar ? <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>{demoBar}</View> : null} */}
+          {demoBar ? <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>{demoBar}</View> : null}
           {body}
         </View>
       </ScrollView>

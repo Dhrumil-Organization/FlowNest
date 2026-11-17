@@ -2,6 +2,9 @@
 // NEW ERP — Roll Cut Scanner  (txntype 'roll_cut_scanner').
 //
 //   SCAN   : [Scan QR] -> Beam No + Taka No text boxes fill from the QR -> [Save] -> POST { prpcode, yearno, scannedString }
+//            two ways to scan: phone CAMERA or a SCANNER GUN (USB / Bluetooth / handheld) — see GunScanner.tsx
+//   OFFLINE: no network -> Save keeps the scan on the device (offline/queue.ts) and it uploads by itself, one by one,
+//            when the network is back. Property + Beam lists come from the copy saved after login (offline/masters.ts).
 //   LIST   : filters Property · From date · To date · Beam No  -> how many scans were done + the scanned takas
 //            + search box (taka / beam / design / grade ...) and lazy loading (rows are shown PAGE_SIZE at a time while scrolling)
 //
@@ -11,22 +14,50 @@ import AppAlert from '@/common/utils/appAlert';
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { createRollCutApi, errMsg, fmtShowDate, getCurrentFinancialYear, parseQr, str, type Opt, type QrData } from './api';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { createRollCutApi, errMsg, fmtApiDate, fmtShowDate, getCurrentFinancialYear, isNetErr, normalizeQrText, parseQr, str, type Opt, type QrData } from './api';
 import { useRollCutCriteria } from './criteria';
 import DateField from './DateField';
+import GunScanner from './GunScanner';
+import { listKey, readList, saveList } from './offline/listCache';
+import { fetchRollCutBeams, getMasters, loadMastersStatus, prefetchMasters } from './offline/masters';
+import { isOnline, reportReachable, useOnline } from './offline/network';
+import { enqueue, initQueue, isQueued, syncNow, useQueue } from './offline/queue';
+import { fmtWhen, makeScope, readJson, writeJson } from './offline/storage';
+import { OfflineBar, PendingQueue } from './OfflineStatus';
 import ScanCamera from './ScanCamera';
 import SelectField from './SelectField';
 
-type Props = { token: string; API: string };
+type Props = { token: string; API: string; username?: string };
+type ScanMode = 'camera' | 'gun';
+const PREFS_KEY = 'rollcut_prefs_v1'; // remembered per device: scan mode + auto save
+
+/** small vibration on phones: the worker looks at the taka, not at the screen */
+function feedback(ok: boolean) {
+  if (Platform.OS === 'web') return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const H = require('expo-haptics');
+    void H.notificationAsync(ok ? H.NotificationFeedbackType.Success : H.NotificationFeedbackType.Error).catch(() => undefined);
+  } catch {
+    /* no haptics on this device */
+  }
+}
 const PAGE_SIZE = 30; // rows rendered per lazy-load step
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-export default function RollCutScanner({ token, API }: Props) {
+export default function RollCutScanner({ token, API, username }: Props) {
   const { width } = useWindowDimensions();
   const wide = width >= 980;
   const api = useMemo(() => createRollCutApi(API, token), [API, token]);
+
+  /* ------------------------------- offline ------------------------------- */
+  const scope = useMemo(() => makeScope(API, username || 'User'), [API, username]);
+  const online = useOnline();
+  const queue = useQueue();
+  const pendingCount = queue.items.length;
+  const syncQueue = useCallback(() => void syncNow({ API, token }), [API, token]);
 
   const [tab, setTab] = useState<'scan' | 'list'>('scan');
   const [camOpen, setCamOpen] = useState(false);
@@ -36,7 +67,10 @@ export default function RollCutScanner({ token, API }: Props) {
   const [qr, setQr] = useState<QrData | null>(null);
   const [saving, setSaving] = useState(false);
   const [failMsg, setFailMsg] = useState('');
-  const [lastSaved, setLastSaved] = useState<{ beam: string; taka: string; at: string } | null>(null);
+  const [lastSaved, setLastSaved] = useState<{ beam: string; taka: string; at: string; offline: boolean } | null>(null);
+  const [mode, setMode] = useState<ScanMode>('camera');
+  const [autoSave, setAutoSave] = useState(true); // scanner gun: save right after the scan (no Save tap)
+  const gunChain = useRef<Promise<any>>(Promise.resolve()); // gun scans are saved strictly one after another
 
   /* ----------------------------- list state ------------------------------ */
   const [prpCode, setPrpCode] = useState('');
@@ -48,14 +82,54 @@ export default function RollCutScanner({ token, API }: Props) {
   const [rows, setRows] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
+  const [listNote, setListNote] = useState(''); // "showing the saved list" when offline
   const [loaded, setLoaded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true); // open at start, closes after Show list, tap header to open again
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  const c = useRollCutCriteria({ token, API, onAutoProperty: (code) => setPrpCode((p) => p || code) });
+  const c = useRollCutCriteria({ token, API, scope, onAutoProperty: (code) => setPrpCode((p) => p || code) });
   const prptype = c.prptype;
+
+  // The app-level helper (RollCutOfflineBoot) already does this after login; repeating it here makes the
+  // screen self-sufficient: queue loaded, waiting scans uploaded, Property + Beam lists refreshed.
+  useEffect(() => {
+    if (!token || !API) return;
+    let alive = true;
+    (async () => {
+      await initQueue(scope);
+      if (!alive) return;
+      if (prptype) await loadMastersStatus(scope, prptype);
+      if (!alive || !online) return;
+      await syncNow({ API, token });
+      if (alive && prptype) void prefetchMasters({ API, token, prptype, scope });
+    })().catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [API, token, scope, prptype, online]);
+
+  // remembered scan mode / auto save
+  useEffect(() => {
+    let alive = true;
+    void readJson<{ mode?: ScanMode; autoSave?: boolean }>(PREFS_KEY, {}).then((p) => {
+      if (!alive) return;
+      if (p.mode === 'gun' || p.mode === 'camera') setMode(p.mode);
+      if (typeof p.autoSave === 'boolean') setAutoSave(p.autoSave);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const changeMode = (m: ScanMode) => {
+    setMode(m);
+    void writeJson(PREFS_KEY, { mode: m, autoSave });
+  };
+  const changeAutoSave = (v: boolean) => {
+    setAutoSave(v);
+    void writeJson(PREFS_KEY, { mode, autoSave: v });
+  };
 
   /* ------------------------------ beam list ------------------------------ */
   const loadBeams = useCallback(() => {
@@ -63,15 +137,25 @@ export default function RollCutScanner({ token, API }: Props) {
     if (!prpCode || !prptype) return () => {};
     let alive = true;
     setBeamLoading(true);
-    api
-      .beams(prpCode, prptype)
-      .then((l) => alive && setBeamList(l))
-      .catch(() => alive && setBeamList([]))
-      .finally(() => alive && setBeamLoading(false));
+    (async () => {
+      // 1) beams of this property saved on the device -> usable at once, with or without network
+      const saved = (await getMasters(scope, prptype)).beams[prpCode];
+      if (alive && saved) setBeamList(saved.list);
+      // 2) live list when online (also refreshes the saved copy)
+      if (!isOnline()) return;
+      try {
+        const l = await fetchRollCutBeams({ API, token, prptype, scope }, prpCode);
+        if (alive) setBeamList(l);
+      } catch {
+        /* keep the saved copy */
+      }
+    })().finally(() => alive && setBeamLoading(false));
     return () => {
       alive = false;
     };
-  }, [api, prpCode, prptype]);
+    // `online`: reload by itself when the network comes back
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API, token, scope, prpCode, prptype, online]);
   useEffect(() => loadBeams(), [loadBeams]);
 
   const beamOpts: Opt[] = useMemo(() => [{ label: 'All beams', value: '' }, ...beamList], [beamList]);
@@ -81,21 +165,44 @@ export default function RollCutScanner({ token, API }: Props) {
     if (!prpCode) { setListError('Select a property.'); return 0; }
     if (!prptype) { setListError('Property group (prptype) not found for this login — please re-login.'); return 0; }
     setListError('');
+    setListNote('');
     setListLoading(true);
+    const key = listKey(prpCode, beamFilter, fmtApiDate(fromDate), fmtApiDate(toDate));
+    // no network: the same filter, as it was the last time it was opened online
+    const fromDevice = async () => {
+      const hit = await readList(scope, key);
+      if (!hit) {
+        setRows([]);
+        setLoaded(false);
+        setListError('No network — this list was not opened before on this device. Your offline scans are safe under “Offline scans” on the Scan tab.');
+        return 0;
+      }
+      setRows(hit.rows);
+      setLoaded(true);
+      setListNote(`Offline — list as saved at ${fmtWhen(hit.at)}. Scans made offline appear here after they upload.`);
+      return hit.rows.length;
+    };
     try {
+      if (!isOnline()) return await fromDevice();
       const r = await api.list({ prptype, prpCode, beamNo: beamFilter, from: fromDate, to: toDate });
+      reportReachable(true);
       const list = Array.isArray(r) ? r : [];
       setRows(list);
       setLoaded(true);
+      void saveList(scope, key, list);
       return list.length; // number of cards that will show
     } catch (e: any) {
+      if (isNetErr(e)) {
+        reportReachable(false);
+        return await fromDevice();
+      }
       setRows([]);
       setListError(errMsg(e, 'Could not load the list.'));
       return 0;
     } finally {
       setListLoading(false);
     }
-  }, [api, prpCode, prptype, beamFilter, fromDate, toDate]);
+  }, [api, scope, prpCode, prptype, beamFilter, fromDate, toDate]);
 
   // NOTE: the list API is called ONLY when the user taps 'Show list' (or pulls to refresh) — never automatically.
 
@@ -143,6 +250,11 @@ export default function RollCutScanner({ token, API }: Props) {
   /* ------------------------------- delete -------------------------------- */
   const deleteRow = useCallback(
     async (row: any) => {
+      const needNet = () => AppAlert.alert('No network', 'A scan that is already on the server can be deleted only with network. Please try again when you are online.');
+      if (!isOnline()) {
+        needNet();
+        return false;
+      }
       try {
         const r = await api.remove({ prpcode: prpCode, yearno: getCurrentFinancialYear(), row });
         if (r?.success !== true) {
@@ -153,6 +265,11 @@ export default function RollCutScanner({ token, API }: Props) {
         AppAlert.alert('Success', r?.message || 'Delete successfully');
         return true;
       } catch (e: any) {
+        if (isNetErr(e)) {
+          reportReachable(false);
+          needNet();
+          return false;
+        }
         AppAlert.alert('Error', errMsg(e, 'Delete failed'));
         return false;
       }
@@ -167,62 +284,152 @@ export default function RollCutScanner({ token, API }: Props) {
     setFailMsg('');
   };
 
-  const onScan = (value: string) => {
+  /**
+   * Save one scan.  online -> server (as before).  no network -> offline queue on the device.
+   * `quiet` = scanner gun: no popup that needs a tap, the result is shown on the screen (+ vibration).
+   */
+  const saveOne = useCallback(
+    async (q: QrData, text: string, quiet: boolean) => {
+      const stamp = () => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const item = { raw: text, prpcode: q.prpcode, yearno: q.yearno || getCurrentFinancialYear(), beamno: q.beamno, takano: q.takano };
+      const fail = (m: string) => {
+        setLastSaved(null);
+        setFailMsg(m);
+        feedback(false);
+        if (!quiet) AppAlert.alert('Error', m);
+      };
+      const done = (offline: boolean) => {
+        setFailMsg('');
+        setLastSaved({ beam: q.beamno, taka: q.takano, at: stamp(), offline });
+        setRaw('');
+        setQr(null);
+        feedback(true);
+      };
+      const keepOnDevice = async () => {
+        // the server cannot check this scan now -> check here what it would refuse for sure
+        if (!item.prpcode || !str(q.beamuid)) return fail('This QR has no property / beam id — it cannot be saved offline. Scan it again when you are online.');
+        const r = await enqueue(item);
+        if (r === 'queued') return done(true);
+        if (r === 'duplicate') return fail(`Taka ${q.takano} is already saved offline and waiting to upload.`);
+        return fail('Could not save on this device (storage full). Please do not scan more until the network is back.');
+      };
+
+      setSaving(true);
+      setFailMsg('');
+      try {
+        if (!isOnline()) return await keepOnDevice();
+        if (isQueued(item)) return fail(`Taka ${q.takano} is already saved offline and waiting to upload.`);
+        const r = await api.save({ prpcode: item.prpcode, yearno: item.yearno, scannedString: text });
+        reportReachable(true);
+        if (r?.success === true) done(false);
+        else fail(r?.message || 'Save failed');
+      } catch (e: any) {
+        if (isNetErr(e)) {
+          // network dropped during the save -> keep it; if the server did receive it, the later upload
+          // gets "Duplicate TakaNo" and is simply marked as already on the server (never saved twice)
+          reportReachable(false);
+          await keepOnDevice();
+        } else {
+          fail(errMsg(e, 'Save failed'));
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [api],
+  );
+
+  const onScan = (value: string, source: ScanMode = 'camera') => {
     setCamOpen(false);
-    const parsed = parseQr(value);
-    if (!parsed || !parsed.beamno || !parsed.takano) {
+    const clean = normalizeQrText(value);
+    const parsed = clean ? parseQr(clean) : null;
+    if (!clean || !parsed) {
       clearScan();
-      AppAlert.alert('Invalid QR', 'QR format not valid');
+      setLastSaved(null);
+      if (source === 'gun') {
+        setFailMsg('QR format not valid — scan the taka QR again');
+        feedback(false);
+      } else {
+        AppAlert.alert('Invalid QR', 'QR format not valid');
+      }
       return;
     }
-    setRaw(value);
+    setRaw(clean);
     setQr(parsed);
     setFailMsg('');
+    if (source === 'gun' && autoSave) {
+      gunChain.current = gunChain.current.then(() => saveOne(parsed, clean, true)).catch(() => undefined);
+    }
   };
 
-  const onSave = async () => {
+  const onSave = () => {
     if (saving) return;
     if (!qr || !raw) return AppAlert.alert('Scan required', 'Please scan the taka QR first.');
-    setSaving(true);
-    setFailMsg('');
-    try {
-      const r = await api.save({ prpcode: qr.prpcode, yearno: qr.yearno || getCurrentFinancialYear(), scannedString: raw });
-      if (r?.success === true) {
-        const now = new Date();
-        setFailMsg('');
-        setLastSaved({ beam: qr.beamno, taka: qr.takano, at: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
-        clearScan();
-      } else {
-        setLastSaved(null);
-        setFailMsg(r?.message || 'Save failed');
-        AppAlert.alert('Error', r?.message || 'Save failed');
-      }
-    } catch (e: any) {
-      setLastSaved(null);
-      setFailMsg(errMsg(e, 'Save failed'));
-      AppAlert.alert('Error', errMsg(e, 'Save failed'));
-    } finally {
-      setSaving(false);
-    }
+    void saveOne(qr, raw, false);
   };
 
   /* ------------------------------- panels -------------------------------- */
   const ready = !!qr;
+  const gun = mode === 'gun';
 
   const scanPanel = (
     <View style={st.panelPad}>
       <View style={st.card}>
-        <View style={st.scanTop}>
-          <TouchableOpacity activeOpacity={0.85} style={[st.scanBtn, ready && st.scanBtnOk, !!failMsg && st.scanBtnFail]} onPress={() => setCamOpen(true)} accessibilityRole="button" accessibilityLabel="Scan QR">
-            <Icon name={failMsg ? 'close' : ready ? 'check' : 'qr-code-scanner'} size={44} color="#fff" />
-          </TouchableOpacity>
-          <Text style={st.scanTitle}>{failMsg ? 'Save failed' : ready ? 'QR scanned' : 'Scan taka QR'}</Text>
-          <Text style={st.scanHint}>{failMsg ? failMsg : ready ? 'Check the details below and press Save' : 'Tap the button and point the camera at the QR code'}</Text>
-          <TouchableOpacity style={st.rescan} onPress={() => setCamOpen(true)} accessibilityRole="button">
-            <Icon name={ready ? 'refresh' : 'photo-camera'} size={15} color={T.copper} />
-            <Text style={st.rescanText}>{ready ? 'Scan again' : 'Open camera'}</Text>
-          </TouchableOpacity>
+        <View style={st.modeRow}>
+          {([['camera', 'Camera', 'photo-camera'], ['gun', 'Scanner gun', 'barcode-reader']] as const).map(([k, label, icon]) => {
+            const on = mode === k;
+            return (
+              <TouchableOpacity key={k} activeOpacity={0.8} style={[st.modeBtn, on && st.modeBtnOn]} onPress={() => changeMode(k)} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                <Icon name={icon} size={17} color={on ? '#fff' : T.nav} />
+                <Text style={[st.modeText, on && { color: '#fff' }]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+
+        <View style={st.scanTop}>
+          <TouchableOpacity
+            activeOpacity={gun ? 1 : 0.85}
+            style={[st.scanBtn, gun && st.scanBtnGun, ready && st.scanBtnOk, !!failMsg && st.scanBtnFail]}
+            onPress={gun ? undefined : () => setCamOpen(true)}
+            disabled={gun}
+            accessibilityRole={gun ? 'image' : 'button'}
+            accessibilityLabel="Scan QR"
+          >
+            {saving && gun ? <ActivityIndicator color="#fff" size="large" /> : <Icon name={failMsg ? 'close' : ready ? 'check' : gun ? 'barcode-reader' : 'qr-code-scanner'} size={44} color="#fff" />}
+          </TouchableOpacity>
+          <Text style={st.scanTitle}>{failMsg ? (ready ? 'Save failed' : 'Not saved') : ready ? 'QR scanned' : 'Scan taka QR'}</Text>
+          <Text style={st.scanHint}>
+            {failMsg
+              ? failMsg
+              : ready
+                ? 'Check the details below and press Save'
+                : gun
+                  ? autoSave
+                    ? 'Scan with the gun — every taka is saved automatically'
+                    : 'Scan with the gun, check the details, then press Save'
+                  : 'Tap the button and point the camera at the QR code'}
+          </Text>
+          {!gun ? (
+            <TouchableOpacity style={st.rescan} onPress={() => setCamOpen(true)} accessibilityRole="button">
+              <Icon name={ready ? 'refresh' : 'photo-camera'} size={15} color={T.copper} />
+              <Text style={st.rescanText}>{ready ? 'Scan again' : 'Open camera'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {gun ? (
+          <>
+            <GunScanner active={!camOpen} onScan={(v) => onScan(v, 'gun')} />
+            <View style={st.autoRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={st.autoTitle}>Auto save</Text>
+                <Text style={st.autoSub}>Save right after every gun scan</Text>
+              </View>
+              <Switch value={autoSave} onValueChange={changeAutoSave} trackColor={{ true: T.green, false: T.border }} thumbColor="#fff" accessibilityLabel="Auto save" />
+            </View>
+          </>
+        ) : null}
 
         <ReadBox label="Beam No" icon="view-column" value={qr?.beamno || ''} onClear={ready ? clearScan : undefined} />
         <ReadBox label="Taka No" icon="confirmation-number" value={qr?.takano || ''} />
@@ -251,14 +458,16 @@ export default function RollCutScanner({ token, API }: Props) {
       ) : null}
 
       {lastSaved ? (
-        <View style={st.okBox}>
-          <View style={st.okIcon}><Icon name="check" size={18} color="#fff" /></View>
+        <View style={[st.okBox, lastSaved.offline && st.offBox]}>
+          <View style={[st.okIcon, lastSaved.offline && { backgroundColor: T.amber }]}><Icon name={lastSaved.offline ? 'offline-pin' : 'check'} size={18} color="#fff" /></View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={st.okTitle}>Saved successfully</Text>
+            <Text style={[st.okTitle, lastSaved.offline && { color: T.amber }]}>{lastSaved.offline ? 'Saved offline — uploads automatically' : 'Saved successfully'}</Text>
             <Text style={st.okSub} numberOfLines={1}>Beam {lastSaved.beam} · Taka {lastSaved.taka} · {lastSaved.at}</Text>
           </View>
         </View>
       ) : null}
+
+      <PendingQueue online={online} onSync={syncQueue} />
     </View>
   );
 
@@ -316,6 +525,11 @@ export default function RollCutScanner({ token, API }: Props) {
           <DateField label="From date" value={fromDate} onChange={changeFrom} />
           <DateField label="To date" value={toDate} onChange={changeTo} />
         </View>
+        {!online ? (
+          <Text style={st.offNote}>
+            Offline — Property and Beam lists are the copy saved on this device{c.propsAt ? ` (updated ${fmtWhen(c.propsAt)})` : ''}.
+          </Text>
+        ) : null}
         {c.prptypeMissing ? <Text style={st.err}>Property group (prptype) not found for this login — please re-login.</Text> : null}
         {listError ? <Text style={st.err}>{listError}</Text> : null}
         <TouchableOpacity activeOpacity={0.85} style={[st.loadBtn, listLoading && { opacity: 0.8 }]} onPress={() => { void loadList().then((n) => { if (n > 0) setFiltersOpen(false); }); }} disabled={listLoading} accessibilityRole="button">
@@ -325,6 +539,13 @@ export default function RollCutScanner({ token, API }: Props) {
         </>
         ) : null}
       </View>
+
+      {loaded && listNote ? (
+        <View style={st.noteBox}>
+          <Icon name="cloud-off" size={16} color={T.amber} />
+          <Text style={st.noteText}>{listNote}</Text>
+        </View>
+      ) : null}
 
       {loaded ? (
         <View style={st.searchBox}>
@@ -401,6 +622,7 @@ export default function RollCutScanner({ token, API }: Props) {
 
   return (
     <View style={st.screen}>
+      <OfflineBar online={online} onSync={syncQueue} />
       {wide ? (
         <View style={st.split}>
           <ScrollView style={st.left} keyboardShouldPersistTaps="handled">{scanPanel}</ScrollView>
@@ -418,6 +640,9 @@ export default function RollCutScanner({ token, API }: Props) {
                   {k === 'list' && loaded ? (
                     <View style={[st.tabBadge, on && { backgroundColor: '#ffffff33' }]}><Text style={[st.tabBadgeText, on && { color: '#fff' }]}>{rows.length}</Text></View>
                   ) : null}
+                  {k === 'scan' && pendingCount ? (
+                    <View style={[st.tabBadge, { backgroundColor: on ? '#ffffff33' : `${T.amber}22` }]}><Text style={[st.tabBadgeText, { color: on ? '#fff' : T.amber }]}>{pendingCount}</Text></View>
+                  ) : null}
                 </TouchableOpacity>
               );
             })}
@@ -426,7 +651,7 @@ export default function RollCutScanner({ token, API }: Props) {
         </>
       )}
 
-      <ScanCamera visible={camOpen} onClose={() => setCamOpen(false)} onScan={onScan} />
+      <ScanCamera visible={camOpen} onClose={() => setCamOpen(false)} onScan={(v) => onScan(v, 'camera')} />
     </View>
   );
 }
@@ -546,6 +771,19 @@ const st = StyleSheet.create({
   panelPad: { padding: 16, width: '100%', maxWidth: 900, alignSelf: 'center' },
 
   card: { backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 16, marginBottom: 12, ...S.card, shadowOpacity: 0.05, elevation: 1 },
+
+  modeRow: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 12, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, marginBottom: 14 },
+  modeBtn: { flex: 1, minHeight: 40, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  modeBtnOn: { backgroundColor: T.nav },
+  modeText: { fontSize: 13, fontWeight: '900', color: T.nav },
+  scanBtnGun: { backgroundColor: T.nav, shadowColor: T.nav },
+  autoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: T.hair },
+  autoTitle: { fontSize: 13, fontWeight: '900', color: T.nav },
+  autoSub: { fontSize: 11.5, fontWeight: '600', color: T.muted, marginTop: 1 },
+  offBox: { borderColor: `${T.amber}66`, backgroundColor: `${T.amber}14` },
+  offNote: { fontSize: 12, fontWeight: '700', color: T.amber, marginTop: 12 },
+  noteBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: `${T.amber}66`, backgroundColor: `${T.amber}12`, marginBottom: 12 },
+  noteText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '700', color: T.ink },
 
   scanTop: { alignItems: 'center', paddingBottom: 16, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: T.hair },
   scanBtn: { width: 96, height: 96, borderRadius: 28, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', shadowColor: T.copper, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },

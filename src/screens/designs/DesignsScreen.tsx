@@ -37,6 +37,7 @@ import { useRouter } from 'expo-router';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 import DyeingMasterTab, { apiErrorText, type DyeingMasterApi } from './DyeingMasterTab';
 import ChartScreen from './chartscreen';
+import { designFamilyName, fromYearwiseDesignFamilyResponse, normalizedDesignName, type CatalogFamilyWarning } from './designFamilyWarning';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -2465,6 +2466,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const { prpcode, strcode, yearno } = useERP();
 
     const [saving, setSaving] = useState(false);
+    const [checkingDesignFamily, setCheckingDesignFamily] = useState(false);
+    const [familyLookupState, setFamilyLookupState] = useState<'idle' | 'checking' | 'found' | 'clear' | 'unavailable'>('idle');
+    const [familyWarning, setFamilyWarning] = useState<CatalogFamilyWarning | null>(null);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
@@ -2514,6 +2518,83 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         if (!value) return '';
         return hsn.options.find(o => o.value === value)?.label || value;
     }, [form.erp_gst_grp, hsn.options]);
+
+    // Advisory read-only lookup against the authoritative selected-year DAPDesign.
+    // Existing Design create/update requests and payloads are NOT changed.
+    const lookupDesignFamily = useCallback(async (name: string): Promise<CatalogFamilyWarning | null> => {
+        if (designFamilyName(name).length < 3) return null;
+        const response = await client.get('/designs/family-check', {
+            params: {
+                yearno,
+                prpcode,
+                design_name: name,
+                ...(design?.dsn_code ? { exclude_dsn_code: design.dsn_code } : {}),
+            },
+        });
+        const body: any = response?.data;
+        if (body?.success === false) throw new Error('Yearwise design-family lookup failed');
+        const result: any = body?.data ?? body?.response?.data;
+        return fromYearwiseDesignFamilyResponse(result);
+    }, [yearno, prpcode, design?.dsn_code]);
+
+    // Debounced hint is non-blocking. Discard stale responses when the user edits.
+    useEffect(() => {
+        let active = true;
+        if (!String(form.code || '').trim() ||
+            (design?.id && normalizedDesignName(form.code) === normalizedDesignName(design.code))) {
+            setFamilyWarning(null);
+            setFamilyLookupState('idle');
+            return () => { active = false; };
+        }
+        setFamilyWarning(null);
+        setFamilyLookupState('checking');
+        const timer = setTimeout(() => {
+            lookupDesignFamily(String(form.code)).then(result => {
+                if (!active) return;
+                setFamilyWarning(result);
+                setFamilyLookupState(result ? 'found' : 'clear');
+            }).catch(() => {
+                if (!active) return;
+                setFamilyWarning(null);
+                setFamilyLookupState('unavailable');
+            });
+        }, 450);
+        return () => { active = false; clearTimeout(timer); };
+    }, [form.code, design?.id, design?.code, lookupDesignFamily]);
+
+    const confirmDesignFamilyWarning = async (): Promise<boolean> => {
+        if (design?.id && normalizedDesignName(form.code) === normalizedDesignName(design.code)) {
+            return true; // Do not re-warn when other fields of an existing design change.
+        }
+        let result: CatalogFamilyWarning | null;
+        try {
+            result = await lookupDesignFamily(String(form.code));
+        } catch {
+            return new Promise<boolean>(resolve => {
+                AppAlert.alert('Design family check unavailable',
+                    'Could not verify existing design families right now. Review the design name before proceeding.', [
+                        { text: 'Review name', style: 'cancel', onPress: () => resolve(false) },
+                        { text: 'Continue saving', onPress: () => resolve(true) },
+                    ], { cancelable: false });
+            });
+        }
+        if (!result) return true;
+        const suggested = result.knownMainDesign;
+        const existingName = result.mainDesigns.length > 1
+            ? `Existing family: ${result.family}. Multiple Main Designs exist (${result.mainDesigns.map(d => d.dsn_code).join(', ')}); review the correct family.`
+            : suggested
+                ? `Existing family: ${result.family}${suggested.dsn_code ? ` (Code ${suggested.dsn_code})` : ''}.`
+                : `Similar ${result.family} designs already exist in yearwise ERP DAPDesign.`;
+        const message = result.exact
+            ? `The design name "${String(form.code).trim()}" already exists.\n\n${existingName}\n\nReview this entry to avoid duplication.`
+            : `You are creating "${String(form.code).trim()}".\n\n${existingName}\n\nThis may be a variation of the same design family. Please check before saving.`;
+        return new Promise<boolean>(resolve => {
+            AppAlert.alert(result.exact ? 'Duplicate design name found' : 'Similar design family found', message, [
+                { text: 'Review name', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Continue saving', onPress: () => resolve(true) },
+            ], { cancelable: false });
+        });
+    };
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
@@ -2601,6 +2682,16 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             ].filter(Boolean).join('\n'));
             return;
         }
+
+        if (saving || checkingDesignFamily) return;
+        setCheckingDesignFamily(true);
+        let familyConfirmed = false;
+        try {
+            familyConfirmed = await confirmDesignFamilyWarning();
+        } finally {
+            setCheckingDesignFamily(false);
+        }
+        if (!familyConfirmed) return;
 
         setSaving(true);
 
@@ -2957,6 +3048,28 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
                 <Text style={fm.label}>DESIGN CODE</Text>
                 <TextInput value={form.code ?? ''} onChangeText={v => set('code', v)} placeholder="e.g. Cambridge" placeholderTextColor={T.muted} style={fm.input} />
+                {familyLookupState === 'checking' && String(form.code || '').trim().length >= 3 ? (
+                    <Text style={fm.familyChecking}>Checking existing design families…</Text>
+                ) : null}
+                {familyLookupState === 'found' && familyWarning ? (
+                    <View style={fm.familyWarningBox}>
+                        <Text style={fm.familyWarningTitle}>Similar design family already exists</Text>
+                        <Text style={fm.familyWarningText}>
+                            {familyWarning.family} already exists in the yearwise Design Master.
+                            {' '}Please check whether this is a variation before saving.
+                            {familyWarning.mainDesigns.length > 1
+                                ? ` Matching Main Design codes: ${familyWarning.mainDesigns.map(d => d.dsn_code).join(', ')}.`
+                                : familyWarning.knownMainDesign?.dsn_code
+                                    ? ` Main Design code: ${familyWarning.knownMainDesign.dsn_code}.`
+                                    : ''}
+                        </Text>
+                        {familyWarning.exact ? <Text style={fm.familyWarningText}>An exact design name also exists.</Text> : null}
+                    </View>
+                ) : null}
+                {familyLookupState === 'unavailable' ? (
+                    <Text style={fm.familyChecking}>Family check unavailable. It will be checked again on Save.</Text>
+                ) : null}
+
 
                 <Text style={fm.label}>CATEGORY</Text>
 
@@ -3137,8 +3250,8 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     greige_width: form.greige_width,
                 }} />
 
-                <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
-                    <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
+                <TouchableOpacity style={[fm.saveBtn, (saving || checkingDesignFamily) && { opacity: 0.5 }]} onPress={save} disabled={saving || checkingDesignFamily}>
+                    <Text style={fm.saveTxt}>{saving ? 'Saving…' : checkingDesignFamily ? 'Checking name…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
             </ScrollView>
             <YarnPickerModal
@@ -3212,6 +3325,10 @@ const fm = StyleSheet.create({
     editCancel: { fontSize: 12, fontWeight: '700', color: T.copper, marginTop: 6 },
     label: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
     hint: { fontSize: 11, color: T.muted, marginTop: -4, marginBottom: 6 },
+    familyChecking: { fontSize: 11, color: T.muted, marginTop: 6 },
+    familyWarningBox: { backgroundColor: T.copper + '12', borderColor: T.copper + '65', borderWidth: 1, borderRadius: 9, padding: 10, marginTop: 8 },
+    familyWarningTitle: { color: T.copper, fontWeight: '800', fontSize: 12 },
+    familyWarningText: { color: T.ink, fontSize: 11, marginTop: 4, lineHeight: 16 },
     input: { backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: T.ink },
     inputRO: { backgroundColor: T.sub, justifyContent: 'center' },
     roTxt: { fontSize: 14, color: T.ink, fontWeight: '600' },

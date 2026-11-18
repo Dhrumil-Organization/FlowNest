@@ -14,13 +14,17 @@
 // (DtsDashboardController opens the year database of `to`, so an earlier year is read from its own books.)
 // A year whose books cannot be opened is shown as "no data" and named in the footnote — never estimated.
 // Expense metrics (DTS expense · Weaving cost) cost each pick-metre at the Expense module's rate of its month, so they
-// cover the months the Expense module has loaded.
+// cover the months the Expense module has loaded (it holds six). They are therefore loaded MONTH BY MONTH, and only
+// those months:  GET ...?section=pickmetres&from=<1st>&to=<month end>  — the very call the dashboard's DTS Expense card
+// and the DTS Expense page already make (so the running month is usually in the cache and appears at once).
+// The page is drawn as soon as the first month arrives and fills in as the others do. Asking for pick-metres of three
+// whole financial years in one request is what timed out — and all but six of those months could not be costed anyway.
 import { T } from '@/src/theme';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line as SvgLine, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { FONT } from '../OwnerDashboardNEW/fonts';
-import type { DtsExpenseSource } from './Expense';
+import { DtsExpenseSource, useDtsExpenseWindow } from './Expense';
 import { daysInMonth, DtsFetch, DtsItem, DtsSection, fmtDY, fyN, M, monthEnd, num, Q, SEC_MACH, toItems, todayS } from './model';
 import { C, st as ui, StateBox } from './ui';
 
@@ -72,8 +76,8 @@ const group = (ls: Line[], dim: string) => {
   return Object.values(g).sort((a, b) => b.amt - a.amt);
 };
 const DIMS: Record<string, string> = {
-  exec: 'Executive', party: 'Customer', cat: 'Category', art: 'Design', shed: 'Shed', head: 'Cost head', secm: 'Machines',
-  vendor: 'Vendor', worker: 'Job worker',
+  exec: 'Executive', party: 'Customer', cat: 'Category', art: 'Design', shed: 'Shed', head: 'Head', secm: 'Machines',
+  vendor: 'Vendor', worker: 'Job worker', mode: 'Mode', status: 'Status',
 };
 const dimLbl = (k: string) => DIMS[k] || k;
 const GREYS = ['#C9C2BA', '#8A8580'];
@@ -113,14 +117,14 @@ const defsOf = (L: Money): Record<FyMetric, Def> => ({
     note: "Dress Material, Technical Textile and Sportswear rolls on any machine: each roll × its picks × the per-pick cost of every head for the section whose machines wove it (the Expense module's month, live or closed). Other categories are left out.",
   },
   payments: {
-    title: 'Payments Made', noun: 'payments', icon: '💸', accent: PAY_COL, fmt: L, measure: 'Paid', count: 'Payments', dims: ['vendor', 'cat'],
+    title: 'Payments Made', noun: 'payments', icon: '💸', accent: PAY_COL, fmt: L, measure: 'Paid', count: 'Payments', dims: ['vendor', 'head', 'mode'],
     extras: (ls) => [{ k: 'avg', label: 'Avg payment', num: ratio(ls, (l) => l.n), fmt: L }],
-    note: 'The part of each cleared payment adjusted against a purchase bill carrying DTS items (job work, greige, processing), by payment date. Yarn bills serve both sections and are left out.',
+    note: 'The part of each cleared payment adjusted against a purchase bill carrying DTS items (job work, greige, processing), by payment date. Bill head = the purchase ledger the bill is booked to; mode = as the voucher names it. Yarn bills serve both sections and are left out.',
   },
   jobwork: {
-    title: 'Job work', noun: 'job work', icon: '🧶', accent: C.prod, fmt: M, measure: 'Woven', count: 'Inwards', qty: { lbl: 'Charges', fmt: L }, dims: ['worker', 'art', 'cat'],
+    title: 'Job work', noun: 'job work', icon: '🧶', accent: C.prod, fmt: M, measure: 'Woven', count: 'Inwards', qty: { lbl: 'Charges', fmt: L }, dims: ['worker', 'art', 'status'],
     extras: (ls) => { const a = sumA(ls), v = ls.reduce((s, l) => s + l.qty, 0); return [{ k: 'perm', label: 'Charge / m', num: a > 0 ? v / a : null, fmt: (x) => `₹${x.toFixed(2)}` }]; },
-    note: 'Outsourced · our yarn: metres of DTS fabric received from job workers, on the inward date, with the job charges of the inward.',
+    note: 'Outsourced · our yarn: metres of DTS fabric received from job workers, on the inward date, with the job charges of the inward. Status = this year\'s received metres against the metres ordered on job work (production orders).',
   },
 });
 
@@ -216,10 +220,18 @@ export function FYBtn({ onPress, dark, big }: { onPress: () => void; dark?: bool
 }
 
 /* ---------- the page ---------- */
+/** loads six earlier months of the Expense module and hands them up (mounted only when asked for) */
+function ExpenseWindow({ token, API, anchor, onData }: { token: string; API: string; anchor: Date; onData: (byMonth: Record<string, any>, done: boolean) => void }) {
+  const w = useDtsExpenseWindow(token, API, anchor);
+  const key = Object.keys(w.byMonth).sort().join(',');
+  useEffect(() => { onData(w.byMonth, w.done); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [key, w.done]);
+  return null;
+}
+
 export default function FYPage({
-  metric, fetch, exp, L, backRef, title = 'DTS',
+  metric, fetch, exp: exp0, L, backRef, title = 'DTS', token = '', API = '',
 }: {
-  metric: FyMetric; fetch: Fetch; exp: DtsExpenseSource; L: Money; title?: string;
+  metric: FyMetric; fetch: Fetch; exp: DtsExpenseSource; L: Money; title?: string; token?: string; API?: string;
   /** the hub's ‹ asks the page first: true = the page stepped back inside itself */
   backRef: React.MutableRefObject<(() => boolean) | null>;
 }) {
@@ -239,20 +251,80 @@ export default function FYPage({
   const [showLines, setShowLines] = useState(false);
   const [tile, setTile] = useState<string | null>(null);
   const [boxW, setBoxW] = useState(0);
+  /* earlier months of the Expense module, six at a time, only when the owner asks for them */
+  const [windows, setWindows] = useState<{ anchor: Date; byMonth: Record<string, any>; done: boolean }[]>([]);
+  const exp: DtsExpenseSource = useMemo(() => {
+    const extra = Object.assign({}, ...windows.map((w) => w.byMonth));
+    return { ...exp0, byMonth: { ...extra, ...exp0.byMonth } };
+  }, [exp0, windows]);
   const expKey = Object.keys(exp.byMonth).sort().join(',');
+  const addWindow = () => {
+    const oldest = Object.keys(exp0.byMonth).sort()[0] || todayS().slice(0, 7);
+    const lastAnchor = windows.length ? windows[windows.length - 1].anchor : new Date(+oldest.slice(0, 4), +oldest.slice(5, 7) - 1, 1);
+    const a = new Date(lastAnchor.getFullYear(), lastAnchor.getMonth() - (windows.length ? 6 : 1), 1);
+    setWindows((ws) => [...ws, { anchor: a, byMonth: {}, done: false }]);
+  };
 
   /* the current year first (the page is drawn as soon as it arrives), then the two earlier years, then the optional
      collection / target figures of Sales. One request per year, each a small month-wise table. */
+  /* ---- cost metrics: only the months the Expense module has rates for, one small request each, newest first ---- */
+  const cost = isCost(metric);
+  const costMonths = useMemo(
+    () => (cost ? Object.keys(exp.byMonth).filter((m) => m <= CUR_M && FY_LIST.includes(fyOfMonth(m))).sort().reverse() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cost, expKey, CUR_M, FY_LIST],
+  );
+  const costKey = costMonths.join(',');
+  const [costRows, setCostRows] = useState<Record<string, any[]>>({});
+  const [costErr, setCostErr] = useState<Record<string, string>>({});
+  const costGen = useRef(0), costSeen = useRef<Record<string, true>>({});
   useEffect(() => {
+    costGen.current++;
+    costSeen.current = {};
+    setCostRows({});
+    setCostErr({});
+  }, [metric, fetch]);
+  useEffect(() => {
+    if (!cost) return;
+    const gen = costGen.current;
+    const queue = costMonths.filter((m) => !costSeen.current[m]);
+    queue.forEach((m) => { costSeen.current[m] = true; });
+    const next = async (): Promise<void> => {
+      const m = queue.shift();
+      if (!m || gen !== costGen.current) return;
+      try {
+        const r = await fetch('pickmetres', `${m}-01`, monthEnd(m));
+        if (gen === costGen.current) setCostRows((o) => ({ ...o, [m]: r.items }));
+      } catch (e: any) {
+        if (gen === costGen.current) setCostErr((o) => ({ ...o, [m]: e?.message || 'Unable to load.' }));
+      }
+      return next();
+    };
+    void next();
+    void next(); /* two at a time */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cost, costKey, fetch, metric]);
+  const costDone = costMonths.filter((m) => costRows[m] || costErr[m]).length, costBusy = cost && costDone < costMonths.length;
+
+  const loadGen = useRef(0);
+  const loadYear = useCallback((y: string, gen: number) => {
+    const [from, to] = yearRange(y);
+    return fetch('fy', from, to, FY_KEY[metric])
+      .then((r) => { if (gen === loadGen.current) setRaw((o) => ({ ...o, [y]: { rows: r.items, error: '' } })); })
+      .catch((e: any) => { if (gen === loadGen.current) setRaw((o) => ({ ...o, [y]: { rows: [], error: e?.message || 'Unable to load.' } })); });
+  }, [fetch, metric]);
+  /* a year that failed: load it again (the failed request is not cached) */
+  const retryYear = (y: string) => {
+    setRaw((o) => { const n = { ...o }; delete n[y]; return n; });
+    void loadYear(y, loadGen.current);
+  };
+  useEffect(() => {
+    if (isCost(metric)) return;
+    const gen = ++loadGen.current;
     let alive = true;
     setRaw({});
     setCross({});
-    const one = (y: string) => {
-      const [from, to] = yearRange(y);
-      return fetch('fy', from, to, FY_KEY[metric])
-        .then((r) => { if (alive) setRaw((o) => ({ ...o, [y]: { rows: r.items, error: '' } })); })
-        .catch((e: any) => { if (alive) setRaw((o) => ({ ...o, [y]: { rows: [], error: e?.message || 'Unable to load.' } })); });
-    };
+    const one = (y: string) => loadYear(y, gen);
     (async () => {
       await one(FY_LIST[0]);
       if (!alive) return;
@@ -268,15 +340,34 @@ export default function FYPage({
       }
     })();
     return () => { alive = false; };
-  }, [metric, fetch, FY_LIST]);
+  }, [metric, fetch, FY_LIST, loadYear]);
 
   /* the Expense module's rates arrive on their own: the cost metrics are re-costed from the rows already loaded, not re-fetched */
   const data = useMemo(() => {
     const o: Record<string, YearData> = {};
+    if (isCost(metric)) {
+      /* the loaded months, each added up to machine group x category x design, then costed at that month's rate */
+      FY_LIST.forEach((y) => { o[y] = { lines: [], meta: {}, error: '', note: '' }; });
+      Object.keys(costRows).forEach((m) => {
+        const yd = o[fyOfMonth(m)];
+        if (!yd) return;
+        const g: Record<string, { v: number; pm: number; n: number; s: 'A' | 'B'; d: Record<string, string> }> = {};
+        (costRows[m] || []).forEach((r) => {
+          if (String(r.date || '').slice(0, 7) !== m) return;
+          const s: 'A' | 'B' = r.sec === 'A' ? 'A' : 'B', key = `${r.grp}|${r.cat}|${r.art}`;
+          const x = g[key] || (g[key] = { v: 0, pm: 0, n: 0, s, d: { cat: String(r.cat || '—'), art: String(r.art || '—'), shed: String(r.shed || '—'), grp: String(r.grp || ''), secm: SEC_MACH[s].lbl } });
+          x.v += num(r.v); x.pm += num(r.pm); x.n += num(r.n);
+        });
+        Object.values(g).forEach((x) => {
+          costInto(yd.lines, metric, exp, yd.meta, { k: m, amt: 0, qty: 0, n: 0, date: `${m}-01`, ref: '', sub: '', d: x.d }, x.s, x.v, x.pm, x.n);
+        });
+      });
+      return o;
+    }
     Object.keys(raw).forEach((y) => { o[y] = buildYear(metric, raw[y], exp); });
     return o;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raw, metric, expKey]);
+  }, [raw, costRows, metric, expKey]);
 
   /* ---------- every number of the page: the lines cut by financial year and month ---------- */
   const base = useMemo(() => FY_LIST.flatMap((y) => data[y]?.lines || []), [data, FY_LIST]);
@@ -377,10 +468,18 @@ export default function FYPage({
   const cntOf = (n: number) => { const c = def.count.toLowerCase(); return n === 1 ? c.replace(/s$/, '') : c; };
   /* the records behind the scope are loaded only when they are opened: the month on screen, else the year */
   const [recFrom, recTo] = month ? [`${month}-01`, monthEnd(month) > today ? today : monthEnd(month)] : yearRange(fy);
-  const recKey = `${metric}|${recFrom}|${recTo}`, wantRecs = view === 'detail' && listing && recFrom <= recTo;
-  const entries = listing && recs.key === recKey
-    ? recs.lines.filter((l) => matches(l, path)).sort((a, b) => b.date.localeCompare(a.date) || b.amt - a.amt)
-    : [];
+  const recKey = `${metric}|${recFrom}|${recTo}`, wantRecs = !cost && view === 'detail' && listing && recFrom <= recTo;
+  const costRecs = useMemo(
+    () => (cost && listing
+      ? Object.keys(costRows).filter((m) => (month ? m === month : fyOfMonth(m) === fy))
+        .flatMap((m) => recLines(metric, toItems('pickmetres', costRows[m]), exp))
+      : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cost, listing, costRows, month, fy, metric, expKey],
+  );
+  const recsReady = cost || (recs.key === recKey && !recs.loading && !recs.error);
+  const entries = !listing ? [] : (cost ? costRecs : recs.key === recKey ? recs.lines : [])
+    .filter((l) => matches(l, path)).sort((a, b) => b.date.localeCompare(a.date) || b.amt - a.amt);
 
   backRef.current = () => {
     if (view === 'detail') {
@@ -409,9 +508,26 @@ export default function FYPage({
   }, [wantRecs, recKey, fetch, expKey]);
 
   const cur = data[FY_CUR];
-  /* a cost metric needs the Expense module's rates before a rupee can be shown */
-  if (!cur || (isCost(metric) && exp.loading)) return <View style={[ui.card, { padding: 16 }]}><StateBox loading /></View>;
-  if (cur.error) return <View style={[ui.card, { padding: 16 }]}><StateBox error={cur.error} /></View>;
+  const waitBox = (txt: string) => (
+    <View style={[ui.card, { padding: 16 }]}>
+      <StateBox loading minHeight={60} />
+      <Text style={{ fontFamily: FONT, fontSize: 11, color: C.mut, textAlign: 'center', paddingBottom: 6 }}>{txt}</Text>
+    </View>
+  );
+  if (cost) {
+    /* a cost metric needs the Expense module's rates, then at least one month of pick-metres; it always says what it waits for */
+    if (!costMonths.length) {
+      if (exp.loading) return waitBox("Reading the Expense module's Section A / B rates…");
+      return <View style={[ui.card, { padding: 16 }]}><StateBox error={exp.error || 'The Expense module has no Section A / Section B rates loaded, so DTS expense cannot be costed.'} /></View>;
+    }
+    if (!Object.keys(costRows).length) {
+      if (costBusy) return waitBox(`Loading DTS rolls of ${mLblY(costMonths[costDone] || costMonths[0])} — month ${Math.min(costDone + 1, costMonths.length)} of ${costMonths.length}…`);
+      return <View style={[ui.card, { padding: 16 }]}><StateBox error={Object.values(costErr)[0] || 'Unable to load the DTS rolls.'} /></View>;
+    }
+  } else {
+    if (!cur) return waitBox(`Loading ${fyLbl(FY_CUR)}…`);
+    if (cur.error) return <View style={[ui.card, { padding: 16 }]}><StateBox error={cur.error} /></View>;
+  }
 
   const sec = (t: string, right?: string | null) => (
     <View style={s.secRow}>
@@ -500,12 +616,13 @@ export default function FYPage({
           {yrs.map((y, i) => {
             const focus = y === fy, fullV = S.full(y), stV = S.stage(y), prevY = yrs[i - 1], useStage = isCur || y === FY_CUR;
             const yoy = prevY ? chg(useStage ? stV : fullV, useStage ? S.stage(prevY) : S.full(prevY)) : null;
-            const failed = !!raw[y]?.error, pending = !raw[y];
+            const costedY = costMonths.filter((m) => fyOfMonth(m) === y);
+            const failed = cost ? !costedY.length : !!raw[y]?.error, pending = cost ? costedY.some((m) => !costRows[m] && !costErr[m]) && !costedY.some((m) => costRows[m]) : !raw[y];
             return (
               <Pressable key={y} onPress={() => goYear(y)} accessibilityRole="button" style={[s.yearCell, focus ? { backgroundColor: col, borderColor: col } : null]}>
                 <Text style={{ fontFamily: FONT, fontSize: 9, fontWeight: '800', color: focus ? '#fff' : C.mut }} numberOfLines={1}>{fyLbl(y)}{y === FY_CUR ? ' · to date' : ''}</Text>
                 <Text style={{ fontFamily: FONT, fontSize: 14, fontWeight: '700', color: focus ? '#fff' : C.ink, marginTop: 2 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {pending ? '…' : failed ? 'no data' : fmt(fullV)}
+                  {pending ? '…' : failed ? (cost ? 'no rates' : 'no data') : fmt(fullV)}
                 </Text>
                 {y !== FY_CUR && !failed && !pending ? (
                   <Text style={{ fontFamily: FONT, fontSize: 9, color: focus ? '#fff' : C.mut, lineHeight: 12.5 }}>at this stage{'\n'}<Text style={{ fontWeight: '700' }}>{fmt(stV)}</Text></Text>
@@ -595,6 +712,14 @@ export default function FYPage({
       {sec('Month by month · three years', 'tap a month')}
       <View style={[ui.card, { paddingTop: 10, paddingHorizontal: 6, paddingBottom: 4, marginBottom: 10 }]}>
         {bars}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, paddingHorizontal: 8, paddingTop: 6 }}>
+          {yrs.map((y) => (
+            <View key={y} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colorOf(y) }} />
+              <Text style={[s.leg, y === fy && { fontWeight: '700', color: C.ink }]}>{fyLbl(y)}{y === FY_CUR ? ' · to date' : ''}</Text>
+            </View>
+          ))}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 5, paddingHorizontal: 6, paddingTop: 8, paddingBottom: 6 }}>
           {ms.map((m, i) => <Chip key={m} small on={month === m} dim={!S.has(fy, i)} color={col} l={mShort(m)} fn={() => pick(m)} />)}
         </ScrollView>
@@ -732,7 +857,7 @@ export default function FYPage({
         {listing ? (
           <>
             <View style={s.dHead}><Text style={[ui.rowHeadText, { flex: 1 }]}>{def.count}</Text><Text style={[ui.rowHeadText, s.dCol]}>{def.measure}</Text></View>
-            {recs.key !== recKey || recs.loading ? <StateBox loading minHeight={60} /> : recs.error ? <StateBox error={recs.error} minHeight={60} /> : !entries.length ? <Text style={s.none}>Nothing recorded.</Text> : null}
+            {!recsReady ? (recs.key === recKey && recs.error ? <StateBox error={recs.error} minHeight={60} /> : <StateBox loading minHeight={60} />) : !entries.length ? <Text style={s.none}>Nothing recorded.</Text> : null}
             {recs.key === recKey && recs.note ? <Text style={{ fontFamily: FONT, fontSize: 10.5, color: C.faint, paddingTop: 6 }}>{recs.note}</Text> : null}
             {entries.slice(0, 80).map((l, i) => (
               <View key={i} style={s.dRow}>
@@ -756,7 +881,7 @@ export default function FYPage({
     </View>
   );
 
-  const failed = FY_LIST.filter((y) => data[y]?.error), notes = FY_LIST.filter((y) => data[y]?.note).map((y) => `${fyLbl(y)}: ${data[y].note}`);
+  const failed = FY_LIST.filter((y) => !cost && data[y]?.error), notes = FY_LIST.filter((y) => data[y]?.note).map((y) => `${fyLbl(y)}: ${data[y].note}`);
   return (
     <View onLayout={(e) => setBoxW(e.nativeEvent.layout.width)} style={{ paddingBottom: 16 }}>
       <View style={s.head}>
@@ -768,9 +893,40 @@ export default function FYPage({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingTop: 2, paddingBottom: 10 }}>
         {FY_LIST.map((f, i) => <Chip key={f} on={fy === f} color={col} l={`${fyLbl(f)}${i === 0 ? ' · current' : ''}`} fn={() => goYear(f)} />)}
       </ScrollView>
-      {view === 'detail' ? detail : overview}
+      {costBusy ? (
+        <View style={s.progress}>
+          <Text style={s.progressT}>Loading month {costDone + 1} of {costMonths.length} — figures below grow as each month arrives</Text>
+        </View>
+      ) : null}
+      {!cost && !raw[fy] ? (
+        <View style={[ui.card, { padding: 16 }]}>
+          <StateBox loading minHeight={60} />
+          <Text style={{ fontFamily: FONT, fontSize: 11, color: C.mut, textAlign: 'center' }}>Reading {fyLbl(fy)} from that year's ERP books…</Text>
+        </View>
+      ) : !cost && raw[fy]?.error ? (
+        <View style={[ui.card, { padding: 16 }]}>
+          <StateBox error={`${fyLbl(fy)} could not be read: ${raw[fy].error}`} onRetry={() => retryYear(fy)} />
+        </View>
+      ) : view === 'detail' ? detail : overview}
+      {windows.map((w, i) => (
+        <ExpenseWindow key={i} token={token} API={API} anchor={w.anchor}
+          onData={(byMonth, done) => setWindows((ws) => ws.map((x, k) => (k === i ? { ...x, byMonth, done } : x)))} />
+      ))}
+      {cost && token && API && view === 'overview' && windows.length < 6 ? (
+        <Pressable onPress={addWindow} disabled={windows.some((w) => !w.done)} accessibilityRole="button" style={s.moreBtn}>
+          <Text style={s.moreBtnT}>
+            {windows.some((w) => !w.done)
+              ? 'Reading earlier months from the Expense module…'
+              : windows.length && !Object.keys(windows[windows.length - 1].byMonth).length
+                ? 'No Section A / B rates in those months — load six more ›'
+                : 'Load six earlier months from the Expense module ›'}
+          </Text>
+        </Pressable>
+      ) : null}
       <Text style={s.foot}>
-        {def.note} Every year is read from that year's own ERP books.{failed.length ? ` ${failed.map(fyLbl).join(' and ')} could not be read and ${failed.length > 1 ? 'are' : 'is'} shown as no data.` : ''}
+        {def.note}{cost && costMonths.length ? ` Costed months: ${costMonths.slice().reverse().map(mLblY).join(', ')} — the months the Expense module holds Section A / B rates for; no other month can be costed, so earlier years show "no rates" rather than an estimate.` : ''}
+        {cost && Object.keys(costErr).length ? ` Could not load ${Object.keys(costErr).sort().map(mLblY).join(', ')} (${Object.values(costErr)[0]}) — tap Refresh to try again.` : ''}
+        {cost ? '' : " Every year is read from that year's own ERP books."}{failed.length ? ` ${failed.map(fyLbl).join(' and ')} could not be read and ${failed.length > 1 ? 'are' : 'is'} shown as no data.` : ''}
         {notes.length ? ` ${notes.join('. ')}.` : ''} {isCur ? `"At this stage" means ${stageLbl} of each year, so every comparison is like-for-like.` : 'Comparisons are full year against full year.'}
       </Text>
     </View>
@@ -811,5 +967,9 @@ const s = StyleSheet.create({
   dRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.hair },
   dCol: { minWidth: 64, textAlign: 'right' },
   showLines: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 9, paddingBottom: 2, marginTop: 6 },
+  moreBtn: { borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', marginTop: 4, backgroundColor: '#fff' },
+  moreBtnT: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: C.bill },
+  progress: { backgroundColor: '#FBF3E4', borderWidth: 1, borderColor: '#EBD9B4', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 },
+  progressT: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: '#8A5A12' },
   foot: { fontFamily: FONT, fontSize: 10, color: C.faint, lineHeight: 15, paddingHorizontal: 4, paddingTop: 14 },
 });

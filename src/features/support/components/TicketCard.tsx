@@ -15,17 +15,45 @@ type Props = {
   dimmed?: boolean;
   ghost?: boolean;
   onLayout?: (e: any) => void;
+  /** one compact line instead of a card (lots of data) */
+  dense?: boolean;
+  /** web: mouse over -> quick preview (null = left) */
+  onHover?: (t: Ticket | null, e?: any) => void;
 };
 
-function Card({ t, onPress, dragHandlers, draggable, dimmed, ghost, onLayout }: Props) {
+function Card({ t, onPress, dragHandlers, draggable, dimmed, ghost, onLayout, dense, onHover }: Props) {
   const p = priorityOf(t.priority);
   const ty = typeOf(t.type);
   const overdue = isOverdue(t);
   const side = devSideOf(t.dev_side);
   const est = t.est_min || 0;
+  const hover = onHover ? { onHoverIn: (e: any) => onHover(t, e), onHoverOut: () => onHover(null) } : {};
+  if (dense) {
+    const over = est && t.spent_min > est;
+    return (
+      <View onLayout={onLayout} style={[s.line, { borderLeftColor: p.color }, dimmed && { opacity: 0.35 }, ghost && s.ghost]}>
+        <Pressable {...(hover as any)} onPress={() => onPress(t)} style={({ pressed, hovered }: any) => [s.lineBody, (pressed || hovered) && !ghost && { backgroundColor: T.sub }]} accessibilityRole="button" accessibilityLabel={`${t.no} ${t.title}`}>
+          <Icon name={ty.icon as any} size={13} color={ty.color} />
+          <Text style={s.lineNo}>{t.no.replace(/^T[SK]-/, '')}</Text>
+          {t.kind === 'ticket' ? <View style={s.dot} /> : null}
+          <Text style={s.lineTitle} numberOfLines={1}>{t.title}</Text>
+          {side ? <Text style={[s.lineChip, { color: side.color }]}>{side.short}</Text> : null}
+          {t.due_date ? <Text style={[s.lineChip, overdue && { color: T.red }]}>{fmtYmd(t.due_date)}</Text> : null}
+          {est || t.spent_min ? <Text style={[s.lineChip, over ? { color: T.red } : null]}>{t.spent_min ? fmtMinutes(t.spent_min) : '0m'}{est ? `/${fmtMinutes(est)}` : ''}</Text> : null}
+          {t.comments ? <Text style={s.lineChip}>💬{t.comments}</Text> : null}
+          {t.assignee ? <Avatar name={t.assignee.name} id={t.assignee.id} color={t.assignee.color} size={18} /> : <View style={[s.unassigned, { width: 18, height: 18 }]} />}
+        </Pressable>
+        {draggable ? (
+          <View {...dragHandlers} style={[s.grip, { width: 22 }]} accessibilityLabel="Drag to move">
+            <Icon name="drag-indicator" size={15} color={T.muted} />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
   return (
     <View onLayout={onLayout} style={[s.card, { borderLeftColor: p.color }, dimmed && { opacity: 0.35 }, ghost && s.ghost]}>
-      <Pressable onPress={() => onPress(t)} style={({ pressed }) => [s.body, pressed && !ghost && { backgroundColor: T.sub }]} accessibilityRole="button" accessibilityLabel={`${t.no} ${t.title}`}>
+      <Pressable {...(hover as any)} onPress={() => onPress(t)} style={({ pressed }) => [s.body, pressed && !ghost && { backgroundColor: T.sub }]} accessibilityRole="button" accessibilityLabel={`${t.no} ${t.title}`}>
         <View style={s.top}>
           <Icon name={ty.icon as any} size={14} color={ty.color} />
           <Text style={s.no}>{t.no}</Text>
@@ -89,5 +117,11 @@ const s = StyleSheet.create({
   foot: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 20, paddingHorizontal: 6, borderRadius: 6, backgroundColor: T.alt },
   chipText: { fontSize: 10.5, fontWeight: '800', color: T.muted },
+  line: { flexDirection: 'row', backgroundColor: T.surface, borderRadius: 8, borderWidth: 1, borderColor: T.border, borderLeftWidth: 3, marginBottom: 4, overflow: 'hidden' },
+  lineBody: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingLeft: 8, paddingRight: 4, minHeight: 32 },
+  lineNo: { fontSize: 10.5, fontWeight: '800', color: T.muted, fontFamily: MONO },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.copper },
+  lineTitle: { flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '800', color: T.ink },
+  lineChip: { fontSize: 10.5, fontWeight: '800', color: T.muted },
   grip: { width: 26, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: T.hair, ...(Platform.OS === 'web' ? ({ cursor: 'grab', touchAction: 'none', userSelect: 'none' } as any) : null) },
 });

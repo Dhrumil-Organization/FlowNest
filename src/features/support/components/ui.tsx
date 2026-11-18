@@ -330,7 +330,7 @@ export function DateInput({ value, onChange, placeholder = 'No date', title = 'D
 
 export const LiveDot = ({ status }: { status: string }) => {
   const c = status === 'live' ? '#22c55e' : status === 'polling' ? T.amber : status === 'offline' ? T.red : '#94a3b8';
-  const label = status === 'live' ? 'Live' : status === 'polling' ? 'Auto-refresh' : status === 'offline' ? 'Offline' : 'Connecting';
+  const label = status === 'live' ? 'Live' : status === 'polling' ? 'Live · fast refresh' : status === 'offline' ? 'Offline' : 'Connecting';
   return (
     <View style={st.live} accessibilityLabel={`Updates: ${label}`}>
       <View style={[st.liveDot, { backgroundColor: c }]} />

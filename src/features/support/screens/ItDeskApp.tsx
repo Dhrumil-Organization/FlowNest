@@ -14,15 +14,24 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { itApi, itLogin, SupportCall } from '../api';
+import { useChat } from '../chatStore';
 import { downloadExcel } from '../download';
 import { Overview, useItDesk, View as DeskView } from '../itStore';
-import { activeFilterCount, EMPTY_FILTERS, Filters, filtersToParams, ItUser, Status, Ticket } from '../model';
+import { activeFilterCount, EMPTY_FILTERS, Filters, filtersToParams, ItUser, periodParams, Status, TeamPerson, Ticket } from '../model';
 import { moduleOptions, ModuleOption } from '../modules';
 import { LiveStatus, LiveSync } from '../realtime';
+import { useLivePulse } from '../livePulse';
+import { SettingsView } from '../components/SettingsView';
+import { StorageView } from '../components/StorageView';
+import { ServerView } from '../components/ServerView';
 import { Board } from '../components/Board';
 import { DoneDialog } from '../components/DoneDialog';
 import { ExportChoice, ExportDialog } from '../components/ExportDialog';
 import { HistoryView } from '../components/HistoryView';
+import { TeamView } from '../components/TeamView';
+import { ActivityView } from '../components/ActivityView';
+import { ChatView } from '../components/ChatView';
+import { BottomNav, navItems, Section, Sidebar } from '../components/Sidebar';
 import { FiltersPanel } from '../components/FiltersPanel';
 import { ListView } from '../components/ListView';
 import { Shell } from '../components/Shell';
@@ -35,6 +44,9 @@ const hostKey = (base: string) => String(base || '').replace(/^https?:\/\//, '')
 /** ends with _token -> kept in the secure store on phones */
 const tokenKey = (base: string) => `support_${hostKey(base)}_it_token`;
 const VIEW_KEY = 'support_it_view';
+const DENSITY_KEY = 'support_it_density';
+const FOLD_KEY = 'support_it_fold';
+const SUMMARY_KEY = 'support_it_summary';
 
 type Props = { base: string; onExit: () => void; canAccess: (path: string) => boolean };
 
@@ -122,6 +134,36 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
   const [resolve, setResolve] = useState<{ t: Ticket; go: (note: string, spent: number) => void; undo: () => void } | null>(null);
   const sync = useRef<LiveSync | null>(null);
   const modules: ModuleOption[] = useMemo(() => moduleOptions(canAccess), [canAccess]);
+  const [density, setDensity] = useState<'cards' | 'lines'>('cards');
+  const [folded, setFolded] = useState(false);
+  const [summary, setSummary] = useState(true);
+  const unread = useChat((s) => s.unread);
+  const lastUnread = useRef(0);
+  // limits / rules from the admin's Settings (live: changes reach every app at once)
+  const [pub, setPub] = useState<Record<string, any>>({});
+  const lastRev = useRef(0);
+  const settingsSig = useRef('');
+  const applyPublic = (p: Record<string, any> | undefined) => {
+    if (!p) return;
+    setPub(p);
+    useChat.getState().setLimits({ max_upload_mb: p.max_upload_mb, max_files_per_message: p.max_files_per_message, blocked_extensions: p.blocked_extensions });
+    const m = useItDesk.getState().meta;
+    if (m) useItDesk.setState({ meta: { ...m, actual_time_required: p.actual_time_required, settings: p } });
+  };
+  const reloadSettings = () => { void api<{ public: Record<string, any> }>('settings.get').then((r) => applyPublic(r.public)).catch(() => {}); };
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [d, f, sm] = await Promise.all([AsyncStorage.getItem(DENSITY_KEY), AsyncStorage.getItem(FOLD_KEY), AsyncStorage.getItem(SUMMARY_KEY)]);
+        if (d === 'lines' || d === 'cards') setDensity(d);
+        if (f === '1') setFolded(true);
+        if (sm === '0') setSummary(false);
+      } catch { /* defaults */ }
+    })();
+  }, []);
+  const saveDensity = (d: 'cards' | 'lines') => { setDensity(d); AsyncStorage.setItem(DENSITY_KEY, d).catch(() => {}); };
+  const toggleFold = () => { setFolded((x) => { AsyncStorage.setItem(FOLD_KEY, x ? '0' : '1').catch(() => {}); return !x; }); };
+  const toggleSummary = () => { setSummary((x) => { AsyncStorage.setItem(SUMMARY_KEY, x ? '0' : '1').catch(() => {}); return !x; }); };
 
   // start: who am I, team, board, search filter, live updates
   useEffect(() => {
@@ -132,7 +174,16 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
         if (!alive) return;
         useItDesk.getState().reset();
         useItDesk.getState().init(api, r.user, r.users, r.meta, r.overview);
-        try { const v = await AsyncStorage.getItem(VIEW_KEY); if (v === 'board' || v === 'list' || v === 'history') setView(v); else setView(view); } catch { /* ignore */ }
+        try {
+          const v = await AsyncStorage.getItem(VIEW_KEY);
+          if (v === 'board' || v === 'list' || v === 'history' || v === 'team' || v === 'chat' || (['activity', 'settings', 'storage', 'server'].includes(v || '') && r.user.role === 'admin')) setView(v as DeskView); else setView(view);
+        } catch { /* ignore */ }
+        // chat: uploads go straight to the server with this login (big files in pieces)
+        useChat.getState().reset();
+        useChat.getState().init(api, { base, realm: 'it', headers: { 'X-Support-Token': token }, api }, `it:${r.user.id}`, 'it');
+        applyPublic(r.meta?.settings);
+        lastRev.current = r.rev;
+        void useChat.getState().loadRooms();
         setBoot('ok');
         void useItDesk.getState().loadBloom();
         sync.current = new LiveSync({
@@ -140,8 +191,13 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
           getPass: async () => (await api<{ realtime: any }>('realtime')).realtime,
           fetchChanges: (since) => api('changes', { since }),
           onTickets: (items) => useItDesk.getState().queueTickets(items),
-          onEvent: (ev) => { if (ev.type === 'users') void api<{ users: ItUser[] }>('users.list').then((x) => useItDesk.getState().setUsers(x.users)).catch(() => {}); },
+          onEvent: (ev) => {
+            if (ev.type === 'users') void api<{ users: ItUser[] }>('users.list').then((x) => useItDesk.getState().setUsers(x.users)).catch(() => {});
+            if (ev.type === 'chat') useChat.getState().onEvent(ev);
+            if (ev.type === 'settings') reloadSettings();
+          },
           onStatus: setLive,
+          pollMs: 60000, // the fast pulse below covers the gaps
         }).start();
       } catch (e: any) {
         if (!alive) return;
@@ -150,15 +206,27 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
         setBoot('error');
       }
     })();
-    return () => { alive = false; sync.current?.stop(); sync.current = null; };
+    return () => { alive = false; sync.current?.stop(); sync.current = null; useChat.getState().reset(); };
   }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // no WebSocket -> a tiny pulse every 1–3 s keeps chat, ticks, board and settings live
+  useLivePulse(boot === 'ok' && live !== 'live', Number(pub.poll_seconds) || 2, (r) => {
+    if (r.rev !== lastRev.current) { lastRev.current = r.rev; void sync.current?.sync(); }
+    if (settingsSig.current && r.settings !== settingsSig.current) reloadSettings();
+    settingsSig.current = r.settings;
+  });
+  useEffect(() => {
+    if (unread > lastUnread.current && view !== 'chat' && lastUnread.current >= 0 && boot === 'ok') toast(`${unread} unread message${unread === 1 ? '' : 's'} in Chat`, 'info');
+    lastUnread.current = unread;
+  }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // reload the visible view whenever the filters change
   useEffect(() => {
     if (boot !== 'ok') return;
     if (view === 'board') void store.reloadBoard();
     else if (view === 'history') void store.loadHistory(true);
-    else void store.loadList(true);
+    else if (view === 'team') void store.loadTeam();
+    else if (view === 'list') void store.loadList(true);
   }, [gen, view, boot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // search: typed words go to the filter after a short pause
@@ -221,6 +289,31 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
     }
   };
 
+  // TEAM tab: whole team Excel, one person's Excel, one person's History
+  const teamExcel = async (extra: Record<string, string> = {}) => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const { assignee, q, from, to, ...f } = filtersToParams(filters) as any;
+      void assignee; void q; void from; void to;
+      const name = await downloadExcel(base, token, { ...f, ...periodParams(useItDesk.getState().period), ...extra });
+      toast(`Excel ready — ${name}`, 'ok');
+    } catch (e: any) {
+      toast(e?.message || 'Export failed.', 'err');
+    } finally {
+      setExporting(false);
+    }
+  };
+  const personExcel = (p: TeamPerson) => teamExcel({ assignee: p.id ? String(p.id) : 'none', layout: 'daily' });
+  const personHistory = (p: TeamPerson) => {
+    store.setFilters({ assignee: p.id ? String(p.id) : 'none' });
+    changeView('history');
+  };
+  const openCard = (t: Ticket) => {
+    useItDesk.setState((st) => ({ tickets: { ...st.tickets, [t.id]: st.tickets[t.id] && st.tickets[t.id].rev >= t.rev ? st.tickets[t.id] : t } }));
+    setOpenId(t.id);
+  };
+
   const logout = async () => {
     setMenu(false);
     try { await api('logout'); } catch { /* ignore */ }
@@ -267,47 +360,75 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
     );
   }
 
+  const nav = navItems(me.role === 'admin', unread);
+  const work = view === 'board' || view === 'list' || view === 'history';
+  const section = (v: Section) => changeView(v);
+
   return (
-    <Shell title="IT Desk" subtitle={`${users.filter((u) => u.active).length} team members · tasks and user tickets`} icon="support-agent" accent={T.copper} live={live} onBack={onExit} right={right}>
-      <View style={[ds.page, phone && { padding: 10 }]}>
-        <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} contentContainerStyle={[ds.tiles, wide && { flex: 1 }]} style={{ flexGrow: 0 }}>
-          {tile('new_tickets', 'New user tickets', 'mark-email-unread', T.copper, { kind: 'ticket', assignee: 'none' })}
-          {tile('my_open', 'My open work', 'person', T.blue, { assignee: 'me' })}
-          {tile('overdue', 'Overdue', 'alarm', T.red, { due: 'overdue' })}
-          {tile('open_total', 'Open in total', 'inbox', T.purple, null)}
-          {tile('done_today', 'Done today', 'task-alt', T.green, null)}
-        </ScrollView>
+    <Shell title="IT Desk" subtitle={`${users.filter((u) => u.active).length} team members · tasks, user tickets, chat`} icon="support-agent" accent={T.copper} live={live} onBack={onExit} right={right}>
+      <View style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
+        <Sidebar items={nav} value={view} onChange={section} folded={folded} onFold={toggleFold} />
+        <View style={[ds.page, phone && { padding: 8, gap: 8 }]}>
+          {work && (view !== 'history') ? (
+            <View>
+              <TouchableOpacity onPress={toggleSummary} style={ds.sumToggle} accessibilityRole="button" accessibilityLabel={summary ? 'Hide the summary' : 'Show the summary'}>
+                <Text style={ds.sumText}>SUMMARY</Text>
+                <Icon name={summary ? 'expand-less' : 'expand-more'} size={16} color={T.muted} />
+              </TouchableOpacity>
+              {summary ? (
+                <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} contentContainerStyle={[ds.tiles, wide && { flex: 1 }]} style={{ flexGrow: 0 }}>
+                  {tile('new_tickets', 'New user tickets', 'mark-email-unread', T.copper, { kind: 'ticket', assignee: 'none' })}
+                  {tile('my_open', 'My open work', 'person', T.blue, { assignee: 'me' })}
+                  {tile('overdue', 'Overdue', 'alarm', T.red, { due: 'overdue' })}
+                  {tile('open_total', 'Open in total', 'inbox', T.purple, null)}
+                  {tile('done_today', 'Done today', 'task-alt', T.green, null)}
+                </ScrollView>
+              ) : null}
+            </View>
+          ) : null}
 
-        <View style={[ds.toolbar, phone && { flexWrap: 'wrap' }]}>
-          <Segmented value={view} onChange={changeView} options={[{ value: 'board', label: 'Board', icon: phone ? undefined : 'view-kanban' }, { value: 'list', label: 'List', icon: phone ? undefined : 'view-list' }, { value: 'history', label: 'History', icon: phone ? undefined : 'history' }]} />
-          <View style={[{ flex: 1, minWidth: phone ? '100%' : 220 }, phone && { order: 3 } as any]}>
-            <Input value={search} onChangeText={setSearch} placeholder="Search number, title, user, module, label…" icon="search" autoCorrect={false}
-              right={search ? <TouchableOpacity onPress={() => setSearch('')} accessibilityLabel="Clear search"><Icon name="cancel" size={17} color={T.muted} /></TouchableOpacity> : null} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Btn small kind="ghost" title={fc ? `Filters · ${fc}` : 'Filters'} icon="filter-alt" onPress={() => setShowFilters(true)} style={fc ? { borderColor: T.copper } : undefined} />
-            {fc ? <Btn small kind="ghost" title="Clear" icon="filter-alt-off" onPress={() => { store.setFilters({ ...EMPTY_FILTERS, q: filters.q }); }} /> : null}
-            <Btn small kind="success" title="Excel" icon="file-download" onPress={() => setExportOpen(true)} busy={exporting} />
-            {!phone ? <Btn small title="New task" icon="add" onPress={() => setNewIn('todo')} /> : null}
-          </View>
-        </View>
-        {store.noMatch ? <Text style={ds.instant}><Icon name="bolt" size={13} color={T.amber} /> No card contains “{filters.q}” — answered instantly by the search index.</Text> : null}
+          {work ? (
+            <View style={[ds.toolbar, phone && { flexWrap: 'wrap' }]}>
+              <View style={[{ flex: 1, minWidth: phone ? '100%' : 220 }]}>
+                <Input value={search} onChangeText={setSearch} placeholder="Search number, title, user, module, label…" icon="search" autoCorrect={false}
+                  right={search ? <TouchableOpacity onPress={() => setSearch('')} accessibilityLabel="Clear search"><Icon name="cancel" size={17} color={T.muted} /></TouchableOpacity> : null} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {view === 'board' ? (
+                  <Segmented value={density} onChange={saveDensity} options={[{ value: 'cards', label: phone ? '' : 'Cards', icon: 'view-agenda' }, { value: 'lines', label: phone ? '' : 'Lines', icon: 'view-headline' }]} />
+                ) : null}
+                <Btn small kind="ghost" title={fc ? `Filters · ${fc}` : 'Filters'} icon="filter-alt" onPress={() => setShowFilters(true)} style={fc ? { borderColor: T.copper } : undefined} />
+                {fc ? <Btn small kind="ghost" title="Clear" icon="filter-alt-off" onPress={() => { store.setFilters({ ...EMPTY_FILTERS, q: filters.q }); }} /> : null}
+                <Btn small kind="success" title="Excel" icon="file-download" onPress={() => setExportOpen(true)} busy={exporting} />
+                {!phone ? <Btn small title="New task" icon="add" onPress={() => setNewIn('todo')} /> : null}
+              </View>
+            </View>
+          ) : null}
+          {work && store.noMatch ? <Text style={ds.instant}><Icon name="bolt" size={13} color={T.amber} /> No card contains “{filters.q}” — answered instantly by the search index.</Text> : null}
 
-        <View style={{ flex: 1, minHeight: 0 }}>
-          {view === 'board' ? <Board onOpen={(t) => setOpenId(t.id)} onDrop={onDrop} onAdd={(s) => setNewIn(s)} onHistory={() => changeView('history')} />
-            : view === 'history' ? <HistoryView onOpen={(t) => setOpenId(t.id)} onExport={() => setExportOpen(true)} />
-            : <ListView onOpen={(t) => setOpenId(t.id)} />}
+          <View style={{ flex: 1, minHeight: 0 }}>
+            {view === 'board' ? <Board onOpen={(t) => setOpenId(t.id)} onDrop={onDrop} onAdd={(s) => setNewIn(s)} onHistory={() => changeView('history')} dense={density === 'lines'} />
+              : view === 'history' ? <HistoryView onOpen={(t) => setOpenId(t.id)} onExport={() => setExportOpen(true)} />
+              : view === 'team' ? <TeamView api={api} onExport={() => void teamExcel({ report: 'team' })} exporting={exporting} onPersonExcel={personExcel} onPersonHistory={personHistory} onOpenCard={openCard} cardOpen={openId !== null} />
+              : view === 'chat' ? <ChatView base={base} live={live} admin={me.role === 'admin'} canGroup={me.role === 'admin' || pub.member_groups !== false} />
+              : view === 'activity' ? <ActivityView api={api} onOpenTicket={(id) => setOpenId(id)} />
+              : view === 'settings' && me.role === 'admin' ? <SettingsView api={api} onSaved={applyPublic} />
+              : view === 'storage' && me.role === 'admin' ? <StorageView api={api} base={base} onOpenTicket={(id) => setOpenId(id)} />
+              : view === 'server' && me.role === 'admin' ? <ServerView api={api} live={live} onStorage={() => changeView('storage')} />
+              : <ListView onOpen={(t) => setOpenId(t.id)} />}
+          </View>
+          {(view === 'list' || view === 'history') && phone ? (
+            <TouchableOpacity style={ds.fab} onPress={() => setNewIn('todo')} accessibilityLabel="New task"><Icon name="add" size={26} color="#fff" /></TouchableOpacity>
+          ) : null}
         </View>
-        {view !== 'board' && phone ? (
-          <TouchableOpacity style={ds.fab} onPress={() => setNewIn('todo')} accessibilityLabel="New task"><Icon name="add" size={26} color="#fff" /></TouchableOpacity>
-        ) : null}
       </View>
+      <BottomNav items={nav} value={view} onChange={section} />
 
       <Panel visible={openId !== null} onClose={() => setOpenId(null)} title={openId ? (store.tickets[openId]?.no || `#${openId}`) : ''} subtitle={openId ? store.tickets[openId]?.title : ''} width={640}>
         {openId !== null ? (
           <TicketDetailView
             realm="it" api={api} base={base} id={openId} rev={store.tickets[openId]?.rev}
-            me={me} users={users} modules={modules} actualTimeRequired={timeRequired}
+            me={me} users={users} modules={modules} actualTimeRequired={timeRequired} uploadHeaders={{ 'X-Support-Token': token }} limits={useChat.getState().limits}
             onChanged={(t) => useItDesk.getState().applyTickets([t])}
             onDeleted={(id) => { const t = useItDesk.getState().tickets[id]; if (t) useItDesk.getState().applyTickets([{ ...t, deleted: true }]); }}
             onClose={() => setOpenId(null)}
@@ -369,7 +490,7 @@ const lg = StyleSheet.create({
 });
 
 const ds = StyleSheet.create({
-  page: { flex: 1, padding: 16, gap: 10 },
+  page: { flex: 1, minWidth: 0, padding: 16, gap: 10 },
   tiles: { flexDirection: 'row', gap: 10 },
   tile: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 150, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border },
   tileIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
@@ -377,6 +498,8 @@ const ds = StyleSheet.create({
   tileLabel: { fontSize: 11, fontWeight: '800', color: T.muted },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   instant: { fontSize: 12, fontWeight: '700', color: T.amber },
+  sumToggle: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 4 },
+  sumText: { fontSize: 10, fontWeight: '900', color: T.muted, letterSpacing: 1 },
   hint: { fontSize: 12.5, color: T.muted, fontWeight: '600' },
   me: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4, paddingRight: 10, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#2A4055' },
   meName: { color: '#fff', fontSize: 12.5, fontWeight: '800', maxWidth: 140 },

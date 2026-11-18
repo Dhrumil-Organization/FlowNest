@@ -12,10 +12,9 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useItDesk } from '../itStore';
-import {
-  dayName, devSideOf, fmtMinutes, fmtYmdFull, MONTHS_FULL, Period, PeriodMode, periodFor, periodHasNext, periodLabel, shiftPeriod, statusOf, Ticket, toYmd, ymdToDate,
-} from '../model';
-import { Avatar, Btn, DateInput, Empty, IconBtn, MONO, Segmented, StatusPill, useLayout } from './ui';
+import { dayName, devSideOf, fmtMinutes, fmtYmdFull, MONTHS_FULL, periodFor, periodLabel, statusOf, Ticket } from '../model';
+import { PeriodBar } from './PeriodBar';
+import { Avatar, Btn, Empty, MONO, StatusPill, useLayout } from './ui';
 
 type Item = { k: string; day?: number; id?: number };
 
@@ -52,37 +51,11 @@ export function HistoryView({ onOpen, onExport }: { onOpen: (t: Ticket) => void;
     return m;
   }, [hist.ids, tickets]);
 
-  const changeMode = (mode: PeriodMode) => {
-    if (mode === period.mode) return;
-    const anchor = ymdToDate(Math.min(period.to || toYmd(new Date()), toYmd(new Date()))) || new Date();
-    setPeriod(periodFor(mode, anchor));
-  };
+
 
   const header = (
     <View style={h.head}>
-      <View style={[h.bar, phone && { flexDirection: 'column', alignItems: 'stretch' }]}>
-        <Segmented value={period.mode} onChange={changeMode} scroll options={[
-          { value: 'day', label: 'Day' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }, { value: 'range', label: 'Range' }, { value: 'all', label: 'All' },
-        ]} />
-        <View style={h.nav}>
-          {period.mode === 'range' ? (
-            <>
-              <View style={{ flex: 1, minWidth: 130 }}><DateInput value={period.from} onChange={(v) => v && setPeriod({ ...period, from: Math.min(v, period.to) })} title="From" clearable={false} /></View>
-              <View style={{ flex: 1, minWidth: 130 }}><DateInput value={period.to} onChange={(v) => v && setPeriod({ ...period, to: Math.max(v, period.from) })} title="To" clearable={false} /></View>
-            </>
-          ) : period.mode === 'all' ? (
-            <Text style={[h.label, { flex: 1 }]}>Everything, newest day first</Text>
-          ) : (
-            <>
-              <IconBtn icon="chevron-left" label="Previous" onPress={() => setPeriod(shiftPeriod(period, -1))} />
-              <Text style={h.label} numberOfLines={1}>{periodLabel(period)}</Text>
-              <IconBtn icon="chevron-right" label="Next" onPress={() => setPeriod(shiftPeriod(period, 1))} disabled={!periodHasNext(period)} />
-              {periodHasNext(period) ? <TouchableOpacity onPress={() => setPeriod(periodFor(period.mode))} style={h.now}><Text style={h.nowText}>{period.mode === 'day' ? 'Today' : period.mode === 'month' ? 'This month' : 'This year'}</Text></TouchableOpacity> : null}
-            </>
-          )}
-          <Btn small kind="success" title={phone ? 'Excel' : 'Excel of this period'} icon="file-download" onPress={onExport} />
-        </View>
-      </View>
+      <PeriodBar period={period} onChange={setPeriod} right={<Btn small kind="success" title={phone ? 'Excel' : 'Excel of this period'} icon="file-download" onPress={onExport} />} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={h.stats}>
         <Stat label="Cards" value={stats ? stats.total : '…'} color={T.nav} icon="layers" />

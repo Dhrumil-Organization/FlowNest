@@ -5,14 +5,16 @@
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { fileUrl, SupportCall } from '../api';
 import type { ModuleOption } from '../modules';
 import { Attachment, Comment, devSideOf, fmtMinutes, fmtWhen, fmtYmd, isOverdue, ItUser, Status, statusOf, STATUSES, Ticket, TicketDetail as TD } from '../model';
 import { DoneDialog } from './DoneDialog';
+import { checkFiles, DEFAULT_LIMITS, fileLook, fmtBytes, Limits, openLink, PickedFile, pickFiles, pickPhotos, uploadAll } from '../files';
+import AppAlert from '@/common/utils/appAlert';
 import { AddPictures, Thumbs } from './Pictures';
 import { TicketForm } from './TicketForm';
-import { Avatar, Btn, Dialog, Empty, Input, Opt, PriorityPill, Select, StatusPill, toast, TypePill, useLayout } from './ui';
+import { Avatar, Btn, Dialog, Empty, IconBtn, Input, Opt, PriorityPill, Select, StatusPill, toast, TypePill, useLayout } from './ui';
 
 type Props = {
   realm: 'it' | 'client';
@@ -29,11 +31,17 @@ type Props = {
   onRequestResolve?: (t: Ticket, status: Status) => void;
   /** IT Desk: Done needs the actual time (server setting) */
   actualTimeRequired?: boolean;
+  /** login headers for file uploads (IT token / FlowNest bearer) */
+  uploadHeaders?: Record<string, string>;
+  /** upload limits from the admin's Settings */
+  limits?: Limits;
 };
 
 type Full = TD & { timeline: Comment[]; pictures: Attachment[] };
 
-export function TicketDetailView({ realm, api, base, id, rev, me, users = [], modules, onChanged, onDeleted, onClose, actualTimeRequired = true }: Props) {
+export function TicketDetailView({ realm, api, base, id, rev, me, users = [], modules, onChanged, onDeleted, onClose, actualTimeRequired = true, uploadHeaders, limits = DEFAULT_LIMITS }: Props) {
+  const [replyFiles, setReplyFiles] = useState<PickedFile[]>([]);
+  const [upPct, setUpPct] = useState<number | null>(null);
   const { phone } = useLayout();
   const isIt = realm === 'it';
   const [t, setT] = useState<Full | null>(null);
@@ -119,10 +127,32 @@ export function TicketDetailView({ realm, api, base, id, rev, me, users = [], mo
     if (r) afterTicket(r.ticket);
   };
 
+  const addFiles = (list: PickedFile[]) => {
+    if (!list.length) return;
+    const lim = { ...limits, max_files_per_message: Math.min(limits.max_files_per_message, 200) };
+    const { ok, problems } = checkFiles(list, lim, replyFiles.length);
+    if (problems.length) void AppAlert.alert(ok.length ? 'Some files were left out' : 'Cannot attach', problems.join('\n\n'));
+    if (ok.length) setReplyFiles((cur) => [...cur, ...ok]);
+  };
+
   const send = async () => {
     const body = reply.trim();
-    if (!body) return;
-    const r = await run('reply', () => api('tickets.comment', { id, body, internal: internal ? 1 : 0 }));
+    if (!body && !replyFiles.length) return;
+    let tokens: string[] = [];
+    if (replyFiles.length) {
+      if (!uploadHeaders) { toast('Files cannot be sent from here.', 'err'); return; }
+      try {
+        setUpPct(0);
+        tokens = await uploadAll({ base, realm, headers: uploadHeaders, api }, replyFiles, (p) => setUpPct(p));
+      } catch (e: any) {
+        setUpPct(null);
+        void AppAlert.alert('Upload failed', `${e?.message || 'Upload failed.'}\n\nNothing was sent — press Send again to retry.`);
+        return;
+      }
+      setUpPct(null);
+    }
+    const r = await run('reply', () => api('tickets.comment', { id, body, internal: internal ? 1 : 0, files: tokens }, { timeout: 120000 }));
+    if (r) setReplyFiles([]);
     if (r) {
       setReply('');
       setInternal(false);
@@ -233,9 +263,15 @@ export function TicketDetailView({ realm, api, base, id, rev, me, users = [], mo
         {busy === 'upload' ? <Text style={d.hint}>Uploading…</Text> : null}
 
         <Text style={d.section}>Activity</Text>
-        {comments.map((c) => <TimelineItem key={c.id} c={c} realm={realm} me={me} />)}
+        {comments.map((c) => <TimelineItem key={c.id} c={c} realm={realm} me={me} base={base} />)}
       </ScrollView>
 
+      {rights.comment === false ? (
+        <View style={[d.composer, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+          <Icon name="lock-outline" size={16} color={T.muted} />
+          <Text style={d.hint}>Only the person who raised this ticket can reply here. Use Chat → IT Help to talk to the IT team.</Text>
+        </View>
+      ) : (
       <View style={d.composer}>
         {isIt ? (
           <View style={d.internalRow}>
@@ -244,13 +280,35 @@ export function TicketDetailView({ realm, api, base, id, rev, me, users = [], mo
             <Text style={[d.internalText, internal && { color: T.amber }]}>{internal ? 'Internal note — only the IT team sees it' : t.kind === 'ticket' ? 'Reply — the user sees it' : 'Comment'}</Text>
           </View>
         ) : null}
+        {replyFiles.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 6 }}>
+            {replyFiles.map((f) => {
+              const look = fileLook(f.name, f.mime);
+              return (
+                <View key={f.key} style={d.trayChip}>
+                  <Icon name={look.icon as any} size={15} color={look.color} />
+                  <Text style={d.fileName} numberOfLines={1}>{f.name}</Text>
+                  <TouchableOpacity onPress={() => setReplyFiles((cur) => cur.filter((x) => x.key !== f.key))} accessibilityLabel={`Remove ${f.name}`}><Icon name="close" size={14} color={T.muted} /></TouchableOpacity>
+                </View>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+        {upPct !== null ? <Text style={d.hint}>Uploading {Math.round(upPct * 100)}%…</Text> : null}
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+          {uploadHeaders ? (
+            <View style={{ flexDirection: 'row' }}>
+              <IconBtn icon="attach-file" label="Attach files (PDF, Excel, zip …)" onPress={async () => addFiles(await pickFiles(true))} />
+              {Platform.OS !== 'web' ? <IconBtn icon="photo-library" label="Attach photos" onPress={async () => addFiles(await pickPhotos())} /> : null}
+            </View>
+          ) : null}
           <View style={{ flex: 1 }}>
             <Input value={reply} onChangeText={setReply} placeholder={isIt ? (internal ? 'Note for the team…' : 'Write a reply…') : 'Write a message to the IT team…'} multiline compact style={{ maxHeight: 140 }} />
           </View>
-          <Btn title="Send" icon="send" onPress={send} busy={busy === 'reply'} disabled={!reply.trim()} kind={internal ? 'dark' : 'primary'} />
+          <Btn title="Send" icon="send" onPress={send} busy={busy === 'reply' || upPct !== null} disabled={!reply.trim() && !replyFiles.length} kind={internal ? 'dark' : 'primary'} />
         </View>
       </View>
+      )}
 
       <DoneDialog ticket={resolveFor ? { ...t, has_resolution: !!t.resolution_note } : null} requireTime={actualTimeRequired} busy={busy === 'move'}
         onCancel={() => setResolveFor(null)} onConfirm={(v) => void move('done', v.note, v.spent_min, true)} />
@@ -270,7 +328,7 @@ export function TicketDetailView({ realm, api, base, id, rev, me, users = [], mo
 
 const EVENT_ICON: Record<string, string> = { created: 'add-circle-outline', status: 'swap-horiz', assigned: 'person-add-alt', resolved: 'verified', reopened: 'replay', updated: 'edit', deleted: 'delete-outline' };
 
-function TimelineItem({ c, realm, me }: { c: Comment; realm: 'it' | 'client'; me?: ItUser | null }) {
+function TimelineItem({ c, realm, me, base }: { c: Comment; realm: 'it' | 'client'; me?: ItUser | null; base: string }) {
   if (c.kind === 'system') {
     return (
       <View style={d.event}>
@@ -292,12 +350,35 @@ function TimelineItem({ c, realm, me }: { c: Comment; realm: 'it' | 'client'; me
         <View style={{ flex: 1 }} />
         <Text style={d.eventTime}>{fmtWhen(c.created_at)}</Text>
       </View>
-      <Text style={d.msgBody} selectable>{c.body}</Text>
+      {c.body && !(c.files?.length && /^sent (a file|\d+ files)$/.test(c.body)) ? <Text style={d.msgBody} selectable>{c.body}</Text> : null}
+      {c.files?.length ? (
+        <View style={{ gap: 6, marginTop: 4 }}>
+          {c.files.some((f) => f.image) ? <Thumbs pics={c.files.filter((f) => f.image).map((f) => ({ key: String(f.id), uri: fileUrl(base, f.url), name: f.name }))} size={84} /> : null}
+          {c.files.filter((f) => !f.image).map((f) => {
+            const look = fileLook(f.name, f.mime);
+            return (
+              <TouchableOpacity key={f.id} style={d.fileRow} onPress={() => openLink(`${fileUrl(base, f.url)}&download=1`)} accessibilityRole="button" accessibilityLabel={`Download ${f.name}`}>
+                <View style={[d.fileIcon, { backgroundColor: `${look.color}18` }]}><Icon name={look.icon as any} size={17} color={look.color} /></View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={d.fileName} numberOfLines={1}>{f.name}</Text>
+                  <Text style={d.fileMeta}>{look.label} · {fmtBytes(f.size)}</Text>
+                </View>
+                <Icon name="file-download" size={18} color={T.muted} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const d = StyleSheet.create({
+  fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 7, borderRadius: 10, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  fileIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  fileName: { fontSize: 12.5, fontWeight: '800', color: T.ink },
+  fileMeta: { fontSize: 11, fontWeight: '700', color: T.muted },
+  trayChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, height: 28, borderRadius: 14, backgroundColor: T.alt, maxWidth: 200 },
   wrap: { padding: 18, paddingBottom: 24 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   userTag: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: `${T.copper}14` },

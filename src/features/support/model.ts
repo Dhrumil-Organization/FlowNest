@@ -49,6 +49,7 @@ export type Comment = {
   internal: boolean;
   event: string;
   created_at: string;
+  files?: Attachment[];
 };
 
 export type Attachment = {
@@ -63,13 +64,14 @@ export type Attachment = {
   by: { kind: string; id: number; name: string };
   created_at: string;
   url: string;
+  image?: boolean;
 };
 
 export type TicketDetail = Ticket & {
   body: string;
   resolution_note: string;
   resolved_by: Person | null;
-  rights: { edit: boolean; move: boolean; take: boolean; delete: boolean; comment: boolean; internal: boolean; reopen: boolean };
+  rights: { edit: boolean; move: boolean; take: boolean; delete: boolean; comment: boolean; internal: boolean; reopen: boolean; mine?: boolean };
   timeline?: Comment[];
   pictures?: Attachment[];
 };
@@ -278,3 +280,25 @@ export const fmtYmdFull = (v: number | string | null | undefined) => {
 /** 20261116 -> "Monday" */
 export const dayName = (v: number | string | null | undefined) => { const d = ymdToDate(v); return d ? DOW[d.getDay()] : ''; };
 export const inPeriod = (t: Pick<Ticket, 'work_date'>, p: Period) => p.mode === 'all' || !p.from || (!!t.work_date && t.work_date >= p.from && t.work_date <= p.to);
+
+/* ------------------------------ team report ---------------------------- */
+// IT Desk "Team" tab: person-wise work of the internal IT team (server: SupportTeam::report).
+export type TeamBucket = { key: number; n: number; spent_min: number; est_min: number; done: number };
+export type TeamPerson = {
+  id: number; name: string; username: string; role: string; active: boolean; color: string;
+  cards: number; todo: number; in_progress: number; review: number; done: number; open: number;
+  tasks: number; tickets: number; est_min: number; spent_min: number;
+  time_vs_est: number | null; on_time: number | null; due_done: number;
+  active_days: number; avg_day_min: number; tickets_done: number; ticket_min: number | null;
+  open_now: number; in_progress_now: number; overdue_now: number; oldest_open: number | null;
+  buckets: TeamBucket[];
+};
+export type TeamReport = {
+  grain: 'day' | 'month'; keys: number[]; from: number | null; to: number | null; scope: 'team' | 'me';
+  people: TeamPerson[];
+  totals: { cards: number; done: number; open: number; tasks: number; tickets: number; est_min: number; spent_min: number; open_now: number; overdue_now: number; on_time: number | null; time_vs_est: number | null; members: number };
+};
+/** time vs estimate colour: on plan / a bit over / far over */
+export const tveColor = (v: number | null) => (v === null ? T.muted : v <= 105 ? T.green : v <= 130 ? T.amber : T.red);
+/** on-time colour */
+export const onTimeColor = (v: number | null) => (v === null ? T.muted : v >= 85 ? T.green : v >= 60 ? T.amber : T.red);

@@ -8,6 +8,9 @@
 //
 //   section = meta | sales | booked | production | collection | outstanding | beam_shortage |
 //             payments_made | monthly | pickmetres | outsourcing | outsourcing_yarn | mill_stock
+//             jobwork -> Outsourcing hub + Yarn ledger (FY to `to`) · jobwork_rolls&uid= -> rolls of one inward
+//             production_rolls&uid=prp|machine|beam -> the rolls of one Production record
+//             yarn_usage -> yarns of DTS designs, DTS-only / common (Stock)
 //             target  -> the DTS targets of the month of `from`            (Target card, Monthly Report)
 //             fy      -> one financial year month-wise, &metric=sales | sales_cross | production | payments |
 //                        jobwork | pickmetres                               (the FY page — aggregated on the server)
@@ -22,9 +25,58 @@ export class DtsError extends Error {
   code?: string;
 }
 
-export type DtsParams = { prptype: string; section: DtsSection; from?: string; to?: string; metric?: string };
+/* ------------------------------------------------------------------ */
+/* One line for every DTS request.                                     */
+/* Opening the screen used to send ~20 heavy requests at the same moment (every widget, stock, the yarn and fabric */
+/* stock reports). The server then timed some out — that is why Stock showed "retry" and needed 3-4 taps.        */
+/* Now at most MAX_PARALLEL run together and the rest wait their turn; a request that fails because the server    */
+/* was busy (timeout, network, 5xx) is tried again by itself before an error is shown.                           */
+/* ------------------------------------------------------------------ */
+const MAX_PARALLEL = 4;
+let running = 0;
+const waiting: (() => void)[] = [];
 
-export async function getDtsSection(API: string, token: string, params: DtsParams): Promise<DtsResponse> {
+/** urgent = asked for by a page the owner has open: it goes to the FRONT of the line, ahead of dashboard cards */
+export async function limited<T>(job: () => Promise<T>, urgent = false): Promise<T> {
+  if (running >= MAX_PARALLEL) await new Promise<void>((go) => (urgent ? waiting.unshift(go) : waiting.push(go)));
+  running++;
+  try {
+    return await job();
+  } finally {
+    running--;
+    const next = waiting.shift();
+    if (next) next();
+  }
+}
+
+/** busy-server failures are worth one more try; a refusal (401 / 403 / 404 / 422) is not */
+const transient = (e: any) => {
+  const st = e?.status ?? e?.response?.status;
+  if (st === 401 || st === 403 || st === 404 || st === 422) return false;
+  return !st || st >= 500 || e?.code === 'ECONNABORTED' || /timeout|network/i.test(String(e?.message || ''));
+};
+
+export async function withRetry<T>(job: () => Promise<T>, tries = 3, urgent = false): Promise<T> {
+  let last: any;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await limited(job, urgent);
+    } catch (e: any) {
+      last = e;
+      if (!transient(e) || i === tries - 1) break;
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
+export type DtsParams = { prptype: string; section: DtsSection; from?: string; to?: string; metric?: string; uid?: string; urgent?: boolean };
+
+export function getDtsSection(API: string, token: string, params: DtsParams): Promise<DtsResponse> {
+  return withRetry(() => getDtsSectionOnce(API, token, params), 3, !!params.urgent);
+}
+
+async function getDtsSectionOnce(API: string, token: string, params: DtsParams): Promise<DtsResponse> {
   try {
     const response = await axios.get(`${API}/api/getDtsDashboard`, {
       params: {
@@ -33,6 +85,7 @@ export async function getDtsSection(API: string, token: string, params: DtsParam
         ...(params.from ? { from: params.from } : null),
         ...(params.to ? { to: params.to } : null),
         ...(params.metric ? { metric: params.metric } : null),
+        ...(params.uid ? { uid: params.uid } : null),
       },
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       timeout: 180000,

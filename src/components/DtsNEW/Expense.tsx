@@ -83,6 +83,34 @@ export function useDtsExpense(token: string, API: string): DtsExpenseSource {
   }, [stamp]);
 }
 
+/**
+ * Six EARLIER months of the Expense module (the six months ending at `anchor`), for the DTS expense FY page.
+ * Same API and same month maths as the Expense module (abMonth = the closed / adjusted figure of a month).
+ * A month the Expense module has no Section A / B sheet for is simply not returned.
+ */
+export function useDtsExpenseWindow(token: string, API: string, anchor: Date): { byMonth: Record<string, any>; done: boolean } {
+  const { months, states } = useExpenseData({ token, apiBase: API, anchor }) as any;
+  const ymOf = (e: any) => `${e.calYear}-${String(e.calMonth + 1).padStart(2, '0')}`;
+  const stamp = (months as any[]).map((e) => `${e.key}:${states[e.key]?.status}`).join('|');
+  return useMemo(() => {
+    const byMonth: Record<string, any> = {};
+    let done = true;
+    (months as any[]).forEach((e) => {
+      const st = states[e.key];
+      if (!st || (st.status !== 'done' && st.status !== 'error')) done = false;
+      const d = st?.data;
+      if (!d || d.section_ab_active !== true) return;
+      try {
+        byMonth[ymOf(e)] = abMonth(e, d);
+      } catch {
+        /* a month the Expense module cannot compute is simply not available */
+      }
+    });
+    return { byMonth, done };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamp]);
+}
+
 /** per-pick cost of a section in a month: { A, B } or null when the Expense module has no figure for it */
 export const sectionRates = (src: DtsExpenseSource, ym: string): { A: number; B: number } | null => {
   const mo = src.byMonth[ym];

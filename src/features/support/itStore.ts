@@ -12,7 +12,7 @@
 import { create } from 'zustand';
 import type { SupportCall } from './api';
 import { Bloom } from './bloom';
-import { EMPTY_FILTERS, Filters, filtersToParams, inPeriod, ItUser, matchesFilters, Period, periodFor, periodParams, Status, STATUSES, Ticket } from './model';
+import { EMPTY_FILTERS, Filters, filtersToParams, inPeriod, ItUser, matchesFilters, Period, periodFor, periodParams, Status, STATUSES, TeamReport, Ticket } from './model';
 
 const PAGE = 40;
 type Col = { ids: number[]; cursor: string | null; more: boolean; loading: boolean; error: string; loaded: boolean };
@@ -21,7 +21,7 @@ const emptyCols = () => ({ todo: emptyCol(), in_progress: emptyCol(), review: em
 
 export type Overview = { new_tickets: number; my_open: number; overdue: number; done_today: number; open_total: number };
 export type Counts = Record<Status | 'total', number> & { done_all?: number };
-export type View = 'board' | 'list' | 'history';
+export type View = 'board' | 'list' | 'history' | 'team' | 'chat' | 'activity' | 'settings' | 'storage' | 'server';
 export type DayCount = { key: number; total: number; done: number; open: number; est_min: number; spent_min: number };
 export type Stats = { total: number; done: number; open: number; tickets: number; est_min: number; spent_min: number; counts: Counts;
   people: { key: any; label: string; total: number; done: number; est_min: number; spent_min: number }[] };
@@ -52,6 +52,9 @@ type State = {
   histDays: Record<number, DayCount>; // exact count per day of the period (day headers)
   histMonths: DayCount[]; // year view: the 12 months
   histStats: Stats | null;
+  team: TeamReport | null;
+  teamLoading: boolean;
+  teamError: string;
 
   init: (api: SupportCall, me: ItUser, users: ItUser[], meta: any, overview: Overview) => void;
   reset: () => void;
@@ -75,6 +78,8 @@ type State = {
   setPeriod: (p: Period) => void;
   loadHistory: (reset?: boolean) => Promise<void>;
   loadHistoryMeta: () => Promise<void>;
+  /** Team tab (person-wise report); quiet = live refresh without any loader */
+  loadTeam: (quiet?: boolean) => Promise<void>;
 };
 
 const cmpPos = (a: Ticket, b: Ticket) => a.position - b.position || b.id - a.id;
@@ -101,6 +106,7 @@ let overviewTimer: any = null;
 let bloomTimer: any = null;
 let histTimer: any = null;
 let queueTimer: any = null;
+let teamTimer: any = null;
 let queued: Record<number, Ticket> = {};
 
 /** same card, same revision, nothing to redraw? */
@@ -132,6 +138,9 @@ export const useItDesk = create<State>((set, get) => ({
   histDays: {},
   histMonths: [],
   histStats: null,
+  team: null,
+  teamLoading: false,
+  teamError: '',
 
   init: (api, me, users, meta, overview) => set({ api, me, users, meta, overview }),
   reset: () => { clearTimeout(queueTimer); queueTimer = null; queued = {}; set({ api: null, me: null, users: [], tickets: {}, cols: emptyCols(), list: emptyCol(), hist: emptyCol(), histDays: {}, histMonths: [], histStats: null, counts: null, filters: { ...EMPTY_FILTERS }, bloom: null, bloomVer: null, bloomStale: true, overview: null, noMatch: false }); },
@@ -284,6 +293,10 @@ export const useItDesk = create<State>((set, get) => ({
       clearTimeout(histTimer);
       histTimer = setTimeout(() => { void get().loadHistoryMeta(); }, 900);
     }
+    if (get().view === 'team') {
+      clearTimeout(teamTimer);
+      teamTimer = setTimeout(() => { void get().loadTeam(true); }, 1500);
+    }
   },
 
   queueTickets: (items) => {
@@ -370,6 +383,22 @@ export const useItDesk = create<State>((set, get) => ({
     } catch (e: any) {
       if (get().gen !== gen) return;
       set((s) => ({ hist: { ...s.hist, loading: false, error: e?.message || 'Could not load.' } }));
+    }
+  },
+
+  loadTeam: async (quiet = false) => {
+    const { api, filters, gen, period } = get();
+    if (!api) return;
+    if (!quiet) set({ teamLoading: true, teamError: '' });
+    try {
+      // person-wise: who it is assigned to is the report itself, so the assignee / search filters are left out
+      const { assignee, q, ...f } = filtersToParams(filters) as any;
+      void assignee; void q;
+      const r = await api<TeamReport>('team.report', { ...f, from: '', to: '', ...periodParams(period) });
+      if (get().gen !== gen && !quiet) return;
+      set({ team: r, teamLoading: false, teamError: '' });
+    } catch (e: any) {
+      if (!quiet) set({ teamLoading: false, teamError: e?.message || 'Could not load the team report.' });
     }
   },
 

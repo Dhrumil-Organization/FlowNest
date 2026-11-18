@@ -10,10 +10,11 @@ import PaymentsMadeDateField from '../components/PaymentsMadeDateField';
 type Party = { prpcode:string;party_code:string;party_name:string;amount:number;payment_count:number;latest_date:number };
 type Payment = { payment_uid:string;payment_srno:number;prpcode:string;party_code:string;party_name:string;
  voucher_no:string;entry_date:number;amount:number;bill_count:number;allocated_amount:number;
- payment_method:string;reference:string;cheque_name:string;paid_date:number;clear_date:number;remark:string };
-type Bill = {sub_srno:number;bill_no:string;bill_date:number;settled_amount:number;tds_amount:number;source_type:string;source_resolved:boolean};
+ payment_method:string;reference:string;cheque_name:string;paid_date:number;clear_date:number;remark:string;
+ paid_total?:number;dts_part?:boolean;bill_head?:string };
+type Bill = {sub_srno:number;bill_no:string;bill_date:number;settled_amount:number;tds_amount:number;source_type:string;source_resolved:boolean;bill_head?:string;dts_share?:number};
 type Report = { from_date:number;to_date:number;fy_label:string;total:number;party_count:number;payment_count:number;
- parties:Party[];payments:Payment[];bill_rows:Bill[];selected_party?:Party | null };
+ parties:Party[];payments:Payment[];bill_rows:Bill[];selected_party?:Party | null; section?:string; section_label?:string; section_note?:string };
 
 type Period = 'today'|'yesterday'|'month'|'custom'|'fy'|'day';
 const C = {nav:'#0E1C2C',copper:'#91492D',ink:'#17212F',muted:'#A29389',line:'#E8DED5',bg:'#F7F5F2',white:'#FFFFFF',pill:'#EEE9E4',green:'#326B51'};
@@ -50,6 +51,9 @@ export default function PaymentsMadeReportScreen() {
   const router=useRouter();const params=useLocalSearchParams();const {width}=useWindowDimensions();
   const {canAccess}=usePermission();const {mode:amountMode,setMode:setAmountMode}=useDashboardAmountMode();
   const prptype=String(params.prptype||'');
+  // Optional: section=dts when opened from the DTS screen (only the part of each payment that cleared DTS bills).
+  // Without it the report is unchanged.
+  const section=String(params.section||'').toLowerCase()==='dts'?'dts':'';
   const anchor=parse(params.date) || parse(new Date().toISOString().slice(0,10)) || '';
   const initial=String(params.period||'month');
   const [period,setPeriod]=useState<Period>((['today','yesterday','month','custom','fy','day'].includes(initial)?initial:'month') as Period);
@@ -90,13 +94,14 @@ export default function PaymentsMadeReportScreen() {
         prptype,date:asOf,level:voucherInPeriod?'voucher':party?'party':'report',
         from_date:dates.from,to_date:dates.to,
         ...(party?{party_code:party}:{}),
-        ...(voucherInPeriod&&payment?{voucher_uid:payment.uid,voucher_srno:payment.srno}:{})
+        ...(voucherInPeriod&&payment?{voucher_uid:payment.uid,voucher_srno:payment.srno}:{}),
+        ...(section?{section}:{})
       });
       if(!res?.success||!res?.data?.report) throw new Error(res?.message||'Payment report unavailable');
       setReport(res.data.report);
     }catch(e:any){setReport(null);setError(e?.message||'Unable to load payment report');}
     finally{setLoading(false);}
-  },[anchor,canView,prptype,dates.from,dates.to,party,payment,voucherInPeriod,initial]);
+  },[anchor,canView,prptype,dates.from,dates.to,party,payment,voucherInPeriod,initial,section]);
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{
     if (party && report?.selected_party) setPartyContext(report.selected_party);
@@ -197,14 +202,16 @@ export default function PaymentsMadeReportScreen() {
   return <ScrollView style={s.screen} contentContainerStyle={s.container}>
     <View style={s.pageTop}>
       <TouchableOpacity onPress={()=>router.back()} style={s.back}><Text style={s.backText}>‹</Text></TouchableOpacity>
-      <Text style={s.breadcrumb}>Owner › <Text style={s.crumbStrong}>Payments made</Text></Text>
+      <Text style={s.breadcrumb}>{section?'DTS':'Owner'} › <Text style={s.crumbStrong}>Payments made{section?' · DTS':''}</Text></Text>
       <View style={{flex:1}}/><AmountDisplayModeControl compact mode={amountMode} onChange={setAmountMode}/>
     </View>
+    {section?<View style={s.dtsBanner}><Text style={s.dtsBannerT}>{report?.section_label||'DTS · Dress Material · Technical Textile · Sportswear'}</Text>
+      <Text style={s.dtsBannerS}>{report?.section_note||'Only the part of each payment adjusted against DTS bills.'}</Text></View>:null}
     <View style={[s.columns,width<760&&s.mobileColumns]}>
       <View style={s.side}>
         <View style={s.filtersCard}>
           <View style={s.chips}>
-            {([['today','Today'],['yesterday','Yesterday'],['month','This month'],['custom','Custom'],['fy','FY '+(report?.fy_label||'').replace(/^FY\s*/,'')]] as [Period,string][]).map(([key,label])=>(
+            {([['today','Today'],['yesterday','Yesterday'],['month','This month'],['custom','Custom'],['fy','FY '+(report?.fy_label||'').replace(/^FY\s*/,'')]] as [Period,string][]).filter(([key])=>!(section&&key==='fy')).map(([key,label])=>(
               <TouchableOpacity key={key} onPress={()=>key==='fy'?openFY():selectPeriod(key)} style={[s.chip,(period===key||(period==='day'&&key==='today'))&&s.chipActive]}>
                 <Text style={[s.chipText,(period===key||(period==='day'&&key==='today'))&&s.chipActiveText]}>{label}</Text>
               </TouchableOpacity>
@@ -245,7 +252,7 @@ export default function PaymentsMadeReportScreen() {
           <View style={s.partyPanel}>
             <View style={s.partyPanelTop}><View style={s.avatar}><Text style={s.avatarText}>{initials(report?.selected_party?.party_name||partyContext?.party_name||party)}</Text></View>
               <View style={{flex:1}}><Text style={s.partyTitle}>{report?.selected_party?.party_name||partyContext?.party_name||party}</Text><Text style={s.meta}>{report?.selected_party?.prpcode||partyContext?.prpcode||''} · {report?.fy_label||''}</Text></View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Payments Made financial-year report" onPress={openFY} style={s.fyBadge}><Text style={s.fyBadgeText}>{report?.fy_label||''} ›</Text></TouchableOpacity>
+              {!section?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Payments Made financial-year report" onPress={openFY} style={s.fyBadge}><Text style={s.fyBadgeText}>{report?.fy_label||''} ›</Text></TouchableOpacity>:null}
             </View>
             <View style={s.stats}><View style={s.stat}><Text style={s.statLabel}>PAID · SELECTED PERIOD</Text><Text style={s.statValue}>{money(report?.selected_party?.amount||0)}</Text><Text style={s.meta}>{report?.selected_party?.payment_count||0} payments</Text></View>
               <View style={s.stat}><Text style={s.statLabel}>AVG DAYS TO PAY</Text><Text style={s.statValue}>—</Text><Text style={s.meta}>Requires verified bill dates</Text></View>
@@ -261,12 +268,12 @@ export default function PaymentsMadeReportScreen() {
             return <View key={`${p.payment_uid}-${p.payment_srno}-${index}`} style={[s.voucher,open&&s.voucherOpen]}>
               <TouchableOpacity onPress={()=>setPayment(open?null:{uid:p.payment_uid,srno:String(p.payment_srno),entryDate:parse(p.entry_date)})} style={s.voucherRow}>
                 <View style={{flex:1,minWidth:0}}><Text style={s.voucherNo}>{p.voucher_no||p.payment_uid} <Text style={s.meta}>{dateText(p.entry_date)}　{p.payment_method||'Recorded'}</Text></Text>
-                  <Text style={s.meta}>{p.bill_count} bills · {p.reference||'Reference unavailable'}</Text></View><Text style={s.amount}>{money(p.amount)}</Text><Text style={s.arrow}>{open?'⌄':'›'}</Text>
+                  <Text style={s.meta}>{p.bill_count} bills · {p.reference||'Reference unavailable'}{p.bill_head?` · ${p.bill_head}`:''}{p.dts_part&&p.paid_total?` · DTS part of ${money(p.paid_total)}`:''}</Text></View><Text style={s.amount}>{money(p.amount)}</Text><Text style={s.arrow}>{open?'⌄':'›'}</Text>
               </TouchableOpacity>
               {open&&<View style={s.voucherDetail}>
                 <Text style={s.sectionCaption}>BILL-WISE ADJUSTMENT</Text>
                 {(report?.bill_rows||[]).map((bill,i)=><View style={s.billRow} key={`${bill.sub_srno}-${i}`}>
-                  <View style={{flex:1}}><Text style={s.billTitle}>{bill.bill_no||'Unresolved bill'}</Text><Text style={s.meta}>{dateText(bill.bill_date)} · {bill.source_type==='PRIOR_FY'?'Opening bill':'Current FY'} {bill.source_resolved?'':' · Source unavailable'}</Text></View>
+                  <View style={{flex:1}}><Text style={s.billTitle}>{bill.bill_no||'Unresolved bill'}</Text><Text style={s.meta}>{dateText(bill.bill_date)} · {bill.source_type==='PRIOR_FY'?'Opening bill':'Current FY'} {bill.source_resolved?'':' · Source unavailable'}{bill.bill_head?` · ${bill.bill_head}`:''}{bill.dts_share!=null&&bill.dts_share<0.9995?` · ${Math.round(bill.dts_share*100)}% of the bill is DTS`:''}</Text></View>
                   <View><Text style={s.amount}>{money(bill.settled_amount)}</Text>{bill.tds_amount>0&&<Text style={s.meta}>TDS {money(bill.tds_amount)}</Text>}</View>
                 </View>)}
                 {!loading&&!(report?.bill_rows||[]).length&&<Text style={s.meta}>No purchase-bill adjustments recorded for this payment</Text>}
@@ -289,6 +296,7 @@ export default function PaymentsMadeReportScreen() {
 }
 
 const s=StyleSheet.create({
+  dtsBanner:{backgroundColor:'#EEF2F9',borderColor:'#3A568A',borderWidth:1,borderRadius:10,padding:10,marginBottom:12},dtsBannerT:{fontSize:11,fontWeight:'900',color:'#3A568A'},dtsBannerS:{fontSize:10,color:'#5A6475',marginTop:2},
   screen:{flex:1,backgroundColor:C.bg},container:{width:'100%',maxWidth:1050,alignSelf:'center',padding:16,paddingBottom:100},
   pageTop:{flexDirection:'row',alignItems:'center',marginBottom:10,gap:10},back:{width:31,height:31,alignItems:'center',justifyContent:'center',backgroundColor:'#fff',borderColor:C.line,borderWidth:1,borderRadius:8},backText:{fontWeight:'900',fontSize:21,color:C.nav},breadcrumb:{fontSize:11,color:C.copper},crumbStrong:{fontWeight:'900',color:C.ink},
   columns:{flexDirection:'row',gap:16,alignItems:'flex-start'},mobileColumns:{flexDirection:'column'},side:{flex:1,minWidth:0},main:{flex:1,minWidth:0,width:'100%'},

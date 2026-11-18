@@ -166,10 +166,11 @@ export default function ExpenseScreen({ token, apiBase }) {
       </View>
       {demoMsg ? <Text style={dm.text}>{demoMsg}</Text> : null}
     </View>
-  ) : demoAvailable ? (
-    <TouchableOpacity onPress={() => { setDemoMsg(''); switchDemo(true); }} style={dm.off}>
-      <Text style={dm.offText}>🧪 Dummy test mode · off — tap to test adjust & freeze with dummy months</Text>
-    </TouchableOpacity>
+  // ) 
+  // : demoAvailable ? (
+  //   <TouchableOpacity onPress={() => { setDemoMsg(''); switchDemo(true); }} style={dm.off}>
+  //     <Text style={dm.offText}>🧪 Dummy test mode · off — tap to test adjust & freeze with dummy months</Text>
+  //   </TouchableOpacity>
   ) : null;
   const scrollTo = useCallback((y) => { if (scrollRef.current && scrollRef.current.scrollTo) scrollRef.current.scrollTo({ y: Math.max(0, y - 8), animated: true }); }, []);
 

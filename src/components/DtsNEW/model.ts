@@ -8,9 +8,10 @@
 
 export type DtsSection =
   | 'meta' | 'sales' | 'booked' | 'production' | 'collection' | 'outstanding' | 'beam_shortage'
-  | 'payments_made' | 'monthly' | 'pickmetres' | 'outsourcing' | 'outsourcing_yarn' | 'mill_stock' | 'target' | 'fy';
+  | 'payments_made' | 'monthly' | 'pickmetres' | 'outsourcing' | 'outsourcing_yarn' | 'mill_stock' | 'target' | 'fy'
+  | 'jobwork' | 'jobwork_rolls' | 'yarn_usage' | 'production_rolls';
 
-/** the hub's cached loader: `metric` is only used by section 'fy' */
+/** the hub's cached loader: `metric` is used by section 'fy'; 'uid:<n>' in its place names the inward of 'jobwork_rolls' */
 export type DtsFetch = (section: DtsSection, from?: string, to?: string, metric?: string) => Promise<DtsResponse>;
 
 /** the DTS targets of one month (section 'target') — null = no billing target entered for that month */
@@ -67,7 +68,11 @@ export type DtsMonthRow = {
 
 export type PathStep = { k: string; v: string };
 export type PeriodKey = 'today' | 'yesterday' | 'month' | 'custom' | 'fy';
-export type DrillInit = { period?: PeriodKey; from?: string; to?: string; path?: PathStep[]; sel?: string | null; kind?: string };
+export type DrillInit = {
+  period?: PeriodKey; from?: string; to?: string; path?: PathStep[]; sel?: string | null; kind?: string;
+  /** Outsourcing hub / Yarn ledger: the view and the supplier › design › challan it is on */
+  hub?: { view?: 'recv' | 'chg' | 'yout' | 'ybal'; worker?: string; art?: string; chal?: string };
+};
 
 export const DTS = {
   lbl: 'DTS',
@@ -228,14 +233,14 @@ export function toItems(section: DtsSection, rows: any[]): DtsItem[] {
         ...base, q: num(r.q),
         d: { cat: s(r.cat) || '—', art: s(r.art) || '—', party: s(r.party) || '—', exec: s(r.exec) || 'UNASSIGNED' },
         label: `Bill ${s(r.no) || '—'}`,
-        sub: `${s(r.party)} · ${s(r.art)} · ${Q(num(r.q))}`,
+        sub: `${s(r.party)} · ${s(r.art)} · ${Q(num(r.q))}${num(r.q) > 0 ? ` @ ₹${(num(r.v) / num(r.q)).toFixed(2)}` : ''}${s(r.so) ? ` · SO ${s(r.so)}` : ''}`,
       });
     } else if (section === 'production') {
       const sec: 'A' | 'B' = s(r.sec) === 'A' ? 'A' : 'B';
       const mc = s(r.mc), beam = s(r.beam);
       out.push({
         ...base, sec, aux: num(r.n),
-        d: { cat: s(r.cat) || '—', art: s(r.art) || '—', shed: s(r.shed) || '—', secm: SEC_MACH[sec].lbl, mc: mc || '—' },
+        d: { cat: s(r.cat) || '—', art: s(r.art) || '—', shed: s(r.shed) || '—', secm: SEC_MACH[sec].lbl, mc: mc || '—', prp: s(r.prp), mac: s(r.mac), beam },
         label: mc ? `${mc}${beam ? ` · Beam ${beam}` : ''}` : s(r.shed) || '—',
         sub: `${s(r.art)} · ${s(r.shed)} · ${pl(num(r.n), 'rolls')}`,
       });
@@ -243,14 +248,15 @@ export function toItems(section: DtsSection, rows: any[]): DtsItem[] {
       out.push({
         ...base,
         d: { exec: s(r.exec) || 'UNASSIGNED', party: s(r.party) || '—', art: s(r.art) || '—', cat: s(r.cat) || '—' },
-        label: `Bill ${s(r.no) || '—'}`,
-        sub: `${s(r.party)} · ${s(r.art)}${r.bill_date ? ` · bill of ${fmtDY(s(r.bill_date))}` : ''}${r.prev_fy ? ' · previous-year bill' : ''}`,
+        label: `Receipt against bill ${s(r.no) || '—'}`,
+        sub: `${s(r.party)} · against bill ${s(r.no) || '—'} (${s(r.art)}${num(r.bill_amt) > 0 ? `, ₹${Math.round(num(r.bill_amt)).toLocaleString('en-IN')}` : ''})${r.bill_date ? ` of ${fmtDY(s(r.bill_date))}` : ''}${r.prev_fy ? ' · previous-year bill' : ''}`,
+        aside: r.settled === undefined ? undefined : r.settled ? 'bill settled' : 'part of bill',
       });
     } else if (section === 'outstanding') {
       const od = num(r.overdue_days);
       out.push({
         ...base,
-        d: { exec: s(r.exec) || 'UNASSIGNED', party: s(r.party) || '—', art: s(r.art) || '—', cat: s(r.cat) || '—' },
+        d: { exec: s(r.exec) || 'UNASSIGNED', party: s(r.party) || '—', art: s(r.art) || '—', cat: s(r.cat) || '—', region: s(r.state) || s(r.city) },
         label: `Bill ${s(r.no) || '—'}`,
         sub: `${s(r.party)} · ${s(r.art)}${r.due ? ` · due ${fmtDY(s(r.due))}` : ''}${r.prev_fy ? ' · previous-year bill' : ''}`,
         aside: od > 0 ? `${od}d overdue` : r.due ? 'within terms' : undefined,
@@ -260,19 +266,20 @@ export function toItems(section: DtsSection, rows: any[]): DtsItem[] {
       const per = num(r.per);
       out.push({
         ...base, aux: num(r.aux),
-        d: { cat: s(r.cat) || '—', art: s(r.art) || '—', mc: s(r.mc) || '—' },
+        d: { cat: s(r.cat) || '—', art: s(r.art) || '—', mc: s(r.mc) || '—', shed: s(r.shed) || s(r.mc) || '—' },
         label: `Beam ${s(r.beam) || '—'}`,
         sub: `${s(r.art)} · ${s(r.mc)} · ${secM(num(r.prod))} checked of ${secM(num(r.aux))} warped${num(r.shared) ? ' · shared beam' : ''}`,
-        aside: `${per.toFixed(1)}%`,
+        aside: `${per.toFixed(1)}% short`,
         warn: per > 3,
       });
     } else if (section === 'payments_made') {
       const share = num(r.share);
       out.push({
         ...base,
-        d: { vendor: s(r.vendor) || '—', cat: s(r.cat) || '—' },
-        label: `Bill ${s(r.no) || '—'}`,
-        sub: `${s(r.vendor)} · ${s(r.cat)}${share > 0 && share < 0.9995 ? ` · ${(share * 100).toFixed(0)}% of the bill is DTS` : ''}${r.bill_date ? ` · bill of ${fmtDY(s(r.bill_date))}` : ''}`,
+        d: { vendor: s(r.vendor) || '—', cat: s(r.cat) || '—', pay: s(r.pay) || s(r.id), vou: s(r.vou), mode: s(r.mode), head: s(r.head), vendor_id: s(r.vendor_id) },
+        x: { paid: num(r.paid) },
+        label: s(r.vou) ? `Voucher ${s(r.vou)}` : `Bill ${s(r.no) || '—'}`,
+        sub: `${s(r.vendor)}${s(r.mode) ? ` · ${s(r.mode)}` : ''} · against bill ${s(r.no) || '—'} · ${s(r.cat)}${share > 0 && share < 0.9995 ? ` · ${(share * 100).toFixed(0)}% of the bill is DTS` : ''}${r.bill_date ? ` · bill of ${fmtDY(s(r.bill_date))}` : ''}`,
       });
     } else if (section === 'pickmetres') {
       const sec: 'A' | 'B' = s(r.sec) === 'A' ? 'A' : 'B';

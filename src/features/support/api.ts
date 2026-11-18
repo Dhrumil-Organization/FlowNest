@@ -61,6 +61,9 @@ export async function itLogin(base: string, username: string, password: string) 
   }
 }
 
+/** where files are uploaded (multipart) — answers an upload ticket */
+export const uploadUrl = (base: string, realm: 'it' | 'client') => `${clean(base)}/api/support/${realm}-upload`;
+
 /** absolute URL for a picture (the server sends /api/support/file/…) */
 export const fileUrl = (base: string, url: string) => (/^https?:/i.test(url) ? url : `${clean(base)}${url}`);
 export const exportUrl = (base: string, params: Record<string, string>, path: 'it-export' | 'client-export' = 'it-export') => {

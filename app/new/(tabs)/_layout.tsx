@@ -23,6 +23,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, Tabs, usePathname, useRouter } from 'expo-router';
+import { CommonActions } from '@react-navigation/native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -388,6 +389,43 @@ export default function TabsLayout() {
           <View style={{ flex: 1, backgroundColor: T.bg }}>
             <Tabs
               key={sessionEpoch}
+              // BACK GOES WHERE YOU CAME FROM: a report opened from Home (or DTS, or any screen) returns there,
+              // not to the first tab and not to another report.
+              backBehavior="history"
+              // FIX "Back from a Home report opens the Expense screen":
+              // a folder tab (reports, designs, costing) keeps its own stack. A report opened from Home is pushed
+              // onto that stack WITHOUT the folder's home under it, so popToTopOnBlur could only pop back to the
+              // FIRST report ever opened there (often Expense) — and that report stayed under every report opened
+              // later, so Back landed on it. When such a tab loses focus, its stack is now thrown away (new route
+              // key = fresh, unmounted navigator). The next report opened from Home is then alone in the stack, and
+              // Back leaves the folder for the screen you came from. Drill-downs inside a report, and Back between
+              // them, are unchanged because the tab only resets after you have left it.
+              screenListeners={({ navigation, route }: { navigation: any; route: { key: string; name: string } }) => ({
+                blur: () => {
+                  setTimeout(() => {
+                    try {
+                      const st = navigation.getState?.();
+                      if (!st || !Array.isArray(st.routes)) return;
+                      const mine = st.routes.find((r: any) => r.key === route.key);
+                      /* only a tab with its own nested stack, and only if you are still away from it */
+                      if (!mine || !mine.state || st.routes[st.index]?.key === route.key) return;
+                      const fresh = `${route.name}-${Date.now().toString(36)}`;
+                      const swap = (k: string) => (k === route.key ? fresh : k);
+                      navigation.dispatch({
+                        ...CommonActions.reset({
+                          ...st,
+                          routes: st.routes.map((r: any) => (r.key === route.key ? { key: fresh, name: r.name } : r)),
+                          history: Array.isArray(st.history) ? st.history.map((h: any) => (h && h.key ? { ...h, key: swap(h.key) } : h)) : st.history,
+                          preloadedRouteKeys: Array.isArray(st.preloadedRouteKeys) ? st.preloadedRouteKeys.filter((k: string) => k !== route.key) : st.preloadedRouteKeys,
+                        }),
+                        target: st.key,
+                      });
+                    } catch {
+                      /* never block leaving a tab */
+                    }
+                  }, 0);
+                },
+              })}
               screenLayout={({ children, route }: { children: React.ReactNode; route: { name: string } }) => (
                 // ScreenErrorBoundary: a screen that fails shows "Try again" in
                 // its own area — header, menu and every other screen keep

@@ -52,13 +52,14 @@ import Drill, { DrillLoad } from './Drill';
 import { DtsExpCard, DtsExpenseSource, sectionRates, useDtsExpense } from './Expense';
 import DtsExpensePage from './ExpensePage';
 import FYPage, { FYBtn, FyMetric } from './Fy';
-import { StockKind, StockPage, useFabricStock } from './Stock';
+import { balAt, flagsOf, OutsourcingHub, useJobWork, workersOf, YarnLedger } from './Outsourcing';
+import { StockKind, StockPage, useFabricStock, useYarnStock } from './Stock';
 import {
   DrillInit, DTS, DtsCategory, DtsFetch, DtsItem, DtsResponse, DtsRightKey, DtsSection, DtsTarget, fmtD, fmtDY, fyEndOf,
   fyStartOf, isDtsCategory, M, mLbl, mLong, monthEnd, num, PathStep, pctTxt, pl, Q, SEC_MACH, secKg, secM, sum, toItems, todayS,
 } from './model';
 import {
-  C, DayNote, Divider, ExecName, ListRow, MLink, monthDaysLeft, RefreshBtn, SecEmpty, SecHead, SecHint, Spark,
+  Avatar, C, DayNote, Divider, ExecName, ListRow, MLink, monthDaysLeft, RefreshBtn, SecEmpty, SecHead, SecHint, Spark,
   st as ui, StateBox, TotRow, TwoLine, VsRow, Widget,
 } from './ui';
 
@@ -72,7 +73,7 @@ const PAY_COL = '#8C4A2F';
 const PAGE_LBL: Record<PageType, string> = {
   fy: 'FY performance',
   monthly: 'Monthly Report', sales: 'Sales', prod: 'Production', coll: 'Payment Collection', out: 'Outstanding',
-  short: 'Beam shortage', pay: 'Payments made', exp: 'Expense', cost: 'Weaving cost', outs: 'Outsourcing', outsl: 'Yarn at job workers',
+  short: 'Beam shortage', pay: 'Payments made', exp: 'Expense', cost: 'Weaving cost', outs: 'Outsourcing', outsl: 'Yarn ledger',
   stock: 'Stock', stockk: 'Stock',
 };
 
@@ -81,8 +82,8 @@ const PAGE_SECTIONS: Record<PageType, string[]> = {
   fy: ['fy', 'sales', 'production', 'payments_made', 'outsourcing', 'pickmetres', 'expense'],
   monthly: ['target', 'sales', 'collection'], sales: ['sales'], prod: ['production'], coll: ['collection'], out: ['outstanding'],
   short: ['beam_shortage'], pay: ['payments_made'], exp: ['pickmetres', 'expense'], cost: ['pickmetres', 'expense'],
-  outs: ['outsourcing', 'outsourcing_yarn'], outsl: ['outsourcing_yarn'], stock: ['mill_stock', 'outsourcing_yarn', 'fabric'],
-  stockk: ['mill_stock', 'outsourcing_yarn', 'fabric'],
+  outs: ['jobwork', 'jobwork_rolls'], outsl: ['jobwork'], stock: ['mill_stock', 'jobwork', 'fabric', 'yarnstock'],
+  stockk: ['mill_stock', 'jobwork', 'fabric', 'yarnstock'],
 };
 
 const NO_EXPENSE: DtsExpenseSource = { x: null, byMonth: {}, months: [], cur: '', loading: true, error: '' };
@@ -303,6 +304,7 @@ function DtsSamples({ prptype, patterns, version }: { prptype: string; patterns:
               key={move.id}
               onPress={canOpenHub ? () => open({ stage: 'sample', sample_id: move.sample }) : undefined}
               left={<TwoLine title={`${move.sample} ${sampleDisplayName(sample)}`} sub={`→ ${move.party || 'Customer'} · ${move.by || 'Recorded'} · ${sampleDateLabel(move.date)}`} />}
+              b={move.no ? `#${move.no}` : undefined} bColor={C.mut}
             />
           ))}
           {!stats.latestDispatches.length ? <SecEmpty>No dispatches of DTS samples this month.</SecEmpty> : null}
@@ -467,6 +469,36 @@ function Monthly({
 }
 
 /* ------------------------------------------------------------------ */
+/* Production: the checked rolls of one record (day x machine x beam), loaded when it is tapped */
+/* ------------------------------------------------------------------ */
+
+function ProdRolls({ fetch, item }: { fetch: Fetch; item: DtsItem }) {
+  const [st, setSt] = useState<{ loading: boolean; error: string; rows: any[] }>({ loading: true, error: '', rows: [] });
+  useEffect(() => {
+    let alive = true;
+    fetch('production_rolls', item.date, item.date, `uid:${item.d.prp}|${item.d.mac}|${item.d.beam || ''}`)
+      .then((r) => alive && setSt({ loading: false, error: '', rows: r.items || [] }))
+      .catch((e: any) => alive && setSt({ loading: false, error: e?.message || 'Unable to load the rolls.', rows: [] }));
+    return () => { alive = false; };
+  }, [fetch, item.date, item.d.prp, item.d.mac, item.d.beam]);
+  if (st.loading || st.error) return <StateBox loading={st.loading} error={st.error} minHeight={40} />;
+  if (!st.rows.length) return <Text style={ui.hint}>No roll found for this entry.</Text>;
+  return (
+    <View>
+      {st.rows.map((r: any) => (
+        <View key={String(r.id)} style={s.rollRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.rollT} numberOfLines={1}>Roll {String(r.roll || '—')} <Text style={s.rollS}>· {fmtDY(String(r.date))}{r.last ? ' · last piece of the beam' : ''}</Text></Text>
+            <Text style={s.rollS} numberOfLines={1}>{[r.art, r.mc, r.beam ? `beam ${r.beam}` : '', r.grade ? `grade ${r.grade}` : 'not graded', num(r.picks) > 0 ? `${num(r.picks)} picks` : ''].filter(Boolean).join(' · ')}</Text>
+          </View>
+          <Text style={[ui.rowNum, { fontWeight: '700' }]}>{secM(num(r.v))}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Target ring: outer = SO booked %, inner = Billed % of the DTS sales target (null = no target entered) */
 /* ------------------------------------------------------------------ */
 
@@ -510,12 +542,15 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
 
   /* ---- API with a per-range cache (a report re-opened for the same range does not hit the server again) ---- */
   const cache = useRef(new Map<string, Promise<DtsResponse>>());
+  /* true while a report / FY page is open: its requests go ahead of the dashboard cards still loading behind it */
+  const pageOpen = useRef(false);
   const fetch: Fetch = useCallback(
     (section, from, to, metric) => {
       const key = `${section}|${from || ''}|${to || ''}|${metric || ''}`;
       let p = cache.current.get(key);
       if (!p) {
-        p = getDtsSection(API, token, { prptype, section, from, to, metric });
+        const uid = metric && metric.startsWith('uid:') ? metric.slice(4) : undefined;
+        p = getDtsSection(API, token, { prptype, section, from, to, metric: uid ? undefined : metric, uid, urgent: pageOpen.current });
         cache.current.set(key, p);
         p.catch(() => cache.current.delete(key));
       }
@@ -574,14 +609,16 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
   const outs = useSection(fetch, 'outstanding', undefined, today, can('outstanding'), ver('outstanding'));
   const short = useSection(fetch, 'beam_shortage', undefined, today, can('beam_shortage'), ver('beam_shortage'));
   const picks = useSection(fetch, 'pickmetres', mFrom, mTo, can('expense'), ver('pickmetres'));
-  const jobIn = useSection(fetch, 'outsourcing', mFrom, mTo, can('outsourcing'), ver('outsourcing'));
-  const jobYarn = useSection(fetch, 'outsourcing_yarn', undefined, today, can('outsourcing'), ver('outsourcing_yarn'));
+  /* Outsourcing widget, hub, yarn ledger and the job-work lines of Stock all read ONE job-work account (section=jobwork) */
+  const jw = useJobWork(fetch, can('outsourcing'), ver('jobwork'));
+  const yarnStock = useYarnStock(token, API, prptype, patterns, can('stock'), ver('yarnstock'));
   const mill = useSection(fetch, 'mill_stock', undefined, today, can('stock'), ver('mill_stock'));
   const fabric = useFabricStock(token, API, prptype, patterns, can('stock'), ver('fabric'));
   const [expSrc, setExpSrc] = useState<DtsExpenseSource>(NO_EXPENSE);
 
   /* ---- pages (‹ back restores the page you came from) ---- */
   const [stack, setStack] = useState<Page[]>([]);
+  pageOpen.current = stack.length > 0;
   const scroll = useRef<ScrollView>(null);
   const push = (type: PageType, data: DrillInit = {}) => {
     setStack((st) => [...st, { type, data }]);
@@ -640,7 +677,7 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
       });
     return {
       sales: mk('sales', true), prod: mk('production', true), coll: mk('collection', true), pay: mk('payments_made', true),
-      out, short: mk('beam_shortage', false), cost, outs: mk('outsourcing', true), outsl: mk('outsourcing_yarn', false),
+      out, short: mk('beam_shortage', false), cost,
     };
   }, [fetch, today, L, expSrc]);
 
@@ -671,7 +708,8 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
       case 'prod':
         return (
           <Drill load={loaders.prod} levels={['cat', 'art', 'shed']} fmt={secM} periodic init={d} onState={keep} recLbl="entries" chartColor={C.prod}
-            note="Checked metres of DTS designs on any loom. Category › design › shed › machine / beam. Tap a point on the graph to narrow to that day. Ranges longer than 62 days are shown shed-wise without the machine level." />
+            recordDetail={(x) => (x.d.prp && x.d.mac ? <ProdRolls fetch={fetch} item={x} /> : <Text style={ui.hint}>Ranges longer than 62 days are added up by shed — choose a shorter period to open the rolls.</Text>)}
+            note="Checked metres of DTS designs on any loom. Category › design › shed › rolls. Each entry is one day on one machine and beam; tap it for its rolls. Tap a point on the graph to narrow to that day." />
         );
       case 'coll':
         return (
@@ -685,12 +723,12 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
         );
       case 'short':
         return (
-          <Drill load={loaders.short} levels={['cat', 'art', 'mc']} fmt={secM} periodic init={{ period: 'fy', ...d }} onState={keep} recLbl="beams" chartColor={C.over}
+          <Drill load={loaders.short} levels={['cat', 'art', 'shed']} fmt={secM} periodic init={{ period: 'fy', ...d }} onState={keep} recLbl="beams" chartColor={C.over}
             auxFmt={(v, w) => `${pctTxt(v, w)} of ${Q(w)} warped`}
             note="Completed beams of DTS designs (last taka entered) — warp issued minus checked metres, the same figures as Reports › Beam Shortage. Beams over 3% short are marked." />
         );
       case 'fy':
-        return <FYPage metric={(d.kind as FyMetric) || 'sales'} fetch={fetch} exp={expSrc} L={L} backRef={pageBack} />;
+        return <FYPage metric={(d.kind as FyMetric) || 'sales'} fetch={fetch} exp={expSrc} L={L} backRef={pageBack} token={token} API={API} />;
       case 'exp':
         return (
           <DtsExpensePage src={expSrc} loadRows={loadPickRows} init={d.sel} onMonth={(m) => keep({ sel: m })} onFy={() => openFy('dtscost')}
@@ -704,32 +742,25 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
         );
       case 'outs':
         return (
-          <>
-            <MLink icon="🧶" color={C.out} title="Yarn at job workers" sub={`${secKg(jobYarnBal)} · issued, consumed and balance by job worker and yarn`} onPress={() => push('outsl')} />
-            <Drill load={loaders.outs} levels={['worker', 'art']} fmt={secM} periodic init={d} onState={keep} recLbl="inwards" chartColor={C.out}
-              auxFmt={(_v, a) => `${L(a)} charges`}
-              note="Fabric received from job workers for DTS items, on the inward date: job inwards that have no grey outward behind them (dyeing-mill inwards are in the Mill Hub). Charges are the job amount of the inward. Job worker › design › inwards." />
-          </>
+          <OutsourcingHub jw={jw} init={d} onState={keep} L={L} fetch={fetch}
+            onLedger={(worker, art, range) => push('outsl', { ...range, hub: { worker, art: art || undefined } })} />
         );
       case 'outsl':
-        return (
-          <Drill load={loaders.outsl} levels={['worker']} fmt={secKg} periodic={false} init={d} onState={keep} recLbl="yarns"
-            note="The yarn job orders of every job worker who delivered DTS fabric this year: issued − consumed − shortage − wastage = balance, as the ERP carries them. Yarn is common to both sections and a yarn challan is not tied to a design, so this is each worker's whole yarn account. A negative balance means more yarn was consumed than issued." />
-        );
+        return <YarnLedger jw={jw} init={d} onState={(st2) => keep({ ...st2, hub: d.hub })} />;
       case 'stock':
-        return <StockPage kinds={stockKinds} onKind={(key) => push('stockk', { kind: key })} />;
+        return <StockPage kinds={stockKinds} onKind={(key) => push('stockk', { kind: key })} commonKg={yarnStock.loading || yarnStock.error ? null : yarnStock.commonKg} />;
       case 'stockk': {
         const k = stockKinds.find((x) => x.key === d.kind) || stockKinds[0];
         if (!k) return null;
         return (
-          <Drill load={() => Promise.resolve({ items: k.items })} levels={k.key === 'jwyarn' ? ['worker'] : ['where', 'art']} fmt={k.fmt} periodic={false}
+          <Drill load={() => Promise.resolve({ items: k.items })} levels={k.key === 'jwyarn' ? ['worker', 'yarn'] : k.key === 'yarn' ? ['where', 'yarn'] : ['where', 'art']} fmt={k.fmt} periodic={false}
             init={d} onState={(st2) => keep({ ...st2, kind: k.key })} recLbl={k.unit}
-            note={`${k.lbl} — DTS only. ${k.key === 'jwyarn' ? 'Job worker › yarns.' : 'Location › design › records.'}`} />
+            note={`${k.lbl} — DTS only. ${k.key === 'jwyarn' ? 'Job worker › yarn › balance.' : k.key === 'yarn' ? 'Yarn pool › yarn › cartons / lots.' : 'Location › design › records.'}`} />
         );
       }
       case 'pay':
         return (
-          <Drill load={loaders.pay} levels={['vendor']} fmt={L} periodic init={d} onState={keep} recLbl="bill payments" chartColor={PAY_COL}
+          <Drill load={loaders.pay} levels={['vendor', 'vou']} fmt={L} periodic init={d} onState={keep} recLbl="bill payments" chartColor={PAY_COL}
             note="The part of each cleared payment that is adjusted against a purchase bill carrying DTS items (job work, greige, processing). Yarn bills serve both sections and are left out. Vendor › bills." />
         );
     }
@@ -905,37 +936,49 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
   ) : null;
 
   const payList = selPay ? onDay(pay.items, selPay) : onDay(pay.items, today);
-  const payVendors = useMemo(() => {
-    const g: Record<string, { k: string; v: number; n: number }> = {};
+  /* one row per payment (a payment can clear several DTS bills): vendor · voucher · mode, "· DTS part" when it also paid other bills */
+  const payRows = useMemo(() => {
+    const g: Record<string, { k: string; vendor: string; vendorId: string; vou: string; mode: string; v: number; paid: number }> = {};
     payList.forEach((x) => {
-      const r = g[x.d.vendor] || (g[x.d.vendor] = { k: x.d.vendor, v: 0, n: 0 });
+      const k = x.d.pay || x.id;
+      const r = g[k] || (g[k] = { k, vendor: x.d.vendor, vendorId: x.d.vendor_id, vou: x.d.vou, mode: x.d.mode, v: 0, paid: num(x.x?.paid) });
       r.v += num(x.v);
-      r.n++;
     });
     return Object.values(g).sort((a, b) => b.v - a.v);
   }, [payList]);
+  /* §4.8 / §5: the EXISTING Payments report, opened with its section fixed to DTS */
+  const openPayments = (o: { day?: string | null; party?: string; uid?: string; srno?: string; month?: boolean }) =>
+    router.push({
+      pathname: '/new/(tabs)/reports/payments-made',
+      params: {
+        view: 'owner', prptype, section: 'dts', date: today,
+        ...(o.month ? { period: 'month' } : o.day ? { period: 'day', day: o.day } : { period: 'today' }),
+        ...(o.party ? { party_code: o.party } : {}),
+        ...(o.uid ? { voucher_uid: o.uid, voucher_srno: o.srno || '' } : {}),
+      },
+    } as any);
   const wPay = can('payments_made') ? (
-    <Widget key="pay" onRefresh={() => bump('payments_made')} icon="💸" title="Payments Made" accent={PAY_COL} time="from accounts" onTitle={() => push('pay', { period: 'month' })}
+    <Widget key="pay" onRefresh={() => bump('payments_made')} icon="💸" title="Payments Made" accent={PAY_COL} time="from accounts" onTitle={() => openPayments({ month: true })}
       right={<FYBtn dark onPress={() => openFy('payments')} />}>
       {pay.loading || pay.error ? <StateBox loading={pay.loading} error={pay.error} onRetry={pay.reload} /> : (
         <>
           <TotRow items={[{ label: 'Today', value: L(sum(onDay(pay.items, today))), color: C.today }, { label: 'This month', value: L(sum(pay.items)) }]} />
           <Spark from={mFrom} to={mTo} entries={pay.items} color={PAY_COL} fmt={L} sel={selPay} onPick={setSelPay} />
           <SecHead right={<DayNote sel={selPay} onClear={() => setSelPay(null)} />}>
-            {selPay ? fmtDY(selPay) : 'Today'} · {pl(payVendors.length, 'vendors')}
+            {selPay ? fmtDY(selPay) : 'Today'} · {pl(payRows.length, 'payments')}
           </SecHead>
-          {payVendors.slice(0, 5).map((r) => (
+          {payRows.slice(0, 5).map((r) => (
             <ListRow
               key={r.k}
-              left={<TwoLine title={r.k} sub={pl(r.n, 'bills')} />}
+              left={<TwoLine title={r.vendor} sub={`${r.vou || 'voucher —'}${r.mode ? ` · ${r.mode}` : ''}${r.paid > r.v + 0.5 ? ' · DTS part' : ''}`} />}
               b={L(r.v)}
-              onPress={() => push('pay', selPay ? { period: 'custom', from: selPay, to: selPay, path: [{ k: 'vendor', v: r.k }] } : { period: 'today', path: [{ k: 'vendor', v: r.k }] })}
+              onPress={() => openPayments({ day: selPay, party: r.vendorId, uid: r.k.split('|')[0], srno: r.k.split('|')[1] })}
             />
           ))}
-          {!payVendors.length ? <SecEmpty>{selPay ? 'No payments on this day.' : 'No payments today.'}</SecEmpty> : null}
-          {payVendors.length > 5 ? (
-            <Pressable onPress={() => push('pay', selPay ? { period: 'custom', from: selPay, to: selPay } : { period: 'today' })} accessibilityRole="button" hitSlop={6}>
-              <Text style={[s.viewFull, { color: PAY_COL }]}>+{payVendors.length - 5} more ›</Text>
+          {!payRows.length ? <SecEmpty>{selPay ? 'No payments on this day.' : 'No payments today.'}</SecEmpty> : null}
+          {payRows.length > 5 ? (
+            <Pressable onPress={() => openPayments({ day: selPay })} accessibilityRole="button" hitSlop={6}>
+              <Text style={[s.viewFull, { color: PAY_COL }]}>+{payRows.length - 5} more ›</Text>
             </Pressable>
           ) : null}
           <SecHint>Payments adjusted against purchase bills that carry DTS items; yarn bills serve both sections and are left out. Tap a day on the graph for its payments.</SecHint>
@@ -950,6 +993,14 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
     outs.items.forEach((x) => { g[x.d.exec] = (g[x.d.exec] || 0) + num(x.v); });
     return Object.entries(g).sort((a, b) => b[1] - a[1]);
   }, [outs.items]);
+  /* region of an executive = the states (account master) where his open DTS bills sit, largest first */
+  const outRegion = useMemo(() => {
+    const g: Record<string, Record<string, number>> = {};
+    outs.items.forEach((x) => { if (!x.d.region) return; const e = g[x.d.exec] || (g[x.d.exec] = {}); e[x.d.region] = (e[x.d.region] || 0) + num(x.v); });
+    const out: Record<string, string> = {};
+    Object.keys(g).forEach((e) => { out[e] = Object.entries(g[e]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k).join(' · '); });
+    return out;
+  }, [outs.items]);
   const wOut = can('outstanding') ? (
     <Widget key="out" onRefresh={() => bump('outstanding')} icon="⏳" title="Outstanding" accent={C.out} onTitle={() => push('out')}>
       {outs.loading || outs.error ? <StateBox loading={outs.loading} error={outs.error} onRetry={outs.reload} /> : (
@@ -961,7 +1012,16 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
           </View>
           <ListRow head left="Executive" b="Outstanding" />
           {outExec.map(([name, v]) => (
-            <ListRow key={name} left={<ExecName name={name} />} b={L(v)} bColor={C.over} onPress={() => push('out', { path: [{ k: 'exec', v: name }] })} />
+            <ListRow key={name}
+              left={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <Avatar name={name} />
+                <View style={{ flexShrink: 1, minWidth: 0 }}>
+                  <Text style={ui.rowName} numberOfLines={1}>{name}</Text>
+                  {outRegion[name] ? <Text style={ui.rowSub} numberOfLines={1}>{outRegion[name]}</Text> : null}
+                </View>
+              </View>}
+              lead={<Text style={{ fontFamily: FONT, fontSize: 11, color: C.faint }}>{outExec.findIndex((e) => e[0] === name) + 1}</Text>}
+              b={L(v)} bColor={C.over} onPress={() => push('out', { path: [{ k: 'exec', v: name }] })} />
           ))}
           {!outExec.length ? <SecEmpty>No open DTS bills.</SecEmpty> : null}
           {outs.meta.reconciliation?.available ? (
@@ -1022,78 +1082,131 @@ export default function DtsNEW({ token, API, prptype = 'S' }: Props) {
   ) : null;
 
   /* ---- DTS expense (top card) ---- */
-  const wExp = can('expense') ? (
+  const noSheet = !expSrc.loading && !expSrc.x && /not active/i.test(expSrc.error);
+  const wExp = can('expense') && !noSheet ? (
     <DtsExpCard key="exp" src={expSrc} rows={picks.items} loading={picks.loading} error={picks.error} onRetry={picks.reload} onOpen={() => push('exp')} onRefresh={() => bump('pickmetres', 'expense')} onFy={() => openFy('dtscost')} />
   ) : null;
 
-  /* ---- outsourcing: fabric received from job workers ---- */
+  /* ---- outsourcing (4.11): received · charges · yarn at suppliers, graph, flags strip, by supplier ---- */
   const [selO, setSelO] = useState<string | null>(null);
-  const jobYarnBal = sum(jobYarn.items.filter((x) => x.v > 0));
-  const jobSel = selO ? onDay(jobIn.items, selO) : jobIn.items;
+  const jwD = jw.data;
+  const jobMonth: DtsItem[] = useMemo(
+    () => (jwD ? jwD.ins.filter((i) => i.date >= mFrom && i.date <= mTo).map((i) => ({ id: i.id, date: i.date, v: i.v, aux: i.aux, d: { worker: i.worker_id, art: i.art }, label: '', sub: '' })) : []),
+    [jwD, mFrom, mTo],
+  );
+  const jobSel = selO ? onDay(jobMonth, selO) : jobMonth;
+  const jwWorkers = useMemo(() => (jwD ? workersOf(jwD) : []), [jwD]);
+  const jwFlags = useMemo(() => (jwD ? jwWorkers.reduce((a, w) => a + flagsOf(jwD, w, today).length, 0) : 0), [jwD, jwWorkers, today]);
+  const jobYarnBal = useMemo(() => (jwD ? jwWorkers.reduce((a, w) => a + Math.max(0, balAt(jwD, w, today)), 0) : 0), [jwD, jwWorkers, today]);
   const jobWorkers = useMemo(() => {
-    const g: Record<string, { k: string; m: number; amt: number; bal: number }> = {};
-    const row = (k: string) => g[k] || (g[k] = { k, m: 0, amt: 0, bal: 0 });
-    jobSel.forEach((x) => { const r = row(x.d.worker); r.m += num(x.v); r.amt += num(x.aux); });
-    jobYarn.items.forEach((x) => { row(x.d.worker).bal += num(x.v); });
-    return Object.values(g).sort((a, b) => b.m - a.m || b.bal - a.bal);
-  }, [jobSel, jobYarn.items]);
+    if (!jwD) return [];
+    return jwWorkers.map((w) => {
+      const ls = jobSel.filter((x) => x.d.worker === w);
+      return { w, name: jwD.names[w] || w, m: sum(ls), designs: new Set(ls.map((x) => x.d.art)).size, bal: balAt(jwD, w, today), flags: flagsOf(jwD, w, today).length };
+    }).filter((r) => r.m > 0 || Math.abs(r.bal) > 0.5).sort((a, b) => b.m - a.m || b.bal - a.bal);
+  }, [jwD, jwWorkers, jobSel, today]);
   const wOuts = can('outsourcing') ? (
-    <Widget key="outs" onRefresh={() => bump('outsourcing', 'outsourcing_yarn')} icon="🧶" title="Outsourcing" accent={C.out} time="live" onTitle={() => push('outs', { period: 'month' })}
+    <Widget key="outs" onRefresh={() => bump('jobwork', 'jobwork_rolls')} icon="🧶" title="Outsourcing" accent={C.out} time="live" onTitle={() => push('outs', { period: 'month' })}
       right={<FYBtn dark onPress={() => openFy('jobwork')} />}>
-      {jobIn.loading || jobIn.error ? <StateBox loading={jobIn.loading} error={jobIn.error} onRetry={jobIn.reload} /> : (
+      {jw.loading || jw.error || !jwD ? <StateBox loading={jw.loading} error={jw.error} onRetry={jw.reload} /> : (
         <>
           <TotRow items={[
-            { label: 'Received · month', value: secM(sum(jobIn.items)), color: C.today },
-            { label: 'Charges · month', value: L(sum(jobIn.items, 'aux')) },
-            { label: 'Yarn at job workers', value: jobYarn.loading ? '…' : jobYarn.error ? '—' : secKg(jobYarnBal), color: C.out, onPress: () => push('outsl') },
+            { label: 'Received · month', value: secM(sum(jobMonth)), color: C.today },
+            { label: 'Charges · month', value: L(sum(jobMonth, 'aux')) },
+            { label: 'Yarn at suppliers', value: jwD.yarnError ? '—' : secKg(jobYarnBal), color: C.out, onPress: () => push('outs', { period: 'month', hub: { view: 'ybal' } }) },
           ]} />
-          <Spark from={mFrom} to={mTo} entries={jobIn.items} color={C.out} fmt={secM} sel={selO} onPick={setSelO} />
-          <SecHead right={<DayNote sel={selO} onClear={() => setSelO(null)} />}>{selO ? fmtDY(selO) : 'This month'} · by job worker</SecHead>
+          <Spark from={mFrom} to={mTo} entries={jobMonth} color={C.out} fmt={secM} sel={selO} onPick={setSelO} />
+          {jwFlags > 0 ? (
+            <Pressable onPress={() => push('outs', { period: 'month', hub: { view: 'ybal' } })} accessibilityRole="button" style={s.flagStrip}>
+              <Text style={s.flagStripT}>⚠ {pl(jwFlags, 'flags')} in the yarn reconciliation ›</Text>
+            </Pressable>
+          ) : null}
+          <SecHead right={<DayNote sel={selO} onClear={() => setSelO(null)} />}>{selO ? fmtDY(selO) : 'This month'} · by supplier</SecHead>
           {jobWorkers.map((r) => (
             <ListRow
-              key={r.k}
-              left={<TwoLine title={r.k} sub={`${L(r.amt)} charges · yarn there ${secKg(r.bal)}`} />}
+              key={r.w}
+              left={<TwoLine title={r.name} sub={`${pl(r.designs, 'designs')} · yarn ${secKg(r.bal)}${r.flags ? ` · ${pl(r.flags, 'flags')}` : ''}`} />}
               b={secM(r.m)}
-              onPress={() => push('outs', dayInit(selO, [{ k: 'worker', v: r.k }]))}
+              onPress={() => push('outs', { ...(selO ? { period: 'custom', from: selO, to: selO } : { period: 'month' }), hub: { worker: r.w } } as DrillInit)}
             />
           ))}
-          {!jobWorkers.length ? <SecEmpty>No DTS fabric received from job workers this month.</SecEmpty> : null}
-          {jobYarn.error ? <StateBox error={jobYarn.error} onRetry={jobYarn.reload} minHeight={36} /> : null}
-          <SecHint>Fabric received from job workers for DTS items. Job worker › design › inwards; yarn is each worker's whole yarn account (yarn is common to both sections).</SecHint>
+          {!jobWorkers.length ? (() => {
+            const last = jwD.ins.reduce((m, i) => (i.date > m.date ? i : m), { date: '' } as any);
+            return (
+              <Pressable onPress={last.date ? () => push('outs', { period: 'custom', from: `${last.date.slice(0, 7)}-01`, to: monthEnd(last.date.slice(0, 7)) }) : undefined} disabled={!last.date} accessibilityRole="button">
+                <SecEmpty>
+                  No DTS fabric received from job workers this month.
+                  {last.date ? ` Last DTS inward: ${fmtDY(last.date)} · ${last.worker} · ${secM(last.v)} — tap to open ${mLong(last.date.slice(0, 7))} ›` : ' No DTS job-work inward this financial year.'}
+                </SecEmpty>
+              </Pressable>
+            );
+          })() : null}
+          {jwD.yarnError ? <Text style={[ui.hint, { color: C.over }]}>Yarn account could not be read: {jwD.yarnError.slice(0, 120)}</Text> : null}
+          <SecHint>Fabric received from job workers for DTS designs. Yarn at a supplier = yarn issued − yarn their inwards used, as the ERP deducts it.</SecHint>
         </>
       )}
     </Widget>
   ) : null;
 
   /* ---- stock: internal and external, never added together ---- */
+  const jwYarnItems: DtsItem[] = useMemo(() => {
+    if (!jwD) return [];
+    const out: DtsItem[] = [];
+    jwWorkers.forEach((w) => {
+      const name = jwD.names[w] || w;
+      Object.values((() => {
+        const g: Record<string, { yarn: string; i: number; u: number }> = {};
+        jwD.outs.forEach((o) => { if (o.worker_id === w) (g[o.yarn_id] || (g[o.yarn_id] = { yarn: o.yarn, i: 0, u: 0 })).i += o.kg; });
+        jwD.used.forEach((x) => { if (x.worker_id === w) (g[x.yarn_id] || (g[x.yarn_id] = { yarn: x.yarn, i: 0, u: 0 })).u += x.kg + x.wst + x.sht; });
+        return g;
+      })()).forEach((r, i) => {
+        const bal = r.i - r.u;
+        if (bal > 0.5) out.push({ id: `${w}|${i}`, date: '', v: bal, d: { worker: name, where: name, yarn: r.yarn }, label: r.yarn, sub: `${name} · issued ${secKg(r.i)} · consumed ${secKg(r.u)}` });
+      });
+    });
+    return out;
+  }, [jwD, jwWorkers]);
   const stockKinds: StockKind[] = useMemo(() => {
     const kinds: StockKind[] = [
       { key: 'greige', side: 'in', lbl: 'Greige fabric', fmt: secM, items: fabric.greige, unit: 'stock lines', loading: fabric.loading, error: fabric.error, reload: fabric.reload },
       { key: 'finished', side: 'in', lbl: 'Finished fabric', fmt: secM, items: fabric.finished, unit: 'stock lines', loading: fabric.loading, error: fabric.error, reload: fabric.reload },
+      { key: 'yarn', side: 'in', lbl: 'Yarn', fmt: secKg, items: yarnStock.yarn, unit: 'lots', loading: yarnStock.loading, error: yarnStock.error, reload: yarnStock.reload, note: 'DTS-only yarns' },
       { key: 'mill', side: 'out', lbl: 'Greige at dyeing mills', fmt: secM, items: mill.items, unit: 'challans', loading: mill.loading, error: mill.error, reload: mill.reload },
     ];
     if (rights && rights.outsourcing) {
       kinds.push({
-        key: 'jwyarn', side: 'out', lbl: 'Yarn at job workers', fmt: secKg, items: jobYarn.items.filter((x) => Math.abs(x.v) > 0.5), unit: 'yarn lines',
-        loading: jobYarn.loading, error: jobYarn.error, reload: jobYarn.reload, note: 'whole account',
+        key: 'jwyarn', side: 'out', lbl: 'Yarn at job workers', fmt: secKg, items: jwYarnItems, unit: 'yarn lines',
+        loading: jw.loading, error: jw.error || jwD?.yarnError || '', reload: jw.reload,
       });
     }
     return kinds;
-  }, [fabric, mill.items, mill.loading, mill.error, mill.reload, jobYarn.items, jobYarn.loading, jobYarn.error, jobYarn.reload, rights]);
+  }, [fabric, yarnStock, mill.items, mill.loading, mill.error, mill.reload, jwYarnItems, jw.loading, jw.error, jw.reload, jwD, rights]);
+  /* each stock line says exactly what is happening: loading, failed (why · tap to retry), empty (why), or the figure */
+  const emptyWhy: Record<string, string> = {
+    greige: 'no DTS greige rolls in stock',
+    finished: 'no DTS finished rolls in stock',
+    yarn: yarnStock.usedYarns ? `none of the ${yarnStock.usedYarns} yarns DTS designs use is in stock only for DTS` : 'no yarn is linked to a DTS design in the Designs module',
+    mill: 'nothing pending at dyeing mills',
+    jwyarn: !jwD ? '' : !num(jwD.found.suppliers) ? 'no DTS job-work supplier found in the ERP (this year or last)' : !num(jwD.found.yarn_challan_lines) ? `${pl(num(jwD.found.suppliers), 'DTS suppliers')} found, but no yarn challan was issued to them` : 'every DTS supplier\'s yarn is used up — no balance lying with them',
+  };
   const stockRow = (k: StockKind) => (
     <ListRow
       key={k.key}
-      left={k.lbl}
-      b={k.loading ? '…' : k.error ? 'retry' : k.items.length ? k.fmt(sum(k.items)) : '—'} bColor={k.error ? C.over : C.ink}
+      left={<TwoLine title={k.lbl} sub={k.loading ? (k.items.length ? 'updating…' : 'loading…') : k.error ? `${k.error.slice(0, 90)} · tap to retry` : k.items.length ? undefined : emptyWhy[k.key]} />}
+      b={k.loading && !k.items.length ? '⟳' : k.error ? 'retry' : k.items.length ? k.fmt(sum(k.items)) : '0'} bColor={k.error ? C.over : k.items.length ? C.ink : C.faint}
       onPress={k.error ? k.reload : k.items.length ? () => push('stockk', { kind: k.key }) : undefined}
     />
   );
   const wStock = can('stock') ? (
-    <Widget key="stock" onRefresh={() => bump('mill_stock', 'outsourcing_yarn', 'fabric')} icon="▦" title="Stock" accent={C.owner} onTitle={() => push('stock')}>
+    <Widget key="stock" onRefresh={() => bump('mill_stock', 'jobwork', 'fabric', 'yarnstock')} icon="▦" title="Stock" accent={C.owner} onTitle={() => push('stock')}>
       <SecHead>Internal</SecHead>
       {stockKinds.filter((k) => k.side === 'in').map(stockRow)}
       <SecHead>External · kept apart</SecHead>
       {stockKinds.filter((k) => k.side === 'out').map(stockRow)}
+      <ListRow left={<TwoLine title="Greige at job workers" sub="not recorded — the ERP books job-work fabric only when received" />} b="—" bColor={C.faint} />
+      {!yarnStock.loading && !yarnStock.error && yarnStock.commonKg > 0 ? (
+        <Text style={ui.hint}>Common yarn in our store — {secKg(yarnStock.commonKg)} of yarns that other designs also use. It is not counted in DTS stock.</Text>
+      ) : null}
       <SecHint>DTS designs only. Internal and external stock are never added together.</SecHint>
     </Widget>
   ) : null;
@@ -1224,6 +1337,11 @@ const s = StyleSheet.create({
   mHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: T.hair },
   mRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: T.hair, minHeight: 40 },
   mCol: { minWidth: 78, textAlign: 'right' },
+  rollRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: T.hair },
+  rollT: { fontFamily: FONT, fontSize: 11.5, fontWeight: '700', color: C.ink },
+  rollS: { fontFamily: FONT, fontSize: 10, color: C.faint, fontWeight: '400' },
+  flagStrip: { backgroundColor: '#FBF3E4', borderWidth: 1, borderColor: '#EBD9B4', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 6, marginBottom: 4 },
+  flagStripT: { fontFamily: FONT, fontSize: 11, fontWeight: '700', color: '#8A5A12' },
   noRight: { fontFamily: FONT, fontSize: 12.5, color: C.mut, lineHeight: 18 },
   foot: { fontFamily: FONT, fontSize: 10, color: C.faint, lineHeight: 15, paddingHorizontal: 4, paddingTop: 2 },
 });

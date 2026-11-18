@@ -31,11 +31,14 @@ type Props = {
   chartColor?: string;
   /** remembers the page's state so ‹ back restores it */
   onState?: (s: DrillInit) => void;
+  /** optional: what a record shows when tapped (Production: its checked rolls, loaded on tap) */
+  recordDetail?: (x: DtsItem) => React.ReactNode;
 };
 
 const PAGE = 200;
 
-export default function Drill({ load, levels, fmt, periodic, init, auxFmt, note, recLbl, chartColor, onState }: Props) {
+export default function Drill({ load, levels, fmt, periodic, init, auxFmt, note, recLbl, chartColor, onState, recordDetail }: Props) {
+  const [openRec, setOpenRec] = useState<string | null>(null);
   const t = todayS();
   const [period, setPeriod] = useState<PeriodKey>(init?.period || 'month');
   const [from, setFrom] = useState(init?.from || addDays(t, -30));
@@ -202,7 +205,9 @@ export default function Drill({ load, levels, fmt, periodic, init, auxFmt, note,
         ) : recs.length ? (
           <>
             {recs.slice(0, shown).map((x, i) => (
-              <View key={`${x.id}${i}`} style={s.recRow}>
+              <React.Fragment key={`${x.id}${i}`}>
+              <Pressable onPress={recordDetail ? () => setOpenRec(openRec === x.id ? null : x.id) : undefined} disabled={!recordDetail}
+                accessibilityRole={recordDetail ? 'button' : undefined} style={s.recRow}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                     <Text style={s.recLabel}>{x.label}</Text>
@@ -213,8 +218,11 @@ export default function Drill({ load, levels, fmt, periodic, init, auxFmt, note,
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[s.recValue, (x.warn || x.v < 0) && { color: C.over }]}>{fmt(num(x.v))}</Text>
                   {x.aside ? <Text style={[s.lvlSub, x.warn && { color: C.over }]}>{x.aside}</Text> : null}
+                  {recordDetail ? <Text style={s.lvlSub}>{openRec === x.id ? 'hide ▴' : 'rolls ▾'}</Text> : null}
                 </View>
-              </View>
+              </Pressable>
+              {recordDetail && openRec === x.id ? <View style={s.recOpen}>{recordDetail(x)}</View> : null}
+              </React.Fragment>
             ))}
             {recs.length > shown ? (
               <Pressable onPress={() => setShown(shown + PAGE)} accessibilityRole="button" style={s.more}>
@@ -255,6 +263,7 @@ const s = StyleSheet.create({
   recDate: { fontFamily: FONT, fontSize: 10.5, color: C.mut },
   recSub: { fontFamily: FONT, fontSize: 10.5, color: C.faint, marginTop: 2 },
   recValue: { fontFamily: FONT, fontSize: 12.5, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
+  recOpen: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: T.bg, borderBottomWidth: 1, borderBottomColor: T.hair },
   none: { fontFamily: FONT, fontSize: 11.5, color: C.mut, paddingHorizontal: 12, paddingVertical: 16 },
   more: { paddingVertical: 11, alignItems: 'center' },
   moreText: { fontFamily: FONT, fontSize: 11.5, fontWeight: '700', color: T.blue },

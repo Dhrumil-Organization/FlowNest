@@ -6,6 +6,8 @@
 //   • "My tickets": live status (Raised → In progress → Testing → Resolved), who is working on it,
 //     the IT team's replies and resolution, chat with the IT team, re-open if still not fixed
 //   • period (this month / last month / this year …) and Excel of the user's own tickets
+//   • "All tickets": everybody's tickets (read; only the one who raised a ticket edits / deletes it)
+//   • Chat: "IT Help" with the whole IT team, direct chats and groups with other users — no ticket needed
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,8 +17,12 @@ import { useTicketDraft } from '../capture';
 import { downloadMyTickets } from '../download';
 import { ago, inPeriod, Period, periodFor, periodParams, shiftPeriod, STATUSES, Ticket, typeOf } from '../model';
 import { ExportChoice, ExportDialog } from '../components/ExportDialog';
+import { WorkLogView } from '../components/WorkLogView';
 import { moduleForRoute, moduleOptions } from '../modules';
 import { LiveStatus, LiveSync } from '../realtime';
+import { useChat } from '../chatStore';
+import { useLivePulse } from '../livePulse';
+import { ChatView } from '../components/ChatView';
 import { Shell } from '../components/Shell';
 import { TicketDetailView } from '../components/TicketDetail';
 import { FormPicture, TicketForm } from '../components/TicketForm';
@@ -57,6 +63,13 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('open');
+  const [page, setPage] = useState<'mine' | 'all' | 'chat' | 'log'>('mine');
+  const [myId, setMyId] = useState(0);
+  const [pub, setPub] = useState<Record<string, any>>({});
+  const unread = useChat((s) => s.unread);
+  const lastRev = useRef(0);
+  const settingsSig = useRef('');
+  const lastUnread = useRef(-1);
   const [pk, setPk] = useState<PeriodKey>('all');
   const period = useMemo(() => periodOf(pk), [pk]);
   const [exportOpen, setExportOpen] = useState(false);
@@ -90,7 +103,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
     setLoading(true);
     try {
       const r = await api<{ items: Ticket[]; next_cursor: string | null; rev: number; counts?: Record<string, number> }>('tickets.list', {
-        status: statusParam, q, sort: 'rev', limit: 30, cursor: reset ? '' : cursor || '', counts: reset ? '1' : '', ...periodParams(period),
+        status: statusParam, q, sort: 'rev', limit: 30, cursor: reset ? '' : cursor || '', counts: reset ? '1' : '', scope: page === 'all' ? 'all' : '', ...periodParams(period),
       });
       if (reset && r.counts && g === reqGen.current) setTotal(r.counts);
       if (g !== reqGen.current) return;
@@ -109,8 +122,15 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
     let alive = true;
     (async () => {
       try {
-        const r = await api<{ realtime: any; rev: number }>('bootstrap');
+        const r = await api<{ realtime: any; rev: number; user: { id: number; key: string }; meta: any }>('bootstrap');
         if (!alive) return;
+        setMyId(r.user.id);
+        lastRev.current = r.rev;
+        applyPublic(r.meta?.settings);
+        // chat with the IT team / other users: uploads go straight to the server with this login
+        useChat.getState().reset();
+        useChat.getState().init(api, { base, realm: 'client', headers: { Authorization: `Bearer ${bearer}`, 'X-Erp-Property': property }, api }, r.user.key || `client:${r.user.id}`, 'client');
+        if (r.meta?.settings?.client_chat !== false) void useChat.getState().loadRooms();
         setBoot('ok');
         sync.current = new LiveSync({
           startRev: r.rev,
@@ -144,7 +164,12 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
               });
             }, 150);
           },
+          onEvent: (ev) => {
+            if (ev.type === 'chat') useChat.getState().onEvent(ev);
+            if (ev.type === 'settings') reloadSettings();
+          },
           onStatus: setLive,
+          pollMs: 60000, // the fast pulse covers the gaps
         }).start();
       } catch (e: any) {
         if (!alive) return;
@@ -152,14 +177,32 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
         setBoot(e?.status === 403 ? 'denied' : 'error');
       }
     })();
-    return () => { alive = false; sync.current?.stop(); clearTimeout(flushTimer.current); flushTimer.current = null; queued.current = {}; };
-  }, [api]);
+    return () => { alive = false; sync.current?.stop(); clearTimeout(flushTimer.current); flushTimer.current = null; queued.current = {}; useChat.getState().reset(); };
+  }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyPublic(p: Record<string, any> | undefined) {
+    if (!p) return;
+    setPub(p);
+    useChat.getState().setLimits({ max_upload_mb: p.max_upload_mb, max_files_per_message: p.max_files_per_message, blocked_extensions: p.blocked_extensions });
+  }
+  function reloadSettings() { void api<{ public: Record<string, any> }>('settings.get').then((r) => { applyPublic(r.public); if (r.public.client_chat !== false) void useChat.getState().loadRooms(); }).catch(() => {}); }
+
+  // no WebSocket -> a tiny pulse every 1–3 s keeps chat, ticks, tickets and settings live
+  useLivePulse(boot === 'ok' && live !== 'live', Number(pub.poll_seconds) || 2, (r) => {
+    if (r.rev !== lastRev.current) { lastRev.current = r.rev; void sync.current?.sync(); }
+    if (settingsSig.current && r.settings !== settingsSig.current) reloadSettings();
+    settingsSig.current = r.settings;
+  });
+  useEffect(() => {
+    if (lastUnread.current >= 0 && unread > lastUnread.current && page !== 'chat') toast(`${unread} unread message${unread === 1 ? '' : 's'} in Chat`, 'info');
+    lastUnread.current = unread;
+  }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (boot !== 'ok') return;
+    if (boot !== 'ok' || page === 'chat' || page === 'log') return;
     const t = setTimeout(() => void load(true), q ? 300 : 0);
     return () => clearTimeout(t);
-  }, [boot, tab, q, pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [boot, tab, q, pk, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doExport = async (c: ExportChoice) => {
     if (exporting) return;
@@ -178,6 +221,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
   const shown = ids.filter((id) => {
     const t = items[id];
     if (!t || t.deleted) return false;
+    if (page === 'mine' && myId && t.client && t.client.id !== myId) return false; // live tickets of others
     if (!inPeriod(t, period)) return false;
     if (tab === 'open') return t.status !== 'done';
     if (tab === 'done') return t.status === 'done';
@@ -224,6 +268,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
     <Shell title="Support" subtitle="Report a problem or ask for something new — the IT team sees it live" icon="confirmation-number" accent={T.blue} live={live} onBack={onExit}
       right={!phone ? <Btn small title="Raise a ticket" icon="add" onPress={() => setForm(true)} /> : null}>
       <View style={[c.page, phone && { padding: 10 }]}>
+        {page !== 'chat' ? (
         <View style={c.hero}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={c.heroTitle}>Something not working, or need something new?</Text>
@@ -231,7 +276,20 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
           </View>
           {phone ? <Btn small title="New" icon="add" onPress={() => setForm(true)} /> : null}
         </View>
+        ) : null}
 
+        <Segmented value={page} onChange={(v) => { setPage(v); if (v === 'mine' || v === 'all') { setIds([]); setTotal(null); } }} scroll options={[
+          { value: 'mine', label: 'My tickets', icon: 'confirmation-number' },
+          ...(pub.users_see_all_tickets !== false ? [{ value: 'all' as const, label: 'All tickets', icon: 'dynamic-feed' }] : []),
+          ...(pub.client_chat !== false ? [{ value: 'chat' as const, label: unread ? `Chat · ${unread > 99 ? '99+' : unread}` : 'Chat', icon: 'forum' }] : []),
+          ...(pub.worklog_enabled !== false ? [{ value: 'log' as const, label: 'IT work log', icon: 'engineering' }] : []),
+        ]} />
+        {page === 'chat' ? (
+          <View style={{ flex: 1, minHeight: 420 }}>
+            <ChatView base={base} live={live} canGroup={pub.client_groups !== false} title="Chat" />
+          </View>
+        ) : page === 'log' ? <WorkLogView api={api} onOpenMine={(id) => setOpenId(id)} /> : (
+        <>
         <View style={[c.bar, phone && { flexDirection: 'column', alignItems: 'stretch' }]}>
           <Segmented value={tab} onChange={setTab} options={[
             { value: 'open', label: `Open${openCount ? ` · ${openCount}` : ''}`, icon: 'pending-actions' },
@@ -247,13 +305,13 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
             </View>
             <Btn small kind="success" title="Excel" icon="file-download" onPress={() => setExportOpen(true)} busy={exporting} />
           </View>
-          <View style={{ flex: 1, minWidth: 200 }}><Input value={q} onChangeText={setQ} placeholder="Search my tickets…" icon="search" /></View>
+          <View style={{ flex: 1, minWidth: 200 }}><Input value={q} onChangeText={setQ} placeholder={page === 'all' ? 'Search all tickets…' : 'Search my tickets…'} icon="search" /></View>
         </View>
 
         <FlatList
           data={shown}
           keyExtractor={(id) => String(id)}
-          renderItem={({ item }) => <MyTicket t={items[item]} onPress={() => setOpenId(item)} />}
+          renderItem={({ item }) => <MyTicket t={items[item]} myId={myId} onPress={() => setOpenId(item)} />}
           onEndReached={() => { if (cursor) void load(false); }}
           onEndReachedThreshold={0.4}
           contentContainerStyle={{ paddingBottom: 60 }}
@@ -264,6 +322,8 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
               action={!q ? <Btn small title="Raise a ticket" icon="add" onPress={() => setForm(true)} /> : undefined} />
           ) : null}
         />
+        </>
+        )}
       </View>
 
       <ExportDialog visible={exportOpen} onClose={() => setExportOpen(false)} onExport={doExport} busy={exporting} realm="client" current={pk === 'all' ? null : period} />
@@ -279,6 +339,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
       <Panel visible={openId !== null} onClose={() => setOpenId(null)} title={openId ? items[openId]?.no || '' : ''} subtitle={openId ? items[openId]?.title : ''} width={640}>
         {openId !== null ? (
           <TicketDetailView realm="client" api={api} base={base} id={openId} rev={items[openId]?.rev} modules={modules}
+            uploadHeaders={{ Authorization: `Bearer ${bearer}`, 'X-Erp-Property': property }} limits={useChat.getState().limits}
             onChanged={(t) => setItems((m) => ({ ...m, [t.id]: t }))}
             onDeleted={(id) => setItems((m) => (m[id] ? { ...m, [id]: { ...m[id], deleted: true } } : m))}
             onClose={() => setOpenId(null)} />
@@ -288,8 +349,9 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
   );
 }
 
-function MyTicket({ t, onPress }: { t: Ticket; onPress: () => void }) {
+function MyTicket({ t, myId, onPress }: { t: Ticket; myId: number; onPress: () => void }) {
   if (!t) return null;
+  const other = !!(myId && t.client && t.client.id !== myId);
   const ty = typeOf(t.type);
   const step = STATUSES.findIndex((s) => s.key === t.status);
   return (
@@ -302,7 +364,7 @@ function MyTicket({ t, onPress }: { t: Ticket; onPress: () => void }) {
         <StatusPill status={t.status} client small />
       </View>
       <Text style={c.title} numberOfLines={2}>{t.title}</Text>
-      {t.module_label ? <Text style={c.meta} numberOfLines={1}>{t.module_label}</Text> : null}
+      {t.module_label || other ? <Text style={c.meta} numberOfLines={1}>{other ? `Raised by ${t.client!.name}${t.module_label ? ' · ' : ''}` : ''}{t.module_label}</Text> : null}
       <View style={c.steps}>
         {STATUSES.map((s, i) => (
           <View key={s.key} style={c.stepWrap}>
@@ -323,7 +385,7 @@ function MyTicket({ t, onPress }: { t: Ticket; onPress: () => void }) {
 }
 
 const c = StyleSheet.create({
-  page: { flex: 1, padding: 16, gap: 10, width: '100%', maxWidth: 980, alignSelf: 'center' },
+  page: { flex: 1, padding: 16, gap: 10, width: '100%', maxWidth: 1180, alignSelf: 'center' },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: `${T.blue}0D`, borderWidth: 1, borderColor: `${T.blue}33` },
   heroTitle: { fontSize: 14.5, fontWeight: '900', color: T.nav },
   heroText: { fontSize: 12.5, color: T.ink, fontWeight: '600', marginTop: 3, lineHeight: 18 },

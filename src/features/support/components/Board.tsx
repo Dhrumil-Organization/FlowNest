@@ -16,7 +16,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, PanResponder, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DONE_WINDOWS, useItDesk } from '../itStore';
-import { canMoveCard, Status, statusOf, STATUSES, Ticket } from '../model';
+import { ago, canMoveCard, devSideOf, fmtMinutes, fmtYmd, isOverdue, Status, statusOf, STATUSES, Ticket } from '../model';
 import { TicketCard } from './TicketCard';
 import { Empty, useLayout } from './ui';
 
@@ -29,11 +29,13 @@ type Props = {
   onDrop: (t: Ticket, to: Status, index: number) => void;
   onAdd: (status: Status) => void;
   onHistory?: () => void;
+  /** one compact line per card (lots of cards) */
+  dense?: boolean;
 };
 
 const inside = (r: Rect | undefined, x: number, y: number) => !!r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 
-export function Board({ onOpen, onDrop, onAdd, onHistory }: Props) {
+export function Board({ onOpen, onDrop, onAdd, onHistory, dense }: Props) {
   const { phone } = useLayout();
   const cols = useItDesk((s) => s.cols);
   const tickets = useItDesk((s) => s.tickets);
@@ -68,6 +70,16 @@ export function Board({ onOpen, onDrop, onAdd, onHistory }: Props) {
   const cardY = useRef<Record<string, Record<number, { y: number; h: number }>>>({});
   const rects = useRef<{ board: Rect; cols: Record<string, Rect>; tabs: Record<string, Rect> }>({ board: { x: 0, y: 0, w: 0, h: 0 }, cols: {}, tabs: {} });
 
+  // web: hover a card -> quick preview next to the mouse (after a short pause, so it never flickers)
+  const [peek, setPeek] = useState<{ t: Ticket; x: number; y: number } | null>(null);
+  const peekTimer = useRef<any>(null);
+  const onHover = useCallback((t: Ticket | null, e?: any) => {
+    clearTimeout(peekTimer.current);
+    if (!t || Platform.OS !== 'web') { setPeek(null); return; }
+    const x = e?.nativeEvent?.clientX ?? 0;
+    const y = e?.nativeEvent?.clientY ?? 0;
+    peekTimer.current = setTimeout(() => setPeek({ t, x, y }), 450);
+  }, []);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   const [target, setTarget] = useState<Target>(null);
@@ -262,6 +274,8 @@ export function Board({ onOpen, onDrop, onAdd, onHistory }: Props) {
                   draggable={movable}
                   dragHandlers={movable ? handlersFor(t, s) : undefined}
                   dimmed={drag?.id === id}
+                  dense={dense}
+                  onHover={Platform.OS === 'web' && !drag ? onHover : undefined}
                   onLayout={(e) => {
                     if (dragRef.current) return; // keep the measurements of the drag start
                     const l = e.nativeEvent.layout;
@@ -323,9 +337,10 @@ export function Board({ onOpen, onDrop, onAdd, onHistory }: Props) {
           <Icon name="add" size={26} color="#fff" />
         </TouchableOpacity>
       ) : null}
+      {peek && !drag ? <Peek {...peek} /> : null}
       {drag && ghost && ghostTicket ? (
         <View pointerEvents="none" style={[b.ghost, { left: ghost.x, top: ghost.y, width: drag.cardW }]}>
-          <TicketCard t={ghostTicket} onPress={() => {}} ghost />
+          <TicketCard t={ghostTicket} onPress={() => {}} ghost dense={dense} />
         </View>
       ) : null}
       {!Object.values(cols).some((c) => c.loaded) ? <Empty icon="dashboard" title="Loading the board…" /> : null}
@@ -333,13 +348,53 @@ export function Board({ onOpen, onDrop, onAdd, onHistory }: Props) {
   );
 }
 
+/** quick look at a card (web hover) — everything without opening it */
+function Peek({ t, x, y }: { t: Ticket; x: number; y: number }) {
+  const g: any = globalThis;
+  const W = 320;
+  const vw = g.innerWidth || 1200;
+  const vh = g.innerHeight || 800;
+  const left = Math.min(x + 16, vw - W - 12);
+  const top = Math.min(y + 12, vh - 230);
+  const st = statusOf(t.status);
+  const side = devSideOf(t.dev_side);
+  const rows: [string, string][] = [
+    ['Status', st.label], ['Assigned', t.assignee?.name || 'Unassigned'],
+    ...(t.client ? [['Raised by', t.client.name] as [string, string]] : [['Created by', t.created_by.name] as [string, string]]),
+    ...(t.module_label ? [['Module', t.module_label] as [string, string]] : []),
+    ...(side ? [['Dev side', side.label] as [string, string]] : []),
+    ...(t.due_date ? [['Due', `${fmtYmd(t.due_date)}${isOverdue(t) ? ' · overdue' : ''}`] as [string, string]] : []),
+    ...(t.est_min || t.spent_min ? [['Time', `${fmtMinutes(t.spent_min) || '0m'} actual · ${fmtMinutes(t.est_min || 0) || '—'} est`] as [string, string]] : []),
+    ['Updated', ago(t.updated_at)],
+  ];
+  return (
+    <View pointerEvents="none" style={[b.peek, { left, top, width: W, position: 'fixed' as any }]}>
+      <Text style={b.peekNo}>{t.no}{t.kind === 'ticket' ? ' · user ticket' : ''}</Text>
+      <Text style={b.peekTitle}>{t.title}</Text>
+      {rows.map(([k, v]) => (
+        <View key={k} style={b.peekRow}><Text style={b.peekKey}>{k}</Text><Text style={b.peekVal} numberOfLines={1}>{v}</Text></View>
+      ))}
+      {t.labels.length ? <Text style={b.peekLabels} numberOfLines={1}>{t.labels.join(' · ')}</Text> : null}
+      <Text style={b.peekHint}>Click to open · {t.comments} comments · {t.attachments} files</Text>
+    </View>
+  );
+}
+
 const b = StyleSheet.create({
+  peek: { zIndex: 2000, backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 12, gap: 3, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  peekNo: { fontSize: 10.5, fontWeight: '900', color: T.muted, letterSpacing: 0.4 },
+  peekTitle: { fontSize: 14, fontWeight: '900', color: T.ink, marginBottom: 6 },
+  peekRow: { flexDirection: 'row', gap: 8 },
+  peekKey: { width: 74, fontSize: 11.5, fontWeight: '800', color: T.muted },
+  peekVal: { flex: 1, fontSize: 11.5, fontWeight: '800', color: T.ink },
+  peekLabels: { fontSize: 11, fontWeight: '800', color: T.yd, marginTop: 4 },
+  peekHint: { fontSize: 10.5, fontWeight: '700', color: T.muted, marginTop: 6 },
   board: { flex: 1, minHeight: 0 },
   cols: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 2 },
   col: { borderRadius: 14, backgroundColor: T.alt, borderWidth: 1, borderColor: 'transparent', overflow: 'hidden' },
   colWide: { flex: 1, minWidth: 0 },
   colPhone: { flex: 1, backgroundColor: 'transparent' },
-  colHead: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 8 },
+  colHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', rowGap: 6, gap: 7, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 8 },
   colTitle: { fontSize: 13.5, fontWeight: '900', color: T.nav },
   count: { minWidth: 24, height: 20, borderRadius: 10, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 11, fontWeight: '900' },

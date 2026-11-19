@@ -548,6 +548,30 @@ registerPermissionArea({
           displayOrder: 156,
           actions: [{ key: 'view', name: 'View' }],
         },
+        // DTS — Dress Material · Technical Textile · Sportswear: the owner's own section in one place
+        // (expense · target · monthly report · sales · production · samples · collection · payments made · outstanding ·
+        // beam shortage · outsourcing · stock, each with drill-down reports) via GET /api/getDtsDashboard (DtsDashboardController).
+        // Each child is one widget + its full report; the API checks the same paths (production.dts.<key>).
+        {
+          key: 'dts',
+          name: 'DTS',
+          type: 'screen',
+          displayOrder: 157,
+          actions: [{ key: 'view', name: 'View' }],
+          children: [
+            { key: 'target', name: 'Target Card & Monthly Report', type: 'widget', displayOrder: 10, actions: [] },
+            { key: 'sales', name: 'Sales', type: 'widget', displayOrder: 20, actions: [] },
+            { key: 'production', name: 'Production', type: 'widget', displayOrder: 30, actions: [] },
+            { key: 'samples', name: 'Samples', type: 'widget', displayOrder: 40, actions: [] },
+            { key: 'collection', name: 'Payment Collection', type: 'widget', displayOrder: 50, actions: [] },
+            { key: 'payments_made', name: 'Payments Made', type: 'widget', displayOrder: 60, actions: [] },
+            { key: 'outstanding', name: 'Outstanding', type: 'widget', displayOrder: 70, actions: [] },
+            { key: 'beam_shortage', name: 'Beam Shortage', type: 'widget', displayOrder: 80, actions: [] },
+            { key: 'expense', name: 'DTS Expense & Weaving Cost', type: 'widget', displayOrder: 90, actions: [] },
+            { key: 'outsourcing', name: 'Outsourcing (Job Work) & Yarn at Job Workers', type: 'widget', displayOrder: 100, actions: [] },
+            { key: 'stock', name: 'Stock', type: 'widget', displayOrder: 110, actions: [] },
+          ],
+        },
         {
           key: 'weft_carton_issue_new',
           name: 'Weft Carton Issue',
@@ -1908,6 +1932,25 @@ registerUiNodes([
     permission: 'production.owner_dashboard',
     action: 'view',
     order: 156,
+  },
+  // DTS (Dress Material · Technical Textile · Sportswear — the owner's own section: dashboard widgets + drill-down reports)
+  {
+    id: 'nav.dts',
+    kind: 'navigation',
+    title: 'DTS',
+    permission: 'production.dts',
+    action: 'view',
+    route: 'dts',
+    icon: 'dashboard',
+    order: 157,
+  },
+  {
+    id: 'screen.dts',
+    kind: 'screen',
+    title: 'DTS',
+    permission: 'production.dts',
+    action: 'view',
+    order: 157,
   },
   {
     id: 'nav.weft_carton_issue_new',

@@ -462,8 +462,10 @@ const dailyEndpoint = (kind) => {
 // server's ExpenseMonthCloseService::DEMO_TODAY) so Oct, Nov, Dec 2026 are finished months.
 export const EXPENSE_DEMO_TODAY = new Date(2027, 0, 15);
 
-export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt', demo = false }) {
-  const MONTHS = buildSixMonths(demo ? EXPENSE_DEMO_TODAY : new Date());
+export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt', demo = false, anchor = null }) {
+  // anchor (optional, used by DTS to read earlier months): the six months ending at that month instead of today.
+  // Not passed = the Expense module's own behaviour, unchanged.
+  const MONTHS = buildSixMonths(demo ? EXPENSE_DEMO_TODAY : (anchor instanceof Date ? anchor : new Date()));
 
   // Per-month state keyed by monthno+yearno (e.g. "0627")
   const initialStates = Object.fromEntries(
@@ -1001,6 +1003,9 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
         // Monthly adjustment & freeze state of this month (Sudamo ExpMonthClose).
         // A frozen month's payload is the snapshot taken when it was frozen.
         data.month_close = payload.month_close || null;
+        // Finish Department (Section C) — per metre only, apart from Sections A and B.
+        // Frozen month: this is the block saved in the freeze snapshot.
+        data.finish_department = payload.finish_department || null;
         data.demo_copy_of = payload.demo_copy_of || null;
 
         if (myGen !== loadGen.current) return null;

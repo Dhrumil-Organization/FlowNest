@@ -8,6 +8,7 @@
 import { S, T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -592,8 +593,13 @@ export function Sheet({
   side?: boolean;
 }) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const wide = width >= 720;
   const asSide = wide && side;
+  // Phones (edge-to-edge): the white sheet goes down behind the navigation bar and its buttons
+  // sit just above it — never behind the ◁ ○ ||| keys. Tablet: centred / side panel inside the
+  // safe area. (navigationBarTranslucent = "this sheet handles the bars itself".)
+  const bottomGap = Math.max(insets.bottom, Platform.OS === 'web' ? 0 : 8);
   return (
     <Modal
       visible={open}
@@ -601,10 +607,15 @@ export function Sheet({
       animationType={wide ? 'fade' : 'slide'}
       onRequestClose={onClose}
       statusBarTranslucent
+      navigationBarTranslucent
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[u.flex, asSide ? u.sideWrap : wide ? u.centerWrap : u.bottomWrap]}
+        style={[
+          u.flex,
+          asSide ? u.sideWrap : wide ? u.centerWrap : u.bottomWrap,
+          wide ? { paddingTop: insets.top + (asSide ? 0 : 24), paddingBottom: insets.bottom + (asSide ? 0 : 24) } : { paddingTop: insets.top + 8 },
+        ]}
       >
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={u.scrim} />
@@ -629,11 +640,11 @@ export function Sheet({
             style={asSide ? { flex: 1 } : { flexGrow: 0, flexShrink: 1 }}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
-            contentContainerStyle={{ padding: 16, gap: 14 }}
+            contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: !footer && !wide ? 16 + bottomGap : 16 }}
           >
             {children}
           </ScrollView>
-          {footer ? <View style={u.sheetFoot}>{footer}</View> : null}
+          {footer ? <View style={[u.sheetFoot, !wide && { paddingBottom: 12 + bottomGap }]}>{footer}</View> : null}
         </View>
       </KeyboardAvoidingView>
     </Modal>

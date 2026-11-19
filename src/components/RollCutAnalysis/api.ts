@@ -3,6 +3,7 @@
 //
 //   POST /api/roll_cut_analysis   (Sudamo: API\SudamoProduction\RollCutAnalysisController@report)
 //     { prpcode, prptype, fromdate: dd-mm-yyyy, todate: dd-mm-yyyy, basis: rollcut|checking|sticker, beamno? }
+//   every taka also carries: maccode, macname, dsncode, dsnname, dsn_planned (design is the PLAN design until checking)
 //   → response: { summary, buckets[], beams[], daily[], takas[], beam_list[], filters, databases[], truncated, errors[] }
 //
 // Host + Bearer token come from ErpSessionGate (same as every NEW ERP module).
@@ -18,6 +19,13 @@ export type TakaRow = {
   beamno: string;
   takano: string;
   prpcode: string;
+  /** loom the beam runs on (GRYProcess → DAPMach). '' when the beam is not on a machine yet / old backend */
+  maccode?: string;
+  macname?: string;
+  /** checking design, or the plan design while the taka is not checked (dsn_planned = true) */
+  dsncode?: string;
+  dsnname?: string;
+  dsn_planned?: boolean;
   sticker_at: string | null;
   rollcut_at: string | null;
   checking_at: string | null;

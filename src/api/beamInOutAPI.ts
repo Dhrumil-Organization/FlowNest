@@ -10,7 +10,7 @@ import { createRepackingIssueService } from './repackingIssueAPI';
 import type { SaveResult } from '../features/repackingIssue/service';
 import type { LookupFilter, LookupKind, LookupOption, RepackListRow } from '../features/repackingIssue/types';
 import { buildPayload, formFromShow, fmt2, fmtQ, inwardFromRow, lower, masterFromRow, num, numberTaxLines, outwardFromRow, taxLineFromRow } from '../features/beamInOut/logic';
-import type { BeamContext, BeamForm, BeamLookup, BeamMaster, BeamTxn, InwardLink, Opt, OutwardBeam, TaxLine } from '../features/beamInOut/types';
+import type { BeamContext, BeamForm, BeamGate, BeamLookup, BeamMaster, BeamTxn, InwardLink, Opt, OutwardBeam, TaxLine } from '../features/beamInOut/types';
 
 type Row = Record<string, any>;
 
@@ -152,6 +152,10 @@ export interface BeamService {
   beams(ctx: BeamContext, txn: BeamTxn, opts: { uid: number; selected: { beamCode: number; beamSrNo: number }[]; search?: string; onlyInHouse?: boolean }): Promise<BeamMaster[]>;
   /** Beam Inward: beams out at the party (open Beam Outward lines) */
   outwardBeams(ctx: BeamContext, opts: { parCode: string; uid: number; selected: { uid: number; srNo: number }[]; search?: string }): Promise<OutwardBeam[]>;
+  /** Beam Inward: open Beam Gate Entries (party optional) */
+  gateEntries(ctx: BeamContext, opts: { parCode?: string; search?: string }): Promise<Opt[]>;
+  /** Beam Inward: beams of a gate entry, as outward lines (linked Trantype -10) */
+  gateBeams(ctx: BeamContext, opts: { gruid: number; uid: number }): Promise<{ gate: BeamGate & { parCode: string; party: string }; beams: OutwardBeam[]; message: string }>;
   inwards(ctx: BeamContext, txn: BeamTxn, opts: { parCode: string; beamCode: number; beamSrNo: number; info: string }): Promise<InwardLink[]>;
   nextVoucher(ctx: BeamContext, vouDate: string): Promise<{ no: string; suffix: string }>;
   /** pads a typed voucher no. to 8 digits and checks it is free in the financial year */
@@ -257,6 +261,38 @@ export function createBeamService(txn: BeamTxn): BeamService {
       });
       const b = ok(res?.data, 'Beams out at the party could not be loaded.');
       return unwrapRows(b).map(outwardFromRow).filter(x => x.link.uid);
+    },
+
+    async gateEntries(ctx, o) {
+      const res = await post(BEAM_ROUTES.crud, { ...ctxParams(ctx, txn), action: 'get_gate_entries_help', parcode: o.parCode ?? '', search: o.search ?? '' });
+      const b = ok(res?.data, 'Gate entries could not be loaded.');
+      return unwrapRows(b).map((raw): Opt => {
+        const r = lower(raw);
+        const vehNo = String(r.vehno ?? '').trim();
+        return {
+          code: String(num(r.uid)),
+          name: `${String(r.grno ?? '').trim()}  •  ${String(r.parname ?? '').trim() || String(r.parcode ?? '')}`,
+          extra: {
+            no: String(r.grno ?? '').trim(), date: String(r.grdate ?? '').replace(/\//g, '-'), parCode: String(r.parcode ?? '').trim(),
+            party: String(r.parname ?? '').trim(), vehNo, outNo: String(r.rono ?? '').trim(), beamNos: String(r.beamnos ?? '').trim(),
+            openBeams: num(r.openbeams),
+          },
+        };
+      }).filter(o => num(o.code));
+    },
+
+    async gateBeams(ctx, o) {
+      const res = await post(BEAM_ROUTES.crud, { ...ctxParams(ctx, txn), action: 'get_gate_entry_beams', gruid: o.gruid, uid: o.uid });
+      const b = ok(res?.data, 'Beams of the gate entry could not be loaded.');
+      const g = lower(b?.gate);
+      return {
+        gate: {
+          uid: num(g.uid), no: String(g.grno ?? '').trim(), date: String(g.grdate ?? '').replace(/\//g, '-'), vehNo: String(g.vehno ?? '').trim(),
+          parCode: String(g.parcode ?? '').trim(), party: String(g.parname ?? '').trim(),
+        },
+        beams: unwrapRows(b?.beams).map(outwardFromRow).filter(x => x.link.uid),
+        message: messageOf(res?.data),
+      };
     },
 
     async inwards(ctx, _t, o) {

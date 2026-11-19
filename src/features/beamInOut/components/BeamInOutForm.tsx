@@ -12,7 +12,7 @@ import { C, R, SP } from '../../repackingIssue/theme';
 import { Banner, Btn, Card, Field, Input, Row, SelectBox, Stat } from '../../repackingIssue/components/ui';
 import { OptionPicker } from '../../repacking/components/OptionPicker';
 import {
-  calcTax, DADD_MAX, emptyForm, fmt2, fmtQ, inwardRequired, REMARK_MAX, rowAmount, rowTotals, txnTitle, validateForm, validateTax,
+  calcTax, DADD_MAX, emptyForm, fmt2, fmtQ, inwardRequired, REMARK_MAX, rowAmount, rowFromOutward, rowTotals, txnTitle, validateForm, validateTax,
 } from '../logic';
 import { BEAM_INFO } from '../types';
 import type { BeamContext, BeamForm, BeamLookup, BeamRights, BeamRow, BeamTxn, Opt, TaxLine } from '../types';
@@ -53,6 +53,10 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   const [saving, setSaving] = useState(false);
   const [vouBusy, setVouBusy] = useState(false);
   const [showAllBeams, setShowAllBeams] = useState(false);
+  /** Beam Inward: gate entry picker / loading its beams */
+  const [gatePick, setGatePick] = useState(false);
+  const [gateBusy, setGateBusy] = useState(false);
+  const inwardTxn = txn === 'beam_inward';
   const vouRef = useRef<TextInput | null>(null);
   const sufRef = useRef<TextInput | null>(null);
 
@@ -118,13 +122,13 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   };
 
   /* ---- party → address, GST accounts; inward links belong to the old party ---- */
-  const pickParty = async (o: Opt) => {
+  const pickParty = async (o: Opt, force = false): Promise<boolean> => {
     setPicker(null);
-    if (o.code === h.party?.code) return;
+    if (o.code === h.party?.code) return true;
     const inward = txn === 'beam_inward';
     const linked = form.rows.some(r => r.inward);
-    if (inward && form.rows.length && !(await confirmAsync('Change party?', 'The beams in this voucher went out to the old party and will be removed.', 'Change', true))) return;
-    if (!inward && linked && !(await confirmAsync('Change party?', 'Inward No. of the beams belong to the old party and will be cleared.', 'Change', true))) return;
+    if (!force && inward && form.rows.length && !(await confirmAsync('Change party?', 'The beams in this voucher went out to the old party and will be removed.', 'Change', true))) return false;
+    if (!force && !inward && linked && !(await confirmAsync('Change party?', 'Inward No. of the beams belong to the old party and will be cleared.', 'Change', true))) return false;
     const addr = String(o.extra?.address ?? '');
     setForm(f => ({
       ...f,
@@ -135,6 +139,7 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
         delAddress: !f.header.delAddress.trim() || f.header.delAddress === f.header.address ? addr.slice(0, DADD_MAX) : f.header.delAddress,
       },
       rows: inward ? [] : f.rows.map(r => ({ ...r, inward: null })),
+      gate: inward ? null : f.gate,
     }));
     setErrors(e => { const n = { ...e }; delete n.party; delete n.delAddress; return n; });
     try {
@@ -143,6 +148,35 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
       setTaxNote(r.sameState === null ? r.message || 'State of the property or the party is blank — all GST lines are open.' : '');
     } catch (e: any) {
       setTaxNote(e?.message || 'GST accounts could not be loaded.');
+    }
+    return true;
+  };
+
+  /* ---- Beam Inward: pick the Beam Gate Entry → its party and beams (linked to their outward lines) ---- */
+  const pickGate = async (o: Opt) => {
+    setGatePick(false);
+    const gruid = Number(o.code) || 0;
+    if (!gruid) return;
+    setGateBusy(true);
+    try {
+      const r = await service.gateBeams(ctx, { gruid, uid: form.meta?.uid ?? 0 });
+      if (!r.beams.length) return notify('Gate entry', r.message || 'All beams of this gate entry are already taken in.');
+      if (h.party?.code !== r.gate.parCode) {
+        if (form.rows.length && !(await confirmAsync('Change party?', `Gate entry ${r.gate.no} is of ${r.gate.party}. The beams in this voucher will be replaced.`, 'Continue', true))) return;
+        const found = (await service.parties(ctx, txn, r.gate.parCode).catch(() => [] as Opt[])).find(p => p.code === r.gate.parCode);
+        await pickParty(found ?? { code: r.gate.parCode, name: r.gate.party }, true);
+      }
+      setForm(f => ({
+        ...f,
+        gate: { uid: r.gate.uid, no: r.gate.no, date: r.gate.date, vehNo: r.gate.vehNo },
+        // our beams come from the gate entry; party beams (Process House) stay
+        rows: [...f.rows.filter(x => x.inward?.tranType !== -10), ...r.beams.map(rowFromOutward)],
+      }));
+      setErrors(e => { const n = { ...e }; delete n.rows; delete n.gate; return n; });
+    } catch (e: any) {
+      notify('Gate entry', e?.message || 'Could not load the gate entry.');
+    } finally {
+      setGateBusy(false);
     }
   };
 
@@ -190,6 +224,9 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   const save = async () => {
     if (!(await checkVoucher())) return notify('Voucher No', 'This voucher no. is already used — change it or leave it blank for the next number.');
     const e = validateForm(form);
+    if (inwardTxn && !form.gate && !rights.withoutGate && mode === 'add' && form.rows.some(r => r.inward?.tranType === -10)) {
+      e.gate = 'Pick the gate entry - beams coming back against a Beam Outward are taken in from the Beam Gate Entry.';
+    }
     const t = validateTax(form.tax, form.sameState);
     if (t) e.tax = t;
     setErrors(e);
@@ -197,7 +234,7 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
     if (tax.net <= 0 && !(await confirmAsync('Net amount is 0', 'Save the voucher with a 0 net amount?', 'Save', false))) return;
     setSaving(true);
     try {
-      const r = await service.save(ctx, form);
+      const r = await service.save(ctx, { ...form, withoutGate: inwardTxn && !!rights.withoutGate });
       if (!r.ok) return notify('Not saved', r.message);
       notify('Saved', r.message);
       if (onSaved) onSaved();
@@ -315,10 +352,39 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
 
   const beamsCard = (
     <Card step={2} title={`Beams (${form.rows.length})`} right={!readOnly && rights.beams ? (
-      <Btn small icon="playlist-add" title="Add beams" onPress={() => (h.party ? setBeamPick(true) : notify('Party', 'Select the party first.'))} />
+      inwardTxn ? (
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Btn small icon="login" title={form.gate ? 'Change gate entry' : 'From gate entry'} loading={gateBusy} onPress={() => setGatePick(true)} />
+          <Btn small kind="ghost" icon="playlist-add" title={rights.withoutGate ? 'Add beams' : 'Party beams'} onPress={() => (h.party ? setBeamPick(true) : notify('Party', 'Select the party first.'))} />
+        </View>
+      ) : (
+        <Btn small icon="playlist-add" title="Add beams" onPress={() => (h.party ? setBeamPick(true) : notify('Party', 'Select the party first.'))} />
+      )
     ) : null}>
       {errors.rows ? <Text style={st.err}>{errors.rows}</Text> : null}
-      {!form.rows.length ? (
+      {errors.gate ? <Text style={st.err}>{errors.gate}</Text> : null}
+      {inwardTxn && form.gate ? (
+        <View style={st.gate}>
+          <Icon name="login" size={20} color={C.cta} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.gateNo}>Gate entry {form.gate.no}</Text>
+            <Text style={st.gateMeta} numberOfLines={1}>{[form.gate.date, form.gate.vehNo].filter(Boolean).join('  •  ') || 'Beams below came in on this gate entry'}</Text>
+          </View>
+        </View>
+      ) : inwardTxn && mode === 'edit' && form.rows.some(r => r.inward?.tranType === -10) ? (
+        <Text style={st.gateMeta}>Taken in without a gate entry (entered before the Beam Gate Entry).</Text>
+      ) : null}
+      {!form.rows.length && inwardTxn ? (
+        <Pressable onPress={!readOnly && rights.beams ? () => setGatePick(true) : undefined} style={st.empty} accessibilityRole="button">
+          <Icon name="login" size={30} color={C.cta} />
+          <Text style={st.emptyTxt}>Pick the gate entry</Text>
+          <Text style={st.emptyHint}>
+            {rights.withoutGate
+              ? 'Security makes a Beam Gate Entry when the beams come in — pick it here. No gate entry? “Add beams” (you have the right to take beams in without one).'
+              : 'Security makes a Beam Gate Entry when the beams come in. Pick it here and the party and beams fill in. Process House beams: “Party beams”.'}
+          </Text>
+        </Pressable>
+      ) : !form.rows.length ? (
         <Pressable onPress={!readOnly && rights.beams ? () => (h.party ? setBeamPick(true) : notify('Party', 'Select the party first.')) : undefined} style={st.empty} accessibilityRole="button">
           <Icon name="view-week" size={30} color={C.cta} />
           <Text style={st.emptyTxt}>Add beams</Text>
@@ -474,7 +540,22 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
         rows={form.rows}
         onPick={addBeams}
         onClose={() => setBeamPick(false)}
+        partyOnly={inwardTxn && !rights.withoutGate}
       />
+      {inwardTxn ? (
+        <OptionPicker
+          visible={gatePick}
+          title="Gate Entry"
+          search={(q: string) => service.gateEntries(ctx, { parCode: h.party?.code ?? '', search: q })}
+          selected={form.gate ? String(form.gate.uid) : undefined}
+          sub={(o: Opt) => {
+            const x = (o.extra ?? {}) as Record<string, any>;
+            return [x.date, `${x.openBeams} beam${x.openBeams === 1 ? '' : 's'}${x.beamNos ? `: ${x.beamNos}` : ''}`, x.outNo && `Outward ${x.outNo}`, x.vehNo].filter(Boolean).join('  •  ');
+          }}
+          onPick={pickGate}
+          onClose={() => setGatePick(false)}
+        />
+      ) : null}
       {editing ? (
         <BeamRowSheet
           visible
@@ -533,6 +614,9 @@ const TABLE_BODY_MAX = 5 * 53 + 4;
 const PHONE_BEAMS = 4;
 
 const st = StyleSheet.create({
+  gate: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: R.md, backgroundColor: C.ctaSoft, borderWidth: 1, borderColor: C.cta, marginBottom: SP.sm },
+  gateNo: { fontSize: 15, fontWeight: '800', color: C.nav },
+  gateMeta: { fontSize: 12, color: C.muted },
   root: { flex: 1, backgroundColor: C.bg },
   ctx: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.md },
   ctxTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: C.nav },

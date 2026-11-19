@@ -17,7 +17,7 @@ import type { BeamContext, BeamMaster, BeamRow, BeamTxn, OutwardBeam } from '../
 type Item = { key: string; beam: BeamMaster; out?: OutwardBeam };
 const beamKey = (b: { beamCode: number; beamSrNo: number }) => `${b.beamCode}-${b.beamSrNo}`;
 
-export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: current, onPick, onClose }: {
+export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: current, onPick, onClose, partyOnly = false }: {
   visible: boolean;
   ctx: BeamContext;
   txn: BeamTxn;
@@ -29,6 +29,8 @@ export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: cur
   rows: BeamRow[];
   onPick: (rows: BeamRow[]) => void;
   onClose: () => void;
+  /** Beam Inward: our beams come back through the Beam Gate Entry — here only the party's own beams */
+  partyOnly?: boolean;
 }) {
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<Item[]>([]);
@@ -36,7 +38,7 @@ export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: cur
   const [loading, setLoading] = useState(false);
   const [showOut, setShowOut] = useState(false);
   /** Beam Inward: 'out' = our beams out at the party, 'party' = the party's own beams (Process House, with a yarn inward) */
-  const [source, setSource] = useState<'out' | 'party'>('out');
+  const [source, setSource] = useState<'out' | 'party'>(partyOnly ? 'party' : 'out');
   const seq = useRef(0);
   const outward = txn === 'beam_outward';
   const fromMaster = outward || source === 'party';
@@ -68,7 +70,7 @@ export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: cur
     if (!visible) return;
     setTicked(new Map());
     setQ('');
-    setSource('out');
+    setSource(partyOnly ? 'party' : 'out');
     load('', showOut);
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -133,7 +135,7 @@ export function BeamPicker({ visible, ctx, txn, service, uid, parCode, rows: cur
           />
           <Icon name="search" size={20} color={C.muted} style={st.searchIcon} />
         </View>
-        {!outward ? (
+        {!outward && !partyOnly ? (
           <Segmented<'out' | 'party'>
             options={[{ value: 'out', label: 'Out at this party', hint: 'Our beams coming back' }, { value: 'party', label: 'Party beams', hint: 'Process House' }]}
             value={source}

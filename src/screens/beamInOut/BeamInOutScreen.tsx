@@ -48,6 +48,7 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
     removeBeam: canDo(R.beams, 'remove_beam'),
     tax: canDo(R.tax, 'edit'),
     print: canDo(R.resource, 'print'),
+    withoutGate: txn === 'beam_inward' && canDo(R.resource, 'without_gate'),
   };
   const canPrint = rights.print && !!BEAM_PRINT_TYPE[txn];
 

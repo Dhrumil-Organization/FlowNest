@@ -343,6 +343,8 @@ export function buildPayload(ctx: BeamContext, f: BeamForm, action: 'add_data' |
     AuthBy: h.authBy?.code ?? '',
     DAdd: h.delAddress.trim(),
     Remark: h.remark.trim(),
+    GRUId: f.txn === 'beam_inward' ? f.gate?.uid ?? 0 : 0,
+    WithoutGate: f.txn === 'beam_inward' && f.withoutGate ? 1 : 0,
     GrsAmt: t.gross,
     TaxAmt: t.taxAmt,
     NTaxAmt: t.nTaxAmt,
@@ -457,5 +459,6 @@ export function formFromShow(txn: BeamTxn, body: Row): BeamForm {
     taxAcc: (body.taxacc ?? []).map((x: unknown) => str(x)).filter(Boolean),
     sameState: body.samestate === null || body.samestate === undefined || body.samestate === '' ? null : num(body.samestate) === 1,
     meta: { uid: num(m.uid), received: num(m.received) || rows.filter(r => r.inQty > 0).length, gatePassNo: str(m.gatepassno) },
+    gate: txn === 'beam_inward' && num(m.gruid) ? { uid: num(m.gruid), no: str(m.gateno), date: '', vehNo: '' } : null,
   };
 }

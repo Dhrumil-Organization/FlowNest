@@ -10,6 +10,7 @@ import './modules/beam.permission';
 import './modules/beamGatePass.module';
 import './modules/beamInOut.module';
 import './modules/beamReport.module';
+import './modules/beamGateEntry.module';
 import './modules/costing.permission';
 import './modules/creel.permission';
 import './modules/dashboard.permission';

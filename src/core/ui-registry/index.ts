@@ -20,6 +20,7 @@ import '../../registry/modules/repacking.module';
 import '../../registry/modules/beamInOut.module';
 import '../../registry/modules/beamGatePass.module';
 import '../../registry/modules/beamReport.module';
+import '../../registry/modules/beamGateEntry.module';
 
 import { validateUiRegistry } from './uiRegistry';
 // FIX: cross-check every UI-registry node's `permission` string against

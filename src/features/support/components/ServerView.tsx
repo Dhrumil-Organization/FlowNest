@@ -73,7 +73,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
       </View>
 
       <View style={[v.cols, !wide && { flexDirection: 'column' }]}>
-        <Card title="Live connection (WebSocket)" style={{ flex: 1 }}>
+        <Card title="Live connection (WebSocket)" style={wide ? { flex: 1 } : undefined}>
           <View style={v.statusRow}>
             <View style={[v.dot, { backgroundColor: st.websocket.ok ? T.green : T.red }]} />
             <Text style={v.big}>{st.websocket.ok ? 'Running' : 'Not reachable'}</Text>
@@ -89,7 +89,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
           )}
           <Text style={[v.muted, { marginTop: 6 }]}>This browser: {live === 'live' ? 'connected live' : live === 'polling' ? 'fast refresh' : live}</Text>
         </Card>
-        <Card title="Online now (last 2 min)" style={{ flex: 1 }}>
+        <Card title="Online now (last 2 min)" style={wide ? { flex: 1 } : undefined}>
           <Text style={v.big}>{st.online.it.length} IT · {st.online.client.length} users</Text>
           <View style={v.people}>
             {[...st.online.it.map((p) => ({ ...p, k: 'it' })), ...st.online.client.map((p) => ({ ...p, k: 'client' }))].slice(0, 24).map((p) => (
@@ -126,7 +126,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
       </Card>
 
       <View style={[v.cols, !wide && { flexDirection: 'column' }]}>
-        <Card title="Busiest actions (last hour)" style={{ flex: 1 }}>
+        <Card title="Busiest actions (last hour)" style={wide ? { flex: 1 } : undefined}>
           {st.traffic.top_actions.length ? st.traffic.top_actions.map((a) => (
             <View key={a.action} style={v.tr}>
               <Text style={[v.cell, { flex: 1 }]} numberOfLines={1}>{a.action || '—'}</Text>
@@ -135,7 +135,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
             </View>
           )) : <Text style={v.muted}>No requests counted yet.</Text>}
         </Card>
-        <Card title="Last 24 hours" style={{ flex: 1 }}>
+        <Card title="Last 24 hours" style={wide ? { flex: 1 } : undefined}>
           <View style={[v.bars, { height: 120 }]}>
             {st.traffic.per_hour.map((x, i) => (
               <View key={i} style={v.barCol} accessibilityLabel={`${x.t}: ${x.n} requests`}>
@@ -148,7 +148,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
       </View>
 
       <View style={[v.cols, !wide && { flexDirection: 'column' }]}>
-        <Card title={`Database · ${st.database.ms} ms to count`} style={{ flex: 1 }}>
+        <Card title={`Database · ${st.database.ms} ms to count`} style={wide ? { flex: 1 } : undefined}>
           {st.database.tables.map((t) => (
             <View key={t.name} style={v.tr}>
               <Text style={[v.cell, { flex: 1 }, t.missing && { color: T.red }]}>{t.name}{t.missing ? ' — missing' : ''}</Text>
@@ -157,7 +157,7 @@ export function ServerView({ api, live, onStorage }: { api: SupportCall; live: L
             </View>
           ))}
         </Card>
-        <Card title="Today" style={{ flex: 1 }}>
+        <Card title="Today" style={wide ? { flex: 1 } : undefined}>
           <View style={v.statsRow}>
             <Stat label="Open tickets / tasks" value={st.work.tickets_open} />
             <Stat label="Raised today" value={st.work.tickets_today} />

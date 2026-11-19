@@ -9,14 +9,18 @@
 //   • older messages load 40 at a time while scrolling up (millions of messages stay smooth)
 //   • search in every chat you can read — Bloom filter answers "no match" instantly
 //   • validations (size, type, count, empty folder) come in the app's common alert
+//   • the composer stays above the keyboard (phones, tablets, iOS Safari) like WhatsApp
+//   • paste a copied picture / file (Ctrl+V, or "Paste" on phones), drag & drop files (web)
+//   • copy a message, forward it (with its files) to other chats / groups
 import { T } from '@/src/theme';
 import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { fileUrl } from '../api';
 import { ChatFile, ChatMessage, ChatRoom, Pending, Person, useChat } from '../chatStore';
-import { canPickFolder, checkFiles, fileLook, fmtBytes, openLink, PickedFile, pickFiles, pickFolder, pickPhotos, takePicture } from '../files';
+import { canPickFolder, checkFiles, clipboardHasImage, copyText, fileLook, fmtBytes, fromWebFiles, openLink, PickedFile, pasteFromClipboard, pickFiles, pickFolder, pickPhotos, takePicture } from '../files';
+import { useKeyboardInset } from '../keyboard';
 import { ago, fmtWhen, toYmd, ymdToDate } from '../model';
 import type { LiveStatus } from '../realtime';
 import { Viewer } from './Pictures';
@@ -67,6 +71,16 @@ export function ChatView({ base, live, admin = false, canGroup = false, title = 
   const [q, setQ] = useState('');
   const [newChat, setNewChat] = useState<'direct' | 'group' | null>(null);
 
+  // "on screen": mounted + (web) the tab is visible -> only then messages count as read
+  useEffect(() => {
+    const d: any = WEB ? (globalThis as any).document : null;
+    const upd = () => useChat.getState().setViewing(!d || d.visibilityState !== 'hidden');
+    upd();
+    d?.addEventListener?.('visibilitychange', upd);
+    const sub = AppState.addEventListener('change', (s) => useChat.getState().setViewing(s === 'active' && (!d || d.visibilityState !== 'hidden')));
+    return () => { d?.removeEventListener?.('visibilitychange', upd); sub.remove(); useChat.getState().setViewing(false); };
+  }, []);
+
   useEffect(() => {
     const st = useChat.getState();
     void st.loadRooms();
@@ -81,11 +95,12 @@ export function ChatView({ base, live, admin = false, canGroup = false, title = 
   const room = rooms.find((r) => r.id === activeId) || null;
   const showList = !phone || !room;
   const showRoom = !phone || !!room;
+  const kb = useKeyboardInset();
 
   if (roomsError && !rooms.length) return <View style={c.wrap}><Empty icon="speaker-notes-off" title="Chat is not available" text={roomsError} /></View>;
 
   return (
-    <View style={c.wrap}>
+    <View style={[c.wrap, kb.inset ? { paddingBottom: kb.inset } : null]} ref={kb.ref} collapsable={false}>
       {showList ? (
         <View style={[c.listPane, phone && { width: '100%' as any, borderRightWidth: 0 }]}>
           <View style={c.listHead}>
@@ -207,6 +222,24 @@ function RoomPane({ room, base, admin, onBack }: { room: ChatRoom; base: string;
   const firstUnread = useRef(room.unread ? room.last_read_id : -1).current;
   const listRef = useRef<FlatList<Row>>(null);
   const reads = byRoom?.reads || {};
+  const addRef = useRef<((l: PickedFile[]) => void) | null>(null);
+  const paneRef = useRef<View>(null);
+  const [dragging, setDragging] = useState(false);
+  const [forward, setForward] = useState<ChatMessage | null>(null);
+
+  // web: drop files anywhere on the chat
+  useEffect(() => {
+    if (!WEB) return undefined;
+    const node: any = paneRef.current;
+    if (!node?.addEventListener) return undefined;
+    let depth = 0;
+    const over = (e: any) => { if (e.dataTransfer?.types?.includes?.('Files')) { e.preventDefault(); } };
+    const enter = (e: any) => { if (e.dataTransfer?.types?.includes?.('Files')) { depth++; setDragging(true); } };
+    const leave = () => { depth = Math.max(0, depth - 1); if (!depth) setDragging(false); };
+    const drop = (e: any) => { e.preventDefault(); depth = 0; setDragging(false); const l = fromWebFiles(e.dataTransfer?.files); if (l.length) addRef.current?.(l); };
+    node.addEventListener('dragover', over); node.addEventListener('dragenter', enter); node.addEventListener('dragleave', leave); node.addEventListener('drop', drop);
+    return () => { node.removeEventListener('dragover', over); node.removeEventListener('dragenter', enter); node.removeEventListener('dragleave', leave); node.removeEventListener('drop', drop); };
+  }, []);
 
   // newest first (inverted list), with day lines and the "new messages" line
   const rows: Row[] = useMemo(() => {
@@ -239,7 +272,8 @@ function RoomPane({ room, base, admin, onBack }: { room: ChatRoom; base: string;
   const sub = room.kind === 'group' && !room.is_member ? `${room.sub} · you see it as IT admin` : room.sub;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} ref={paneRef} collapsable={false}>
+      {dragging ? <View style={c.dropZone} pointerEvents="none"><Icon name="file-upload" size={34} color={T.blue} /><Text style={c.dropText}>Drop files to send in {room.name}</Text></View> : null}
       <View style={c.roomHead}>
         {onBack ? <IconBtn icon="arrow-back" label="Back to chats" onPress={onBack} /> : null}
         <RoomIcon r={room} size={34} />
@@ -283,10 +317,11 @@ function RoomPane({ room, base, admin, onBack }: { room: ChatRoom; base: string;
         ) : null}
       </View>
 
-      <Composer room={room} reply={reply} onReplyDone={() => setReply(null)} editing={editing} onEditDone={() => setEditing(null)} />
+      <Composer room={room} reply={reply} onReplyDone={() => setReply(null)} editing={editing} onEditDone={() => setEditing(null)} addRef={addRef} />
 
       <Viewer pics={viewer?.pics || []} index={viewer ? viewer.index : null} onClose={() => setViewer(null)} onIndex={(i) => setViewer((v) => (v ? { ...v, index: i } : v))} />
-      <MessageMenu m={menuFor} admin={admin} room={room} seen={menuFor?.mine ? seenInfo(room, reads, menuFor) : null} onClose={() => setMenuFor(null)} onReply={(m) => { setReply(m); setMenuFor(null); }} onEdit={(m) => { setEditing(m); setMenuFor(null); }} />
+      <MessageMenu m={menuFor} admin={admin} room={room} seen={menuFor?.mine ? seenInfo(room, reads, menuFor) : null} onClose={() => setMenuFor(null)} onReply={(m) => { setReply(m); setMenuFor(null); }} onEdit={(m) => { setEditing(m); setMenuFor(null); }} onForward={(m) => { setForward(m); setMenuFor(null); }} />
+      <ForwardDialog m={forward} onClose={() => setForward(null)} />
       <RoomInfo visible={info} onClose={() => setInfo(false)} room={room} admin={admin} />
     </View>
   );
@@ -313,6 +348,7 @@ function Bubble({ m, first, base, phone, focus, seen, group, onPics, onMenu, onR
       {!mine ? (first ? <Avatar name={m.user.name} id={m.user.id} color={m.user.color} size={30} /> : <View style={{ width: 30 }} />) : null}
       <View style={[c.bubble, mine ? c.mine : c.theirs, focus && { borderColor: T.amber, borderWidth: 2 }, { maxWidth: phone ? '84%' as any : '70%' as any }]}>
         {first && !mine ? <Text style={[c.author, { color: m.user.color }]}>{m.user.name}{m.user.kind === 'it' ? <Text style={c.itTag}>  IT</Text> : null}</Text> : null}
+        {m.forwarded && !m.deleted ? <Text style={c.fwd}><Icon name="shortcut" size={12} color={T.muted} /> Forwarded</Text> : null}
         {m.reply_to ? (
           <View style={c.quote}><Text style={c.quoteName}>{m.reply_to.user_name}</Text><Text style={c.quoteText} numberOfLines={2}>{m.reply_to.text}</Text></View>
         ) : null}
@@ -444,7 +480,7 @@ function PendingBubble({ p }: { p: Pending }) {
 
 /* ------------------------------- composer -------------------------------- */
 
-function Composer({ room, reply, onReplyDone, editing, onEditDone }: { room: ChatRoom; reply: ChatMessage | null; onReplyDone: () => void; editing: ChatMessage | null; onEditDone: () => void }) {
+function Composer({ room, reply, onReplyDone, editing, onEditDone, addRef }: { room: ChatRoom; reply: ChatMessage | null; onReplyDone: () => void; editing: ChatMessage | null; onEditDone: () => void; addRef?: React.MutableRefObject<((l: PickedFile[]) => void) | null> }) {
   const { phone } = useLayout();
   const send = useChat((s) => s.send);
   const edit = useChat((s) => s.edit);
@@ -458,6 +494,20 @@ function Composer({ room, reply, onReplyDone, editing, onEditDone }: { room: Cha
   useEffect(() => { if (editing) { setText(editing.body); inputRef.current?.focus(); } }, [editing]);
   useEffect(() => { if (reply) inputRef.current?.focus(); }, [reply]);
 
+  const [canPaste, setCanPaste] = useState(WEB);
+  useEffect(() => { if (addRef) addRef.current = (l) => add(l); });
+  // web: Ctrl+V / ⌘V of a copied picture or file goes into the message
+  useEffect(() => {
+    if (!WEB) return undefined;
+    const node: any = inputRef.current;
+    if (!node?.addEventListener) return undefined;
+    const onPaste = (e: any) => {
+      const l = fromWebFiles(e.clipboardData?.files);
+      if (l.length) { e.preventDefault(); add(l); }
+    };
+    node.addEventListener('paste', onPaste);
+    return () => node.removeEventListener('paste', onPaste);
+  });
   const add = (list: PickedFile[], fold = '') => {
     if (!list.length) return;
     // same file twice -> once
@@ -530,7 +580,7 @@ function Composer({ room, reply, onReplyDone, editing, onEditDone }: { room: Cha
         </View>
       ) : null}
       <View style={c.inputRow}>
-        {!editing ? <IconBtn icon="attach-file" label="Attach files" onPress={() => setMenu(true)} /> : null}
+        {!editing ? <IconBtn icon="attach-file" label="Attach files" onPress={() => { setMenu(true); if (!WEB) void clipboardHasImage().then(setCanPaste); }} /> : null}
         <View style={c.inputBox}>
           <TextInput
             ref={inputRef}
@@ -552,13 +602,21 @@ function Composer({ room, reply, onReplyDone, editing, onEditDone }: { room: Cha
           {saving ? <ActivityIndicator color="#fff" size="small" /> : <Icon name={editing ? 'check' : 'send'} size={19} color="#fff" />}
         </TouchableOpacity>
       </View>
-      {WEB && !phone ? <Text style={c.hint}>Enter to send · Shift+Enter new line · up to {fmtBytes(limits.max_upload_mb * 1048576)} per file, {limits.max_files_per_message} files per message</Text> : null}
+      {WEB && !phone ? <Text style={c.hint}>Enter to send · Shift+Enter new line · Ctrl+V pastes pictures · up to {fmtBytes(limits.max_upload_mb * 1048576)} per file, {limits.max_files_per_message} files per message</Text> : null}
       <Dialog visible={menu} onClose={() => setMenu(false)} title="Attach" width={360}>
         <View style={{ gap: 8 }}>
           <Btn kind="ghost" title="Pictures" icon="photo-library" onPress={() => void pick(pickPhotos)} />
           {!WEB ? <Btn kind="ghost" title="Camera" icon="photo-camera" onPress={() => void pick(takePicture)} /> : null}
           <Btn kind="ghost" title="Files (PDF, Excel, video, zip …)" icon="attach-file" onPress={() => void pick(() => pickFiles(true))} />
           {canPickFolder ? <Btn kind="ghost" title="A whole folder" icon="folder" onPress={() => void pickDir()} /> : null}
+          {canPaste ? <Btn kind="ghost" title="Paste copied picture / file" icon="content-paste" onPress={async () => {
+            setMenu(false);
+            try {
+              const l = await pasteFromClipboard();
+              if (!l.length) void AppAlert.alert('Nothing to paste', WEB ? 'Copy a picture or file first — or press Ctrl+V (⌘V) in the message box.' : 'Copy a picture first, then tap Paste.');
+              else add(l);
+            } catch (e: any) { void AppAlert.alert('Could not paste', WEB ? 'The browser did not allow reading the clipboard. Press Ctrl+V (⌘V) in the message box instead.' : (e?.message || 'Please try again.')); }
+          }} /> : null}
           <Text style={c.fileMeta}>Up to {fmtBytes(limits.max_upload_mb * 1048576)} per file. Big files go up in pieces and continue after a network drop.</Text>
         </View>
       </Dialog>
@@ -568,7 +626,7 @@ function Composer({ room, reply, onReplyDone, editing, onEditDone }: { room: Cha
 
 /* ------------------------------ dialogs ------------------------------ */
 
-function MessageMenu({ m, admin, room, seen, onClose, onReply, onEdit }: { m: ChatMessage | null; admin: boolean; room: ChatRoom; seen: ReturnType<typeof seenInfo> | null; onClose: () => void; onReply: (m: ChatMessage) => void; onEdit: (m: ChatMessage) => void }) {
+function MessageMenu({ m, admin, room, seen, onClose, onReply, onEdit, onForward }: { m: ChatMessage | null; admin: boolean; room: ChatRoom; seen: ReturnType<typeof seenInfo> | null; onClose: () => void; onReply: (m: ChatMessage) => void; onEdit: (m: ChatMessage) => void; onForward: (m: ChatMessage) => void }) {
   const remove = useChat((s) => s.remove);
   const [confirm, setConfirm] = useState(false);
   useEffect(() => { setConfirm(false); }, [m]);
@@ -587,12 +645,62 @@ function MessageMenu({ m, admin, room, seen, onClose, onReply, onEdit }: { m: Ch
       ) : null}
       <View style={{ gap: 8, marginTop: 8 }}>
         <Btn kind="ghost" title="Reply" icon="reply" onPress={() => onReply(m)} />
+        {m.body ? <Btn kind="ghost" title="Copy text" icon="content-copy" onPress={async () => { const ok = await copyText(m.body); toast(ok ? 'Copied' : 'Could not copy', ok ? 'ok' : 'err'); onClose(); }} /> : null}
+        {m.kind === 'text' ? <Btn kind="ghost" title={m.file_count ? `Forward (with ${m.file_count} file${m.file_count === 1 ? '' : 's'})` : 'Forward'} icon="shortcut" onPress={() => onForward(m)} /> : null}
         {canEdit ? <Btn kind="ghost" title="Edit" icon="edit" onPress={() => onEdit(m)} /> : null}
         {m.mine && m.kind === 'text' && !canEdit ? <Text style={c.fileMeta}>The time to edit this message is over.</Text> : null}
         {canDelete ? (confirm
           ? <Btn kind="danger" title={m.file_count ? 'Yes, delete it (files removed from the server)' : 'Yes, delete it'} icon="delete" onPress={() => { remove(m.id).catch((e) => AppAlert.alert('Could not delete', e?.message || 'Please try again.')); onClose(); }} />
           : <Btn kind="ghost" title={m.mine ? 'Delete' : 'Delete (IT admin)'} icon="delete-outline" onPress={() => setConfirm(true)} />) : null}
       </View>
+    </Dialog>
+  );
+}
+
+/** forward a message to one or more chats */
+function ForwardDialog({ m, onClose }: { m: ChatMessage | null; onClose: () => void }) {
+  const api = useChat((s) => s.api);
+  const rooms = useChat((s) => s.rooms);
+  const [pick, setPick] = useState<number[]>([]);
+  const [q, setQ] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setPick([]); setQ(''); setNote(''); }, [m]);
+  if (!m) return null;
+  const list = rooms.filter((r) => r.is_member || r.kind === 'team' || r.kind === 'help').filter((r) => !q || r.name.toLowerCase().includes(q.toLowerCase()));
+  const go = async () => {
+    if (!pick.length) { void AppAlert.alert('Forward', 'Pick at least one chat.'); return; }
+    setBusy(true);
+    try {
+      await api!('chat.forward', { message_id: m.id, room_ids: pick, note }, { timeout: 120000 });
+      toast(`Forwarded to ${pick.length} chat${pick.length === 1 ? '' : 's'}`, 'ok');
+      useChat.getState().refreshRooms(100);
+      pick.forEach((id) => { if (useChat.getState().byRoom[id]?.loaded) void useChat.getState().sync(id); });
+      onClose();
+    } catch (e: any) { void AppAlert.alert('Could not forward', e?.message || 'Please try again.'); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog visible={!!m} onClose={onClose} title="Forward to…" width={440}
+      footer={<><Btn title="Cancel" kind="ghost" onPress={onClose} /><Btn title={pick.length ? `Forward to ${pick.length}` : 'Forward'} icon="shortcut" busy={busy} disabled={!pick.length} onPress={go} /></>}>
+      <View style={c.fwdPreview}>
+        <Text style={c.quoteName}>{m.user.name}</Text>
+        <Text style={c.quoteText} numberOfLines={2}>{m.body || (m.folder ? `📁 ${m.folder}` : `📎 ${m.file_count} file(s)`)}</Text>
+        {m.file_count ? <Text style={c.fileMeta}>{m.file_count} file{m.file_count === 1 ? '' : 's'} · {fmtBytes(m.file_bytes)} — sent along</Text> : null}
+      </View>
+      <Input value={q} onChangeText={setQ} placeholder="Search chats…" icon="search" />
+      <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ gap: 4, paddingVertical: 6 }}>
+        {list.map((r) => {
+          const on = pick.includes(r.id);
+          return (
+            <TouchableOpacity key={r.id} style={[c.person, on && { backgroundColor: `${T.copper}12`, borderColor: T.copper }]} onPress={() => setPick((cur) => (on ? cur.filter((x) => x !== r.id) : cur.length >= 20 ? cur : [...cur, r.id]))}>
+              <RoomIcon r={r} size={30} />
+              <View style={{ flex: 1 }}><Text style={c.roomName} numberOfLines={1}>{r.name}</Text><Text style={c.fileMeta} numberOfLines={1}>{r.sub}</Text></View>
+              <Icon name={on ? 'check-box' : 'check-box-outline-blank'} size={20} color={on ? T.copper : T.muted} />
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <Input value={note} onChangeText={setNote} placeholder="Add a message (optional)" />
     </Dialog>
   );
 }
@@ -738,6 +846,10 @@ function RoomInfo({ visible, onClose, room, admin }: { visible: boolean; onClose
 }
 
 const c = StyleSheet.create({
+  fwd: { fontSize: 10.5, fontWeight: '800', fontStyle: 'italic', color: T.muted },
+  fwdPreview: { padding: 10, borderRadius: 10, backgroundColor: T.alt, borderLeftWidth: 3, borderLeftColor: T.blue, gap: 2, marginBottom: 8 },
+  dropZone: { ...StyleSheet.absoluteFillObject, zIndex: 20, backgroundColor: 'rgba(58,86,138,0.10)', borderWidth: 2, borderStyle: 'dashed', borderColor: T.blue, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  dropText: { fontSize: 15, fontWeight: '900', color: T.blue },
   fast: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, height: 18, borderRadius: 9, backgroundColor: `${T.amber}18`, marginLeft: 6 },
   fastText: { fontSize: 9.5, fontWeight: '900', color: T.amber },
   itTag: { fontSize: 9.5, fontWeight: '900', color: T.copper },

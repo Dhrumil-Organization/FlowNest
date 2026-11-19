@@ -9,6 +9,7 @@ import {
   TouchableOpacity, useWindowDimensions, View, ViewStyle,
 } from 'react-native';
 import { create } from 'zustand';
+import { useKeyboardInset } from '../keyboard';
 import { colorFor, initials, priorityOf, statusOf, typeOf, ymdToDate, toYmd } from '../model';
 
 export const WEB = Platform.OS === 'web';
@@ -175,11 +176,12 @@ export function Panel({ visible, onClose, title, subtitle, children, width = 560
   visible: boolean; onClose: () => void; title: string; subtitle?: string; children: React.ReactNode; width?: number; right?: React.ReactNode; footer?: React.ReactNode;
 }) {
   const { phone, width: W } = useLayout();
+  const kb = useKeyboardInset(); // reply box / editor stays above the keyboard
   return (
     <Modal visible={visible} transparent animationType={phone ? 'slide' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
       <View style={[st.backdrop, phone && { backgroundColor: T.bg }]}>
         {!phone ? <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" /> : null}
-        <View style={[st.panel, phone ? st.panelPhone : { width: Math.min(width, W - 40) }]}>
+        <View ref={kb.ref} collapsable={false} style={[st.panel, phone ? st.panelPhone : { width: Math.min(width, W - 40) }, kb.inset ? { paddingBottom: kb.inset } : null]}>
           <View style={st.panelHead}>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={st.panelTitle} numberOfLines={1}>{title}</Text>

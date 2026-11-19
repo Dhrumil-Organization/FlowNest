@@ -15,7 +15,7 @@ import { DEFAULT_LIMITS, Job, Limits, newJobs, PickedFile, UploadCfg, uploadJobs
 export type Person = { key?: string; kind: 'it' | 'client'; id: number; name: string; color: string; sub?: string };
 export type ChatFile = { id: number; name: string; path: string; mime: string; size: number; width: number; height: number; image: boolean; url: string; download_url: string };
 export type ChatMessage = {
-  id: number; room_id: number; user: Person & { key: string }; mine: boolean; kind: 'text' | 'system'; can_edit?: boolean;
+  id: number; room_id: number; user: Person & { key: string }; mine: boolean; kind: 'text' | 'system'; can_edit?: boolean; forwarded?: boolean;
   body: string; deleted: boolean; reply_to: { id: number; user_name: string; text: string } | null;
   files: ChatFile[]; file_count: number; file_bytes: number; folder: string; zip_url: string | null; edited_at: string | null; created_at: string;
 };
@@ -29,6 +29,7 @@ export type Pending = {
   key: string; room_id: number; body: string; files: PickedFile[]; jobs: Job[]; folder: string;
   reply_to: ChatMessage['reply_to']; error: string; stage: 'uploading' | 'sending' | 'error'; created_at: string;
 };
+export type Incoming = { room_id: number; room_name: string; kind: ChatRoom['kind']; user_name: string; text: string; count: number; color: string; other: Person | null; at: number; last_id: number };
 type RoomMsgs = { ids: number[]; moreOlder: boolean; loadingOlder: boolean; loaded: boolean; error: string; syncAt: string; reads: Record<string, number>; rev: number };
 const emptyRoom = (): RoomMsgs => ({ ids: [], moreOlder: false, loadingOlder: false, loaded: false, error: '', syncAt: '', reads: {}, rev: -1 });
 
@@ -51,6 +52,12 @@ type State = {
   focusId: number | null;
   /** last pulse numbers per room: [last id, change no.] */
   marks: Record<number, [number, number]>;
+  /** the chat screen is on screen right now (a room counts as "read" only then) */
+  viewing: boolean;
+  /** new messages from others that the person is not looking at -> in-app banner */
+  incoming: Incoming[];
+  setViewing: (v: boolean) => void;
+  dismissIncoming: (roomId?: number) => void;
   init: (api: SupportCall, upload: UploadCfg, meKey: string, realm: 'it' | 'client') => void;
   setLimits: (l: Partial<Limits>) => void;
   reset: () => void;
@@ -66,7 +73,7 @@ type State = {
   edit: (id: number, body: string) => Promise<void>;
   remove: (id: number) => Promise<void>;
   onEvent: (ev: any) => void;
-  pulse: () => Promise<{ rev: number; settings: string } | null>;
+  pulse: () => Promise<{ rev: number; settings: string; notices?: number } | null>;
   loadBlooms: () => Promise<void>;
   mayFind: (q: string, roomId?: number | null) => boolean;
 };
@@ -104,12 +111,23 @@ export const useChat = create<State>((set, get) => ({
   bloomsAt: 0,
   focusId: null,
   marks: {},
+  viewing: false,
+  incoming: [],
+
+  setViewing: (v) => {
+    set({ viewing: v });
+    markViewed();
+    const id = get().activeId;
+    if (v && id) { get().markRead(id); get().dismissIncoming(id); }
+  },
+  dismissIncoming: (roomId) => set((s) => ({ incoming: roomId ? s.incoming.filter((x) => x.room_id !== roomId) : [] })),
 
   init: (api, upload, meKey, realm) => set({ api, upload, meKey, realm }),
   setLimits: (l) => set((s) => ({ limits: { ...s.limits, ...l } })),
   reset: () => {
     Object.values(aborts).forEach((a) => a.abort());
-    set({ api: null, upload: null, rooms: [], roomsLoaded: false, roomsError: '', unread: 0, activeId: null, msgs: {}, byRoom: {}, pending: {}, blooms: {}, focusId: null, marks: {} });
+    set({ api: null, upload: null, rooms: [], roomsLoaded: false, roomsError: '', unread: 0, activeId: null, msgs: {}, byRoom: {}, pending: {}, blooms: {}, focusId: null, marks: {}, incoming: [], viewing: false });
+    markViewed();
   },
 
   loadRooms: async () => {
@@ -117,8 +135,25 @@ export const useChat = create<State>((set, get) => ({
     if (!api) return;
     try {
       const r = await api<{ rooms: ChatRoom[]; unread: number; me: string }>('chat.rooms');
-      const active = get().activeId;
+      // a room is "being read" only while the chat screen is on screen with that room open
+      const active = get().viewing ? get().activeId : null;
       const rooms = r.rooms.map((x) => (x.id === active ? { ...x, unread: 0 } : x));
+      // new messages from somebody else in a chat the person is not looking at -> banner
+      const prev = get().rooms;
+      if (get().roomsLoaded && prev.length) {
+        const me = r.me || get().meKey;
+        const before: Record<number, number> = {};
+        prev.forEach((x) => { before[x.id] = x.last?.id || 0; });
+        const fresh: Incoming[] = [];
+        rooms.forEach((x) => {
+          if (!x.last || x.id === active || x.last.user_key === me) return;
+          const was = before[x.id];
+          if (was !== undefined && x.last.id <= was) return;
+          if (was === undefined && !x.unread) return;
+          fresh.push({ room_id: x.id, room_name: x.name, kind: x.kind, user_name: x.last.user_name, text: x.last.text, count: Math.max(1, x.unread), color: x.color, other: x.other, at: Date.now(), last_id: x.last.id });
+        });
+        if (fresh.length) set((s) => ({ incoming: [...s.incoming.filter((i) => !fresh.some((f) => f.room_id === i.room_id)), ...fresh].slice(-5) }));
+      }
       const marks: Record<number, [number, number]> = { ...get().marks };
       rooms.forEach((x) => { if (!marks[x.id]) marks[x.id] = [x.last_message_id, x.rev]; });
       set({ rooms, unread: rooms.reduce((n, x) => n + x.unread, 0), roomsLoaded: true, roomsError: '', marks, meKey: r.me || get().meKey });
@@ -133,7 +168,9 @@ export const useChat = create<State>((set, get) => ({
 
   open: async (roomId, aroundId) => {
     set({ activeId: roomId, focusId: aroundId || null });
+    markViewed();
     if (roomId === null) return;
+    get().dismissIncoming(roomId);
     const { api } = get();
     if (!api) return;
     const cur = get().byRoom[roomId];
@@ -198,7 +235,7 @@ export const useChat = create<State>((set, get) => ({
         });
         if (!r.more_newer) break;
       }
-      if (get().activeId === roomId) get().markRead(roomId);
+      if (get().activeId === roomId && get().viewing) get().markRead(roomId);
     } catch { /* the next event / pulse tries again */ } finally {
       syncBusy[roomId] = false;
       if (syncAgain[roomId]) { syncAgain[roomId] = false; void get().sync(roomId); }
@@ -206,6 +243,7 @@ export const useChat = create<State>((set, get) => ({
   },
 
   markRead: (roomId) => {
+    if (!get().viewing) return; // not on screen -> stays unread (accurate counts)
     const ids = get().byRoom[roomId]?.ids || [];
     const last = ids.length ? ids[ids.length - 1] : 0;
     const room = get().rooms.find((r) => r.id === roomId);
@@ -274,7 +312,7 @@ export const useChat = create<State>((set, get) => ({
     if (!api || pulseBusy) return null;
     pulseBusy = true;
     try {
-      const r = await api<{ rooms: [number, number, number][]; rev: number; settings: string }>('chat.pulse', {}, { timeout: 10000 });
+      const r = await api<{ rooms: [number, number, number][]; rev: number; settings: string; notices?: number }>('chat.pulse', {}, { timeout: 10000 });
       const marks = get().marks;
       const next: Record<number, [number, number]> = {};
       let listChanged = r.rooms.length !== Object.keys(marks).length;
@@ -288,7 +326,7 @@ export const useChat = create<State>((set, get) => ({
       });
       set({ marks: next });
       if (listChanged) get().refreshRooms(50);
-      return { rev: r.rev, settings: r.settings };
+      return { rev: r.rev, settings: r.settings, notices: r.notices };
     } catch {
       return null;
     } finally {
@@ -331,6 +369,12 @@ export const useChat = create<State>((set, get) => ({
     return false;
   },
 }));
+
+/** which chat is on screen (the phone's notification handler skips pushes for exactly that chat) */
+function markViewed() {
+  const st = useChat.getState();
+  (globalThis as any).__supportViewingRoom = st.viewing && st.activeId ? st.activeId : null;
+}
 
 /** upload the files of a waiting message (only those not done yet), then send it */
 async function runPending(roomId: number, key: string) {

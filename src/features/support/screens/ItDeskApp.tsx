@@ -24,6 +24,10 @@ import { useLivePulse } from '../livePulse';
 import { SettingsView } from '../components/SettingsView';
 import { StorageView } from '../components/StorageView';
 import { ServerView } from '../components/ServerView';
+import { NotesView } from '../components/NotesView';
+import { NoticeBell, refreshNoticeCount, useNotices } from '../components/NoticeBell';
+import { ChatBanner } from '../components/ChatBanner';
+import { quietRegister } from '../push';
 import { Board } from '../components/Board';
 import { DoneDialog } from '../components/DoneDialog';
 import { ExportChoice, ExportDialog } from '../components/ExportDialog';
@@ -48,9 +52,9 @@ const DENSITY_KEY = 'support_it_density';
 const FOLD_KEY = 'support_it_fold';
 const SUMMARY_KEY = 'support_it_summary';
 
-type Props = { base: string; onExit: () => void; canAccess: (path: string) => boolean };
+type Props = { base: string; onExit: () => void; canAccess: (path: string) => boolean; link?: { ticket?: number; chat?: number; note?: number } | null };
 
-export function ItDeskApp({ base, onExit, canAccess }: Props) {
+export function ItDeskApp({ base, onExit, canAccess, link }: Props) {
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -65,7 +69,7 @@ export function ItDeskApp({ base, onExit, canAccess }: Props) {
 
   if (!ready) return <Shell title="IT Desk" icon="support-agent" accent={T.copper} onBack={onExit}><ActivityIndicator color={T.copper} style={{ marginTop: 60 }} /></Shell>;
   if (!token) return <ItLogin base={base} onExit={onExit} onLoggedIn={(t) => saveToken(t)} />;
-  return <ItDesk key={token} base={base} token={token} onExit={onExit} onLogout={() => saveToken(null)} canAccess={canAccess} />;
+  return <ItDesk key={token} base={base} token={token} onExit={onExit} onLogout={() => saveToken(null)} canAccess={canAccess} link={link} />;
 }
 
 /* ------------------------------- login -------------------------------- */
@@ -110,7 +114,8 @@ function ItLogin({ base, onExit, onLoggedIn }: { base: string; onExit: () => voi
 }
 
 /* -------------------------------- desk -------------------------------- */
-function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; token: string; onExit: () => void; onLogout: () => void; canAccess: (p: string) => boolean }) {
+export type DeepLink = { ticket?: number; chat?: number; note?: number } | null;
+function ItDesk({ base, token, onExit, onLogout, canAccess, link }: { base: string; token: string; onExit: () => void; onLogout: () => void; canAccess: (p: string) => boolean; link?: DeepLink }) {
   const { phone, wide } = useLayout();
   const api: SupportCall = useMemo(() => itApi(base, token), [base, token]);
   const store = useItDesk();
@@ -138,6 +143,7 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
   const [folded, setFolded] = useState(false);
   const [summary, setSummary] = useState(true);
   const unread = useChat((s) => s.unread);
+  const chatOpen = useChat((s) => s.activeId !== null) && phone; // phone: a chat uses the whole screen (like WhatsApp)
   const lastUnread = useRef(0);
   // limits / rules from the admin's Settings (live: changes reach every app at once)
   const [pub, setPub] = useState<Record<string, any>>({});
@@ -149,6 +155,13 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
     useChat.getState().setLimits({ max_upload_mb: p.max_upload_mb, max_files_per_message: p.max_files_per_message, blocked_extensions: p.blocked_extensions });
     const m = useItDesk.getState().meta;
     if (m) useItDesk.setState({ meta: { ...m, actual_time_required: p.actual_time_required, settings: p } });
+  };
+  const [openNote, setOpenNote] = useState<number | null>(null);
+  // a notification / bell / deep link -> the right place
+  const openLink = (l: { ticket_id?: number; room_id?: number; note_id?: number }) => {
+    if (l.ticket_id) setOpenId(l.ticket_id);
+    else if (l.room_id) { changeView('chat'); void useChat.getState().loadRooms().then(() => useChat.getState().open(l.room_id!)); }
+    else if (l.note_id) { changeView('notes'); setOpenNote(l.note_id); }
   };
   const reloadSettings = () => { void api<{ public: Record<string, any> }>('settings.get').then((r) => applyPublic(r.public)).catch(() => {}); };
   useEffect(() => {
@@ -176,13 +189,15 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
         useItDesk.getState().init(api, r.user, r.users, r.meta, r.overview);
         try {
           const v = await AsyncStorage.getItem(VIEW_KEY);
-          if (v === 'board' || v === 'list' || v === 'history' || v === 'team' || v === 'chat' || (['activity', 'settings', 'storage', 'server'].includes(v || '') && r.user.role === 'admin')) setView(v as DeskView); else setView(view);
+          if (v === 'board' || v === 'list' || v === 'history' || v === 'team' || v === 'chat' || v === 'notes' || (['activity', 'settings', 'storage', 'server'].includes(v || '') && r.user.role === 'admin')) setView(v as DeskView); else setView(view);
         } catch { /* ignore */ }
         // chat: uploads go straight to the server with this login (big files in pieces)
         useChat.getState().reset();
         useChat.getState().init(api, { base, realm: 'it', headers: { 'X-Support-Token': token }, api }, `it:${r.user.id}`, 'it');
         applyPublic(r.meta?.settings);
         lastRev.current = r.rev;
+        useNotices.setState({ unread: (r as any).notices || 0, items: [], loaded: false });
+        void quietRegister(api); // keeps this device's notification token fresh (no pop-up)
         void useChat.getState().loadRooms();
         setBoot('ok');
         void useItDesk.getState().loadBloom();
@@ -195,6 +210,7 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
             if (ev.type === 'users') void api<{ users: ItUser[] }>('users.list').then((x) => useItDesk.getState().setUsers(x.users)).catch(() => {});
             if (ev.type === 'chat') useChat.getState().onEvent(ev);
             if (ev.type === 'settings') reloadSettings();
+            if (ev.type === 'notice') void refreshNoticeCount(api);
           },
           onStatus: setLive,
           pollMs: 60000, // the fast pulse below covers the gaps
@@ -214,11 +230,14 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
     if (r.rev !== lastRev.current) { lastRev.current = r.rev; void sync.current?.sync(); }
     if (settingsSig.current && r.settings !== settingsSig.current) reloadSettings();
     settingsSig.current = r.settings;
+    if (typeof r.notices === 'number' && r.notices !== useNotices.getState().unread) void refreshNoticeCount(api);
   });
+  // opened from a notification (?ticket= / ?chat= / ?note=)
   useEffect(() => {
-    if (unread > lastUnread.current && view !== 'chat' && lastUnread.current >= 0 && boot === 'ok') toast(`${unread} unread message${unread === 1 ? '' : 's'} in Chat`, 'info');
-    lastUnread.current = unread;
-  }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (boot !== 'ok' || !link) return;
+    openLink({ ticket_id: link.ticket, room_id: link.chat, note_id: link.note });
+  }, [boot, link?.ticket, link?.chat, link?.note]); // eslint-disable-line react-hooks/exhaustive-deps
+  // new chat messages: the in-app banner (ChatBanner) — accurate per chat, real time
 
   // reload the visible view whenever the filters change
   useEffect(() => {
@@ -340,6 +359,7 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
   const fc = activeFilterCount(filters);
   const right = me ? (
     <>
+      <NoticeBell api={api} admin={me.role === 'admin'} onOpen={openLink} />
       {me.role === 'admin' ? <IconBtn tone="dark" icon="group" label="IT team" onPress={() => setShowUsers(true)} /> : null}
       <TouchableOpacity onPress={() => setMenu(true)} style={ds.me} accessibilityLabel="My account">
         <Avatar name={me.name} id={me.id} color={me.color} size={30} />
@@ -412,6 +432,8 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
               : view === 'team' ? <TeamView api={api} onExport={() => void teamExcel({ report: 'team' })} exporting={exporting} onPersonExcel={personExcel} onPersonHistory={personHistory} onOpenCard={openCard} cardOpen={openId !== null} />
               : view === 'chat' ? <ChatView base={base} live={live} admin={me.role === 'admin'} canGroup={me.role === 'admin' || pub.member_groups !== false} />
               : view === 'activity' ? <ActivityView api={api} onOpenTicket={(id) => setOpenId(id)} />
+              : view === 'notes' ? <NotesView api={api} base={base} admin={me.role === 'admin'} upload={useChat.getState().upload} openId={openNote} onOpened={() => setOpenNote(null)}
+                  onExcel={async (p) => { const name = await downloadExcel(base, token, p); toast(`Excel ready — ${name}`, 'ok'); }} />
               : view === 'settings' && me.role === 'admin' ? <SettingsView api={api} onSaved={applyPublic} />
               : view === 'storage' && me.role === 'admin' ? <StorageView api={api} base={base} onOpenTicket={(id) => setOpenId(id)} />
               : view === 'server' && me.role === 'admin' ? <ServerView api={api} live={live} onStorage={() => changeView('storage')} />
@@ -422,7 +444,8 @@ function ItDesk({ base, token, onExit, onLogout, canAccess }: { base: string; to
           ) : null}
         </View>
       </View>
-      <BottomNav items={nav} value={view} onChange={section} />
+      {!(view === 'chat' && chatOpen) ? <BottomNav items={nav} value={view} onChange={section} /> : null}
+      <ChatBanner onOpen={(roomId) => openLink({ room_id: roomId })} />
 
       <Panel visible={openId !== null} onClose={() => setOpenId(null)} title={openId ? (store.tickets[openId]?.no || `#${openId}`) : ''} subtitle={openId ? store.tickets[openId]?.title : ''} width={640}>
         {openId !== null ? (

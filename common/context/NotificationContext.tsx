@@ -45,11 +45,19 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
 // arrive exactly as before. `shouldShowAlert` is intentionally left unchanged
 // here to avoid changing the working Expo notification behavior.
 Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
+    handleNotification: async (n: any) => {
+        // Support Desk chat message while IT Desk / Support is open: the app shows its own
+        // in-app banner (and nothing at all for the chat that is on screen) -> no double alert.
+        const d = n?.request?.content?.data || {};
+        if (String(d.type || '').toUpperCase() === 'SUPPORT' && d.room_id && (globalThis as any).__supportMounted) {
+            return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false } as any;
+        }
+        return {
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+        } as any;
+    },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -418,6 +426,22 @@ const navigateNotificationRoute = async (
     router: ReturnType<typeof useRouter>,
     data: any,
 ): Promise<'handled' | 'pending' | 'ignored'> => {
+    // Support Desk (IT Desk / Support): open that screen with the ticket / chat / note
+    if (data && String(data.type || '').toUpperCase() === 'SUPPORT' && data.path) {
+        try {
+            const accessToken = await AsyncStorage.getItem('access_token');
+            if (!accessToken) return 'pending';
+            const params: Record<string, string> = {};
+            if (data.ticket_id) params.ticket = String(data.ticket_id);
+            if (data.room_id) params.chat = String(data.room_id);
+            if (data.note_id) params.note = String(data.note_id);
+            router.push({ pathname: String(data.path) as any, params } as any);
+            return 'handled';
+        } catch (error) {
+            console.warn('Support notification navigation failed:', error);
+            return 'ignored';
+        }
+    }
     if (!data || String(data.type || '').toUpperCase() !== 'ROUTE') return 'ignored';
 
     try {

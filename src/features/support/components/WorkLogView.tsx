@@ -84,7 +84,7 @@ function Row({ x, phone, onPress }: { x: Item; phone: boolean; onPress?: () => v
       <Icon name={ty.icon as any} size={15} color={ty.color} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={w.title} numberOfLines={1}>{x.title}</Text>
+          <Text style={[w.title, { flexShrink: 1 }]} numberOfLines={1}>{x.title}</Text>
           {x.mine ? <Text style={w.mineTag}> YOURS </Text> : null}
         </View>
         <Text style={w.meta} numberOfLines={1}>{[x.no, x.module_label, side?.label, x.status === 'done' && x.resolved_at ? `done ${ago(x.resolved_at)}` : `updated ${ago(x.updated_at)}`].filter(Boolean).join(' · ')}</Text>
@@ -107,7 +107,7 @@ const w = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 5, backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, borderLeftWidth: 4 },
   title: { fontSize: 13.5, fontWeight: '800', color: T.ink, flexShrink: 1 },
   meta: { fontSize: 11.5, fontWeight: '700', color: T.muted, marginTop: 1 },
-  mineTag: { fontSize: 9.5, fontWeight: '900', color: '#fff', backgroundColor: T.copper, borderRadius: 4, overflow: 'hidden' },
+  mineTag: { fontSize: 9.5, fontWeight: '900', color: '#fff', backgroundColor: T.copper, borderRadius: 4, overflow: 'hidden', flexShrink: 0 },
   who: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 150 },
   whoText: { fontSize: 12, fontWeight: '800', color: T.ink, flexShrink: 1 },
   status: { fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden', minWidth: 84, textAlign: 'center' },

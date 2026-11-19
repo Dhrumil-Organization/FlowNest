@@ -91,7 +91,7 @@ export function ActivityView({ api, onOpenTicket }: { api: SupportCall; onOpenTi
           </Card>
 
           <View style={[a.cols, !wide && { flexDirection: 'column' }]}>
-            <Card title="People" style={{ flex: 1.4 }}>
+            <Card title="People" style={wide ? { flex: 1.4 } : undefined}>
               {!phone ? (
                 <View style={[a.tr, a.th]}>
                   <Text style={[a.thText, { flex: 1.6 }]}>Person</Text>
@@ -104,15 +104,15 @@ export function ActivityView({ api, onOpenTicket }: { api: SupportCall; onOpenTi
                 </View>
               ) : null}
               {st.people.map((p) => (
-                <View key={p.id} style={[a.tr, phone && { flexWrap: 'wrap' }]}>
-                  <View style={[a.who, { flex: 1.6 }]}>
+                <View key={p.id} style={[a.tr, phone && { flexWrap: 'wrap', rowGap: 4 }]}>
+                  <View style={[a.who, phone ? { width: '100%' as any } : { flex: 1.6 }]}>
                     <Avatar name={p.name} id={p.id} color={p.color} size={28} />
                     <View style={{ minWidth: 0, flex: 1 }}>
                       <Text style={a.name} numberOfLines={1}>{p.name}{p.active ? '' : ' · off'}</Text>
                       <Text style={a.muted} numberOfLines={1}>{p.last_message_at ? `last message ${ago(p.last_message_at)}` : 'no chat in this period'}</Text>
                     </View>
                   </View>
-                  {phone ? <Text style={a.muted}>{p.messages} chat · {p.files} files · {p.ticket_replies} replies · {p.internal_notes} notes · {p.tickets_talked} tickets</Text> : (
+                  {phone ? <Text style={[a.muted, { paddingLeft: 36 }]}>{p.messages} chat · {p.files} files · {p.ticket_replies} replies · {p.internal_notes} notes · {p.tickets_talked} tickets</Text> : (
                     <>
                       <Text style={[a.cell, a.n]}>{p.messages}</Text>
                       <Text style={[a.cell, a.n]}>{p.files}</Text>
@@ -125,7 +125,7 @@ export function ActivityView({ api, onOpenTicket }: { api: SupportCall; onOpenTi
                 </View>
               ))}
             </Card>
-            <Card title={`Waiting for an IT answer (${st.tickets.waiting.length})`} style={{ flex: 1 }}>
+            <Card title={`Waiting for an IT answer (${st.tickets.waiting.length})`} style={wide ? { flex: 1 } : undefined}>
               {!st.tickets.waiting.length ? <Text style={a.muted}>All user tickets are answered. 👍</Text> : null}
               {st.tickets.waiting.map((w) => (
                 <Pressable key={w.id} onPress={() => onOpenTicket(w.id)} style={({ hovered }: any) => [a.wait, hovered && { backgroundColor: T.sub }]}>
@@ -140,7 +140,7 @@ export function ActivityView({ api, onOpenTicket }: { api: SupportCall; onOpenTi
           </View>
 
           <View style={[a.cols, !wide && { flexDirection: 'column' }]}>
-            <Card title="Latest ticket conversations" style={{ flex: 1.4 }}>
+            <Card title="Latest ticket conversations" style={wide ? { flex: 1.4 } : undefined}>
               {!st.tickets.recent.length ? <Text style={a.muted}>No ticket messages in this period.</Text> : null}
               {st.tickets.recent.map((r, i) => (
                 <Pressable key={i} onPress={() => onOpenTicket(r.ticket_id)} style={({ hovered }: any) => [a.conv, hovered && { backgroundColor: T.sub }]}>
@@ -150,12 +150,13 @@ export function ActivityView({ api, onOpenTicket }: { api: SupportCall; onOpenTi
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={a.name} numberOfLines={1}>{r.author} · <Text style={a.muted}>{r.no} {r.title}</Text></Text>
                     <Text style={a.convText} numberOfLines={2}>{r.text}</Text>
+                    {phone ? <Text style={a.muted}>{ago(r.at)}</Text> : null}
                   </View>
-                  <Text style={a.muted}>{ago(r.at)}</Text>
+                  {!phone ? <Text style={a.muted}>{ago(r.at)}</Text> : null}
                 </Pressable>
               ))}
             </Card>
-            <View style={{ flex: 1, gap: 12 }}>
+            <View style={[{ gap: 12 }, wide ? { flex: 1 } : null]}>
               <Card title="Busiest chats">
                 {!st.chat.rooms.length ? <Text style={a.muted}>No chat in this period.</Text> : null}
                 {st.chat.rooms.slice(0, 12).map((r) => (

@@ -1,5 +1,6 @@
 import { AmountDisplayModeControl, formatSummaryAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import { SubScreenHeader } from '@/src/components/layout/SubScreenHeader';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
@@ -289,7 +290,6 @@ export default function SalesFlowScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [sortField, setSortField] = useState<'amount' | 'qty'>('amount');
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
   const layout = useReportLayout();
   const hasFocusedOnce = useRef(false);
@@ -437,13 +437,23 @@ export default function SalesFlowScreen() {
 
   const rows = useMemo(() => report?.rows || [], [report]);
 
-  const sortedRows = useMemo(() => {
-    return [...rows].sort((left, right) => {
-      const a = Number(sortField === 'qty' ? left.qty || 0 : left.amount || 0);
-      const b = Number(sortField === 'qty' ? right.qty || 0 : right.amount || 0);
-      return b - a;
-    });
-  }, [rows, sortField]);
+  // The current drilldown stage determines both searchable identifiers and sort fields.
+  // In particular, document searches include the actual document number AND date.
+  const searchKeys = level === 'documents'
+    ? ['document_no', 'document_date', 'name', 'code']
+    : level === 'lines'
+      ? ['name', 'code', 'line_no', 'category_name', 'category_code', 'design_name', 'design_code', 'document_no', 'document_date']
+      : ['name', 'code'];
+  const tools = useDrilldownList(rows, searchKeys, [
+    { key: level === 'documents' ? 'document_no' : level === 'lines' ? 'line_no' : 'name', label: level === 'documents' ? 'Document' : level === 'lines' ? 'Line' : LEVEL_META[level].singular, type: level === 'lines' ? 'number' : 'text' },
+    ...(level === 'documents' ? [{ key: 'document_date', label: 'Date', type: 'date' as const }] : []),
+    { key: 'amount', label: 'Amount', type: 'number' },
+    { key: 'qty', label: 'Qty', type: 'number' },
+  ], 'amount');
+  const sortedRows = tools.rows;
+  const searchPlaceholder = level === 'documents' ? 'Search document no. or date (DD-MM-YYYY)'
+    : level === 'lines' ? 'Search line, design or category'
+    : `Search ${LEVEL_META[level].singular.toLowerCase()} name or code`;
 
   const contextItems = useMemo(
     () =>
@@ -658,13 +668,8 @@ export default function SalesFlowScreen() {
                 <Text style={styles.panelKicker}>SALES BREAKDOWN</Text>
                 <Text numberOfLines={1} style={styles.panelTitle}>{LEVEL_META[level].title}</Text>
               </View>
-              <TouchableOpacity
-                onPress={() => setSortField(current => (current === 'amount' ? 'qty' : 'amount'))}
-                style={styles.sortButton}
-              >
-                <Text style={styles.sortText}>{sortField === 'amount' ? 'AMOUNT ▼' : 'QTY ▼'}</Text>
-              </TouchableOpacity>
             </View>
+            <DrilldownListTools state={tools} placeholder={searchPlaceholder} showCount />
 
             <View style={styles.columns}>
               <Text style={styles.columnName}>{LEVEL_META[level].singular.toUpperCase()}</Text>
@@ -688,7 +693,7 @@ export default function SalesFlowScreen() {
               <View style={styles.state}>
                 <Text style={styles.emptyTitle}>No Sales data</Text>
                 <Text style={styles.stateText}>
-                  No records match this filter for {selectedChip?.label || 'the selected month'}.
+                  {tools.search ? `No matching ${LEVEL_META[level].singular.toLowerCase()} entries.` : `No records match this filter for ${selectedChip?.label || 'the selected month'}.`}
                 </Text>
               </View>
             ) : (

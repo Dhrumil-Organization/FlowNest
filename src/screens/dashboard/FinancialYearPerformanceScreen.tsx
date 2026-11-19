@@ -1,4 +1,5 @@
 import { api } from '@/src/screens/dashboard/employ/api/api';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import { DashboardAPI } from '@/src/api/dashboard';
 import FyProductionCostScreen from '@/src/screens/dashboard/FyProductionCostScreen';
 import { useDashboardAmountMode, formatDashboardAmount } from '@/src/components/dashboard/AmountDisplayModeControl';
@@ -1152,6 +1153,10 @@ function SalesFinancialYearPerformanceScreen() {
   }, [focus, focusRangeLines, executiveOverview]);
   // Show EVERY executive in scope (owner: all; My View: all assigned), not a top 5.
   const topExecutives = executiveRows;
+  const executiveTools = useDrilldownList(topExecutives, ['name','code'], [
+    {key:'name',label:'Executive',type:'text'},
+    {key:'amount',label:'Amount',type:'number'},
+  ], 'amount');
 
   const topPreviousExecutives = useMemo(() => {
     if (!previous) return new Map<string, GroupRow>();
@@ -1345,6 +1350,11 @@ function SalesFinancialYearPerformanceScreen() {
       .filter(row => String(row.month_key || '') === key);
   }, [detailData, detailMonth, focus?.startYear]);
   const detailRows: GroupRow[] = useMemo(() => normalizeDrillRows(currentDetailRowsRaw), [currentDetailRowsRaw]);
+  const detailTools = useDrilldownList(detailRows, ['name','code'], [
+    {key:'name',label:'Name',type:'text'},
+    {key:'amount',label:'Amount',type:'number'},
+    {key:'qty',label:'Metres',type:'number'},
+  ], 'amount');
 
   const previousDetailRowsRaw = useMemo(() => {
     if (!focus || !detailData?.previous) return [] as any[];
@@ -1697,7 +1707,8 @@ function SalesFinancialYearPerformanceScreen() {
 
             <SectionLabel right={previous ? `grey = ${fyLabel(previous.startYear)}${focus.isCurrent ? ' at this stage' : ''}` : undefined}>ALL EXECUTIVES ({topExecutives.length}) · {fyLabel(focus.startYear)}{focus.isCurrent ? ' TO DATE' : ''}</SectionLabel>
             <View style={styles.topCard}>
-              {topExecutives.map((row, i) => {
+              <DrilldownListTools state={executiveTools} placeholder="Search executive name or code" showCount />
+              {executiveTools.rows.map((row, i) => {
                 const v = row.amount;
                 const share = topTotal > 0 ? v / topTotal * 100 : 0;
                 const previousRow = topPreviousExecutives.get(row.code || row.name);
@@ -1806,8 +1817,9 @@ function SalesFinancialYearPerformanceScreen() {
             ) : null}
 
             <View style={styles.detailCard}>
+              <DrilldownListTools state={detailTools} placeholder={`Search ${DIMENSIONS.find(d => d.key === activeDetailDim)?.label?.toLowerCase() || 'name'} or code`} showCount />
               <View style={styles.detailHeaderRow}><Text style={styles.detailHeadName}>{DIMENSIONS.find(d => d.key === activeDetailDim)?.label || 'Detail'}</Text><Text style={styles.detailHeadQty}>Metres</Text><Text style={styles.detailHeadAmount}>Billed</Text></View>
-              {detailRows.map((row, i) => {
+              {detailTools.rows.map((row, i) => {
                 const share = detailScopeTotal > 0 ? row.amount / detailScopeTotal * 100 : 0;
                 const previousRow = previousDetailRows.get(row.code || row.name);
                 const previousValue = previousRow?.amount || 0;

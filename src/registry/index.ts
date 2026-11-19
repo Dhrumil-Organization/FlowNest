@@ -18,6 +18,11 @@ import './modules/orders.permission';
 import './modules/priority.permission';
 import './modules/production.module';
 import './modules/mill.permission';
+import './modules/repackingIssue.module';
+import './modules/repacking.module';
+import './modules/beamInOut.module';
+import './modules/beamGatePass.module';
+import './modules/beamReport.module';
 
 import { validatePermissionRegistry } from './permissionRegistry';
 

@@ -33,6 +33,8 @@ type Props = {
   onClose: () => void;
   onSelect: (option: SearchablePickerOption) => void;
   onRefresh?: () => void;
+  /** optional: called (debounced) with the typed text, for lists searched on the server */
+  onQueryChange?: (query: string) => void;
 };
 
 export default function SearchablePickerModal({
@@ -45,8 +47,15 @@ export default function SearchablePickerModal({
   onClose,
   onSelect,
   onRefresh,
+  onQueryChange,
 }: Props) {
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!onQueryChange || !visible) return;
+    const t = setTimeout(() => onQueryChange(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query, visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!visible) setQuery('');

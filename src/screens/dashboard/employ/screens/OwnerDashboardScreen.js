@@ -2688,6 +2688,7 @@
 // screens/OwnerDashboardScreen.js
 import { AmountDisplayModeControl, formatActualDashboardQuantity, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import { buildProductionShedSummary } from '@/src/screens/dashboard/ProductionShedSummary';
 import { usePermission } from '@/src/core/permissions';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -2832,13 +2833,21 @@ export default function OwnerDashboardScreen({
   const dateString = date.toISOString().split('T')[0];
   const [showTour, setShowTour] = useState(false);
 
-  const [collectionSort, setCollectionSort] = useState({
-    field: 'today',
-    direction: 'desc',
-  });
-
-  const [outstandingSort, setOutstandingSort] = useState('desc');
-  const [paymentSort, setPaymentSort] = useState('desc');
+  // Each preview uses the same presentation-only filters as its full report.
+  const collectionTools = useDrilldownList(data?.collection?.by_exec, ['name', 'exec_id', 'code'], [
+    { key: 'name', label: 'Executive', type: 'text' },
+    { key: 'today', label: 'Today', type: 'number' },
+    { key: 'mtd', label: 'MTD', type: 'number' },
+  ], 'today');
+  const outstandingTools = useDrilldownList(data?.outstanding?.by_exec, ['name', 'exec_id', 'code'], [
+    { key: 'name', label: 'Executive', type: 'text' },
+    { key: 'outstanding', label: 'Amount', type: 'number' },
+  ], 'outstanding');
+  const paymentTools = useDrilldownList(data?.payment?.by_party, ['party_name', 'party_code', 'prpcode'], [
+    { key: 'party_name', label: 'Party', type: 'text' },
+    { key: 'to_pay', label: 'Amount', type: 'number' },
+    { key: 'pending_count', label: 'Pending', type: 'number' },
+  ], 'to_pay');
 
   const load = useCallback(
     async (getUserPrptype, silent = false) => {
@@ -3055,32 +3064,7 @@ export default function OwnerDashboardScreen({
   };
 
 
-  const sortedCollection = [...(Array.isArray(collection?.by_exec) ? collection.by_exec : [])].sort((a, b) => {
-    const aValue = Number(a?.[collectionSort.field] || 0);
-    const bValue = Number(b?.[collectionSort.field] || 0);
-
-    return collectionSort.direction === 'asc'
-      ? aValue - bValue
-      : bValue - aValue;
-  });
-
-  const toggleCollectionSort = () => {
-    setCollectionSort(prev => {
-      if (prev.field === 'today' && prev.direction === 'desc') {
-        return { field: 'today', direction: 'asc' };
-      }
-
-      if (prev.field === 'today' && prev.direction === 'asc') {
-        return { field: 'mtd', direction: 'desc' };
-      }
-
-      if (prev.field === 'mtd' && prev.direction === 'desc') {
-        return { field: 'mtd', direction: 'asc' };
-      }
-
-      return { field: 'today', direction: 'desc' };
-    });
-  };
+  const sortedCollection = collectionTools.rows;
 
   // Creditor Dashboard belongs to the payable/payment side.
   // Keep this separate from CollectionFlow (receivable side).
@@ -3103,30 +3087,8 @@ export default function OwnerDashboardScreen({
     });
   };
 
-  const sortedPayment = [...(payment?.by_party || [])].sort((a, b) => {
-    const aValue = Number(a?.to_pay || 0);
-    const bValue = Number(b?.to_pay || 0);
-    return paymentSort === 'asc' ? aValue - bValue : bValue - aValue;
-  });
-
-  const togglePaymentSort = () => {
-    setPaymentSort(prev => prev === 'desc' ? 'asc' : 'desc');
-  };
-
-  const sortedOutstanding = [...(Array.isArray(outstanding?.by_exec) ? outstanding.by_exec : [])].sort((a, b) => {
-    const aValue = Number(a?.outstanding || 0);
-    const bValue = Number(b?.outstanding || 0);
-
-    return outstandingSort === 'asc'
-      ? aValue - bValue
-      : bValue - aValue;
-  });
-
-  const toggleOutstandingSort = () => {
-    setOutstandingSort(prev =>
-      prev === 'desc' ? 'asc' : 'desc'
-    );
-  };
+  const sortedPayment = paymentTools.rows;
+  const sortedOutstanding = outstandingTools.rows;
 
   return (
     <>
@@ -3341,30 +3303,8 @@ export default function OwnerDashboardScreen({
                     BY SALES EXECUTIVE · TODAY · MTD
                   </Text>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ColHeader
-                      label1="EXECUTIVE"
-                      label2="TODAY"
-                      label3="MTD"
-                    />
-
-                    <TouchableOpacity
-                      onPress={toggleCollectionSort}
-                      style={{
-                        marginLeft: -12,
-                        paddingLeft: 0,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 9,
-                          color: '#8C837B',
-                        }}
-                      >
-                        ▼
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  <DrilldownListTools state={collectionTools} placeholder="Search executive name or code" compact showCount />
+                  <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" />
 
                   {/* <TableWrapper rowCount={collection.by_exec.length}> */}
                   <TableWrapper rowCount={sortedCollection.length}>
@@ -3403,11 +3343,11 @@ export default function OwnerDashboardScreen({
                     pathname: '/new/(tabs)/reports/payments-made',
                     params: { prptype: getUserPrptype, date: dateString, period: 'fy' },
                   })}
-                  onOpenPayment={(entry) => router.push({
+                  onOpenParty={(party) => router.push({
                     pathname: '/new/(tabs)/reports/payments-made',
                     params: { prptype: getUserPrptype, date: dateString,
-                      period: 'day', day: String(entry.entry_date), party_code: String(entry.party_code),
-                      voucher_uid: String(entry.payment_uid), voucher_srno: String(entry.payment_srno) },
+                      period: 'day', day: String(party.latest_date || dateString),
+                      party_code: String(party.party_code) },
                   })}
                 />
               )}
@@ -3436,15 +3376,8 @@ export default function OwnerDashboardScreen({
                     />
                   </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ColHeader label1="PARTY" label2="PENDING" label3="TO PAY" />
-                    <TouchableOpacity
-                      onPress={togglePaymentSort}
-                      style={{ marginLeft: -12, paddingLeft: 0 }}
-                    >
-                      <Text style={{ fontSize: 9, color: '#8C837B' }}>▼</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <DrilldownListTools state={paymentTools} placeholder="Search party name or code" compact showCount />
+                  <ColHeader label1="PARTY" label2="PENDING" label3="TO PAY" />
 
                   <TableWrapper rowCount={sortedPayment.length}>
                     {sortedPayment.map((party, i) => (
@@ -3498,16 +3431,11 @@ export default function OwnerDashboardScreen({
               </Text>
               <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" /> */}
 
-                  <TouchableOpacity
-                    onPress={toggleOutstandingSort}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Sort executive outstanding"
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, minHeight: 32 }}
-                  >
-                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 10, fontWeight: '700', color: '#8C837B', letterSpacing: 0.5 }}>EXECUTIVE</Text>
-                    <Text numberOfLines={1} style={{ flexShrink: 0, textAlign: 'right', fontSize: 10, fontWeight: '700', color: '#8C837B', letterSpacing: 0.5 }}>OUTSTANDING  ▼</Text>
-                  </TouchableOpacity>
+                  <DrilldownListTools state={outstandingTools} placeholder="Search executive name or code" compact showCount />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 7 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#8C837B' }}>EXECUTIVE</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#8C837B' }}>OUTSTANDING</Text>
+                  </View>
 
                   {/* <TableWrapper rowCount={outstanding.by_exec.length}>
                 {outstanding.by_exec.map(exec => ( */}

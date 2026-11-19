@@ -153,7 +153,7 @@ function ListView(p: {
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     return rows.filter((r) =>
-      (!t || str(r.IssRNo).toLowerCase().includes(t) || str(r.CartNo).toLowerCase().includes(t))
+      (!t || str(r.IssRNo).toLowerCase().includes(t) || str(r.CartNo).toLowerCase().includes(t) || str(r.BeamNo).toLowerCase().includes(t))
       && (type === 'all' || String(num(r.IsCartonType)) === type)
       && (status === 'all' || String(num(r.IsCartonStatus)) === status));
   }, [rows, q, type, status]);
@@ -244,7 +244,7 @@ function ListView(p: {
       {!wide && filtersOpen && filterCard}
       <View style={s.searchBox}>
         <Icon name="search" size={17} color={T.muted} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Search return no / carton no" placeholderTextColor={T.muted} style={s.searchInput} autoCorrect={false} />
+        <TextInput value={q} onChangeText={setQ} placeholder="Search return no / Carton No / Beam No" placeholderTextColor={T.muted} style={s.searchInput} autoCorrect={false} />
         {!!q && <TouchableOpacity onPress={() => setQ('')} hitSlop={HIT}><Icon name="close" size={16} color={T.muted} /></TouchableOpacity>}
       </View>
       <View style={s.chipLine}>
@@ -342,7 +342,7 @@ function ListView(p: {
       />
       <PrinterSheet
         visible={!!printRow}
-        subtitle={printRow ? `${str(printRow.IssRNo)} · ${str(printRow.CartNo)}` : ''}
+        subtitle={printRow ? `${str(printRow.IssRNo)} · ${str(printRow.CartNo)} · ${str(printRow.BeamNo)}` : ''}
         state={printers}
         printing={printing}
         onClose={() => setPrintRow(null)}

@@ -19,6 +19,8 @@ registerPermissionArea({
         // NEW: matches SalesOrderNew's SummaryTab — the richer Orders
         // screen being migrated in (see ORDERS_MIGRATION.md).
         { key: 'summary', name: 'Summary', type: 'tab', displayOrder: 40, actions: [{ key: 'view', name: 'View' }, { key: 'filter', name: 'Filter' }] },
+        // Proforma: split an authorized Grey SO into proforma invoices (FAMSOProforma) — SalesOrderEntryNEW/ProformaTab.tsx
+        { key: 'proforma', name: 'Proforma', type: 'tab', displayOrder: 50, actions: [{ key: 'view', name: 'View' }, { key: 'add', name: 'Add Proforma' }, { key: 'edit', name: 'Edit Proforma' }, { key: 'delete', name: 'Delete Proforma', dangerous: true }, { key: 'print', name: 'Print' }] },
       ],
     },
   ],

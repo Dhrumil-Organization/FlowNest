@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { api, formatAmount } from '../api/api';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import PaymentsMadeDateField from '../components/PaymentsMadeDateField';
 
 type Party = { prpcode:string;party_code:string;party_name:string;amount:number;payment_count:number;latest_date:number };
@@ -56,7 +57,6 @@ export default function PaymentsMadeReportScreen() {
   const [customFrom,setCustomFrom]=useState(`${anchor.slice(0,7)}-01`);
   const [customTo,setCustomTo]=useState(anchor);
   const [appliedCustom,setAppliedCustom]=useState<{from:string;to:string}|null>(null);
-  const [search,setSearch]=useState('');
   const [party,setParty]=useState(String(params.party_code||''));
   const [partyContext,setPartyContext]=useState<Party|null>(null);
   const [payment,setPayment]=useState<{uid:string;srno:string;entryDate:string}|null>(params.voucher_uid ?
@@ -106,10 +106,22 @@ export default function PaymentsMadeReportScreen() {
     }
   },[party,report,payment]);
   const selectedPayment=useMemo(()=>report?.payments.find(p=>p.payment_uid===payment?.uid&&String(p.payment_srno)===payment?.srno),[report,payment]);
-  const filteredParties=useMemo(()=>{
-    const q=search.trim().toLowerCase();
-    return (report?.parties||[]).filter(p=>!q||`${p.party_name} ${p.party_code} ${p.prpcode}`.toLowerCase().includes(q));
-  },[report?.parties,search]);
+  const partyTools=useDrilldownList(report?.parties, ['party_name','party_code','prpcode'], [
+    {key:'party_name',label:'Party',type:'text'},
+    {key:'amount',label:'Amount',type:'number'},
+    {key:'latest_date',label:'Latest Date',type:'date'},
+  ],'amount');
+  const voucherTools=useDrilldownList(report?.payments, ['voucher_no','entry_date','payment_uid','reference','cheque_name','payment_method'], [
+    {key:'voucher_no',label:'Voucher',type:'text'},
+    {key:'entry_date',label:'Date',type:'date'},
+    {key:'amount',label:'Amount',type:'number'},
+  ],'entry_date');
+  const billTools=useDrilldownList(report?.bill_rows, ['bill_no','bill_date','source_type'], [
+    {key:'bill_no',label:'Bill No.',type:'text'},
+    {key:'bill_date',label:'Bill Date',type:'date'},
+    {key:'settled_amount',label:'Amount',type:'number'},
+  ],'bill_date');
+  const filteredParties=partyTools.rows;
   const selectPeriod=(next:Period)=>{
     setPeriod(next);setError('');setValidation('');
     // Navigation stays on the current party / voucher stage, including Custom.
@@ -228,7 +240,7 @@ export default function PaymentsMadeReportScreen() {
           </View>
         ) : null}
         {!party ? <>
-          <TextInput style={s.search} placeholder="Search party, head or city..." value={search} onChangeText={setSearch}/>
+          <DrilldownListTools state={partyTools} placeholder="Search party name or code" showCount />
           <View style={s.tableCard}>
             <View style={s.tableHeader}><Text style={s.tableHeaderText}>{filteredParties.length} parties　{report?.fy_label||''}</Text><Text style={s.tableHeaderText}>paid {money(report?.total||0)}</Text></View>
             <ScrollView nestedScrollEnabled style={s.rows}>
@@ -253,10 +265,11 @@ export default function PaymentsMadeReportScreen() {
             </View>
           </View>
           <Text style={s.sectionCaption}>PAYMENTS · {dateText(dates.from)} – {dateText(dates.to)} · TAP ONE FOR ITS BILLS</Text>
+          <DrilldownListTools state={voucherTools} placeholder="Search voucher no., date or reference" showCount />
           {payment && !voucherInPeriod && payment.entryDate ? (
             <Text style={s.voucherOutside}>Selected voucher is outside this period ({dateText(payment.entryDate)}). Party view is preserved. Select a period containing that date to reopen it.</Text>
           ) : null}
-          {(report?.payments||[]).map((p,index)=>{
+          {voucherTools.rows.map((p,index)=>{
             const open=payment?.uid===p.payment_uid && payment?.srno===String(p.payment_srno);
             return <View key={`${p.payment_uid}-${p.payment_srno}-${index}`} style={[s.voucher,open&&s.voucherOpen]}>
               <TouchableOpacity onPress={()=>setPayment(open?null:{uid:p.payment_uid,srno:String(p.payment_srno),entryDate:parse(p.entry_date)})} style={s.voucherRow}>
@@ -265,7 +278,8 @@ export default function PaymentsMadeReportScreen() {
               </TouchableOpacity>
               {open&&<View style={s.voucherDetail}>
                 <Text style={s.sectionCaption}>BILL-WISE ADJUSTMENT</Text>
-                {(report?.bill_rows||[]).map((bill,i)=><View style={s.billRow} key={`${bill.sub_srno}-${i}`}>
+                <DrilldownListTools state={billTools} placeholder="Search bill no. or bill date (DD-MM-YYYY)" compact showCount />
+                {billTools.rows.map((bill,i)=><View style={s.billRow} key={`${bill.sub_srno}-${i}`}>
                   <View style={{flex:1}}><Text style={s.billTitle}>{bill.bill_no||'Unresolved bill'}</Text><Text style={s.meta}>{dateText(bill.bill_date)} · {bill.source_type==='PRIOR_FY'?'Opening bill':'Current FY'} {bill.source_resolved?'':' · Source unavailable'}</Text></View>
                   <View><Text style={s.amount}>{money(bill.settled_amount)}</Text>{bill.tds_amount>0&&<Text style={s.meta}>TDS {money(bill.tds_amount)}</Text>}</View>
                 </View>)}

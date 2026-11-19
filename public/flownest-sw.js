@@ -115,3 +115,38 @@ self.addEventListener('message', (event) => {
     })(),
   );
 });
+
+
+/* ---- Support Desk: browser notifications (Web Push) ----
+ * Shows what the server sends (new ticket, reply, chat message, broadcast) and opens IT Desk /
+ * Support with the ticket / chat when clicked. Same worker as the offline shell (one per site). */
+self.addEventListener('push', function (e) {
+  var m = {};
+  try { m = e.data ? e.data.json() : {}; } catch (x) { m = { title: 'FlowNest', body: e.data ? e.data.text() : '' }; }
+  var d = m.data || {};
+  var q = [];
+  if (d.ticket_id) q.push('ticket=' + d.ticket_id);
+  if (d.room_id) q.push('chat=' + d.room_id);
+  if (d.note_id) q.push('note=' + d.note_id);
+  var url = (d.path || '/') + (q.length ? '?' + q.join('&') : '');
+  e.waitUntil(self.registration.showNotification(m.title || 'FlowNest', {
+    body: m.body || '',
+    tag: m.tag || d.tag || undefined,
+    renotify: !!(m.tag || d.tag),
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    data: { url: url },
+  }));
+});
+
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if ('focus' in c) { c.postMessage({ type: 'support-open', url: url }); return c.focus().then(function (w) { return w && w.navigate ? w.navigate(url) : w; }).catch(function () {}); }
+    }
+    return self.clients.openWindow(url);
+  }));
+});

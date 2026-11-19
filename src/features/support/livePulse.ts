@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useChat } from './chatStore';
 
-type PulseResult = { rev: number; settings: string };
+type PulseResult = { rev: number; settings: string; notices?: number };
 
 const hidden = () => {
   if (Platform.OS === 'web') { const d: any = (globalThis as any).document; return !!d && d.visibilityState === 'hidden'; }

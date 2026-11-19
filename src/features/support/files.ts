@@ -57,6 +57,53 @@ function webPick(opts: { multiple?: boolean; folder?: boolean; accept?: string; 
   });
 }
 
+/** web: File objects (paste / drag & drop) -> picked files */
+export function fromWebFiles(list: any): PickedFile[] {
+  const g: any = globalThis;
+  return Array.from(list || []).filter((f: any) => f && typeof f.size === 'number').map((f: any, i: number) => {
+    const isImg = /^image\//.test(f.type || '');
+    // a screenshot pasted from the clipboard is always called "image.png" -> give it a real name
+    const name = !f.name || f.name === 'image.png' ? `pasted-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}${i ? `-${i + 1}` : ''}.${(f.type || 'image/png').split('/')[1] || 'png'}` : f.name;
+    return { key: uid(), name, size: f.size, mime: f.type || 'application/octet-stream', file: f, uri: isImg ? g.URL.createObjectURL(f) : undefined };
+  });
+}
+
+/** phone: a picture copied to the clipboard -> a file (Paste) */
+export async function pasteFromClipboard(): Promise<PickedFile[]> {
+  if (WEB) {
+    const nav: any = (globalThis as any).navigator;
+    if (!nav?.clipboard?.read) return [];
+    const items = await nav.clipboard.read();
+    const out: any[] = [];
+    for (const it of items) for (const t of it.types) if (t.startsWith('image/') || !t.startsWith('text/')) { const b = await it.getType(t); out.push(new (globalThis as any).File([b], '', { type: t })); }
+    return fromWebFiles(out);
+  }
+  const Clipboard = await import('expo-clipboard');
+  if (!(await Clipboard.hasImageAsync())) return [];
+  const img = await Clipboard.getImageAsync({ format: 'png' });
+  if (!img?.data) return [];
+  const b64 = img.data.replace(/^data:image\/\w+;base64,/, '');
+  const name = `pasted-${Date.now()}.png`;
+  const uri = `${FileSystem.cacheDirectory}${name}`;
+  await FileSystem.writeAsStringAsync(uri, b64, { encoding: FileSystem.EncodingType.Base64 });
+  return [{ key: uid(), name, size: Math.floor((b64.length * 3) / 4), mime: 'image/png', uri }];
+}
+
+export async function clipboardHasImage(): Promise<boolean> {
+  if (WEB) return true;
+  try { const Clipboard = await import('expo-clipboard'); return await Clipboard.hasImageAsync(); } catch { return false; }
+}
+
+/** copy text (message, note) */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (WEB) { await (globalThis as any).navigator.clipboard.writeText(text); return true; }
+    const Clipboard = await import('expo-clipboard');
+    await Clipboard.setStringAsync(text);
+    return true;
+  } catch { return false; }
+}
+
 /** any files (documents, zip, pictures …) */
 export async function pickFiles(multiple = true): Promise<PickedFile[]> {
   if (WEB) return webPick({ multiple });

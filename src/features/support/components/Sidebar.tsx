@@ -11,7 +11,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLayout } from './ui';
 
-export type Section = 'board' | 'list' | 'history' | 'team' | 'chat' | 'activity' | 'settings' | 'storage' | 'server';
+export type Section = 'board' | 'list' | 'history' | 'team' | 'chat' | 'notes' | 'activity' | 'settings' | 'storage' | 'server';
 export type NavItem = { key: Section; label: string; short: string; icon: string; group: 'Work' | 'Team' | 'Admin'; badge?: number };
 
 export function navItems(admin: boolean, unread: number): NavItem[] {
@@ -21,6 +21,7 @@ export function navItems(admin: boolean, unread: number): NavItem[] {
     { key: 'history', label: 'History', short: 'History', icon: 'history', group: 'Work' },
     { key: 'team', label: admin ? 'Team report' : 'My report', short: admin ? 'Team' : 'Report', icon: 'groups', group: 'Team' },
     { key: 'chat', label: 'Chat', short: 'Chat', icon: 'forum', group: 'Team', badge: unread },
+    { key: 'notes', label: 'Notes', short: 'Notes', icon: 'sticky-note-2', group: 'Team' },
     ...(admin ? [
       { key: 'activity' as Section, label: 'Activity', short: 'Activity', icon: 'insights', group: 'Admin' as const },
       { key: 'server' as Section, label: 'Server', short: 'Server', icon: 'dns', group: 'Admin' as const },
@@ -82,8 +83,10 @@ export function BottomNav({ items, value, onChange }: { items: NavItem[]; value:
   if (!phone) return null;
   // phones: 4 tabs + "More" when there are many sections (IT admin)
   const many = items.length > 5;
-  const main = many ? items.slice(0, 4) : items;
-  const rest = many ? items.slice(4) : [];
+  // the most used sections stay one tap away; the rest go under "More"
+  const PRIORITY: Section[] = ['board', 'chat', 'list', 'notes'];
+  const main = many ? PRIORITY.map((k) => items.find((x) => x.key === k)).filter(Boolean) as NavItem[] : items;
+  const rest = many ? items.filter((x) => !main.includes(x)) : [];
   const restOn = rest.some((x) => x.key === value);
   const restBadge = rest.reduce((n, x) => n + (x.badge || 0), 0);
   return (

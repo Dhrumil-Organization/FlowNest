@@ -21,7 +21,7 @@ const emptyCols = () => ({ todo: emptyCol(), in_progress: emptyCol(), review: em
 
 export type Overview = { new_tickets: number; my_open: number; overdue: number; done_today: number; open_total: number };
 export type Counts = Record<Status | 'total', number> & { done_all?: number };
-export type View = 'board' | 'list' | 'history' | 'team' | 'chat' | 'activity' | 'settings' | 'storage' | 'server';
+export type View = 'board' | 'list' | 'history' | 'team' | 'chat' | 'notes' | 'activity' | 'settings' | 'storage' | 'server';
 export type DayCount = { key: number; total: number; done: number; open: number; est_min: number; spent_min: number };
 export type Stats = { total: number; done: number; open: number; tickets: number; est_min: number; spent_min: number; counts: Counts;
   people: { key: any; label: string; total: number; done: number; est_min: number; spent_min: number }[] };

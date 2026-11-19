@@ -23,6 +23,10 @@ import { LiveStatus, LiveSync } from '../realtime';
 import { useChat } from '../chatStore';
 import { useLivePulse } from '../livePulse';
 import { ChatView } from '../components/ChatView';
+import { NotesView } from '../components/NotesView';
+import { NoticeBell, refreshNoticeCount, useNotices } from '../components/NoticeBell';
+import { ChatBanner } from '../components/ChatBanner';
+import { quietRegister } from '../push';
 import { Shell } from '../components/Shell';
 import { TicketDetailView } from '../components/TicketDetail';
 import { FormPicture, TicketForm } from '../components/TicketForm';
@@ -44,11 +48,13 @@ type Props = {
   canAccess: (path: string) => boolean;
   startNew?: boolean;
   onExit: () => void;
+  /** opened from a notification: ?ticket= / ?chat= / ?note= */
+  link?: { ticket?: number; chat?: number; note?: number } | null;
 };
 
 type Tab = 'open' | 'done' | 'all';
 
-export function ClientApp({ base, bearer, property, canAccess, startNew, onExit }: Props) {
+export function ClientApp({ base, bearer, property, canAccess, startNew, onExit, link }: Props) {
   const { phone } = useLayout();
   const api: SupportCall = useMemo(() => clientApi(base, bearer, property), [base, bearer, property]);
   const draft = useTicketDraft();
@@ -63,7 +69,8 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('open');
-  const [page, setPage] = useState<'mine' | 'all' | 'chat' | 'log'>('mine');
+  const [page, setPage] = useState<'mine' | 'all' | 'chat' | 'notes' | 'log'>('mine');
+  const [openNote, setOpenNote] = useState<number | null>(null);
   const [myId, setMyId] = useState(0);
   const [pub, setPub] = useState<Record<string, any>>({});
   const unread = useChat((s) => s.unread);
@@ -131,6 +138,8 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
         useChat.getState().reset();
         useChat.getState().init(api, { base, realm: 'client', headers: { Authorization: `Bearer ${bearer}`, 'X-Erp-Property': property }, api }, r.user.key || `client:${r.user.id}`, 'client');
         if (r.meta?.settings?.client_chat !== false) void useChat.getState().loadRooms();
+        useNotices.setState({ unread: (r as any).notices || 0, items: [], loaded: false });
+        void quietRegister(api);
         setBoot('ok');
         sync.current = new LiveSync({
           startRev: r.rev,
@@ -167,6 +176,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
           onEvent: (ev) => {
             if (ev.type === 'chat') useChat.getState().onEvent(ev);
             if (ev.type === 'settings') reloadSettings();
+            if (ev.type === 'notice') void refreshNoticeCount(api);
           },
           onStatus: setLive,
           pollMs: 60000, // the fast pulse covers the gaps
@@ -192,14 +202,21 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
     if (r.rev !== lastRev.current) { lastRev.current = r.rev; void sync.current?.sync(); }
     if (settingsSig.current && r.settings !== settingsSig.current) reloadSettings();
     settingsSig.current = r.settings;
+    if (typeof r.notices === 'number' && r.notices !== useNotices.getState().unread) void refreshNoticeCount(api);
   });
+  const openLink = (l: { ticket_id?: number; room_id?: number; note_id?: number }) => {
+    if (l.ticket_id) setOpenId(l.ticket_id);
+    else if (l.room_id) { setPage('chat'); void useChat.getState().loadRooms().then(() => useChat.getState().open(l.room_id!)); }
+    else if (l.note_id) { setPage('notes'); setOpenNote(l.note_id); }
+  };
   useEffect(() => {
-    if (lastUnread.current >= 0 && unread > lastUnread.current && page !== 'chat') toast(`${unread} unread message${unread === 1 ? '' : 's'} in Chat`, 'info');
-    lastUnread.current = unread;
-  }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (boot !== 'ok' || !link) return;
+    openLink({ ticket_id: link.ticket, room_id: link.chat, note_id: link.note });
+  }, [boot, link?.ticket, link?.chat, link?.note]); // eslint-disable-line react-hooks/exhaustive-deps
+  // new chat messages: the in-app banner (ChatBanner) — accurate per chat, real time
 
   useEffect(() => {
-    if (boot !== 'ok' || page === 'chat' || page === 'log') return;
+    if (boot !== 'ok' || page === 'chat' || page === 'log' || page === 'notes') return;
     const t = setTimeout(() => void load(true), q ? 300 : 0);
     return () => clearTimeout(t);
   }, [boot, tab, q, pk, page]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -266,9 +283,9 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
 
   return (
     <Shell title="Support" subtitle="Report a problem or ask for something new — the IT team sees it live" icon="confirmation-number" accent={T.blue} live={live} onBack={onExit}
-      right={!phone ? <Btn small title="Raise a ticket" icon="add" onPress={() => setForm(true)} /> : null}>
+      right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><NoticeBell api={api} onOpen={openLink} />{!phone ? <Btn small title="Raise a ticket" icon="add" onPress={() => setForm(true)} /> : null}</View>}>
       <View style={[c.page, phone && { padding: 10 }]}>
-        {page !== 'chat' ? (
+        {page === 'mine' ? (
         <View style={c.hero}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={c.heroTitle}>Something not working, or need something new?</Text>
@@ -282,12 +299,16 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
           { value: 'mine', label: 'My tickets', icon: 'confirmation-number' },
           ...(pub.users_see_all_tickets !== false ? [{ value: 'all' as const, label: 'All tickets', icon: 'dynamic-feed' }] : []),
           ...(pub.client_chat !== false ? [{ value: 'chat' as const, label: unread ? `Chat · ${unread > 99 ? '99+' : unread}` : 'Chat', icon: 'forum' }] : []),
+          { value: 'notes' as const, label: 'Notes', icon: 'sticky-note-2' },
           ...(pub.worklog_enabled !== false ? [{ value: 'log' as const, label: 'IT work log', icon: 'engineering' }] : []),
         ]} />
         {page === 'chat' ? (
           <View style={{ flex: 1, minHeight: 420 }}>
             <ChatView base={base} live={live} canGroup={pub.client_groups !== false} title="Chat" />
           </View>
+        ) : page === 'notes' ? (
+          <NotesView api={api} base={base} upload={useChat.getState().upload} openId={openNote} onOpened={() => setOpenNote(null)}
+            onExcel={async (p) => { const name = await downloadMyTickets(base, bearer, property, p); toast(`Excel ready — ${name}`, 'ok'); }} />
         ) : page === 'log' ? <WorkLogView api={api} onOpenMine={(id) => setOpenId(id)} /> : (
         <>
         <View style={[c.bar, phone && { flexDirection: 'column', alignItems: 'stretch' }]}>
@@ -326,6 +347,7 @@ export function ClientApp({ base, bearer, property, canAccess, startNew, onExit 
         )}
       </View>
 
+      <ChatBanner onOpen={(roomId) => openLink({ room_id: roomId })} />
       <ExportDialog visible={exportOpen} onClose={() => setExportOpen(false)} onExport={doExport} busy={exporting} realm="client" current={pk === 'all' ? null : period} />
 
       <Panel visible={form} onClose={() => setForm(false)} title="Raise a ticket" subtitle={preset ? `From: ${preset.label}` : 'The IT team gets it immediately'} width={680}>

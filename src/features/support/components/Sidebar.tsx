@@ -4,11 +4,11 @@
 //   tablet          a slim icon rail with small labels
 //   phone           a bottom bar
 // Chat shows the number of unread messages; Activity is only for the IT admin.
-import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { T } from '../../../../src/theme';
 import { useLayout } from './ui';
 
 export type Section = 'board' | 'list' | 'history' | 'team' | 'chat' | 'notes' | 'activity' | 'settings' | 'storage' | 'server';

@@ -1,11 +1,11 @@
 // FILE: src/features/support/components/Shell.tsx
 // Frame of the Support Desk "software" (opened from the header icon, like Mill mode):
 // its own dark header with a way back to FlowNest, then the app.
-import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
 import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { T } from '../../../../src/theme';
 import { LiveDot, ToastHost, useLayout } from './ui';
 
 type Props = {

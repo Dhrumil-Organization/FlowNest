@@ -13,6 +13,7 @@ import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -146,6 +147,11 @@ export function MonthlyTargetScreen() {
   const [selectedMetric, setSelectedMetric] = useState<DashboardMetricKey>(initialMetric);
   const [cards, setCards] = useState<DashboardCard[]>([]);
   const [executives, setExecutives] = useState<AnalyticsExecutiveRow[]>([]);
+  const executiveTools = useDrilldownList(executives, ['executive_name','executive_code'], [
+    {key:'executive_name',label:'Executive',type:'text'},
+    {key:'actual',label:'Actual',type:'number'},
+    {key:'achievement_pct',label:'Achievement',type:'number'},
+  ],'actual');
   const [reconciliation, setReconciliation] = useState<CollectionReconciliation | undefined>();
   const [periodTitle, setPeriodTitle] = useState('Monthly Target');
   const [scopeMessage, setScopeMessage] = useState('');
@@ -396,9 +402,10 @@ export function MonthlyTargetScreen() {
                 </View>
                 <Text style={styles.executivesCount}>{executives.length}</Text>
               </View>
-              {executives.length === 0 ? (
+              <DrilldownListTools state={executiveTools} placeholder="Search executive name or code" showCount />
+              {executiveTools.rows.length === 0 ? (
                 <View style={styles.noRows}><Text style={styles.noRowsTitle}>No executive data</Text><Text style={styles.noRowsText}>No rows were returned for this metric and month.</Text></View>
-              ) : executives.map((row, index) => <ExecutiveRow key={`${row.executive_code}-${index}`} row={row} rank={index} onPress={() => openExecutive(row)} amountMode={amountMode} />)}
+              ) : executiveTools.rows.map((row, index) => <ExecutiveRow key={`${row.executive_code}-${index}`} row={row} rank={index} onPress={() => openExecutive(row)} amountMode={amountMode} />)}
             </View>
               )}
             />

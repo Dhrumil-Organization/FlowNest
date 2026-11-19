@@ -3,7 +3,8 @@
 // (Legacy: components/SalesOrderNew/index.tsx, route app/(tabs)/sales-order-entry.tsx).
 // The legacy screen, route and files are untouched.
 //
-// Tabs (same as Legacy): New Order · Auth (pending count) · Tracking · Summary.
+// Tabs (same as Legacy): New Order · Auth (pending count) · Tracking · Summary, plus (NEW only) Proforma —
+// split an authorized Grey SO into proforma invoices (ProformaTab.tsx, rights orders.proforma).
 // Only the open tab is mounted — like Legacy, a tab re-reads the property / year the
 // New Order tab saved ('selected_prpcode', 'selectedyear') every time it is opened.
 //
@@ -53,25 +54,31 @@ import * as api from './api';
 import AuthTab from './AuthTab';
 import { todayYmd } from './model';
 import NewOrderTab from './NewOrderTab';
+import ProformaTab from './ProformaTab';
 import SummaryTab from './SummaryTab';
 import TrackingTab from './TrackingTab';
 import { CONTENT, useCols } from './ui';
+import { usePermission } from '@/src/core/permissions';
+import { SO_PROFORMA } from '@/src/features/soProforma/permissions';
 
 type Props = { token: string; API: string; username?: string };
 
-type TabId = 'neworder' | 'auth' | 'tracking' | 'summary';
+type TabId = 'neworder' | 'auth' | 'tracking' | 'summary' | 'proforma';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'neworder', label: 'New Order', icon: 'add-shopping-cart' },
   { id: 'auth', label: 'Auth', icon: 'verified-user' },
   { id: 'tracking', label: 'Tracking', icon: 'local-shipping' },
   { id: 'summary', label: 'Summary', icon: 'summarize' },
+  { id: 'proforma', label: 'Proforma', icon: 'request-quote' },
 ];
 
 export default function SalesOrderEntryNEW({ token, API }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('neworder');
   const [pendingCnt, setPendingCnt] = useState(0);
   const { isPhone } = useCols();
+  const { canDo } = usePermission();
+  const tabs = TABS.filter((t) => t.id !== 'proforma' || canDo(SO_PROFORMA.resource, 'view'));
   // null until read: New Order loads the saved default property / year with this id
   const [userid, setUserid] = useState<string | null>(null);
 
@@ -97,7 +104,7 @@ export default function SalesOrderEntryNEW({ token, API }: Props) {
           <Segment
             value={activeTab}
             onChange={(v) => setActiveTab(v)}
-            options={TABS.map((t) => ({
+            options={tabs.map((t) => ({
               value: t.id,
               icon: isPhone ? undefined : t.icon,
               label: t.id === 'auth' && pendingCnt > 0 ? `${t.label} (${pendingCnt})` : t.label,
@@ -110,6 +117,7 @@ export default function SalesOrderEntryNEW({ token, API }: Props) {
         {activeTab === 'auth' && userid !== null ? <AuthTab token={token} API={API} userid={userid} /> : null}
         {activeTab === 'tracking' && userid !== null ? <TrackingTab token={token} API={API} userid={userid} /> : null}
         {activeTab === 'summary' && userid !== null ? <SummaryTab token={token} API={API} userid={userid} /> : null}
+        {activeTab === 'proforma' && userid !== null ? <ProformaTab token={token} API={API} userid={userid} /> : null}
       </View>
     </View>
   );

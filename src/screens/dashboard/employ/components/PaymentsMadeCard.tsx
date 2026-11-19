@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api, formatAmount } from '../api/api';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 
 const C = {
   brown: '#8E4A31', brownDark: '#804029', brownBar: '#A7644A',
@@ -58,6 +59,11 @@ export default function PaymentsMadeCard({ prptype, date, amountMode = 'compact'
   const money = (n: number) => formatAmount(n, amountMode);
   // Do not show old day's party rows while the newly clicked day is loading.
   const partiesForSelectedDay = data?.selected_date === selectedDay ? (data.parties || []) : [];
+  const partyTools = useDrilldownList(partiesForSelectedDay, ['party_name', 'party_code', 'prpcode'], [
+    { key: 'party_name', label: 'Party', type: 'text' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+    { key: 'payment_count', label: 'Payments', type: 'number' },
+  ], 'amount');
 
   return (
     <View style={s.card}>
@@ -117,8 +123,9 @@ export default function PaymentsMadeCard({ prptype, date, amountMode = 'compact'
             </ScrollView>
             <Text style={s.selectedTitle}>{shortDate(selectedDay || 0).toUpperCase()} · {selectedEntry?.payment_count || 0} PAYMENTS · {selectedEntry?.party_count || 0} PARTIES</Text>
             {loading ? <ActivityIndicator color={C.brown} size="small" style={{ marginVertical: 7 }}/> : null}
+            <DrilldownListTools state={partyTools} placeholder="Search party name or code" compact showCount />
             <ScrollView nestedScrollEnabled style={s.paymentsList}>
-              {partiesForSelectedDay.map((p, index) => (
+              {partyTools.rows.map((p, index) => (
                 <TouchableOpacity key={`${p.prpcode}-${p.party_code}-${index}`} onPress={() => onOpenParty(p)} style={s.paymentRow} activeOpacity={0.75}>
                   <View style={[s.marker, { backgroundColor: [C.brown, C.green, '#345785'][index % 3] }]}/>
                   <View style={s.paymentText}>
@@ -129,7 +136,7 @@ export default function PaymentsMadeCard({ prptype, date, amountMode = 'compact'
                   <Text style={s.chevron}>›</Text>
                 </TouchableOpacity>
               ))}
-              {!loading && !partiesForSelectedDay.length && <Text style={s.noPayments}>No payments for this date</Text>}
+              {!loading && !partyTools.rows.length && <Text style={s.noPayments}>{partyTools.search ? 'No matching parties' : 'No payments for this date'}</Text>}
             </ScrollView>
             {data?.reconciliation && !data.reconciliation.matches ? <Text style={s.warning}>Payment reconciliation difference: {money(data.reconciliation.difference)}</Text> : null}
             <Text style={s.footer}>Tap a day to see parties paid · tap a party to open its individual vouchers and bill adjustments.</Text>

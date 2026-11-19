@@ -7,17 +7,22 @@
  */
 import './modules/administration.permission';
 import './modules/beam.permission';
+import './modules/beamGatePass.module';
+import './modules/beamInOut.module';
+import './modules/beamReport.module';
 import './modules/costing.permission';
 import './modules/creel.permission';
 import './modules/dashboard.permission';
 import './modules/datalog.permission';
 import './modules/designs.permission';
 import './modules/greyPacking.permission';
+import './modules/mill.permission';
 import './modules/monthlySalesTarget.permission';
 import './modules/orders.permission';
 import './modules/priority.permission';
 import './modules/production.module';
-import './modules/mill.permission';
+import './modules/repacking.module';
+import './modules/repackingIssue.module';
 import './modules/support.permission';
 
 import { validatePermissionRegistry } from './permissionRegistry';

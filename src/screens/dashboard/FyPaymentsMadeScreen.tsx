@@ -1,3 +1,4 @@
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput,
@@ -78,7 +79,6 @@ export default function FyPaymentsMadeScreen() {
   const [selectedYear, setSelectedYear] = useState(activeYear);
   const [partyCode, setPartyCode] = useState(originalParty);
   const [partyName, setPartyName] = useState('');
-  const [search, setSearch] = useState('');
   const [yearsState, setYearsState] = useState<Record<number, YearState>>({});
   // Local drilldown is inside this standalone FY page. Never push a Reports-tab route.
   const [detail, setDetail] = useState<{ data: DetailReport | null; loading: boolean; error: string }>({ data: null, loading: false, error: '' });
@@ -103,7 +103,7 @@ export default function FyPaymentsMadeScreen() {
     ? 'voucher' : partyCode ? 'party' : selectedMonth !== null ? 'month' : 'overview';
   useEffect(() => { pageScroll.current?.scrollTo({ y: 0, animated: false }); }, [stage, selectedYear]);
   const returnToOverview = () => {
-    setVoucher(null); setPartyCode(''); setSelectedMonth(null); setSearch(''); setShowAllPartyRows(false); setPartyView('bill_head'); setChosenHead(''); setChosenMode('');
+    setVoucher(null); setPartyCode(''); setSelectedMonth(null); partyTools.setSearch(''); setShowAllPartyRows(false); setPartyView('bill_head'); setChosenHead(''); setChosenMode('');
   };
   const backOneStage = () => {
     if (stage === 'voucher') { setVoucher(null); return; }
@@ -113,7 +113,7 @@ export default function FyPaymentsMadeScreen() {
       if (partyView === 'mode') { setPartyView('bill_head'); return; }
       setPartyCode(''); setVoucher(null); return;
     }
-    if (stage === 'month') { setSelectedMonth(null); setSearch(''); return; }
+    if (stage === 'month') { setSelectedMonth(null); partyTools.setSearch(''); return; }
     closeFY();
   };
 
@@ -210,10 +210,12 @@ export default function FyPaymentsMadeScreen() {
     voucher?.uid, voucher?.srno, voucher?.entryDate, voucherInPeriod]);
 
   const visibleParties = selectedMonth !== null ? (detail.data?.parties ?? []) : (current?.parties ?? []);
-  const list = useMemo(() => {
-    const text = search.trim().toLowerCase();
-    return visibleParties.filter(p => !text || `${p.party_name} ${p.party_code} ${p.prpcode}`.toLowerCase().includes(text));
-  }, [search, visibleParties]);
+  const partyTools = useDrilldownList(visibleParties, ['party_name','party_code','prpcode'], [
+    {key:'party_name',label:'Party',type:'text'},
+    {key:'amount',label:'Amount',type:'number'},
+    {key:'payment_count',label:'Payments',type:'number'},
+  ],'amount');
+  const list = partyTools.rows;
   const matching = current?.parties.find(p => p.party_code === partyCode);
   useEffect(() => { if (matching?.party_name) setPartyName(matching.party_name); }, [matching?.party_name]);
 
@@ -224,7 +226,7 @@ export default function FyPaymentsMadeScreen() {
     setPartyCode('');
     setVoucher(null);
     setPartyView('bill_head'); setChosenHead(''); setChosenMode('');
-    setSearch('');
+    partyTools.partyTools.setSearch('');
     setHoverMonth(null);
     setShowAllPartyRows(false);
   };
@@ -232,7 +234,7 @@ export default function FyPaymentsMadeScreen() {
     setPartyCode(p.party_code);
     setPartyName(p.party_name);
     setPartyView('bill_head'); setChosenHead(''); setChosenMode('');
-    setSearch('');
+    partyTools.setSearch('');
     setVoucher(null);
     setShareNotice('');
   };
@@ -248,6 +250,16 @@ export default function FyPaymentsMadeScreen() {
   const paymentMode = (p: Payment): string => (p.payment_method || '').trim() || 'Not specified';
   const matchingHeadPayments = reportPayments.filter(p => !chosenHead || paymentHead(p) === chosenHead);
   const matchingModePayments = matchingHeadPayments.filter(p => !chosenMode || paymentMode(p) === chosenMode);
+  const voucherTools = useDrilldownList(matchingModePayments, ['voucher_no','entry_date','payment_uid','reference'], [
+    {key:'voucher_no',label:'Voucher',type:'text'},
+    {key:'entry_date',label:'Date',type:'date'},
+    {key:'amount',label:'Amount',type:'number'},
+  ],'entry_date');
+  const billTools = useDrilldownList(detail.data?.bill_rows, ['bill_no','bill_date','source_type'], [
+    {key:'bill_no',label:'Bill No.',type:'text'},
+    {key:'bill_date',label:'Bill Date',type:'date'},
+    {key:'settled_amount',label:'Amount',type:'number'},
+  ],'bill_date');
   const headGroups = Array.from(matchingHeadPayments.reduce((groups, payment) => {
     const key = paymentHead(payment);
     const row = groups.get(key) || { name: key, amount: 0, payments: 0 };
@@ -269,7 +281,7 @@ export default function FyPaymentsMadeScreen() {
   const seriesTint = (y: number) => y === selectedYear ? COLORS.brown : y === selectedYear - 1 ? '#88837F' : '#C4C0BB';
   const selectBarMonth = (y: number, i: number) => {
     if (yearsState[y]?.data?.full.months?.[i]?.available !== true) return;
-    setSelectedYear(y); setSelectedMonth(i); setPartyCode(''); setVoucher(null); setSearch('');
+    setSelectedYear(y); setSelectedMonth(i); setPartyCode(''); setVoucher(null); partyTools.setSearch('');
     setChosenHead(''); setChosenMode(''); setPartyView('bill_head'); setHoverMonth(null);
   };
   const selectedPayment = reportPayments.find(p => p.payment_uid === voucher?.uid && String(p.payment_srno) === voucher?.srno);
@@ -316,7 +328,7 @@ export default function FyPaymentsMadeScreen() {
   // keep the original FY overview ordering when no drilldown is selected.
   const partyPanelView = (
 <View style={st.partyPanel}><View style={st.partyPanelTitle}><Text style={st.sectionEyebrow}>PARTIES · {fyName(selectedYear)}{selectedMonth !== null ? ' · ' + mon(selectedMonth) : ''}</Text><Text style={st.smallText}>{selectedMonth === null ? 'Select a party for its FY payments' : 'Showing parties paid in the selected month'}</Text></View>
-          <TextInput value={search} onChangeText={setSearch} placeholder="Search party or code…" style={st.search}/>
+          <DrilldownListTools state={partyTools} placeholder="Search party name or code" showCount />
           <View>{(showAllPartyRows ? list : list.slice(0, 6)).map(p => <TouchableOpacity key={`${p.prpcode}-${p.party_code}`} style={[st.partyRow, partyCode === p.party_code && st.partyRowActive]} onPress={() => selectPartyInline(p)} accessibilityRole="button">
             <View style={st.avatar}><Text style={st.avatarText}>{initials(p.party_name)}</Text></View>
             <View style={{ flex: 1, minWidth: 0 }}><Text style={st.partyRowTitle} numberOfLines={1}>{p.party_name || p.party_code}</Text><Text style={st.smallText}>{p.prpcode} · {p.payment_count} payments</Text></View>
@@ -544,8 +556,9 @@ export default function FyPaymentsMadeScreen() {
               {partyView === 'payments' && <>
                 <TouchableOpacity accessibilityRole="button" onPress={() => { setPartyView(chosenHead ? 'mode' : 'bill_head'); setChosenMode(''); }}><Text style={st.brownLink}>‹ {chosenMode || 'Payment groups'}</Text></TouchableOpacity>
                 <View style={st.artifactTableHeader}><Text style={st.tableColMain}>PAYMENTS</Text><Text style={st.tableColOther}>PAID</Text></View>
-                <ScrollView nestedScrollEnabled style={{maxHeight: 440}} showsVerticalScrollIndicator={matchingModePayments.length > 8}>
-                {matchingModePayments.map(p => <TouchableOpacity key={`${p.prpcode}-${p.payment_uid}-${p.payment_srno}`} onPress={() => selectVoucherInline(p)} accessibilityRole="button" style={st.artifactPaymentLine}>
+                <DrilldownListTools state={voucherTools} placeholder="Search voucher no., date or reference" compact showCount />
+                <ScrollView nestedScrollEnabled style={{maxHeight: 440}} showsVerticalScrollIndicator={voucherTools.rows.length > 8}>
+                {voucherTools.rows.map(p => <TouchableOpacity key={`${p.prpcode}-${p.payment_uid}-${p.payment_srno}`} onPress={() => selectVoucherInline(p)} accessibilityRole="button" style={st.artifactPaymentLine}>
                   <View style={{flex:1}}><Text style={st.artifactPaymentName}><Text style={{color: COLORS.brown}}>{p.voucher_no || p.payment_uid}</Text> · {p.party_name} · {paymentMode(p)} · {p.bill_count} {p.bill_count === 1 ? 'bill' : 'bills'}</Text>
                     <Text style={st.artifactPaymentDate}>{toIso(p.entry_date)}</Text></View>
                   <Text style={st.artifactPaymentAmount}>{money(n(p.amount))}</Text><Text style={st.brownLink}>›</Text>
@@ -569,7 +582,8 @@ export default function FyPaymentsMadeScreen() {
             {!!selectedPayment && voucherInPeriod && <View style={st.billPanel}>
               <Text style={st.voucherNumber}>{selectedPayment.voucher_no} · {toIso(selectedPayment.entry_date)} · {money(n(selectedPayment.amount))}</Text>
               <Text style={st.sectionEyebrow}>BILL-WISE ADJUSTMENTS</Text>
-              {(detail.data?.bill_rows || []).map((b, index) => <View key={`${b.sub_srno}-${index}`} style={st.billRow}>
+              <DrilldownListTools state={billTools} placeholder="Search bill no. or bill date (DD-MM-YYYY)" compact showCount />
+              {billTools.rows.map((b, index) => <View key={`${b.sub_srno}-${index}`} style={st.billRow}>
                 <View style={{flex:1}}><Text style={st.billNumber}>{b.bill_no || 'Unresolved purchase bill'}</Text><Text style={st.smallText}>{toIso(b.bill_date) || 'Date unavailable'}</Text></View>
                 <Text style={st.billAmount}>{money(n(b.settled_amount))}</Text>
               </View>)}

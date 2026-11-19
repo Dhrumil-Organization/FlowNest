@@ -14,6 +14,12 @@ import './modules/salesTarget.ui';
 // validateUiRegistry() runs below — guarantees its permission definitions
 // are in place before the cross-check.
 import '../../registry/modules/production.module';
+// Repacking Issue: single-file module (permission resource + ui nodes), same pattern as production.module.
+import '../../registry/modules/repackingIssue.module';
+import '../../registry/modules/repacking.module';
+import '../../registry/modules/beamInOut.module';
+import '../../registry/modules/beamGatePass.module';
+import '../../registry/modules/beamReport.module';
 
 import { validateUiRegistry } from './uiRegistry';
 // FIX: cross-check every UI-registry node's `permission` string against

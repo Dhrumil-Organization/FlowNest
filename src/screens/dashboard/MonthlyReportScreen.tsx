@@ -9,6 +9,7 @@ import {
 import { ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
 import { DashboardGrid, Slot } from '@/src/components/dashboard/DashboardGrid';
 import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
@@ -233,31 +234,12 @@ function ReportPanel({
   const meta = METRIC_META[metric];
   const pct = Math.max(0, Number(card?.achievement_pct || 0));
   const configured = Boolean(card?.target_configured);
-  const [sortConfig, setSortConfig] = useState<{
-    key: 'actual' | 'ach';
-    direction: 'asc' | 'desc';
-  }>({
-    key: 'actual',
-    direction: 'desc',
-  });
-
-  const sortedRows = useMemo(() => {
-    return [...rows].sort((a, b) => {
-      const aValue =
-        sortConfig.key === 'actual'
-          ? Number(a.actual || 0)
-          : Number(a.achievement_pct || 0);
-
-      const bValue =
-        sortConfig.key === 'actual'
-          ? Number(b.actual || 0)
-          : Number(b.achievement_pct || 0);
-
-      return sortConfig.direction === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
-    });
-  }, [rows, sortConfig]);
+  const tools = useDrilldownList(rows, ['executive_name', 'executive_code'], [
+    { key: 'executive_name', label: 'Executive', type: 'text' },
+    { key: 'actual', label: 'Actual', type: 'number' },
+    { key: 'achievement_pct', label: 'Achievement', type: 'number' },
+  ], 'actual');
+  const sortedRows = tools.rows;
 
   return (
     <View style={styles.panel}>
@@ -291,31 +273,14 @@ function ReportPanel({
           {rows.length === 0 ? <Text style={styles.noPulse}>No executive activity</Text> : null}
         </View>
 
+        <DrilldownListTools state={tools} placeholder="Search executive name or code" compact showCount />
         <View style={styles.tableTitleRow}>
           <Text style={styles.tableTitle}>BY EXECUTIVE</Text>
-          {/* <Text style={styles.tableTitle}>ACTUAL · ACH</Text> */}
-          <TouchableOpacity
-            activeOpacity={0.6}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={() =>
-              setSortConfig(prev => ({
-                key: prev.key === 'actual' ? 'ach' : 'actual',
-                direction:
-                  prev.key === 'actual' && prev.direction === 'asc'
-                    ? 'desc'
-                    : 'asc',
-              }))
-            }
-          >
-            <Text style={styles.tableTitle}>
-              ACTUAL · ACH
-              {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.tableTitle}>ACTUAL · ACH</Text>
         </View>
 
-        {rows.length === 0 ? (
-          <View style={styles.emptyBox}><Text style={styles.emptyText}>No executive records for this month.</Text></View>
+        {sortedRows.length === 0 ? (
+          <View style={styles.emptyBox}><Text style={styles.emptyText}>{tools.search ? 'No matching executives.' : 'No executive records for this month.'}</Text></View>
         // ) : rows.map((row, index) => {
          ) : sortedRows.map((row, index) => {
           const avatarTone = [T.yd, T.green, T.purple, T.copper, T.blue][index % 5];

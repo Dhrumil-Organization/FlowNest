@@ -18,6 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from './employ/api/api';
 import { DashboardAPI } from '@/src/api/dashboard';
 import { ReportContainer, SplitPane, useReportLayout } from '@/src/components/dashboard/ResponsiveReport';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
+import FutureDatedReceiptsPanel, { OutstandingFutureReceipt, OutstandingFutureReceiptSummary, formatOutstandingYmd } from '@/src/components/dashboard/FutureDatedReceiptsPanel';
 
 type Mode = 'collection' | 'outstanding';
 type Level = 'executives' | 'parties' | 'party_detail';
@@ -45,6 +47,9 @@ type Row = {
   today_amount_exact?: string;
   amount?: number;
   amount_exact?: string;
+  ledger_balance?: number;
+  future_dated_receipt_amount?: number;
+  future_dated_receipt_amount_exact?: string;
   dates?: DateBreakdownRow[];
   date_reconciliation?: {
     party_amount?: number;
@@ -78,6 +83,7 @@ type AgeingInvoice = {
   outstanding?: number;
   outstanding_exact?: string;
   prp_code?: string;
+  balance_source?: string;
 };
 type Ageing = {
   total?: number;
@@ -93,6 +99,7 @@ type Ageing = {
   reconciliation_difference_exact?: string;
   is_reconciled?: boolean;
   message?: string;
+  future_dated_allocations_restored?: number;
 };
 
 type Report = {
@@ -126,11 +133,14 @@ type Report = {
   ageing?: Ageing;
   history?: HistoryRow[];
   collection_history?: HistoryRow[];
+  future_dated_receipt_summary?: OutstandingFutureReceiptSummary;
+  future_dated_receipts?: OutstandingFutureReceipt[];
+  future_dated_receipts_total?: number;
+  future_dated_receipts_total_exact?: string;
   message?: string | null;
 };
 
 type MonthChip = { ym: string; label: string; requestDate: string };
-
 const one = (value: unknown): string => {
   if (Array.isArray(value)) return String(value[0] ?? '');
   return String(value ?? '');
@@ -223,7 +233,6 @@ export default function CollectionFlowScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [sortAscending, setSortAscending] = useState(false);
   const [ageingExpanded, setAgeingExpanded] = useState(false);
   const [expandedHistoryDates, setExpandedHistoryDates] = useState<Record<string, boolean>>({});
   const [expandedParties, setExpandedParties] = useState<Record<string, boolean>>({});
@@ -360,11 +369,12 @@ export default function CollectionFlowScreen() {
   );
 
   const rows = useMemo(() => report?.rows || [], [report]);
-  const sortedRows = useMemo(() => {
-    const copy = [...rows];
-    copy.sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
-    return sortAscending ? copy : copy.reverse();
-  }, [rows, sortAscending]);
+  const listTools = useDrilldownList(rows, ['name', 'code'], [
+    { key: 'name', label: level === 'executives' ? 'Executive' : 'Party', type: 'text' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+    ...(mode === 'collection' ? [{ key: 'today_amount', label: 'Today', type: 'number' as const }] : []),
+  ], 'amount');
+  const sortedRows = listTools.rows;
 
   const title = mode === 'collection' ? 'Collection Report' : 'Outstanding Report';
   const panelTitle = level === 'executives'
@@ -436,6 +446,16 @@ export default function CollectionFlowScreen() {
     0,
   );
 
+  const historyTools = useDrilldownList(historyRows, ['date_ymd', 'date_label'], [
+    { key: 'date_ymd', label: 'Date', type: 'date' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+  ], 'date_ymd');
+  const invoiceTools = useDrilldownList(report?.ageing?.open_invoices, ['bill_no', 'bill_date', 'prp_code', 'uid'], [
+    { key: 'bill_no', label: 'Bill No.', type: 'text' },
+    { key: 'bill_date', label: 'Bill Date', type: 'date' },
+    { key: 'outstanding', label: 'Amount', type: 'number' },
+  ], 'bill_date');
+
   // UI only: history and breakdown sit side by side on tablet / desktop
   const splitView = showPaymentHistory && !layout.compact;
 
@@ -452,7 +472,8 @@ export default function CollectionFlowScreen() {
                 </View>
               </View>
 
-              {historyRows.length === 0 ? (
+              <DrilldownListTools state={historyTools} placeholder="Search payment date (DD-MM-YYYY)" showCount />
+              {historyTools.rows.length === 0 ? (
                 <View style={styles.historyEmpty}>
                   <Text style={styles.historyEmptyTitle}>No payment entries</Text>
                   <Text style={styles.historyEmptyText}>
@@ -460,7 +481,7 @@ export default function CollectionFlowScreen() {
                   </Text>
                 </View>
               ) : (
-                historyRows.map((item, index) => {
+                historyTools.rows.map((item, index) => {
                   const dateKey = String(item?.date_ymd || index);
                   const parties = item?.parties || [];
                   const canExpand = mode === 'collection' && parties.length > 0;
@@ -499,20 +520,7 @@ export default function CollectionFlowScreen() {
                             <Text style={styles.childColumnName}>PARTY</Text>
                             <Text style={styles.childColumnValue}>AMOUNT</Text>
                           </View>
-                          {parties.map((party, partyIndex) => (
-                            <View key={`${dateKey}-${party?.code || partyIndex}`} style={styles.childRow}>
-                              <View style={[styles.childRank, { backgroundColor: [T.yd, T.green, T.copper, T.purple, T.blue][partyIndex % 5] }]}>
-                                <Text style={styles.childRankText}>{partyIndex + 1}</Text>
-                              </View>
-                              <View style={styles.childMain}>
-                                <Text style={styles.childName}>{party?.name || 'Unspecified'}</Text>
-                                {party?.code ? <Text style={styles.childCode}>{party.code}</Text> : null}
-                              </View>
-                              <Text style={styles.childAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
-                                {formatSummaryAmount(party?.amount, amountMode, party?.amount_exact)}
-                              </Text>
-                            </View>
-                          ))}
+                          <CollectionHistoryParties dateKey={dateKey} parties={parties} amountMode={amountMode} />
                           <View style={styles.childTotalRow}>
                             <View>
                               <Text style={styles.childTotalLabel}>DATE TOTAL</Text>
@@ -536,6 +544,7 @@ export default function CollectionFlowScreen() {
 
   const mainBlock = (
           (level === 'party_detail' && mode === 'outstanding' ? (
+            <>
             <View style={styles.ageingPanel}>
               <View style={styles.ageingHeader}>
                 <View>
@@ -618,7 +627,7 @@ export default function CollectionFlowScreen() {
                       <Text style={styles.adjustmentTitle}>Net balance adjustment</Text>
                       <Text style={styles.adjustmentText}>
                         Open invoices {formatSummaryAmount(report?.ageing?.total, amountMode, report?.ageing?.total_exact)} · credits / other account adjustments {formatSummaryAmount(report?.ageing?.net_adjustment, amountMode, report?.ageing?.net_adjustment_exact)}.
-                        {'\n'}The Outstanding card continues to use the net FamAcc.ClBal balance.
+                        {'\n'}{report?.future_dated_receipt_summary ? 'Net Outstanding includes the future-effective receipt adjustment for the selected report date.' : 'The Outstanding card uses the current net account balance.'}
                       </Text>
                     </View>
                   ) : null}
@@ -642,7 +651,8 @@ export default function CollectionFlowScreen() {
 
                   {ageingExpanded && (report?.ageing?.open_invoices || []).length > 0 ? (
                     <View style={styles.invoiceList}>
-                      {(report?.ageing?.open_invoices || []).map((invoice, index) => (
+                      <DrilldownListTools state={invoiceTools} placeholder="Search bill no. or bill date (DD-MM-YYYY)" showCount />
+                      {invoiceTools.rows.map((invoice, index) => (
                         <View key={invoice?.uid || `${invoice?.bill_no || 'invoice'}-${index}`} style={styles.invoiceRow}>
                           <View style={styles.invoiceInfo}>
                             <Text style={styles.invoiceNo}>{invoice?.bill_no || `Invoice ${index + 1}`}</Text>
@@ -650,6 +660,9 @@ export default function CollectionFlowScreen() {
                               {String(invoice?.bill_date || '')} · {Number(invoice?.ageing_days || 0)}d
                               {invoice?.prp_code ? ` · ${invoice.prp_code}` : ''}
                             </Text>
+                            {invoice?.balance_source === 'CURRENT_INVOICE_FUTURE_RECEIPT_RESTORED' ? (
+                              <Text style={styles.invoiceRestored}>RESTORED · FUTURE RECEIPT</Text>
+                            ) : null}
                           </View>
                           <Text style={styles.invoiceAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(invoice?.outstanding, amountMode, invoice?.outstanding_exact)}</Text>
                         </View>
@@ -659,6 +672,11 @@ export default function CollectionFlowScreen() {
                 </>
               )}
             </View>
+            <FutureDatedReceiptsPanel
+              report={report}
+              amountMode={amountMode}
+            />
+          </>
           ) : (
             <View style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -668,13 +686,8 @@ export default function CollectionFlowScreen() {
                   </Text>
                   <Text style={styles.panelTitle}>{panelTitle}</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setSortAscending(value => !value)}
-                  style={styles.sortButton}
-                >
-                  <Text style={styles.sortText}>{sortAscending ? 'LOWEST ▲' : 'HIGHEST ▼'}</Text>
-                </TouchableOpacity>
               </View>
+              <DrilldownListTools state={listTools} placeholder={level === 'executives' ? 'Search executive name or code' : 'Search party name or code'} showCount />
 
               <View style={styles.columns}>
                 <Text style={styles.columnName}>{level === 'executives' ? 'EXECUTIVE' : 'PARTY'}</Text>
@@ -748,6 +761,11 @@ export default function CollectionFlowScreen() {
                         <Text style={[styles.rowAmount, { color: mode === 'outstanding' ? T.red : T.ink }]}>
                           {formatSummaryAmount(row.amount, amountMode, row.amount_exact)}
                         </Text>
+                        {mode === 'outstanding' && Math.abs(Number(row.future_dated_receipt_amount || 0)) > 0.005 ? (
+                          <Text style={styles.rowFutureAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                            Future EDate +{formatSummaryAmount(row.future_dated_receipt_amount, amountMode, row.future_dated_receipt_amount_exact)}
+                          </Text>
+                        ) : null}
                       </View>
 
                       {canExpandParty ? (
@@ -761,19 +779,7 @@ export default function CollectionFlowScreen() {
                           <Text style={styles.childColumnName}>DATE</Text>
                           <Text style={styles.childColumnValue}>AMOUNT</Text>
                         </View>
-                        {partyDates.map((dateRow, dateIndex) => (
-                          <View key={`${partyKey}-${dateRow?.date_ymd || dateIndex}`} style={styles.partyDateRow}>
-                            <View style={styles.partyDateMain}>
-                              <Text style={styles.partyDateLabel}>{dateRow?.date_label || String(dateRow?.date_ymd || '')}</Text>
-                              <Text style={styles.partyDateEntries}>
-                                {Number(dateRow?.entry_count || 0)} entr{Number(dateRow?.entry_count || 0) === 1 ? 'y' : 'ies'}
-                              </Text>
-                            </View>
-                            <Text style={styles.childAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
-                              {formatSummaryAmount(dateRow?.amount, amountMode, dateRow?.amount_exact)}
-                            </Text>
-                          </View>
-                        ))}
+                        <CollectionPartyDates partyKey={partyKey} dates={partyDates} amountMode={amountMode} />
                         <View style={styles.childTotalRow}>
                           <View>
                             <Text style={styles.childTotalLabel}>PARTY TOTAL</Text>
@@ -899,6 +905,26 @@ export default function CollectionFlowScreen() {
             </View>
           </View>
 
+          {mode === 'outstanding' && report?.future_dated_receipt_summary ? (
+            <View style={styles.futureSummary}>
+              <View style={styles.futureSummaryTop}>
+                <View style={styles.futureSummaryLabelWrap}>
+                  <Text style={styles.futureSummaryLabel}>OUTSTANDING AS ON {formatOutstandingYmd(report.future_dated_receipt_summary.as_on_date)}</Text>
+                  <Text style={styles.futureSummaryHelp}>Future-effective receipts shown separately, already added back into the total.</Text>
+                </View>
+                <Text style={styles.futureSummaryAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                  +{formatSummaryAmount(report.future_dated_receipt_summary.amount, amountMode, report.future_dated_receipt_summary.amount_exact)}
+                </Text>
+              </View>
+              <View style={styles.futureSummaryBottom}>
+                <Text style={styles.futureSummaryMeta}>Current ledger balance</Text>
+                <Text style={styles.futureSummaryBalance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                  {formatSummaryAmount(report.future_dated_receipt_summary.current_ledger_amount, amountMode, report.future_dated_receipt_summary.current_ledger_amount_exact)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
           {hasReconciliation ? (
             <View style={[styles.reconcile, reconciled ? styles.reconcileOk : styles.reconcileWarn]}>
               <Text style={[styles.reconcileTitle, { color: reconciled ? T.green : '#B85C00' }]}>
@@ -935,6 +961,36 @@ export default function CollectionFlowScreen() {
       </SafeAreaView>
     </View>
   );
+}
+
+// Nested collection lists have independent local filters. Financial reconciliation
+// always uses the complete server list, never the filtered presentation subset.
+function CollectionHistoryParties({ dateKey, parties, amountMode }: { dateKey: string; parties: PartyBreakdownRow[]; amountMode: 'compact' | 'actual' }) {
+  const tools = useDrilldownList(parties, ['name', 'code'], [
+    { key: 'name', label: 'Party', type: 'text' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+  ], 'amount');
+  return <>
+    <DrilldownListTools state={tools} placeholder="Search party name or code" compact showCount />
+    {tools.rows.map((party, index) => <View key={`${dateKey}-${party?.code || index}`} style={styles.childRow}>
+      <View style={[styles.childRank, { backgroundColor: [T.yd, T.green, T.copper, T.purple, T.blue][index % 5] }]}><Text style={styles.childRankText}>{index + 1}</Text></View>
+      <View style={styles.childMain}><Text style={styles.childName}>{party?.name || 'Unspecified'}</Text>{party?.code ? <Text style={styles.childCode}>{party.code}</Text> : null}</View>
+      <Text style={styles.childAmount}>{formatSummaryAmount(party?.amount, amountMode, party?.amount_exact)}</Text>
+    </View>)}
+  </>;
+}
+function CollectionPartyDates({ partyKey, dates, amountMode }: { partyKey: string; dates: DateBreakdownRow[]; amountMode: 'compact' | 'actual' }) {
+  const tools = useDrilldownList(dates, ['date_label', 'date_ymd'], [
+    { key: 'date_ymd', label: 'Date', type: 'date' },
+    { key: 'amount', label: 'Amount', type: 'number' },
+  ], 'date_ymd');
+  return <>
+    <DrilldownListTools state={tools} placeholder="Search date (DD-MM-YYYY)" compact showCount />
+    {tools.rows.map((item, index) => <View key={`${partyKey}-${item?.date_ymd || index}`} style={styles.partyDateRow}>
+      <View style={styles.partyDateMain}><Text style={styles.partyDateLabel}>{item?.date_label || String(item?.date_ymd || '')}</Text><Text style={styles.partyDateEntries}>{Number(item?.entry_count || 0)} entries</Text></View>
+      <Text style={styles.childAmount}>{formatSummaryAmount(item?.amount, amountMode, item?.amount_exact)}</Text>
+    </View>)}
+  </>;
 }
 
 const styles = StyleSheet.create({
@@ -993,6 +1049,16 @@ const styles = StyleSheet.create({
   totalRight: { alignItems: 'flex-end' },
   totalCount: { color: T.ink, fontSize: 15, fontWeight: '900', marginTop: 3 },
 
+  futureSummary: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#EBD0A9', borderRadius: 12 },
+  futureSummaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9 },
+  futureSummaryLabelWrap: { flex: 1, minWidth: 0 },
+  futureSummaryLabel: { fontSize: 8, fontWeight: '900', color: '#A65E10', letterSpacing: 0.4 },
+  futureSummaryHelp: { fontSize: 9, lineHeight: 13, color: '#856A48', marginTop: 3 },
+  futureSummaryAmount: { fontSize: 13, fontWeight: '900', color: '#B85C00', maxWidth: '42%', textAlign: 'right' },
+  futureSummaryBottom: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#EBD0A9', paddingTop: 9, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  futureSummaryMeta: { color: '#856A48', fontSize: 9 },
+  futureSummaryBalance: { color: T.ink, fontSize: 11, fontWeight: '900', maxWidth: '50%', textAlign: 'right' },
+  rowFutureAmount: { fontSize: 8, color: '#B85C00', marginTop: 4, fontWeight: '800', textAlign: 'right' },
   reconcile: { marginTop: 10, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1 },
   reconcileOk: { backgroundColor: '#EFF7F2', borderColor: '#CFE4D5' },
   reconcileWarn: { backgroundColor: '#FFF4EC', borderColor: '#EBC9AF' },
@@ -1014,8 +1080,11 @@ const styles = StyleSheet.create({
   panelHeader: { padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 0.7 },
   panelTitle: { color: T.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  sortControls: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
   sortButton: { backgroundColor: T.alt, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 },
+  sortButtonActive: { backgroundColor: T.nav },
   sortText: { color: T.nav, fontSize: 8, fontWeight: '900' },
+  sortTextActive: { color: '#FFFFFF' },
   columns: { height: 34, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderBottomWidth: 1, borderColor: T.hair },
   columnName: { flex: 1, color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
   columnValue: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
@@ -1163,6 +1232,7 @@ const styles = StyleSheet.create({
   invoiceNo: { color: T.ink, fontSize: 10, fontWeight: '900' },
   invoiceMeta: { color: T.muted, fontSize: 8, marginTop: 3 },
   invoiceAmount: { color: T.red, fontSize: 10, fontWeight: '900', marginLeft: 10 },
+  invoiceRestored: { color: '#B85C00', fontSize: 8, fontWeight: '900', marginTop: 4 },
 
   footerTotal: { minHeight: 55, backgroundColor: T.alt, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   footerKicker: { color: T.nav, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },

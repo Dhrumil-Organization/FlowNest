@@ -3,6 +3,7 @@ import {ActivityIndicator,Platform,Pressable,ScrollView,StyleSheet,Text,TextInpu
 import Svg, {Polyline,Line,Circle} from 'react-native-svg';
 import {useLocalSearchParams,useRouter,usePathname} from 'expo-router';
 import {api} from '@/src/screens/dashboard/employ/api/api';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 
 type Row={code:string;name:string;amount:number};
 type Month={label:string;date:string;amount:number|null;target?:number|null;targetSource?:string;targetError?:string;rows:Row[];receiptCount?:number|null;error?:string};
@@ -69,7 +70,7 @@ export default function FyPaymentCollectionScreen(){
  const displayAmount=(value:number|null):string=>amountMode==='compact'?compact(value):amount(value);
  const [targetBreakdownOpen,setTargetBreakdownOpen]=useState(false);
  const [month,setMonth]=useState<number|null>(null),[executive,setExecutive]=useState<Row|null>(null),[customers,setCustomers]=useState<Row[]>([]),[loadingDetail,setLoadingDetail]=useState(false);
- const [search,setSearch]=useState(''),[ascending,setAscending]=useState(false),[detailError,setDetailError]=useState(''),[selectedKpi,setSelectedKpi]=useState<string|null>(null);
+ const [search,setSearch]=useState(''),[ascending,setAscending]=useState(false),[sortByName,setSortByName]=useState(false),[detailError,setDetailError]=useState(''),[selectedKpi,setSelectedKpi]=useState<string|null>(null);
  const years=[activeFY,activeFY-1,activeFY-2];
  const [history,setHistory]=useState<Record<number,Month[]>>({});
  const [billedByFY,setBilledByFY]=useState<Record<number,(number|null)[]>>({});
@@ -198,7 +199,7 @@ export default function FyPaymentCollectionScreen(){
  const topShare=topExecutive&&total&&total>0?topExecutive.amount/total*100:null;
  const rows=useMemo(()=>merge((month===null?available:(months[month] && months[month].amount!==null)?[months[month]]:[]).map(x=>Array.isArray(x?.rows)?x.rows:[])),[months,month]);
  const selectedRows=executive?(Array.isArray(customers)?customers:[]):rows;
- const visible=useMemo(()=>selectedRows.filter(x=>(x.name+' '+x.code).toLowerCase().includes(search.trim().toLowerCase())).sort((a,b)=>ascending?a.amount-b.amount:b.amount-a.amount),[selectedRows,search,ascending]);
+ const visible=useMemo(()=>selectedRows.filter(x=>(x.name+' '+x.code).toLowerCase().includes(search.trim().toLowerCase())).sort((a,b)=>sortByName?(a.name.localeCompare(b.name,'en',{sensitivity:'base',numeric:true})*(ascending?-1:1)):(ascending?a.amount-b.amount:b.amount-a.amount)),[selectedRows,search,ascending,sortByName]);
  const pickExecutive=useCallback(async(r:Row,retainCustomer=false)=>{const epoch=++requestEpoch.current;setExecutive(r);setCustomers([]);if(!retainCustomer)setSearch('');setDetailError('');setLoadingDetail(true);
    const sources=month===null?available:(months[month]?[months[month]]:[]),lists:Row[][]=[];
    for(const m of sources){if(m?.amount===null)continue;try{const d=await fetchReport(m.date,'parties',r.code);lists.push(d.rows);}catch(e:any){setDetailError(e?.message||'Some customer details are unavailable');}}
@@ -291,6 +292,15 @@ export default function FyPaymentCollectionScreen(){
  const modeGroups=useMemo(()=>{const groups=new Map<string,{mode:string;amount:number;receipts:(ReceiptItem & {dateLabel:string;date:string})[]}>();const seen=new Set<string>();for(const d of receiptDays)for(const r of d.receipts){const key=`${d.date}:${r.receipt_uid}:${r.receipt_srno}`;if(seen.has(key))continue;seen.add(key);const mode=r.payment_mode||'Unclassified';const g=groups.get(mode)||{mode,amount:0,receipts:[]};g.amount+=Number(r.amount||0);g.receipts.push({...r,dateLabel:d.label,date:d.date});groups.set(mode,g);}return [...groups.values()].sort((a,b)=>b.amount-a.amount);},[receiptDays]);
  const allReceipts=useMemo(()=>modeGroups.flatMap(g=>g.receipts.map(r=>({...r,groupMode:g.mode}))).sort((a,b)=>b.date.localeCompare(a.date)),[modeGroups]);
  const selectedReceipts=paymentMode==='ALL_RECEIPTS'?allReceipts:(modeGroups.find(g=>g.mode===paymentMode)?.receipts||[]);
+ const modeTools=useDrilldownList(modeGroups,['mode'],[
+   {key:'mode',label:'Mode',type:'text'},
+   {key:'amount',label:'Amount',type:'number'},
+ ],'amount');
+ const receiptTools=useDrilldownList(selectedReceipts,['voucher_no','receipt_uid','receipt_srno','date','dateLabel','payment_reference','bank_name'],[
+   {key:'voucher_no',label:'Voucher',type:'text'},
+   {key:'date',label:'Date',type:'date'},
+   {key:'amount',label:'Amount',type:'number'},
+ ],'date');
  const selectedReceiptAmount=paymentMode==='ALL_RECEIPTS'?modeGroups.reduce((sum,g)=>sum+g.amount,0):(modeGroups.find(g=>g.mode===paymentMode)?.amount??0);
  const modeTotal=modeGroups.reduce((a,g)=>a+g.amount,0);
  const modeCount=modeGroups.reduce((a,g)=>a+g.receipts.length,0);
@@ -501,20 +511,22 @@ export default function FyPaymentCollectionScreen(){
        {!paymentMode?<>
          <Text style={[s.note,{marginBottom:10}]}>BY PAYMENT MODE · {month===null?'All available months':`${NAMES[month]} ${fy+(month>=9?1:0)}`} · {modeCount} receipt entries</Text>
          <View style={{flexDirection:'row',justifyContent:'space-between',borderBottomWidth:1,borderColor:BORDER,paddingBottom:7}}><Text style={s.eyebrow}>MODE</Text><Text style={s.eyebrow}>RECEIPTS       COLLECTED</Text></View>
-         {modeGroups.map(g=><Pressable key={g.mode} onPress={()=>setPaymentMode(g.mode)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{g.mode}</Text><View style={[s.rankTrack,{marginRight:16}]}><View style={[s.rankFill,{width:`${modeTotal>0?Math.min(100,g.amount/modeTotal*100):0}%` as any}]}/></View></View><Text style={s.note}>{g.receipts.length}     </Text><Text style={s.rankAmount}>{displayAmount(g.amount)} ›</Text></Pressable>)}
+         <DrilldownListTools state={modeTools} placeholder="Search payment mode" compact showCount />
+         {modeTools.rows.map(g=><Pressable key={g.mode} onPress={()=>setPaymentMode(g.mode)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{g.mode}</Text><View style={[s.rankTrack,{marginRight:16}]}><View style={[s.rankFill,{width:`${modeTotal>0?Math.min(100,g.amount/modeTotal*100):0}%` as any}]}/></View></View><Text style={s.note}>{g.receipts.length}     </Text><Text style={s.rankAmount}>{displayAmount(g.amount)} ›</Text></Pressable>)}
          {!loadingReceipts?<AmountTotal format={displayAmount} label="RECEIPTS ACROSS MODES" count={modeCount} total={modeTotal} secondary={`${modeGroups.length} modes · receipt-level amounts (distinct UID + SrNo)`}/>:null}
          {modeGroups.length>0?<Pressable onPress={()=>setPaymentMode('ALL_RECEIPTS')} style={{paddingVertical:12}}><Text style={s.link}>Show {modeCount} receipt entries ›</Text></Pressable>:null}
        </>:<>
          <Pressable onPress={()=>setPaymentMode(null)}><Text style={s.link}>‹ All payment modes</Text></Pressable>
          <View style={{flexDirection:'row',justifyContent:'space-between',paddingVertical:8,borderBottomWidth:1,borderColor:BORDER}}><Text style={s.eyebrow}>RECEIPTS · {paymentMode==='ALL_RECEIPTS'?'ALL MODES':paymentMode}</Text><Text style={s.eyebrow}>COLLECTED</Text></View>
          {!loadingReceipts?<AmountTotal format={displayAmount} label="SELECTED RECEIPTS" count={selectedReceipts.length} total={selectedReceiptAmount} secondary={paymentMode==='ALL_RECEIPTS'?'All payment modes':'Payment mode '+String(paymentMode||'')}/>:null}
-         {selectedReceipts.map((r,i)=>{const key=`${r.date}:${r.receipt_uid}:${r.receipt_srno}`;return <View key={key+'-'+i}><Pressable onPress={()=>setExpandedReceipt(expandedReceipt===key?null:key)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{r.voucher_no||'Voucher not recorded'} · {paymentMode==='ALL_RECEIPTS'?(('groupMode' in r)?r.groupMode:'Unclassified'):paymentMode}</Text><Text style={s.note}>{r.dateLabel} · Ref {r.payment_reference||'—'}</Text></View><Text style={s.rankAmount}>{displayAmount(r.amount)} {expandedReceipt===key?'⌃':'⌄'}</Text></Pressable>{expandedReceipt===key?<View style={{padding:10,backgroundColor:BG,borderRadius:7}}><Text style={s.note}>Voucher: {r.voucher_no||'—'} · Receipt UID: {r.receipt_uid} · SrNo: {r.receipt_srno}</Text><Text style={s.note}>Reference: {r.payment_reference||'—'} · Bank: {r.bank_name||'Not recorded'}</Text><Text style={s.note}>Allocations: {r.allocation_count} · Amount: {displayAmount(r.amount)}</Text></View>:null}</View>;})}
+         <DrilldownListTools state={receiptTools} placeholder="Search voucher no., receipt date or reference" compact showCount />
+         {receiptTools.rows.map((r,i)=>{const key=`${r.date}:${r.receipt_uid}:${r.receipt_srno}`;return <View key={key+'-'+i}><Pressable onPress={()=>setExpandedReceipt(expandedReceipt===key?null:key)} style={s.rankRow}><View style={{flex:1}}><Text style={s.rankName}>{r.voucher_no||'Voucher not recorded'} · {paymentMode==='ALL_RECEIPTS'?(('groupMode' in r)?r.groupMode:'Unclassified'):paymentMode}</Text><Text style={s.note}>{r.dateLabel} · Ref {r.payment_reference||'—'}</Text></View><Text style={s.rankAmount}>{displayAmount(r.amount)} {expandedReceipt===key?'⌃':'⌄'}</Text></Pressable>{expandedReceipt===key?<View style={{padding:10,backgroundColor:BG,borderRadius:7}}><Text style={s.note}>Voucher: {r.voucher_no||'—'} · Receipt UID: {r.receipt_uid} · SrNo: {r.receipt_srno}</Text><Text style={s.note}>Reference: {r.payment_reference||'—'} · Bank: {r.bank_name||'Not recorded'}</Text><Text style={s.note}>Allocations: {r.allocation_count} · Amount: {displayAmount(r.amount)}</Text></View>:null}</View>;})}
          {!loadingReceipts?<AmountTotal format={displayAmount} label="RECEIPTS TOTAL" count={selectedReceipts.length} total={selectedReceiptAmount}/>:null}
        </>}
        {!loadingReceipts&&!receiptDays.length?<Text style={s.note}>No receipt history returned for this customer in the selected period.</Text>:null}
      </View>
-   </View>:<><View style={s.sectionHeading}><Text style={s.sectionTitle}>{executive?'Customer collections':month===null?'Top executives · '+fyName(fy):'Executives · '+NAMES[month]}</Text><Pressable onPress={()=>setAscending(x=>!x)}><Text style={s.link}>Amount {ascending?'↑':'↓'}</Text></Pressable></View>
-   <View style={s.panel}><TextInput style={s.search} placeholder={executive?'Search customer':'Search executive'} value={search} onChangeText={setSearch}/>
+   </View>:<><View style={s.sectionHeading}><Text style={s.sectionTitle}>{executive?'Customer collections':month===null?'Top executives · '+fyName(fy):'Executives · '+NAMES[month]}</Text><View style={{flexDirection:'row',gap:10}}><Pressable onPress={()=>{if(!sortByName){setSortByName(true);setAscending(false);}else setAscending(x=>!x);}}><Text style={s.link}>{executive?'Customer':'Executive'} {sortByName?(ascending?'Z–A':'A–Z'):''}</Text></Pressable><Pressable onPress={()=>{if(sortByName){setSortByName(false);setAscending(false);}else setAscending(x=>!x);}}><Text style={s.link}>Amount {!sortByName?(ascending?'↑':'↓'):''}</Text></Pressable></View></View>
+   <View style={s.panel}><TextInput style={s.search} placeholder={executive?'Search customer name or code':'Search executive name or code'} value={search} onChangeText={setSearch}/>
     {!busy&&!loadingDetail?<AmountTotal format={displayAmount} label={`${searchActive?'MATCHING ':'TOTAL '}${listKind}`} count={visible.length} total={visibleTotal} secondary={listSecondary}/>:null}
     {executive?<Pressable onPress={()=>{setExecutive(null);setCustomers([]);setSearch('')}}><Text style={s.link}>‹ All executives</Text></Pressable>:null}
     {loadingDetail?<SkeletonLines count={8}/>:null}{detailError?<Text style={s.warningText}>{detailError}</Text>:null}

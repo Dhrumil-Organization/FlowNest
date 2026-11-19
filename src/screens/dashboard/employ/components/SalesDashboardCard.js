@@ -13,6 +13,7 @@ import {
 import { formatAmount } from '../api/api';
 import InteractiveDailyTrendChart from './InteractiveDailyTrendChart';
 import { COLORS, SectionCard, SectionHeader } from './SharedComponents';
+import DrilldownListTools, { useDrilldownList } from '@/src/components/dashboard/DrilldownListTools';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -98,12 +99,18 @@ function MetricValue({ quantity, amount, compact = false, amountMode = 'compact'
 }
 
 function ChildSection({ type, rows, amountMode = 'compact' }) {
+  const tools = useDrilldownList(rows, ['name', 'code'], [
+    { key: 'name', label: type === 'executive' ? 'Executive' : type === 'party' ? 'Party' : type === 'design' ? 'Design' : 'Category', type: 'text' },
+    { key: 'mtd_amount', label: 'Amount', type: 'number' },
+    { key: 'mtd_qty', label: 'Qty', type: 'number' },
+  ], 'mtd_amount');
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
   return (
     <View style={styles.childSection}>
       <Text style={styles.childTitle}>{CHILD_LABELS[type] || type.toUpperCase()}</Text>
-      {rows.map((row, index) => (
+      <DrilldownListTools state={tools} placeholder={`Search ${type}, code, amount or qty`} compact showCount />
+      {tools.rows.map((row, index) => (
         <View key={`${type}-${row.code || row.name}-${index}`} style={styles.childRow}>
           <View style={styles.childNameWrap}>
             {type === 'executive' ? (
@@ -146,48 +153,20 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
   const [dimension, setDimension] = useState(sales?.default_dimension || 'category');
   const [expandedKey, setExpandedKey] = useState(null);
 
-  const [sortConfig, setSortConfig] = useState({
-    field: 'mtd_amount',
-    direction: 'desc',
-  });
-
   const rows = useMemo(() => sales?.dimensions?.[dimension] || [], [sales, dimension]);
-
-  const sortedRows = useMemo(() => {
-    const data = [...rows];
-
-    if (!sortConfig.field) return data;
-
-    return data.sort((a, b) => {
-      const aValue = Number(a?.[sortConfig.field] || 0);
-      const bValue = Number(b?.[sortConfig.field] || 0);
-
-      return sortConfig.direction === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
-    });
-  }, [rows, sortConfig]);
-
-
-  const toggleSort = () => {
-    setSortConfig(prev => ({
-      field: prev.field === 'mtd_qty'
-        ? 'mtd_amount'
-        : 'mtd_qty',
-
-      direction:
-        prev.field === 'mtd_qty' &&
-          prev.direction === 'desc'
-          ? 'asc'
-          : 'desc',
-    }));
-  };
+  const tools = useDrilldownList(rows, ['name', 'code'], [
+    { key: 'name', label: dimension === 'executive' ? 'Executive' : dimension === 'party' ? 'Party' : dimension === 'design' ? 'Design' : 'Category', type: 'text' },
+    { key: 'mtd_amount', label: 'Amount', type: 'number' },
+    { key: 'mtd_qty', label: 'Qty', type: 'number' },
+  ], 'mtd_amount');
+  const sortedRows = tools.rows;
 
   const dailyTrend = useMemo(() => sales?.daily_trend || [], [sales]);
 
   const chooseDimension = next => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setDimension(next);
+    tools.setSearch('');
     setExpandedKey(null);
   };
 
@@ -273,14 +252,10 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner', 
         })}
       </View>
 
+      <DrilldownListTools state={tools} placeholder={`Search ${dimension}, code, amount or qty`} compact showCount />
       <View style={styles.columnHeader}>
         <Text style={styles.columnTitle}>{dimension.toUpperCase()}</Text>
-        {/* <Text style={styles.columnMetric}>QTY   AMOUNT</Text> */}
-        <TouchableOpacity onPress={toggleSort}>
-          <Text style={styles.columnMetric}>
-            {amountMode === 'actual' ? 'QTY / AMOUNT ▼' : 'QTY   AMOUNT ▼'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.columnMetric}>QTY · AMOUNT</Text>
       </View>
 
       <ScrollView style={styles.salesRowsScroll} nestedScrollEnabled showsVerticalScrollIndicator>

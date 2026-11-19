@@ -96,6 +96,14 @@ export interface BeamHeader {
   remark: string;
 }
 
+/** Beam Inward: the Beam Gate Entry (GRLog BMR) the beams came in on */
+export interface BeamGate {
+  uid: number;
+  no: string;
+  date: string;
+  vehNo: string;
+}
+
 export interface BeamForm {
   txn: BeamTxn;
   header: BeamHeader;
@@ -106,6 +114,10 @@ export interface BeamForm {
   /** property state = party state → CGST + SGST; different → IGST; null → a state is blank (nothing locked) */
   sameState: boolean | null;
   meta?: { uid: number; received: number; gatePassNo?: string };
+  /** Beam Inward: gate entry the beams came in on (beams back against a Beam Outward need one) */
+  gate?: BeamGate | null;
+  /** Beam Inward saved by a user with the "Inward without Gate Entry" right (sent to the server) */
+  withoutGate?: boolean;
   /** Vou. No was filled in by the next-number call (not typed): the server gives the next free number at save */
   autoVouNo?: boolean;
 }
@@ -132,6 +144,8 @@ export interface BeamRights {
   removeBeam: boolean;
   tax: boolean; // change the tax detail
   print: boolean;
+  /** Beam Inward: may take in our beams without a Beam Gate Entry */
+  withoutGate?: boolean;
 }
 
 export type BeamLookup = 'account' | 'group' | 'entType' | 'department' | 'authBy';

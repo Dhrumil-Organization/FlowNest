@@ -21,11 +21,14 @@ export const BEAM_OUTWARD = {
 
 export const BEAM_INWARD = {
   resource: 'beam_inward',
+  /** action on beam_inward: take in our beams without a Beam Gate Entry (gate entry is compulsory otherwise) */
+  withoutGate: 'without_gate',
   beams: 'beam_inward.beam_detail',
   tax: 'beam_inward.tax_detail',
 } as const;
 
-const resource = (key: string, name: string, description: string, displayOrder: number) => ({
+type Action = { key: string; name: string; dangerous?: boolean; displayOrder: number };
+const resource = (key: string, name: string, description: string, displayOrder: number, extra: Action[] = []) => ({
   key,
   name,
   type: 'screen' as const,
@@ -37,6 +40,7 @@ const resource = (key: string, name: string, description: string, displayOrder: 
     { key: 'edit', name: `Edit ${name}`, displayOrder: 30 },
     { key: 'delete', name: `Delete ${name}`, dangerous: true, displayOrder: 40 },
     { key: 'print', name: 'Print', displayOrder: 50 },
+    ...extra,
   ],
   children: [
     {
@@ -73,7 +77,9 @@ registerPermissionArea({
   displayOrder: 30,
   resources: [
     resource('beam_outward', 'Beam Outward', 'Knitting: beams sent to a party (FAMBOut RType O)', 60),
-    resource('beam_inward', 'Beam Inward', 'Knitting: beams received back from a party (FAMBOut RType I)', 61),
+    resource('beam_inward', 'Beam Inward', 'Knitting: beams received back from a party (FAMBOut RType I)', 61, [
+      { key: 'without_gate', name: 'Inward without Gate Entry', dangerous: true, displayOrder: 60 },
+    ]),
   ],
 });
 

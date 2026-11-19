@@ -565,7 +565,10 @@ export default function CheckingScannerModule({ token, API }: Props) {
         if (d) {
           setFv((p) => ({
             ...p, QltWt: d.QltWt, WarpLen: d.WarpLen, UId: d.UId, AuthStatus: d.AuthStatus, BeamNo: d.BeamNo, BeamUId: d.BeamUId,
-            DsnCode: d.DsnCode, DsnName: d.DsnName, OrderNo: d.OrderNo, OrderUId: d.OrderUId, OrderDsnCode: d.OrderDsnCode,
+            // Keep the design the user picked when the help row has no design of its own.
+            DsnCode: d.DsnCode || d.dsncode || item?.dsncode || item?.DsnCode || p.DsnCode,
+            DsnName: d.DsnName || d.dsnname || item?.dsnname || item?.DsnName || p.DsnName,
+            OrderNo: d.OrderNo, OrderUId: d.OrderUId, OrderDsnCode: d.OrderDsnCode,
             OrderDsnName: d.OrderDsnName, OrderLastDate: d.OrderLastDate, PlanNo: d.PlanNo, PlanUId: d.PlanUId, Status: d.Status, IsAuth: d.IsAuth,
           }));
         }
@@ -671,7 +674,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
   const validateForm = async () => {
     if (!fv.BeamNo) { await showAlert('Please select Beam No'); return false; }
     if (!fv.TakaNo) { await showAlert('Please Enter TakaNo'); return false; }
-    if (!fv.DsnName) { await showAlert('Please Enter Design'); return false; }
+    if (!fv.DsnName && !fv.DsnCode && !selectedDesign) { await showAlert('Please Enter Design'); return false; }
     const m = parseFloat(meter);
     if (meter === '' || Number.isNaN(m) || m <= 0) { await showAlert('Please Enter valid Meter'); return false; }
     const k = parseFloat(kgs);
@@ -705,6 +708,8 @@ export default function CheckingScannerModule({ token, API }: Props) {
     try {
       const payload = {
         ...v,
+        DsnCode: v.DsnCode || selectedDesign?.dsncode || selectedDesign?.DsnCode || '',
+        DsnName: v.DsnName || selectedDesign?.dsnname || selectedDesign?.DsnName || '',
         AvgWt: avgWt,
         prpcode: v.PrpCode,
         isfirsttaka: v.isfirsttaka || '',
@@ -1128,7 +1133,7 @@ export default function CheckingScannerModule({ token, API }: Props) {
     },
     mdesign: {
       title: 'Select Design', list: manualDesigns, t: (x) => str(x.dsnname), sub: (x) => `Code ${str(x.dsncode)}`,
-      on: (x) => { setSelectedDesign(x); setFv((p) => ({ ...p, DsnCode: x.dsncode, DsnName: x.dsnname })); void manualDesignSelect(x); },
+      on: (x) => { setSelectedDesign(x); setFv((p) => ({ ...p, DsnCode: x.dsncode || x.DsnCode, DsnName: x.dsnname || x.DsnName })); void manualDesignSelect(x); },
     },
     mgrade: {
       title: 'Select Grade', list: manualGrades, t: (x) => str(x.GrdName), sub: (x) => `Code ${str(x.GrdCode)}`,

@@ -3,7 +3,8 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BEAM_PRINT_FORMATS, BEAM_PRINT_TYPE, createBeamService } from '../../api/beamInOutAPI';
+import { BEAM_OUTWARD_PRINT_OPTIONS, BEAM_PRINT_FORMATS, BEAM_PRINT_TYPE, JOB_PRINT_PICK, createBeamService } from '../../api/beamInOutAPI';
+import type { JobOut } from '../../features/beamInOut/job';
 import PdfStep from '../../components/YarnSalesInvoice/PdfStep';
 import { OptionPicker } from '../../features/repacking/components/OptionPicker';
 import { useBusinessContext } from '../../core/business';
@@ -21,7 +22,7 @@ type Screen =
   | { kind: 'list' }
   | { kind: 'loading'; row: RepackListRow }
   | { kind: 'form'; mode: 'add' | 'edit' | 'view'; form?: BeamForm; title: string }
-  | { kind: 'pdf'; url: string; title: string };
+  | { kind: 'pdf'; url: string; title: string; back?: Screen };
 
 export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
   const { prpCode, yearNo, yearName, strCode } = useBusinessContext();
@@ -44,11 +45,12 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
     add: canDo(R.resource, 'add'),
     edit: canDo(R.resource, 'edit'),
     delete: canDo(R.resource, 'delete'),
-    beams: canDo(R.beams, 'edit'),
-    removeBeam: canDo(R.beams, 'remove_beam'),
-    tax: canDo(R.tax, 'edit'),
+    beams: canDo(R.resource, R.beams),
+    removeBeam: canDo(R.resource, R.removeBeam),
+    tax: canDo(R.resource, R.tax),
+    jobYarn: canDo(R.resource, R.jobYarn),
     print: canDo(R.resource, 'print'),
-    withoutGate: txn === 'beam_inward' && canDo(R.resource, 'without_gate'),
+    withoutGate: txn === 'beam_inward' && canDo(R.resource, BEAM_INWARD.withoutGate),
   };
   const canPrint = rights.print && !!BEAM_PRINT_TYPE[txn];
 
@@ -68,8 +70,30 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
     setPrintRow(null);
     setPrinting(true);
     try {
+      if (format === JOB_PRINT_PICK) {
+        // yarn of this Beam Outward = its job outward (GRYOut UId + store come with show_data)
+        const f = await service.load(ctx, row.uid);
+        if (!f.job?.uid) throw new Error('No yarn was sent with this outward.');
+        const url = await service.printJob(ctx, f.job.uid, f.job.store?.code ?? '');
+        setView({ kind: 'pdf', url, title: `Job outward ${f.job.outNo || ''}`.trim() });
+        return;
+      }
       const url = await service.print(ctx, row.uid, format);
       setView({ kind: 'pdf', url, title: `${title} ${row.vouNo}` });
+    } catch (e: any) {
+      notify('Print', e?.message || 'Print failed.');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  /** from the open entry (view mode): print its job outward, back returns to the entry */
+  const printJob = async (job: JobOut) => {
+    const back = view;
+    setPrinting(true);
+    try {
+      const url = await service.printJob(ctx, job.uid ?? 0, job.store?.code ?? '');
+      setView({ kind: 'pdf', url, title: `Job outward ${job.outNo || ''}`.trim(), back });
     } catch (e: any) {
       notify('Print', e?.message || 'Print failed.');
     } finally {
@@ -106,14 +130,14 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
     <OptionPicker
       visible={!!printRow}
       title="Print format"
-      options={BEAM_PRINT_FORMATS}
+      options={txn === 'beam_outward' ? BEAM_OUTWARD_PRINT_OPTIONS : BEAM_PRINT_FORMATS}
       onPick={o => printRow && doPrint(printRow, o.code)}
       onClose={() => setPrintRow(null)}
     />
   );
 
   if (view.kind === 'pdf') {
-    return <PdfStep pdfUrl={view.url} title={view.title} onBack={() => setView({ kind: 'list' })} />;
+    return <PdfStep pdfUrl={view.url} title={view.title} onBack={() => setView(view.back ?? { kind: 'list' })} />;
   }
 
   if (view.kind === 'list') {
@@ -146,6 +170,7 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
         </Pressable>
         <Text style={st.title} numberOfLines={1}>{view.kind === 'loading' ? `Opening ${view.row.vouNo}…` : view.title}</Text>
       </View>
+      {printing ? <View style={st.printing}><ActivityIndicator color={C.cta} /><Text style={st.printTxt}>Preparing print…</Text></View> : null}
       {view.kind === 'loading' ? (
         <View style={st.center}><ActivityIndicator size="large" color={C.cta} /></View>
       ) : (
@@ -159,6 +184,7 @@ export default function BeamInOutScreen({ txn }: { txn: BeamTxn }) {
           initialForm={view.form}
           onSaved={() => backToList(true)}
           onCancel={() => backToList()}
+          onPrintJob={rights.print && txn === 'beam_outward' && !printing ? printJob : undefined}
         />
       )}
     </View>

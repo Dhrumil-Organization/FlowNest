@@ -11,6 +11,8 @@ import type { SaveResult } from '../features/repackingIssue/service';
 import type { LookupFilter, LookupKind, LookupOption, RepackListRow } from '../features/repackingIssue/types';
 import { buildPayload, formFromShow, fmt2, fmtQ, inwardFromRow, lower, masterFromRow, num, numberTaxLines, outwardFromRow, taxLineFromRow } from '../features/beamInOut/logic';
 import type { BeamContext, BeamForm, BeamGate, BeamLookup, BeamMaster, BeamTxn, InwardLink, Opt, OutwardBeam, TaxLine } from '../features/beamInOut/types';
+import { cartonHitFromRow, jobOutwardFromRow, outLineFromRow } from '../features/beamInOut/job';
+import type { JobCartonHit, JobOutLine, JobOutwardHit } from '../features/beamInOut/job';
 
 type Row = Record<string, any>;
 
@@ -126,6 +128,12 @@ export const BEAM_PRINT_FORMATS: Opt[] = [
   { code: 'one', name: 'Format One' },
   { code: 'two', name: 'Format Two' },
 ];
+/** yarn sent with a Beam Outward = a web job outward (GRYOut) → its own print type, keyed by the GRYOut UId + store */
+export const JOB_PRINT_TYPE = 'yarn_job_outward';
+export const JOB_PRINT_FORMAT = '1';
+/** list print picker of Beam Outward: the beam formats + the yarn job outward */
+export const JOB_PRINT_PICK = 'yarn_job_outward';
+export const BEAM_OUTWARD_PRINT_OPTIONS: Opt[] = [...BEAM_PRINT_FORMATS, { code: JOB_PRINT_PICK, name: 'Yarn job outward' }];
 
 /** PDF url out of a print response: results[printType], else the first url found */
 export const pdfUrlOf = (data: any, printType: string): string => {
@@ -163,9 +171,21 @@ export interface BeamService {
   browse(ctx: BeamContext, from: string, to: string): Promise<RepackListRow[]>;
   /** web print (saleschallanmultiprintnew) → PDF url */
   print(ctx: BeamContext, uid: number, format: string): Promise<string>;
+  /** yarn job outward print (GRYOut UId, its store) → PDF url */
+  printJob(ctx: BeamContext, jobUid: number, strCode: string, format?: string): Promise<string>;
   load(ctx: BeamContext, uid: number): Promise<BeamForm>;
   save(ctx: BeamContext, form: BeamForm): Promise<SaveResult>;
   remove(ctx: BeamContext, uid: number): Promise<SaveResult>;
+  /* ---- beam job (yarn with the beams) ---- */
+  jobTypes(ctx: BeamContext): Promise<Opt[]>;
+  /** stores the job yarn can go out from (FAMStore) */
+  jobStores(ctx: BeamContext): Promise<Opt[]>;
+  /** a scanned / typed carton of the store, in any merge (several when the same no. is in two merges) */
+  findCarton(ctx: BeamContext, o: { cartonNo: string; strCode: string; uid: number }): Promise<JobCartonHit[]>;
+  /** Beam Inward: job outwards of the party with yarn still open */
+  jobOutwards(ctx: BeamContext, parCode: string): Promise<JobOutwardHit[]>;
+  /** Beam Inward: yarn lines of a job outward with what is still open (uid = this inward when editing) */
+  jobOutwardLines(ctx: BeamContext, o: { outUid: number; uid: number }): Promise<JobOutLine[]>;
 }
 
 const ctxParams = (ctx: BeamContext, txn: BeamTxn) => ({ prpcode: ctx.prpCode, yearno: ctx.yearNo, txntype: txn });
@@ -331,6 +351,18 @@ export function createBeamService(txn: BeamTxn): BeamService {
       return url;
     },
 
+    async printJob(ctx, jobUid, strCode, format = JOB_PRINT_FORMAT) {
+      if (!jobUid) throw new Error('No yarn was sent with this outward.');
+      const res = await post(BEAM_ROUTES.print, {
+        prpcode: ctx.prpCode, yearno: String(ctx.yearNo), strcode: strCode || beamStrCode(ctx.prpCode), uid: String(jobUid), printTypes: [JOB_PRINT_TYPE], printFormat: format,
+      });
+      const data = res?.data;
+      if (failed(data)) throw new Error(messageOf(data, 'Print failed.'));
+      const url = pdfUrlOf(data, JOB_PRINT_TYPE);
+      if (!url) throw new Error(messageOf(data, 'The print did not return a PDF.') || 'The print did not return a PDF.');
+      return url;
+    },
+
     async browse(ctx, from, to) {
       const b = await crud('browse_data', ctx, { fromdate: from, todate: to }, 'Could not load entries.');
       return unwrapRows(b).map((raw): RepackListRow => {
@@ -358,7 +390,7 @@ export function createBeamService(txn: BeamTxn): BeamService {
       if (failed(data)) throw new Error(messageOf(data, 'Entry not found.'));
       const cands = [bodyOf(data), data?.response, data?.data, data];
       const body = cands.find(c => c && typeof c === 'object' && 'main' in c) ?? {};
-      const form = formFromShow(txn, { main: unwrapRows(body.main), d1: unwrapRows(body.d1), tax: unwrapRows(body.tax), taxacc: body.taxacc ?? [], samestate: body.samestate });
+      const form = formFromShow(txn, { main: unwrapRows(body.main), d1: unwrapRows(body.d1), tax: unwrapRows(body.tax), taxacc: body.taxacc ?? [], samestate: body.samestate, job: body.job, jobin: body.jobin });
       if (!form.meta?.uid) throw new Error('Entry not found.');
       // names of the coded masters
       const named = async (kind: BeamLookup, o: Opt | null) => {
@@ -384,6 +416,31 @@ export function createBeamService(txn: BeamTxn): BeamService {
       } catch (e) {
         return { ok: false, message: apiError(e) };
       }
+    },
+
+    async jobTypes(ctx) {
+      const b = await crud('get_job_types', ctx, {}, 'Job types could not be loaded.');
+      return unwrapRows(b).map((raw): Opt => { const r = lower(raw); return { code: String(r.job_type ?? '').trim(), name: String(r.job_name ?? '').trim() || String(r.job_type ?? '') }; }).filter(o => o.code);
+    },
+
+    async findCarton(ctx, o) {
+      const b = await crud('get_job_carton', ctx, { cartonno: o.cartonNo.trim(), strcode: o.strCode, uid: o.uid }, 'Carton could not be found.');
+      return unwrapRows(b).map(cartonHitFromRow);
+    },
+
+    async jobStores(ctx) {
+      const b = await crud('get_job_stores', ctx, {}, 'Stores could not be loaded.');
+      return unwrapRows(b).map((raw): Opt => { const r = lower(raw); return { code: String(r.str_code ?? '').trim(), name: String(r.str_name ?? '').trim() || String(r.str_code ?? '') }; }).filter(o => o.code);
+    },
+
+    async jobOutwards(ctx, parCode) {
+      const b = await crud('get_job_outwards', ctx, { parcode: parCode }, 'Job outwards could not be loaded.');
+      return unwrapRows(b).map(jobOutwardFromRow).filter(x => x.outUid);
+    },
+
+    async jobOutwardLines(ctx, o) {
+      const b = await crud('get_job_outward_lines', ctx, { outuid: o.outUid, uid: o.uid }, 'Yarn lines could not be loaded.');
+      return unwrapRows(b).map(outLineFromRow);
     },
 
     async remove(ctx, uid) {

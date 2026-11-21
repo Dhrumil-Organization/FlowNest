@@ -1,6 +1,9 @@
 // FILE: src/features/beamInOut/components/BeamInOutForm.tsx
 // Beam Outward / Beam Inward entry (FAMBOut RType O / I):
-//  1 Voucher & Party  →  2 Beams (multi-select help, rate for all, tap a beam for details)  →  3 Accounts  →  4 Amount & Tax
+//  1 Voucher & Party  →  2 Beams (multi-select help, rate for all, tap a beam for details)  →  3 Job yarn  →  4 Accounts  →  5 Amount & Tax
+//  Job yarn (beam JOB work): Outward = yarn sent with the beams (scan cartons, partial qty, GST on the yarn only);
+//  Inward = yarn back on the beams (gross − beam weight per beam) + annexure (shortage / wastage / loose / excess).
+//  Empty beams never carry GST.
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -12,13 +15,18 @@ import { C, R, SP } from '../../repackingIssue/theme';
 import { Banner, Btn, Card, Field, Input, Row, SelectBox, Stat } from '../../repackingIssue/components/ui';
 import { OptionPicker } from '../../repacking/components/OptionPicker';
 import {
-  calcTax, DADD_MAX, emptyForm, fmt2, fmtQ, inwardRequired, REMARK_MAX, rowAmount, rowFromOutward, rowTotals, txnTitle, validateForm, validateTax,
+  calcTax, DADD_MAX, emptyForm, fmt2, fmtQ, inwardRequired, REMARK_MAX, rowAmount, rowFromOutward, rowTotals, taxBase, txnTitle, validateForm, validateTax,
 } from '../logic';
+import { emptyJob, emptyJobIn, hasJobYarn, jobTotals, validateJob, validateJobIn } from '../job';
+import { JobReturnCard } from './JobReturnCard';
+import { JobYarnCard } from './JobYarnCard';
 import { BEAM_INFO } from '../types';
 import type { BeamContext, BeamForm, BeamLookup, BeamRights, BeamRow, BeamTxn, Opt, TaxLine } from '../types';
 import { BeamPicker } from './BeamPicker';
 import { BeamRowSheet } from './BeamRowSheet';
 import { TaxSheet } from './TaxSheet';
+
+import type { JobOut } from '../job';
 
 export interface BeamInOutFormProps {
   ctx: BeamContext;
@@ -29,6 +37,8 @@ export interface BeamInOutFormProps {
   initialForm?: BeamForm;
   onSaved?: () => void;
   onCancel?: () => void;
+  /** view mode: print the yarn job outward of this entry */
+  onPrintJob?: (job: JobOut) => void;
 }
 
 const TITLES: Record<BeamLookup, string> = {
@@ -39,7 +49,7 @@ const TITLES: Record<BeamLookup, string> = {
   authBy: 'Authorized By',
 };
 
-export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initialForm, onSaved, onCancel }: BeamInOutFormProps) {
+export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initialForm, onSaved, onCancel, onPrintJob }: BeamInOutFormProps) {
   const { isPhone, isDesktop } = useDeviceClass();
   const [form, setForm] = useState<BeamForm>(() => initialForm ?? emptyForm(txn));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -66,7 +76,12 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   const readOnly = !canWrite;
   const h = form.header;
   const totals = rowTotals(form.rows);
-  const tax = useMemo(() => calcTax(totals.gross, form.tax, form.sameState), [totals.gross, form.tax, form.sameState]);
+  const base = taxBase(form);
+  const tax = useMemo(() => calcTax(base.gross, form.tax, form.sameState, base.noGst), [base.gross, base.noGst, form.tax, form.sameState]);
+  const yarnOn = hasJobYarn(form.job);
+  const yarn = jobTotals(form.job ?? emptyJob());
+  /** whole voucher: beams (never GST) + yarn with its tax — or beams with the non-GST lines */
+  const netAll = yarnOn ? Math.round((totals.gross + tax.net) * 100) / 100 : tax.net;
   const title = txnTitle(txn);
 
   /* ---- add: next voucher no. filled in (again when the date moves to another year), suffix BM ---- */
@@ -229,9 +244,11 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
     }
     const t = validateTax(form.tax, form.sameState);
     if (t) e.tax = t;
+    const j = inwardTxn ? validateJobIn(form.jobIn, form.rows) : validateJob(form.job);
+    if (j) e.job = j;
     setErrors(e);
     if (Object.keys(e).length) return notify('Check entry', Object.values(e).slice(0, 5).join('\n'));
-    if (tax.net <= 0 && !(await confirmAsync('Net amount is 0', 'Save the voucher with a 0 net amount?', 'Save', false))) return;
+    if (netAll <= 0 && !(await confirmAsync('Net amount is 0', 'Save the voucher with a 0 net amount?', 'Save', false))) return;
     setSaving(true);
     try {
       const r = await service.save(ctx, { ...form, withoutGate: inwardTxn && !!rights.withoutGate });
@@ -288,7 +305,7 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   );
 
   const accountsCard = (
-    <Card step={3} title="Accounts">
+    <Card step={4} title="Accounts">
       <Field label="Account" required error={errors.account}>
         <SelectBox icon="account-balance" value={h.account?.name} code={h.account?.code} placeholder="Select account" onPress={() => setPicker('account')} invalid={!!errors.account} disabled={readOnly} />
       </Field>
@@ -455,13 +472,15 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
   );
 
   const amountCard = (
-    <Card step={4} title="Amount">
+    <Card step={5} title="Amount">
       <View style={st.amtGrid}>
-        <Stat label="Gross" value={fmt2(tax.gross)} />
+        <Stat label="Beams" value={fmt2(totals.gross)} />
+        {yarnOn ? <Stat label="Yarn" value={fmt2(yarn.gross)} /> : null}
         <Stat label="Less" value={fmt2(tax.less)} />
-        <Stat label="GST" value={fmt2(tax.gst)} />
-        <Stat label="Net Amount" value={fmt2(tax.net)} strong />
+        <Stat label={yarnOn ? 'GST (yarn)' : 'GST'} value={fmt2(tax.gst)} />
+        <Stat label="Net Amount" value={fmt2(netAll)} strong />
       </View>
+      {!yarnOn ? <Text style={st.meta}>Empty beams carry no GST.</Text> : null}
       <Pressable
         onPress={() => (form.tax.length ? setTaxOpen(true) : notify('Tax Detail', 'Select the Entry Type first — its tax lines are loaded from it.'))}
         style={[st.taxBtn, !!errors.tax && { borderColor: C.danger }]}
@@ -484,6 +503,16 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
     </Card>
   );
 
+  const jobCard = inwardTxn ? (
+    <JobReturnCard step={3} ctx={ctx} service={service} uid={form.meta?.uid ?? 0} parCode={h.party?.code ?? ''} rows={form.rows}
+      jobIn={form.jobIn ?? emptyJobIn()} readOnly={readOnly || !rights.jobYarn} error={errors.job}
+      onChange={ji => { setForm(f => ({ ...f, jobIn: ji })); setErrors(e => { const n = { ...e }; delete n.job; return n; }); }} />
+  ) : (
+    <JobYarnCard onPrint={mode === 'view' && onPrintJob ? onPrintJob : undefined} step={3} ctx={ctx} service={service} uid={form.meta?.uid ?? 0} job={form.job ?? emptyJob()} readOnly={readOnly || !rights.jobYarn} error={errors.job}
+      taxLines={form.tax} sameState={form.sameState}
+      onChange={j => { setForm(f => ({ ...f, job: j })); setErrors(e => { const n = { ...e }; delete n.job; return n; }); }} />
+  );
+
   const wrap = { width: '100%' as const, maxWidth: 1280, alignSelf: 'center' as const };
 
   return (
@@ -503,12 +532,13 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
           {isDesktop ? (
             <View style={{ flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' }}>
               <View style={{ width: 420 }}>{voucherCard}{accountsCard}</View>
-              <View style={{ flex: 1, minWidth: 0 }}>{beamsCard}{amountCard}</View>
+              <View style={{ flex: 1, minWidth: 0 }}>{beamsCard}{jobCard}{amountCard}</View>
             </View>
           ) : (
             <>
               {voucherCard}
               {beamsCard}
+              {jobCard}
               {accountsCard}
               {amountCard}
             </>
@@ -521,7 +551,8 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
           <View style={[st.totals, !isPhone && { flex: 1 }]}>
             <Stat label="Beams" value={String(totals.beams)} />
             <Stat label="Qty" value={fmtQ(totals.qty)} />
-            <Stat label="Net Amount" value={fmt2(tax.net)} strong />
+            {yarnOn ? <Stat label="Yarn kg" value={fmtQ(yarn.qty)} /> : null}
+            <Stat label="Net Amount" value={fmt2(netAll)} strong />
           </View>
           <View style={[{ flexDirection: 'row', gap: SP.sm }, !isPhone && { width: 340 }]}>
             <Btn kind="ghost" title={readOnly ? 'Close' : 'Cancel'} onPress={cancel} style={{ flex: 1 }} />
@@ -573,7 +604,8 @@ export function BeamInOutForm({ ctx, txn, service, rights, mode = 'add', initial
       ) : null}
       <TaxSheet
         visible={taxOpen}
-        gross={totals.gross}
+        gross={base.gross}
+        noGst={base.noGst}
         lines={form.tax}
         sameState={form.sameState}
         taxAccNote={taxNote}

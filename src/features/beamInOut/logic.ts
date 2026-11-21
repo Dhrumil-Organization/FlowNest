@@ -2,6 +2,7 @@
 // Pure logic for Beam Outward / Inward: amounts, tax detail, validation, payload ⇄ form.
 import { newKey, todayDMY, isValidDMY } from '../repackingIssue/logic';
 import type { BeamContext, BeamForm, BeamHeader, BeamMaster, BeamRow, BeamTxn, InwardLink, Opt, OutwardBeam, TaxLine } from './types';
+import { emptyJob, emptyJobIn, hasJobYarn, jobFromShow, jobInFromShow, jobInPayload, jobPayload, jobTotals } from './job';
 
 type Row = Record<string, any>;
 
@@ -48,7 +49,20 @@ export const emptyHeader = (): BeamHeader => ({
   remark: '',
 });
 
-export const emptyForm = (txn: BeamTxn): BeamForm => ({ txn, header: emptyHeader(), rows: [], tax: [], taxAcc: [], sameState: null });
+export const emptyForm = (txn: BeamTxn): BeamForm => ({
+  txn, header: emptyHeader(), rows: [], tax: [], taxAcc: [], sameState: null,
+  job: txn === 'beam_outward' ? emptyJob() : undefined, jobIn: txn === 'beam_inward' ? emptyJobIn() : undefined,
+});
+
+/**
+ * What the Tax Detail works on. Empty beams never carry GST:
+ *  - Beam Outward with job yarn → the yarn amount (the tax belongs to the yarn challan GRYOut)
+ *  - otherwise → the beam amount with every GST line 0 (other lines — freight, round off — still apply)
+ */
+export const taxBase = (f: BeamForm) => {
+  const yarn = hasJobYarn(f.job);
+  return { gross: yarn ? jobTotals(f.job!).gross : rowTotals(f.rows).gross, noGst: !yarn };
+};
 
 export const rowFromMaster = (b: BeamMaster, prev?: BeamRow): BeamRow => ({
   key: newKey('b'),
@@ -147,7 +161,7 @@ export interface TaxCalcLine extends TaxLine {
  * Header split as the web: TaxAmt = '+' lines with an account, NTaxAmt = '+' without,
  * DisAmt / NDisAmt = '-' lines with / without an account (stored negative, like the web).
  */
-export function calcTax(gross: number, lines: TaxLine[], sameState: boolean | null = null) {
+export function calcTax(gross: number, lines: TaxLine[], sameState: boolean | null = null, noGst = false) {
   let running = r2(gross);
   let gstBase = running;
   let firstGstBase: number | null = null;
@@ -156,8 +170,8 @@ export function calcTax(gross: number, lines: TaxLine[], sameState: boolean | nu
   const out: TaxCalcLine[] = [...lines]
     .sort((a, b) => a.taxSr - b.taxSr)
     .map(t => {
-      const off = taxLineOff(t, sameState);
       const isGst = !!gstKind(t);
+      const off = taxLineOff(t, sameState) || (noGst && isGst);
       if (isGst && !prevGst) gstBase = running;
       if (isGst && firstGstBase === null) firstGstBase = gstBase;
       const base = isGst ? gstBase : running;
@@ -264,19 +278,11 @@ export function validateForm(f: BeamForm): Errors {
 export function buildPayload(ctx: BeamContext, f: BeamForm, action: 'add_data' | 'modify_data'): Row {
   const h = f.header;
   const totals = rowTotals(f.rows);
-  const t = calcTax(totals.gross, f.tax, f.sameState);
-  const g = gstRates(f.tax, f.sameState);
+  const base = taxBase(f);
+  const t = calcTax(base.gross, f.tax, f.sameState, base.noGst);
+  const g = { C: 0, S: 0, I: 0 }; // empty beams never carry GST — with job yarn the GST is on the yarn lines (server)
 
-  // GST per beam row on its share of the GST base, last row takes the rounding difference
-  const ratio = totals.gross ? t.gstBase / totals.gross : 0;
-  const gstOf = (k: 'C' | 'S' | 'I') => r2(t.lines.filter(l => gstKind(l) === k && !l.off).reduce((x, l) => x + l.amount, 0));
-  const head = { C: gstOf('C'), S: gstOf('S'), I: gstOf('I') };
-  const done = { C: 0, S: 0, I: 0 };
-  const share = (k: 'C' | 'S' | 'I', amount: number, last: boolean) => {
-    const v = last ? r2(head[k] - done[k]) : r2((amount * ratio * g[k]) / 100);
-    done[k] = r2(done[k] + v);
-    return v;
-  };
+  const share = (_k: 'C' | 'S' | 'I', _amount: number, _last: boolean) => 0;
 
   const d1 = f.rows.map((r, i) => {
     const amount = rowAmount(r);
@@ -354,6 +360,8 @@ export function buildPayload(ctx: BeamContext, f: BeamForm, action: 'add_data' |
     NetAmt: t.net,
     d1,
     tax,
+    // beam job: always sent by the app (the server then applies "no GST on empty beams"); the web screen sends neither
+    ...(f.txn === 'beam_outward' ? { job: jobPayload(f.job) } : { jobin: jobInPayload(f.jobIn, f.rows) }),
   };
 }
 
@@ -459,6 +467,8 @@ export function formFromShow(txn: BeamTxn, body: Row): BeamForm {
     taxAcc: (body.taxacc ?? []).map((x: unknown) => str(x)).filter(Boolean),
     sameState: body.samestate === null || body.samestate === undefined || body.samestate === '' ? null : num(body.samestate) === 1,
     meta: { uid: num(m.uid), received: num(m.received) || rows.filter(r => r.inQty > 0).length, gatePassNo: str(m.gatepassno) },
+    job: txn === 'beam_outward' ? jobFromShow(body.job) : undefined,
+    jobIn: txn === 'beam_inward' ? jobInFromShow(body.jobin, rows) : undefined,
     gate: txn === 'beam_inward' && num(m.gruid) ? { uid: num(m.gruid), no: str(m.gateno), date: '', vehNo: '' } : null,
   };
 }

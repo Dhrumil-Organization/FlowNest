@@ -1,6 +1,7 @@
 // FILE: src/features/beamInOut/types.ts
 // Beam Outward / Beam Inward (Knitting) — FAMBOut (RType O / I), FAMBOutD1, FAMBOutTax.
 import type { RepackContext } from '../repackingIssue/types';
+import type { JobIn, JobOut } from './job';
 
 export type BeamContext = RepackContext;
 export type BeamTxn = 'beam_outward' | 'beam_inward';
@@ -120,6 +121,10 @@ export interface BeamForm {
   withoutGate?: boolean;
   /** Vou. No was filled in by the next-number call (not typed): the server gives the next free number at save */
   autoVouNo?: boolean;
+  /** Beam Outward: yarn sent with the beams for job work (GRYOut) — GST works on this yarn only */
+  job?: JobOut;
+  /** Beam Inward: yarn back on the beams (GRYInw + annexure) */
+  jobIn?: JobIn;
 }
 
 export interface BeamListRow {
@@ -146,6 +151,8 @@ export interface BeamRights {
   print: boolean;
   /** Beam Inward: may take in our beams without a Beam Gate Entry */
   withoutGate?: boolean;
+  /** beam job: send yarn with the beams (outward) / take it back on the beams (inward) */
+  jobYarn?: boolean;
 }
 
 export type BeamLookup = 'account' | 'group' | 'entType' | 'department' | 'authBy';

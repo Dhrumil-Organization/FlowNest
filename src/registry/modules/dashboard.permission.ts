@@ -54,6 +54,9 @@ registerPermissionArea({
         },
         // Reports → Real Costing Chain (RealCostChainController): assumed vs actual cost per metre, design → beam
         { key: 'real_costing', name: 'Real Costing Chain', type: 'report', displayOrder: 45, actions: [] },
+        // Reports → Assign Report (AssignReportScreen): the web ERP's Reports screen — assigned reports
+        // with their saved settings. Path: 'reports.assign_report'. Export = Excel / PDF download.
+        { key: 'assign_report', name: 'Assign Report', type: 'report', displayOrder: 50, actions: [{ key: 'export', name: 'Export' }] },
       ],
     },
   ],

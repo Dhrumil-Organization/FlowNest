@@ -29,11 +29,11 @@ export default function ReportsHome() {
   const cards = [
     // Registered resource path 'reports.real_costing' (dashboard.permission.ts) — assignable per role / user.
     { key: 'reports.real_costing', title: 'Real Costing Chain', sub: 'Assumed vs actual by design and beam', route: 'RealCosting' },
-    { key: 'management.reports.expense', title: 'Expense & Production', sub: 'Electricity, salary, stores and cost per pick', route: 'Expense' },
+    { key: 'reports.expense', title: 'Expense & Production', sub: 'Electricity, salary, stores and cost per pick', route: 'Expense' },
     // Registered resource path is 'reports.beam_shortage' (see dashboard.permission.ts) — assignable per role / user.
     { key: 'reports.beam_shortage', title: 'Beam Shortage', sub: 'Completed beams: warped vs produced, design-wise with beam detail', route: 'BeamShortage' },
-    // Registered resource path 'management.reports.assign_report' (dashboard.permission.ts) — the web ERP's Reports screen.
-    { key: 'management.reports.assign_report', title: 'Assign Report', sub: 'Your assigned reports with their saved settings — pick, set dates, load', route: 'AssignReport' },
+    // Registered resource path 'reports.assign_report' (dashboard.permission.ts) — assignable per role / user.
+    { key: 'reports.assign_report', title: 'Assign Report', sub: 'Your assigned reports with their saved settings — pick, set dates, load', route: 'AssignReport' },
   ].filter(x => canAccess(x.key));
 
   // FIX: this screen used to draw its own "MADHUSUDHAN FABRICS" / "Reports"

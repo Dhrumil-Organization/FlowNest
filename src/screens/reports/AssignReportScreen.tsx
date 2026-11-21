@@ -21,7 +21,7 @@
 //   [Excel] [PDF]    after a load: the grid exactly as shown (columns, search, filters, sort, groups, sub totals,
 //                    TOTAL, colours) → preview → download / share / print. Always a grid, also from "Cards".
 //
-// Right: management.reports.assign_report (Permission Manager → Management → Reports → Assign Report).
+// Right: reports.assign_report (Permission Manager → Management → Reports → Assign Report).
 import { usePermission } from '@/src/core/permissions';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -95,7 +95,7 @@ export default function AssignReportScreen() {
   const [mailOpen, setMailOpen] = useState(false);
   // Excel / PDF: Permission Manager → Management → Reports → Assign Report → Export
   const { canDo } = usePermission();
-  const canExport = canDo('management.reports.assign_report', 'export');
+  const canExport = canDo('reports.assign_report', 'export');
 
   /* ------------------------------ settings ------------------------------- */
   const [sv, setSv] = useState<SettingsAnswer | null>(null);

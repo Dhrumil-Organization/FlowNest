@@ -12,7 +12,9 @@ import { Btn, Input } from '../../repackingIssue/components/ui';
 import { calcTax, cleanSignedDecimal, fmt2, gstKind, validateTax } from '../logic';
 import type { TaxLine } from '../types';
 
-export function TaxSheet({ visible, gross, lines, sameState, taxAccNote, readOnly, onApply, onClose }: {
+export function TaxSheet({ visible, gross, lines, sameState, taxAccNote, readOnly, onApply, onClose, noGst = false }: {
+  /** no job yarn: every GST line is 0 (empty beams carry no GST) */
+  noGst?: boolean;
   visible: boolean;
   gross: number;
   lines: TaxLine[];
@@ -35,7 +37,7 @@ export function TaxSheet({ visible, gross, lines, sameState, taxAccNote, readOnl
     }
   }, [visible, lines]);
 
-  const calc = useMemo(() => calcTax(gross, draft, sameState), [gross, draft, sameState]);
+  const calc = useMemo(() => calcTax(gross, draft, sameState, noGst), [gross, draft, sameState, noGst]);
 
   /* Enter: % → Amount → next line's % … ; Enter on the last field = OK (like the web Tax Detail) */
   const refs = useRef<Record<string, TextInput | null>>({});
@@ -63,7 +65,7 @@ export function TaxSheet({ visible, gross, lines, sameState, taxAccNote, readOnl
       visible={visible}
       onClose={onClose}
       title="Tax Detail"
-      subtitle={`Gross ₹ ${fmt2(gross)}`}
+      subtitle={noGst ? `Beams ₹ ${fmt2(gross)}  •  no GST on empty beams` : `Job yarn ₹ ${fmt2(gross)}  •  GST on the yarn only`}
       maxWidth={820}
       footer={
         <View style={st.foot}>

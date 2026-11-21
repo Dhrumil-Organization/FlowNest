@@ -28,7 +28,7 @@ export const GENERATED_ROUTES: readonly GeneratedRoute[] = [
     "subtitle": "Your assigned reports with their saved settings — pick, set dates, load",
     "requires": [
       {
-        "resource": "management.reports.assign_report"
+        "resource": "reports.assign_report"
       }
     ],
     "inheritParent": false
@@ -52,7 +52,7 @@ export const GENERATED_ROUTES: readonly GeneratedRoute[] = [
     "subtitle": "Electricity, salary, stores and cost per pick",
     "requires": [
       {
-        "resource": "management.reports.expense"
+        "resource": "reports.expense"
       }
     ],
     "inheritParent": false
